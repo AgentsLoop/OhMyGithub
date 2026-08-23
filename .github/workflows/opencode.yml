@@ -116,9 +116,9 @@ jobs:
           curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null
           sudo apt-get install -y nginx
           cat > "$OPENCODE_WEB_DIR/nginx.conf" <<EOF
+          pid $OPENCODE_WEB_DIR/nginx.pid;
           events {}
           http {
-            pid $OPENCODE_WEB_DIR/nginx.pid;
             map \$http_upgrade \$connection_upgrade {
               default upgrade;
               '' close;
@@ -247,7 +247,7 @@ jobs:
           exit "$code"
 
       - name: Keep temporary access available for 30 minutes
-        if: always()
+        if: always() && steps.opencode_web.outcome == 'success'
         shell: bash
         run: sleep 1800
 
