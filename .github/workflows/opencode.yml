@@ -118,6 +118,7 @@ jobs:
           cat > "$OPENCODE_WEB_DIR/nginx.conf" <<EOF
           events {}
           http {
+            pid $OPENCODE_WEB_DIR/nginx.pid;
             map \$http_upgrade \$connection_upgrade {
               default upgrade;
               '' close;
@@ -134,7 +135,7 @@ jobs:
             }
           }
           EOF
-          nohup nginx -c "$OPENCODE_WEB_DIR/nginx.conf" -g 'daemon off;' \
+          nohup sudo nginx -c "$OPENCODE_WEB_DIR/nginx.conf" -g 'daemon off;' \
             > "$OPENCODE_WEB_DIR/nginx.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/nginx.pid"
           for _ in {1..20}; do
