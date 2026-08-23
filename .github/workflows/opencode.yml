@@ -181,11 +181,18 @@ jobs:
         run: |
           set -euo pipefail
           echo "Expected session: ${{ steps.opencode_run.outputs.session_id }}"
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=20 -i "$SSH_KEY" -p "${{ steps.agentsweb.outputs.port }}" \
-            "runner@${{ steps.agentsweb.outputs.host }}" \
-            "curl --fail --silent --show-error -H 'x-opencode-directory: $GITHUB_WORKSPACE' http://127.0.0.1:$OPENCODE_WEB_PORT/session" \
-            | tee "$OPENCODE_WEB_DIR/ssh-sessions.json"
+          for _ in {1..12}; do
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=20 -o ConnectionAttempts=1 -i "$SSH_KEY" \
+              -p "${{ steps.agentsweb.outputs.port }}" \
+              "runner@${{ steps.agentsweb.outputs.host }}" \
+              "curl --fail --silent --show-error -H 'x-opencode-directory: $GITHUB_WORKSPACE' http://127.0.0.1:$OPENCODE_WEB_PORT/session" \
+              > "$OPENCODE_WEB_DIR/ssh-sessions.json"; then
+              break
+            fi
+            sleep 5
+          done
+          [[ -s "$OPENCODE_WEB_DIR/ssh-sessions.json" ]]
           echo
           echo 'Sessions returned through SSH:'
           jq . "$OPENCODE_WEB_DIR/ssh-sessions.json"
