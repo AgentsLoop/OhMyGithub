@@ -1,0 +1,117 @@
+:root {
+  --bg: #10141f;
+  --panel: #1b2233;
+  --text: #e8ecf4;
+  --muted: #93a0b5;
+  --accent: #31c4f3;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 20% 10%, #1c2438 0%, var(--bg) 55%);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.shell {
+  position: relative;
+  padding: 24px;
+}
+
+h1 {
+  margin: 0 0 16px;
+  text-align: center;
+  letter-spacing: 0.35em;
+  font-size: 28px;
+  color: var(--accent);
+}
+
+.layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.board-wrap {
+  position: relative;
+}
+
+#board {
+  background: #0a0e17;
+  border: 2px solid #2c3650;
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.panel { display: grid; gap: 12px; width: 150px; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid #2c3650;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.card h2 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
+#next { display: block; margin: 0 auto; }
+
+.stats p {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.buttons { display: grid; gap: 8px; }
+
+button {
+  padding: 8px 10px;
+  border: 1px solid #3a4767;
+  border-radius: 4px;
+  background: #242e46;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: #2e3a58; }
+button:disabled { opacity: 0.45; cursor: default; }
+
+.help ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(9, 12, 20, 0.72);
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.overlay.visible { display: flex; }
+
+#overlay-text {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}

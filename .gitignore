@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+
+# OpenCode workflow runtime artifacts (never commit these)
+.agentsweb/
+.opencode-ssh/
+.opencode-web/
+opencode-agentsweb-id_ed25519
+opencode-agentsweb-id_ed25519.pub
