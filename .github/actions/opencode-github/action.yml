@@ -1,0 +1,61 @@
+name: OpenCode GitHub Action (local)
+description: Run OpenCode GitHub integration and expose its live Web UI session
+inputs:
+  model:
+    required: true
+  use_github_token:
+    required: false
+    default: 'false'
+  public_url:
+    required: true
+  web_port:
+    required: true
+  run_dir:
+    required: true
+outputs:
+  session_id:
+    description: OpenCode session created for this GitHub event
+    value: ${{ steps.run.outputs.session_id }}
+  session_url:
+    description: Direct URL to the live OpenCode Web UI session
+    value: ${{ steps.run.outputs.session_url }}
+runs:
+  using: composite
+  steps:
+    - name: Install OpenCode
+      shell: bash
+      run: curl --fail --silent --show-error --location https://opencode.ai/install | bash
+
+    - name: Add OpenCode to PATH
+      shell: bash
+      run: echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+    - name: Run OpenCode GitHub integration
+      id: run
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+        MODEL: ${{ inputs.model }}
+        USE_GITHUB_TOKEN: ${{ inputs.use_github_token }}
+        PUBLIC_URL: ${{ inputs.public_url }}
+        WEB_PORT: ${{ inputs.web_port }}
+        RUN_DIR: ${{ inputs.run_dir }}
+      run: |
+        set -euo pipefail
+        OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+        nohup bash -c '"$1" github run > "$2" 2>&1; echo $? > "$3"' \
+          _ "$OPENCODE_BIN" "$RUN_DIR/github-run.log" "$RUN_DIR/github-run.exit" \
+          > /dev/null 2>&1 &
+        echo $! > "$RUN_DIR/github-run.pid"
+
+        SESSION_ID=''
+        for _ in {1..120}; do
+          SESSION_ID="$(curl --fail --silent --show-error "http://127.0.0.1:$WEB_PORT/session" \
+            | jq -r '.[0].id // empty')"
+          [[ "$SESSION_ID" == ses_* ]] && break
+          sleep 1
+        done
+        [[ "$SESSION_ID" == ses_* ]]
+        DIRECTORY_B64="$(printf '%s' "$GITHUB_WORKSPACE" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+        printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
+          "${PUBLIC_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"

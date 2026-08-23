@@ -163,36 +163,17 @@ jobs:
           git config user.name 'opencode[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-      - name: Start OpenCode GitHub run and locate its web session
+      - name: Run local OpenCode GitHub integration and locate its web session
         id: opencode_run
-        shell: bash
+        uses: ./.github/actions/opencode-github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MODEL: opencode/big-pickle
-          USE_GITHUB_TOKEN: true
-        run: |
-          set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          [[ -x "$OPENCODE_BIN" ]]
-          # shellcheck disable=SC2016
-          nohup bash -c '"$1" github run > "$2" 2>&1; echo $? > "$3"' \
-            _ "$OPENCODE_BIN" "$OPENCODE_WEB_DIR/github-run.log" "$OPENCODE_WEB_DIR/github-run.exit" \
-            > /dev/null 2>&1 &
-          echo $! > "$OPENCODE_WEB_DIR/github-run.pid"
-
-          SESSION_ID=''
-          for _ in {1..120}; do
-            SESSION_ID="$(curl --fail --silent --show-error "http://127.0.0.1:$OPENCODE_WEB_PORT/session" \
-              | jq -r '.[0].id // empty')"
-            [[ "$SESSION_ID" == ses_* ]] && break
-            sleep 1
-          done
-          [[ "$SESSION_ID" == ses_* ]]
-          DIRECTORY_B64="$(printf '%s' "$GITHUB_WORKSPACE" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
-          WEB_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
-          [[ -n "$WEB_URL" ]]
-          printf 'session_id=%s\nurl=%s\n' "$SESSION_ID" \
-            "${WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
+        with:
+          model: opencode/big-pickle
+          use_github_token: 'true'
+          public_url: ${{ steps.opencode_web.outputs.url }}
+          web_port: ${{ env.OPENCODE_WEB_PORT }}
+          run_dir: ${{ env.OPENCODE_WEB_DIR }}
 
       - name: Verify live sessions through SSH
         id: verify_sessions
@@ -218,7 +199,7 @@ jobs:
           SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
-          OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.url }}
+          OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;

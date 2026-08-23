@@ -27,7 +27,9 @@ selection in the browser, while the runner's project exists only on the
 temporary GitHub Actions filesystem.
 
 The workflow uses the built-in OpenCode model path and does not require an
-`OPENCODE_API_KEY` secret.
+`OPENCODE_API_KEY` secret. The upstream composite action is copied to
+`.github/actions/opencode-github/action.yml`; its run phase is modified to
+expose the session ID and direct Web UI URL before waiting for completion.
 
 ## Findings: tracking the GitHub run in Web UI
 
