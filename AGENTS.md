@@ -1,5 +1,11 @@
 # aiplay agent instructions
 
+## Wiki index
+
+- [OpenCode workflow](wiki/opencode.md)
+- [Temporary Mac SSH access](wiki/access.md)
+- [Testing and verification](wiki/testing.md)
+
 ## OpenCode GitHub Actions
 
 The issue-triggered workflow uses `opencode/big-pickle` and the GitHub Actions
