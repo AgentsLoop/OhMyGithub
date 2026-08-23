@@ -53,7 +53,10 @@ jobs:
           ssh-keygen -t ed25519 -f "$SSH_KEY" -N '' -q
           chmod 600 "$SSH_KEY"
           install -d -m 700 "$HOME/.ssh"
-          cat "$SSH_PUBLIC_KEY" > "$HOME/.ssh/authorized_keys"
+          {
+            cat "$SSH_PUBLIC_KEY"
+            printf '%s\n' '${{ secrets.AGENTSWEB_SSH_PUBLIC_KEY }}'
+          } > "$HOME/.ssh/authorized_keys"
           chmod 600 "$HOME/.ssh/authorized_keys"
           sudo mkdir -p /run/sshd
           sudo /usr/sbin/sshd -p 2222 -o PasswordAuthentication=no \
@@ -74,7 +77,7 @@ jobs:
           done
           grep -q 'agentsweb.space' "$SSH_DIR/tunnel.log"
           SSH_HOST="${SSH_NAME}.agentsweb.space"
-          SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i opencode-agentsweb-id_ed25519 -p ${SSH_PORT} runner@${SSH_HOST}"
+          SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
 
       - name: Post temporary SSH connection command
