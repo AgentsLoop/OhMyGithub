@@ -227,7 +227,7 @@ jobs:
           exit "$code"
 
       - name: Keep temporary access available for 30 minutes
-        if: always() && steps.verify_sessions.outcome == 'success'
+        if: success()
         shell: bash
         run: sleep 1800
 
