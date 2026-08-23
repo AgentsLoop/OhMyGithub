@@ -27,6 +27,7 @@ jobs:
       SSH_PUBLIC_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519.pub
       SSH_DIR: ${{ github.workspace }}/.opencode-ssh
       OPENCODE_WEB_PORT: 4096
+      OPENCODE_PROXY_PORT: 4097
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
     steps:
       - name: Checkout repository
@@ -98,19 +99,49 @@ jobs:
         run: |
           set -euo pipefail
           install -d -m 700 "$OPENCODE_WEB_DIR"
-          npm install --global opencode-ai@latest
-          nohup env \
-            opencode web --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
+          curl --fail --silent --show-error https://opencode.ai/install | bash
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          [[ -x "$OPENCODE_BIN" ]]
+          nohup "$OPENCODE_BIN" web --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
+            > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
           for _ in {1..45}; do
             curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null && break
             sleep 1
           done
           curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null
+          sudo apt-get install -y nginx
+          cat > "$OPENCODE_WEB_DIR/nginx.conf" <<EOF
+          events {}
+          http {
+            map \$http_upgrade \$connection_upgrade {
+              default upgrade;
+              '' close;
+            }
+            server {
+              listen 127.0.0.1:$OPENCODE_PROXY_PORT;
+              location / {
+                proxy_set_header x-opencode-directory "$GITHUB_WORKSPACE";
+                proxy_set_header Host \$host;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection \$connection_upgrade;
+                proxy_pass http://127.0.0.1:$OPENCODE_WEB_PORT;
+              }
+            }
+          }
+          EOF
+          nohup nginx -c "$OPENCODE_WEB_DIR/nginx.conf" -g 'daemon off;' \
+            > "$OPENCODE_WEB_DIR/nginx.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/nginx.pid"
+          for _ in {1..20}; do
+            curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$OPENCODE_PROXY_PORT/" >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_PROXY_PORT/" >/dev/null
           curl --fail --silent --show-error --location --output "$OPENCODE_WEB_DIR/cloudflared" \
             https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
           chmod 755 "$OPENCODE_WEB_DIR/cloudflared"
-          nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+          nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_PROXY_PORT" \
             > "$OPENCODE_WEB_DIR/cloudflared.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/cloudflared.pid"
           for _ in {1..60}; do
@@ -121,6 +152,43 @@ jobs:
           [[ -n "${WEB_URL:-}" ]]
           printf 'url=%s\n' "$WEB_URL" >> "$GITHUB_OUTPUT"
 
+      - name: Configure Git identity
+        shell: bash
+        run: |
+          git config user.name 'opencode[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Start OpenCode GitHub run and locate its web session
+        id: opencode_run
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODEL: opencode/big-pickle
+          USE_GITHUB_TOKEN: true
+        run: |
+          set -euo pipefail
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          [[ -x "$OPENCODE_BIN" ]]
+          # shellcheck disable=SC2016
+          nohup bash -c '"$1" github run > "$2" 2>&1; echo $? > "$3"' \
+            _ "$OPENCODE_BIN" "$OPENCODE_WEB_DIR/github-run.log" "$OPENCODE_WEB_DIR/github-run.exit" \
+            > /dev/null 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/github-run.pid"
+
+          SESSION_ID=''
+          for _ in {1..120}; do
+            SESSION_ID="$(curl --fail --silent --show-error "http://127.0.0.1:$OPENCODE_WEB_PORT/session" \
+              | jq -r '.[0].id // empty')"
+            [[ "$SESSION_ID" == ses_* ]] && break
+            sleep 1
+          done
+          [[ "$SESSION_ID" == ses_* ]]
+          DIRECTORY_B64="$(printf '%s' "$GITHUB_WORKSPACE" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+          WEB_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
+          [[ -n "$WEB_URL" ]]
+          printf 'session_id=%s\nurl=%s\n' "$SESSION_ID" \
+            "${WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
+
       - name: Post temporary access details
         id: access_comment
         uses: actions/github-script@v7
@@ -128,7 +196,7 @@ jobs:
           SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
-          OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
+          OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.url }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
@@ -138,28 +206,28 @@ jobs:
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
               'Run this command while the job is active:', '',
               '```sh', process.env.SSH_COMMAND, '```', '',
-              '🌐 **Public OpenCode web UI is ready.**', '',
+              '🌐 **Live OpenCode web session is ready.**', '',
               `URL: ${process.env.OPENCODE_WEB_URL}`, '',
-              'Both connections remain available while OpenCode runs and for 30 minutes afterwards.'
+              'This opens the currently running `/oc` session directly. Access remains available while OpenCode runs and for 30 minutes afterwards.'
             ].join('\n');
             const result = await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: number, body
             });
             core.setOutput('comment_id', result.data.id);
 
-      - name: Configure Git identity
+      - name: Wait for OpenCode
+        id: wait_opencode
         shell: bash
         run: |
-          git config user.name 'opencode[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-      - name: Run OpenCode
-        uses: anomalyco/opencode/github@latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          model: opencode/big-pickle
-          use_github_token: true
+          set -euo pipefail
+          for _ in {1..21600}; do
+            [[ -f "$OPENCODE_WEB_DIR/github-run.exit" ]] && break
+            sleep 1
+          done
+          [[ -f "$OPENCODE_WEB_DIR/github-run.exit" ]]
+          code="$(cat "$OPENCODE_WEB_DIR/github-run.exit")"
+          echo "OpenCode exited with code $code"
+          exit "$code"
 
       - name: Keep temporary access available for 30 minutes
         if: always()
@@ -185,6 +253,7 @@ jobs:
         run: |
           set +e
           [[ -f "$OPENCODE_WEB_DIR/cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/cloudflared.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/nginx.pid" ]] && sudo kill "$(cat "$OPENCODE_WEB_DIR/nginx.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
           [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
           sudo pkill -f 'sshd.*2222' 2>/dev/null || true
