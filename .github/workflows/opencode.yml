@@ -84,19 +84,6 @@ jobs:
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
 
-      - name: Verify AgentsWeb SSH availability
-        shell: bash
-        run: |
-          set -euo pipefail
-          for _ in {1..12}; do
-            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -o ConnectTimeout=20 -o ConnectionAttempts=1 -i "$SSH_KEY" \
-              -p "${{ steps.agentsweb.outputs.port }}" \
-              "runner@${{ steps.agentsweb.outputs.host }}" \
-              'printf "agentsweb-ssh-ok runner=%s\n" "$(hostname)"' && break
-            sleep 5
-          done
-
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
         shell: bash
