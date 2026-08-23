@@ -88,10 +88,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=20 -i "$SSH_KEY" -p "${{ steps.agentsweb.outputs.port }}" \
-            "runner@${{ steps.agentsweb.outputs.host }}" \
-            'printf "agentsweb-ssh-ok runner=%s\n" "$(hostname)"'
+          for _ in {1..12}; do
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=20 -o ConnectionAttempts=1 -i "$SSH_KEY" \
+              -p "${{ steps.agentsweb.outputs.port }}" \
+              "runner@${{ steps.agentsweb.outputs.host }}" \
+              'printf "agentsweb-ssh-ok runner=%s\n" "$(hostname)"' && break
+            sleep 5
+          done
 
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
@@ -188,6 +192,18 @@ jobs:
           [[ -n "$WEB_URL" ]]
           printf 'session_id=%s\nurl=%s\n' "$SESSION_ID" \
             "${WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify live sessions through SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=20 -i "$SSH_KEY" -p "${{ steps.agentsweb.outputs.port }}" \
+            "runner@${{ steps.agentsweb.outputs.host }}" \
+            "curl --fail --silent --show-error -H 'x-opencode-directory: $GITHUB_WORKSPACE' http://127.0.0.1:$OPENCODE_PROXY_PORT/session" \
+            | tee "$OPENCODE_WEB_DIR/ssh-sessions.json"
+          jq -e --arg session "${{ steps.opencode_run.outputs.session_id }}" \
+            'map(.id) | index($session) != null' "$OPENCODE_WEB_DIR/ssh-sessions.json"
 
       - name: Post temporary access details
         id: access_comment
