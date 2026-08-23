@@ -5,13 +5,25 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited]
 
 jobs:
   opencode:
     if: >-
-      (github.event.comment.user.type != 'Bot') &&
+      (github.event.sender.type != 'Bot') &&
       (contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode'))
+      contains(github.event.comment.body, '/opencode') ||
+      contains(github.event.issue.body, '/oc') ||
+      contains(github.event.issue.body, '/opencode') ||
+      contains(github.event.issue.title, '/oc') ||
+      contains(github.event.issue.title, '/opencode') ||
+      contains(github.event.pull_request.body, '/oc') ||
+      contains(github.event.pull_request.body, '/opencode') ||
+      contains(github.event.pull_request.title, '/oc') ||
+      contains(github.event.pull_request.title, '/opencode'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -27,7 +39,7 @@ jobs:
       OPENCODE_PROXY_PORT: 4097
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
       BRANCH_NAME: opencode/${{ github.run_id }}
-      COMMENT_BODY: ${{ github.event.comment.body }}
+      COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6

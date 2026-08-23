@@ -4,8 +4,9 @@ The canonical workflow is `.github/workflows/opencode.yml`.
 
 ## Trigger
 
-Comment `/oc <request>` or `/opencode <request>` on an issue or pull request.
-Bot-authored comments are ignored, so status comments do not recurse.
+`/oc <request>` or `/opencode <request>` can appear in a newly created or
+edited issue/PR title or body, an issue comment, or a pull-request review
+comment. Bot-authored events are ignored, so status comments do not recurse.
 
 ## What the job does
 
