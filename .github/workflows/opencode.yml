@@ -113,6 +113,12 @@ jobs:
             "runner@${{ steps.agentsweb.outputs.host }}" \
             'printf "agentsweb-ssh-ok runner=%s\n" "$(hostname)"'
 
+      - name: Configure Git identity
+        shell: bash
+        run: |
+          git config user.name 'opencode[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
         env:
