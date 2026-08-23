@@ -8,12 +8,15 @@
 
 ## OpenCode GitHub Actions
 
-The issue-triggered workflow uses `opencode/big-pickle` and the GitHub Actions
+The issue-triggered workflow uses `opencode/nemotron-3.5-lightning-free` and the GitHub Actions
 token. It does not require an `OPENCODE_API_KEY` repository secret.
 
 Trigger it by commenting `/oc <request>` or `/opencode <request>` on an issue
 or pull request. The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
+
+When monitoring a triggered run, use `gh run watch <run-id> --repo agents-dev/aiplay --exit-status`.
+Do not use tight `for` loops around `gh run list`, which needlessly consume GitHub API rate limit.
 
 ## Mac SSH access
 
