@@ -77,14 +77,6 @@ jobs:
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i opencode-agentsweb-id_ed25519 -p ${SSH_PORT} runner@${SSH_HOST}"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
 
-      - name: Upload temporary SSH key
-        uses: actions/upload-artifact@v4
-        with:
-          name: opencode-agentsweb-ssh-key
-          path: ${{ env.SSH_KEY }}
-          retention-days: 1
-          if-no-files-found: error
-
       - name: Post temporary SSH connection command
         id: ssh_comment
         uses: actions/github-script@v7
@@ -99,9 +91,8 @@ jobs:
             const body = [
               '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
-              'Download the `opencode-agentsweb-ssh-key` artifact from the run, then run:', '',
-              '```sh', `gh run download ${context.runId} -n opencode-agentsweb-ssh-key`,
-              `chmod 600 opencode-agentsweb-id_ed25519 && ${process.env.SSH_COMMAND}`, '```', '',
+              'Run this command while the job is active:', '',
+              '```sh', process.env.SSH_COMMAND, '```', '',
               'This connection is temporary and closes when OpenCode finishes.'
             ].join('\n');
             const result = await github.rest.issues.createComment({
