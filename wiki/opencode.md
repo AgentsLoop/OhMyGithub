@@ -13,11 +13,11 @@ Bot-authored comments are ignored, so status comments do not recurse.
 2. Starts an ephemeral AgentsWeb SSH tunnel.
 3. Starts the OpenCode web UI and publishes it through a temporary public
    trycloudflare.com tunnel.
-4. Starts `opencode github run` against the same OpenCode installation and
+4. Creates an `opencode/<run-id>` branch from the relevant base branch.
+5. Starts `opencode run --attach` against the same OpenCode installation and
    server-backed session store, then posts a direct URL to that live session.
-5. Verifies SSH connectivity.
-6. Configures the `opencode[bot]` Git identity.
-7. Runs `opencode/big-pickle` and allows it to push a branch and open a PR.
+6. Verifies SSH connectivity.
+7. Waits for OpenCode, pushes the branch, and creates the pull request in YAML.
 8. Keeps SSH and the web UI available for 30 minutes after the prompt ends,
    then marks the comment closed and terminates both tunnels.
 
@@ -27,22 +27,21 @@ selection in the browser, while the runner's project exists only on the
 temporary GitHub Actions filesystem.
 
 The workflow uses the built-in OpenCode model path and does not require an
-`OPENCODE_API_KEY` secret. The upstream composite action is copied to
-`.github/actions/opencode-github/action.yml`; its run phase is modified to
-expose the session ID and direct Web UI URL before waiting for completion.
+`OPENCODE_API_KEY` secret. Branch creation, pushing, and pull-request creation
+are deliberately handled by the workflow rather than by OpenCode's GitHub
+integration.
 
 ## Findings: tracking the GitHub run in Web UI
 
-`anomalyco/opencode/github@latest` is a composite action. It installs the
-OpenCode CLI and runs:
+The previous GitHub integration installed the OpenCode CLI and ran:
 
 ```sh
 opencode github run
 ```
 
-The GitHub command creates a regular OpenCode session through the shared
-session services and sends the GitHub prompt through that session. Replacing
-the action is therefore not required just to obtain a Web UI session.
+The workflow now sends the comment text directly to `opencode run --attach`.
+This keeps the regular OpenCode session while making branch and PR behavior
+explicit and reviewable in YAML.
 
 The Web UI still needs to be connected to the same project. OpenCode's server
 loads project instances per request using the `x-opencode-directory` header.

@@ -26,6 +26,8 @@ jobs:
       OPENCODE_WEB_PORT: 4096
       OPENCODE_PROXY_PORT: 4097
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
+      BRANCH_NAME: opencode/${{ github.run_id }}
+      COMMENT_BODY: ${{ github.event.comment.body }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -149,17 +151,43 @@ jobs:
           git config user.name 'opencode[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-      - name: Run local OpenCode GitHub integration and locate its web session
+      - name: Create OpenCode branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          git fetch origin "$BASE_BRANCH"
+          git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
+
+      - name: Run OpenCode and locate its web session
         id: opencode_run
-        uses: ./.github/actions/opencode-github
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          model: opencode/big-pickle
-          use_github_token: 'true'
-          public_url: ${{ steps.opencode_web.outputs.url }}
-          web_port: ${{ env.OPENCODE_WEB_PORT }}
-          run_dir: ${{ env.OPENCODE_WEB_DIR }}
+          OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
+        run: |
+          set -euo pipefail
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          PROMPT_FILE="$OPENCODE_WEB_DIR/prompt.txt"
+          RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
+          RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
+          printf '%s\n\nWork directly on the current branch. Do not create a branch or pull request; the workflow will handle both.' "$COMMENT_BODY" > "$PROMPT_FILE"
+          # The inner shell expands the positional parameters after nohup starts.
+          # shellcheck disable=SC2016
+          nohup bash -c '"$1" run --attach "http://127.0.0.1:$2" --model opencode/big-pickle "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
+            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" \
+            > /dev/null 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
+          SESSION_ID=''
+          for _ in {1..120}; do
+            SESSION_ID="$(curl --fail --silent --show-error "http://127.0.0.1:$OPENCODE_WEB_PORT/session" | jq -r '.[0].id // empty')"
+            [[ "$SESSION_ID" == ses_* ]] && break
+            sleep 1
+          done
+          [[ "$SESSION_ID" == ses_* ]]
+          DIRECTORY_B64="$(printf '%s' "$GITHUB_WORKSPACE" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+          printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
+            "${OPENCODE_WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
 
       - name: Verify live sessions through SSH
         id: verify_sessions
@@ -211,19 +239,31 @@ jobs:
             });
             core.setOutput('comment_id', result.data.id);
 
-      - name: Wait for OpenCode
-        id: wait_opencode
+      - name: Wait for OpenCode and create pull request
         shell: bash
         run: |
           set -euo pipefail
           for _ in {1..21600}; do
-            [[ -f "$OPENCODE_WEB_DIR/github-run.exit" ]] && break
+            [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]] && break
             sleep 1
           done
-          [[ -f "$OPENCODE_WEB_DIR/github-run.exit" ]]
-          code="$(cat "$OPENCODE_WEB_DIR/github-run.exit")"
+          [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]]
+          code="$(cat "$OPENCODE_WEB_DIR/opencode-run.exit")"
           echo "OpenCode exited with code $code"
-          exit "$code"
+          [[ "$code" == 0 ]]
+          BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          if git diff --quiet "origin/$BASE_BRANCH"...HEAD; then
+            echo 'OpenCode made no changes; no pull request will be created.'
+            exit 0
+          fi
+          git push --set-upstream origin "$BRANCH_NAME"
+          TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
+          TITLE="${TITLE:0:120}"
+          gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
+            --title "$TITLE" \
+            --body "Automated implementation requested in comment:\n\n$COMMENT_BODY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Keep temporary access available for 30 minutes
         if: success()
@@ -251,6 +291,7 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/cloudflared.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/nginx.pid" ]] && sudo kill "$(cat "$OPENCODE_WEB_DIR/nginx.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/opencode-run.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode-run.pid")" 2>/dev/null || true
           [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
           sudo pkill -f 'sshd.*2222' 2>/dev/null || true
           rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"
