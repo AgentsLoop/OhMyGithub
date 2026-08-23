@@ -26,6 +26,8 @@ jobs:
       SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
       SSH_PUBLIC_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519.pub
       SSH_DIR: ${{ github.workspace }}/.opencode-ssh
+      OPENCODE_WEB_PORT: 4096
+      OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -81,13 +83,52 @@ jobs:
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
 
-      - name: Post temporary SSH connection command
-        id: ssh_comment
+      - name: Verify AgentsWeb SSH availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=20 -i "$SSH_KEY" -p "${{ steps.agentsweb.outputs.port }}" \
+            "runner@${{ steps.agentsweb.outputs.host }}" \
+            'printf "agentsweb-ssh-ok runner=%s\n" "$(hostname)"'
+
+      - name: Start OpenCode web UI and Cloudflare tunnel
+        id: opencode_web
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$OPENCODE_WEB_DIR"
+          npm install --global opencode-ai@latest
+          nohup env \
+            opencode web --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
+          for _ in {1..45}; do
+            curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null
+          curl --fail --silent --show-error --location --output "$OPENCODE_WEB_DIR/cloudflared" \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod 755 "$OPENCODE_WEB_DIR/cloudflared"
+          nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+            > "$OPENCODE_WEB_DIR/cloudflared.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/cloudflared.pid"
+          for _ in {1..60}; do
+            WEB_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
+            [[ -n "$WEB_URL" ]] && break
+            sleep 1
+          done
+          [[ -n "${WEB_URL:-}" ]]
+          printf 'url=%s\n' "$WEB_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Post temporary access details
+        id: access_comment
         uses: actions/github-script@v7
         env:
           SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
+          OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
@@ -97,21 +138,14 @@ jobs:
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
               'Run this command while the job is active:', '',
               '```sh', process.env.SSH_COMMAND, '```', '',
-              'This connection is temporary and closes when OpenCode finishes.'
+              '🌐 **Public OpenCode web UI is ready.**', '',
+              `URL: ${process.env.OPENCODE_WEB_URL}`, '',
+              'Both connections remain available while OpenCode runs and for 30 minutes afterwards.'
             ].join('\n');
             const result = await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: number, body
             });
             core.setOutput('comment_id', result.data.id);
-
-      - name: Verify AgentsWeb SSH availability
-        shell: bash
-        run: |
-          set -euo pipefail
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=20 -i "$SSH_KEY" -p "${{ steps.agentsweb.outputs.port }}" \
-            "runner@${{ steps.agentsweb.outputs.host }}" \
-            'printf "agentsweb-ssh-ok runner=%s\n" "$(hostname)"'
 
       - name: Configure Git identity
         shell: bash
@@ -127,11 +161,16 @@ jobs:
           model: opencode/big-pickle
           use_github_token: true
 
+      - name: Keep temporary access available for 30 minutes
+        if: always()
+        shell: bash
+        run: sleep 1800
+
       - name: Mark SSH session closed
-        if: always() && steps.ssh_comment.outputs.comment_id != ''
+        if: always() && steps.access_comment.outputs.comment_id != ''
         uses: actions/github-script@v7
         env:
-          COMMENT_ID: ${{ steps.ssh_comment.outputs.comment_id }}
+          COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
         with:
           script: |
             await github.rest.issues.updateComment({
@@ -145,7 +184,10 @@ jobs:
         shell: bash
         run: |
           set +e
+          [[ -f "$OPENCODE_WEB_DIR/cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/cloudflared.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
           [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
           sudo pkill -f 'sshd.*2222' 2>/dev/null || true
           rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"
           rm -rf "$SSH_DIR" "$HOME/.ssh/authorized_keys"
+          rm -rf "$OPENCODE_WEB_DIR"
