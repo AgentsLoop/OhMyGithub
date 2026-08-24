@@ -284,7 +284,7 @@ jobs:
           PROMPT_FILE="$OPENCODE_WEB_DIR/prompt.txt"
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
-          skill_text="$(jq -r 'if length == 0 then \"(none)\" else join(\", \" ) end' <<<"$OPENCODE_SKILLS")"
+          skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
           printf '%s\n\nBuild the requested game fully, run the unit tests, and work directly on the current branch. Do not create a branch or pull request; the workflow will handle both.\n\nWorkflow label context: model/%s; skills: %s. Use the listed skills when relevant.' \
             "$COMMENT_BODY" "$OPENCODE_MODEL" "$skill_text" > "$PROMPT_FILE"
           # The inner shell expands the positional parameters after nohup starts.
