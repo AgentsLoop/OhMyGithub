@@ -38,6 +38,7 @@ jobs:
       OPENCODE_WEB_PORT: 4096
       OPENCODE_PROXY_PORT: 4097
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
       COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
@@ -378,7 +379,7 @@ jobs:
         id: app_tunnel
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           : > "$OPENCODE_WEB_DIR/app.log"
           if npm run start -- --port "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 & then
             echo $! > "$OPENCODE_WEB_DIR/app.pid"
@@ -398,12 +399,15 @@ jobs:
               npx --yes http-server public -p "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
             fi
             echo $! > "$OPENCODE_WEB_DIR/app.pid"
+            for _ in {1..60}; do
+              curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT" >/dev/null && break
+              sleep 1
+            done
+            if ! curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$APP_PORT" >/dev/null; then
+              echo 'WARNING: app did not respond locally, including after fallback; continuing without a public app URL.'
+              exit 0
+            fi
           fi
-          for _ in {1..60}; do
-            curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT" >/dev/null && break
-            sleep 1
-          done
-          curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$APP_PORT" >/dev/null
           "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate \
             --url "http://127.0.0.1:$APP_PORT" \
             > "$OPENCODE_WEB_DIR/app-cloudflared.log" 2>&1 &
@@ -415,9 +419,16 @@ jobs:
             [[ -n "$APP_URL" ]] && break
             sleep 1
           done
-          [[ -n "$APP_URL" ]]
-          curl --fail --silent --show-error --max-time 20 "$APP_URL" >/dev/null
+          if [[ -z "$APP_URL" ]]; then
+            echo 'WARNING: Cloudflare tunnel did not provide a public URL; continuing.'
+            exit 0
+          fi
+          if ! curl --fail --silent --show-error --max-time 20 "$APP_URL" >/dev/null; then
+            echo "WARNING: public app URL failed its health check ($APP_URL); continuing without posting it."
+            exit 0
+          fi
           echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
+          exit 0
 
       - name: Create pull request
         shell: bash
@@ -438,7 +449,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post verified app URL
-        if: success()
+        if: success() && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
           APP_URL: ${{ env.APP_URL }}
