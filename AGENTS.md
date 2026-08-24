@@ -10,6 +10,8 @@
 
 After every code change, commit and push the change. For small code changes, amend
 the current commit and push the amended commit instead of creating another commit.
+Before running any workflow, verify that the working tree is clean and everything
+is committed.
 
 ## OpenCode GitHub Actions
 
