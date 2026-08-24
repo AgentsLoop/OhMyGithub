@@ -340,6 +340,7 @@ jobs:
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           "$OPENCODE_BIN" run \
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+            --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model opencode/nemotron-3.5-lightning-free \
             'Now verify the completed app. Start the app server, run browser tests, fix any failures, and confirm the app works on port 3000. Do not create a branch or pull request; the workflow will handle both.' \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
