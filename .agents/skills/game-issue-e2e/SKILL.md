@@ -26,6 +26,28 @@ The test is complete only when all of these are true:
 - The public application URL responds successfully while the temporary tunnel
   is still alive.
 
+## Skill labels
+
+Before creating the test issue, inspect the repository's current labels and
+use the available `skill/*` labels that match the requested game. The current
+skill labels are:
+
+- `skill/gauntlet-loop` — use for Gauntlet Loop/gameplay-loop or iterative
+  game-building requests.
+- `skill/image-search` — use when the request needs web image discovery or
+  image-search assets.
+- `skill/load-sketchfab-threejs` — use for Sketchfab, GLB, Three.js, or
+  PlayCanvas model-loading/material/animation requests.
+- `skill/mcp-duckgo` — use when the request explicitly requires DuckDuckGo/MCP
+  search support.
+
+These labels are based on the skill labels currently configured in
+`agents-dev/aiplay`; refresh them with `gh label list` before each test because
+the set can change. Do not add a skill label merely because a skill exists:
+apply only labels supported by the issue's requirements. If a matching label
+does not exist, continue without inventing or creating one and record that in
+the test report.
+
 ## Procedure
 
 1. Before starting the test, inspect the working tree with `git status --short`.
@@ -34,9 +56,14 @@ The test is complete only when all of these are true:
    before creating the issue or triggering any Action. Do not start the test
    with uncommitted or unpushed changes.
 2. Confirm `gh auth status` and identify the repository with `gh repo view`.
-3. Create a new issue with `gh issue create`. Put `/oc` in the title or body;
-   do not add a comment because this specifically tests the `issues` trigger.
+3. Inspect the current labels with `gh label list`, identify the applicable
+   `skill/*` labels from the request, and create a new issue with
+   `gh issue create --label <label> ...`. Put `/oc` in the title or body; do
+   not add a comment because this specifically tests the `issues` trigger.
    Ask for a concrete playable game and include its functional requirements.
+   If multiple skills are needed, pass one `--label` option per matching
+   label. Record the issue's final labels and verify them with
+   `gh issue view <issue-number> --json labels`.
 4. Locate the newest `opencode.yml` run with:
 
    ```sh
