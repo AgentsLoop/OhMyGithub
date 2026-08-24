@@ -284,18 +284,12 @@ jobs:
           PROMPT_FILE="$OPENCODE_WEB_DIR/prompt.txt"
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
-          # Issue bodies may contain prior retry notes. Keep the original request
-          # focused so the model does not recursively re-plan workflow history.
-          # GitHub issue bodies can contain escaped newlines from prior edits.
-          REQUEST_BODY="${COMMENT_BODY%%\\n\\nRetest*}"
-          REQUEST_BODY="${REQUEST_BODY//Add tests and verify the app server before completion./Verify the app server before completion.}"
-          REQUEST_BODY="${REQUEST_BODY//Add tests and verify the app server before completion/Verify the app server before completion}"
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
-          printf '%s\n\nImplement the requested game in one pass now: create the required source, HTML, CSS, and package files. Do not add tests or a testing framework. Do not pause for planning or inspect unrelated workflow files. Work directly on the current branch; do not create a branch or pull request because the workflow handles both. For a local static server, use python3 -m http.server 3000 --bind 127.0.0.1 --directory . with the port as a positional argument.\n\nWorkflow label context: model/%s; skills: %s. Use the listed skills when relevant.' \
-            "$REQUEST_BODY" "$OPENCODE_MODEL" "$skill_text" > "$PROMPT_FILE"
+          printf '%s\n\nBuild the requested game fully, run the unit tests, and work directly on the current branch. Do not create a branch or pull request; the workflow will handle both.\n\nWorkflow label context: model/%s; skills: %s. Use the listed skills when relevant.' \
+            "$COMMENT_BODY" "$OPENCODE_MODEL" "$skill_text" > "$PROMPT_FILE"
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
-          nohup bash -c 'timeout --signal=TERM --kill-after=30s 20m "$1" run --attach "http://127.0.0.1:$2" --auto --model "$6" "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
+          nohup bash -c 'timeout --signal=TERM 20m "$1" run --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
             _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" \
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
@@ -364,7 +358,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for _ in {1..1500}; do
+          for _ in {1..21600}; do
             [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]] && break
             sleep 1
           done
@@ -373,12 +367,11 @@ jobs:
           echo "OpenCode exited with code $code"
           [[ "$code" == 0 ]]
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          timeout --signal=TERM --kill-after=30s 20m "$OPENCODE_BIN" run \
+          timeout --signal=TERM 20m "$OPENCODE_BIN" run \
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
-            --auto \
             --model "${{ steps.opencode_labels.outputs.model }}" \
-            'Now verify the completed app manually. Do not add tests or install a testing framework. Start the app server, inspect the rendered page and exercise the core game interactions with bounded checks, fix any failures, and confirm the app serves correctly on port 3000. If you start a server for checking, run it in the background, stop it after the check, and then exit immediately. Do not leave a foreground server or repeat a hanging tool call. Do not create a branch or pull request; the workflow will handle both.' \
+            'Now verify the completed app. Run the unit and browser tests, fix any failures, and confirm the app serves correctly on port 3000. If you start a server for testing, run it in the background, stop it after the check, and then exit immediately. Do not leave a foreground server or repeat tool calls. Do not create a branch or pull request; the workflow will handle both.' \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
       - name: Expose verified app
@@ -398,16 +391,12 @@ jobs:
           done
           if ! curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$APP_PORT" >/dev/null; then
             [[ -f "$OPENCODE_WEB_DIR/app.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
-            # npm may leave its child server behind after the parent exits.
-            # Clear only the exact app port before starting the deterministic fallback.
-            lsof -tiTCP:"$APP_PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill -TERM || true
-            sleep 1
-            lsof -tiTCP:"$APP_PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill -KILL || true
             : > "$OPENCODE_WEB_DIR/app.log"
-            APP_ROOT='.'
-            [[ -f index.html || ! -d public ]] || APP_ROOT='public'
-            python3 -m http.server "$APP_PORT" --bind 127.0.0.1 --directory "$APP_ROOT" \
-              >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
+            if [[ -f index.html ]]; then
+              npx --yes http-server . -p "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
+            else
+              npx --yes http-server public -p "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
+            fi
             echo $! > "$OPENCODE_WEB_DIR/app.pid"
           fi
           for _ in {1..60}; do
