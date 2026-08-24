@@ -1,0 +1,13 @@
+{
+  "name": "star-dodger",
+  "version": "1.0.0",
+  "description": "Star Dodger - dodge falling stars and asteroids",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": ["game", "star-dodger"],
+  "author": "",
+  "license": "MIT"
+}
