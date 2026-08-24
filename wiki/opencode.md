@@ -1,6 +1,7 @@
 # OpenCode GitHub workflow
 
 The canonical workflow is `.github/workflows/opencode.yml`.
+The build and verification prompt templates are stored in `.github/prompts/`.
 
 ## Trigger
 

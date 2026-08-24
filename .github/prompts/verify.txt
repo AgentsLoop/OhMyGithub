@@ -1,0 +1,1 @@
+Now verify the completed app. Ensure the app server is running in the tmux session named app-server on port 3000, run browser tests, fix any failures, and confirm the app works on port 3000. Do not create a branch or pull request; the workflow will handle both.
