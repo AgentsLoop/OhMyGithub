@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>NEON HARVEST — 3D Crystal Collector</title>
+    <meta name="description" content="Pilot your starship, harvest energy crystals, dodge asteroids. A polished 3D GLB game." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="c"></canvas>
+
+      <!-- Top HUD -->
+      <header id="hud">
+        <div class="hud-left">
+          <div class="brand">NEON<span>HARVEST</span></div>
+          <div class="sub">Collect 15 crystals • Dodge asteroids</div>
+        </div>
+        <div class="hud-center">
+          <div class="stat">
+            <span class="label">SCORE</span>
+            <span class="value" id="score">0 / 15</span>
+          </div>
+          <div class="stat">
+            <span class="label">TIME</span>
+            <span class="value" id="time">60.0</span>
+          </div>
+          <div class="stat">
+            <span class="label">LIVES</span>
+            <span class="value hearts" id="lives">♥ ♥ ♥</span>
+          </div>
+        </div>
+        <div class="hud-right">
+          <button id="btnRestart" class="ghost">Restart</button>
+        </div>
+      </header>
+
+      <!-- Progress bar -->
+      <div id="progressWrap"><div id="progressBar"></div></div>
+
+      <!-- Asset status -->
+      <div id="assetStatus" class="hidden"></div>
+
+      <!-- Overlays -->
+      <div id="overlayStart" class="overlay visible">
+        <div class="card">
+          <div class="badge">✦ REAL 3D GLB ASSETS • LIGHTWEIGHT • PBR</div>
+          <h1>NEON HARVEST</h1>
+          <p class="tagline">Pilot your starship through a neon debris field. Harvest cyan energy crystals before your reactor times out.</p>
+
+          <div class="glb-preview-row">
+            <div class="glb-chip"><span class="dot ship"></span> Ship — <code>player.glb</code> <span class="size">6.0 kB</span></div>
+            <div class="glb-chip"><span class="dot crystal"></span> Crystal — <code>collectible.glb</code> <span class="size">3.0 kB</span> • anim</div>
+          </div>
+
+          <div class="instructions">
+            <div class="col">
+              <h3>How to Play</h3>
+              <ul>
+                <li><kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to drift</li>
+                <li>Collect <strong>15 crystals</strong> to warp out</li>
+                <li>Hit an asteroid = lose a heart</li>
+                <li>You have <strong>60 seconds</strong></li>
+              </ul>
+            </div>
+            <div class="col">
+              <h3>On Mobile</h3>
+              <ul>
+                <li>Use on-screen D-pad (bottom-left)</li>
+                <li>Or drag directly on the field</li>
+                <li>Supports portrait & landscape</li>
+              </ul>
+            </div>
+          </div>
+
+          <button id="btnPlay" class="primary">▶ START RUN</button>
+          <p class="hint">Tip: graze crystals with the nose of your ship — collection radius is generous. Hold a direction to build momentum.</p>
+          <p class="models-note">Models are procedurally generated CC0 GLB — Three.js <code>GLTFLoader</code> with PBR, emissive, and spin animation. Falls back to primitives if a GLB fails.</p>
+          <div id="loadInfo" class="load-info">Loading 3D assets…</div>
+        </div>
+      </div>
+
+      <div id="overlayWin" class="overlay">
+        <div class="card">
+          <h2>★ WARP SUCCESS ★</h2>
+          <p class="big" id="winScore">15 / 15 crystals • 42.3s</p>
+          <p>You punched through the debris field with a full hold. Reactor stable, crystals secured.</p>
+          <button class="primary" data-restart>Play Again</button>
+        </div>
+      </div>
+
+      <div id="overlayLose" class="overlay">
+        <div class="card">
+          <h2>◼ SIGNAL LOST</h2>
+          <p class="big" id="loseReason">Reactor timeout</p>
+          <p id="loseScore">7 / 15 crystals collected</p>
+          <button class="primary" data-restart>Retry Run</button>
+        </div>
+      </div>
+
+      <!-- Mobile controls -->
+      <div id="mobileControls" class="hidden">
+        <div class="dpad">
+          <button class="dpad-btn up" data-dir="up">▲</button>
+          <div class="dpad-row">
+            <button class="dpad-btn left" data-dir="left">◀</button>
+            <button class="dpad-btn down" data-dir="down">▼</button>
+            <button class="dpad-btn right" data-dir="right">▶</button>
+          </div>
+        </div>
+        <div class="drag-hint">drag field to steer</div>
+      </div>
+
+      <!-- Damage flash -->
+      <div id="flash"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
