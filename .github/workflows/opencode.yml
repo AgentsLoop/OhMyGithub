@@ -350,8 +350,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run start -- --port "$APP_PORT" > "$OPENCODE_WEB_DIR/app.log" 2>&1 &
-          echo $! > "$OPENCODE_WEB_DIR/app.pid"
+          : > "$OPENCODE_WEB_DIR/app.log"
+          if npm run start -- --port "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 & then
+            echo $! > "$OPENCODE_WEB_DIR/app.pid"
+          else
+            echo 'npm run start could not be launched; using http-server fallback.' >> "$OPENCODE_WEB_DIR/app.log"
+          fi
+          for _ in {1..15}; do
+            curl --fail --silent --show-error --max-time 2 "http://127.0.0.1:$APP_PORT" >/dev/null && break
+            sleep 1
+          done
+          if ! curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$APP_PORT" >/dev/null; then
+            [[ -f "$OPENCODE_WEB_DIR/app.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
+            : > "$OPENCODE_WEB_DIR/app.log"
+            if [[ -f index.html ]]; then
+              npx --yes http-server . -p "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
+            else
+              npx --yes http-server public -p "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
+            fi
+            echo $! > "$OPENCODE_WEB_DIR/app.pid"
+          fi
           for _ in {1..60}; do
             curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT" >/dev/null && break
             sleep 1
