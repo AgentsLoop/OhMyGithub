@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gauntlet Loop</title>
+<meta name="description" content="Gauntlet Loop — survive endless waves in a tight arena. Dash, slash, endure." />
+<style>
+  :root{
+    --bg:#0a0e1a;
+    --panel:#121a2e;
+    --panel2:#1a2442;
+    --border:#2a3a5e;
+    --accent:#4ade80;
+    --accent2:#38bdf8;
+    --accent3:#f472b6;
+    --text:#e2e8f0;
+    --muted:#94a3b8;
+    --danger:#ef4444;
+    --warn:#f59e0b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family: ui-sans-system, -apple-system, Segoe UI, Roboto, Helvetica, Arial, monospace;
+    background: radial-gradient(1200px 600px at 20% -10%, #1e3a5f 0%, transparent 60%),
+                radial-gradient(900px 500px at 90% 10%, #2a1a4a 0%, transparent 60%),
+                var(--bg);
+    color:var(--text);
+    display:flex;flex-direction:column;min-height:100vh;
+    overflow-x:hidden;
+  }
+  header{
+    padding:14px 18px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    border-bottom:1px solid var(--border);
+    background:rgba(10,14,26,0.8);backdrop-filter:blur(8px);
+    position:sticky;top:0;z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{
+    width:36px;height:36px;border-radius:10px;
+    background:linear-gradient(135deg, var(--accent), var(--accent2));
+    display:grid;place-items:center;font-weight:900;color:#0a0e1a;letter-spacing:-1px;
+    box-shadow:0 0 20px rgba(56,189,248,0.4);
+  }
+  .brand h1{font-size:18px;letter-spacing:0.08em;text-transform:uppercase}
+  .brand h1 span{color:var(--accent)}
+  .brand p{font-size:11px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase}
+  .header-right{display:flex;align-items:center;gap:10px}
+  .pill{
+    font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+    background:var(--panel);color:var(--muted)
+  }
+  .pill strong{color:var(--text)}
+  main{
+    flex:1;display:grid;
+    grid-template-columns: 280px minmax(0,1fr) 280px;
+    gap:16px;padding:16px;max-width:1440px;width:100%;margin:0 auto;
+  }
+  @media (max-width:1100px){
+    main{grid-template-columns: 1fr; grid-template-rows: auto auto auto;}
+    .side{order:2}
+    .arena-wrap{order:1}
+  }
+  .card{
+    background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .card h2{font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card h2 i{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);display:inline-block}
+  .stats{display:grid;gap:10px}
+  .stat-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)}
+  .stat-label{font-size:12px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase}
+  .stat-value{font-weight:800;font-size:18px}
+  .hearts{display:flex;gap:4px}
+  .heart{
+    width:22px;height:22px;border-radius:6px;display:grid;place-items:center;
+    background:var(--panel2);border:1px solid var(--border);font-size:12px;
+    transition: all .2s;
+  }
+  .heart.full{background:linear-gradient(135deg,#ef4444,#f97316);color:white;border-color:transparent;box-shadow:0 0 10px rgba(239,68,68,0.4)}
+  .heart.empty{opacity:0.25}
+  .progress{height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-top:6px}
+  .progress>div{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
+  .kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi>div{padding:10px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);text-align:center}
+  .kpi strong{font-size:20px;display:block}
+  .kpi span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em}
+  .instructions{line-height:1.5;font-size:13px;color:#cbd5e1}
+  .instructions ul{margin:8px 0 0 16px;display:grid;gap:6px}
+  .instructions li::marker{color:var(--accent2)}
+  .keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .key{
+    font-size:11px;padding:4px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);
+    border-bottom-width:3px; font-weight:700; color:var(--text)
+  }
+  .key.action{border-color:var(--accent);color:var(--accent)}
+  .arena-wrap{position:relative;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .arena-card{padding:0;overflow:hidden;position:relative}
+  .arena-header{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 14px;border-bottom:1px solid var(--border);
+    background:rgba(255,255,255,0.02)
+  }
+  .arena-header h2{margin:0}
+  .wave-badge{
+    display:flex;align-items:center;gap:8px;
+    padding:6px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--border);font-size:12px
+  }
+  .wave-badge b{color:var(--warn)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--danger);animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(0.85)}}
+  #game{
+    width:100%;height:auto;aspect-ratio: 3 / 2; display:block;
+    background:
+      linear-gradient(rgba(56,189,248,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56,189,248,0.06) 1px, transparent 1px),
+      radial-gradient(600px 400px at 50% 50%, rgba(74,222,128,0.08), transparent 70%),
+      #0b1224;
+    background-size: 32px 32px, 32px 32px, auto, auto;
+    touch-action:none;
+    cursor:crosshair;
+  }
+  .overlay{
+    position:absolute;inset:0;display:grid;place-items:center;
+    background:rgba(8,12,24,0.72);backdrop-filter:blur(4px);
+    opacity:0;pointer-events:none;transition:opacity .25s;
+    padding:20px;text-align:center;
+  }
+  .overlay.show{opacity:1;pointer-events:auto}
+  .overlay-box{
+    background:linear-gradient(180deg, var(--panel2), var(--panel));
+    border:1px solid var(--border);border-radius:16px;padding:22px;max-width:420px;width:100%;
+    box-shadow:0 20px 50px rgba(0,0,0,0.5)
+  }
+  .overlay-box h3{font-size:22px;margin-bottom:8px}
+  .overlay-box p{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+  .btn{
+    appearance:none;border:none;cursor:pointer;
+    padding:10px 16px;border-radius:12px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;font-size:13px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#081018;
+    box-shadow:0 8px 20px rgba(56,189,248,0.3);
+    transition:transform .08s, filter .15s;
+  }
+  .btn:active{transform:scale(0.97)}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border);box-shadow:none}
+  .hud-mobile{display:none}
+  .touch-controls{display:none}
+  @media (max-width:1100px){
+    .hud-mobile{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  }
+  @media (max-width:700px){
+    header{padding:10px 12px}
+    main{padding:10px;gap:10px}
+    .touch-controls{
+      display:grid;grid-template-columns: 1fr auto;gap:10px;align-items:center;
+      padding:10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px
+    }
+    .dpad{display:grid;grid-template-columns:40px 40px 40px;grid-template-rows:40px 40px;gap:6px;justify-items:center}
+    .dpad button{width:40px;height:40px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-weight:900}
+    .dpad button:active{background:var(--accent2);color:#081018}
+    .attack-btn{width:88px;height:88px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));font-weight:900;color:#081018;box-shadow:0 8px 20px rgba(56,189,248,0.3)}
+    .attack-btn:active{transform:scale(0.96)}
+  }
+  footer{
+    padding:10px 16px;text-align:center;font-size:11px;color:var(--muted);
+    border-top:1px solid var(--border);letter-spacing:0.06em
+  }
+  /* screen shake */
+  .shake{animation:shake .22s}
+  @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-3px,2px)}50%{transform:translate(3px,-2px)}75%{transform:translate(-2px,-1px)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">GL</div>
+    <div>
+      <h1>Gauntlet <span>Loop</span></h1>
+      <p>Survive • Slash • Endure</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="pill">Best <strong id="bestScore">0</strong></div>
+    <button id="restartTop" class="btn ghost" style="padding:6px 12px;font-size:11px">Restart [R]</button>
+  </div>
+</header>
+
+<main>
+  <aside class="card side">
+    <h2><i></i> Status</h2>
+    <div class="stats">
+      <div class="stat-row">
+        <span class="stat-label">Health</span>
+        <div class="hearts" id="hearts"></div>
+      </div>
+      <div class="stat-row" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="stat-label">Wave Progress</span>
+          <span class="stat-value" id="enemiesLeft" style="font-size:12px">0 left</span>
+        </div>
+        <div class="progress"><div id="waveProgress" style="width:0%"></div></div>
+      </div>
+      <div class="kpi">
+        <div><strong id="score">0</strong><span>Score</span></div>
+        <div><strong id="wave">1</strong><span>Wave</span></div>
+      </div>
+      <div class="kpi">
+        <div><strong id="kills">0</strong><span>Kills</span></div>
+        <div><strong id="timeAlive">00:00</strong><span>Time</span></div>
+      </div>
+    </div>
+
+    <div class="hud-mobile" style="margin-top:12px">
+      <div class="card" style="padding:10px;text-align:center"><strong id="scoreM">0</strong><div style="font-size:11px;color:var(--muted)">SCORE</div></div>
+      <div class="card" style="padding:10px;text-align:center"><strong id="waveM">1</strong><div style="font-size:11px;color:var(--muted)">WAVE</div></div>
+    </div>
+
+    <div style="margin-top:14px" class="card">
+      <h2><i style="background:var(--warn)"></i> Objective</h2>
+      <div class="instructions">
+        <p><strong style="color:var(--text)">Survive the loop.</strong> Enemies spawn in waves and relentlessly pursue you. Clear each wave to face a stronger horde.</p>
+        <ul>
+          <li>Move to kite enemies, don't get cornered</li>
+          <li>Time your slash — it hits in a wide arc</li>
+          <li>Each wave gets faster & denser</li>
+        </ul>
+        <div class="keys">
+          <span class="key">W A S D</span>
+          <span class="key">↑ ← ↓ →</span>
+          <span class="key action">SPACE / CLICK</span>
+          <span class="key">R = Restart</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="arena-wrap">
+    <div class="card arena-card" id="arenaCard">
+      <div class="arena-header">
+        <h2><i></i> Arena — Sector 7 Loop</h2>
+        <div class="wave-badge"><span class="dot"></span> Wave <b id="waveBadge">1</b> • <span id="enemyCountBadge">0 enemies</span></div>
+      </div>
+      <div style="position:relative">
+        <canvas id="game" width="900" height="600" aria-label="Gauntlet Loop arena"></canvas>
+        <div id="startOverlay" class="overlay show">
+          <div class="overlay-box">
+            <h3>Enter the Loop</h3>
+            <p>Move with <b>WASD</b> or <b>Arrows</b>. Attack with <b>Space</b> or <b>Click</b> / tap. Slash has a wide arc — lure enemies together then strike.</p>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+              <button id="playBtn" class="btn">Start Loop</button>
+              <button id="howBtn" class="btn ghost">How to play</button>
+            </div>
+            <p style="margin-top:10px;font-size:11px;opacity:0.7">Responsive — works with keyboard, mouse, or touch. No installs.</p>
+          </div>
+        </div>
+        <div id="pauseOverlay" class="overlay">
+          <div class="overlay-box">
+            <h3>Paused</h3>
+            <p>Press <b>P</b> or click Resume</p>
+            <button id="resumeBtn" class="btn">Resume</button>
+          </div>
+        </div>
+        <div id="gameOverOverlay" class="overlay">
+          <div class="overlay-box">
+            <h3 style="color:var(--danger)">Loop Broken</h3>
+            <p id="finalStats">You fell on wave 1 with 0 points</p>
+            <div style="display:flex;gap:10px;justify-content:center">
+              <button id="restartBtn" class="btn">Restart Loop</button>
+              <button id="shareBtn" class="btn ghost">Share</button>
+            </div>
+            <p style="margin-top:10px;font-size:11px">Press <b>R</b> or <b>Enter</b> to restart</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="touch-controls" id="touchControls">
+      <div class="dpad">
+        <div></div><button data-dir="up">↑</button><div></div>
+        <button data-dir="left">←</button><button data-dir="down">↓</button><button data-dir="right">→</button>
+      </div>
+      <button class="attack-btn" id="touchAttack">SLASH</button>
+    </div>
+  </section>
+
+  <aside class="card side">
+    <h2><i style="background:var(--accent3)"></i> Field Notes</h2>
+    <div class="instructions">
+      <p><b>Player</b> — cyan loop-runner. Small hitbox, fast.</p>
+      <p><b>Enemies</b> — hunt you directly. Variants:</p>
+      <ul>
+        <li><span style="color:#fb7185">● Grunt</span> — balanced (2 HP)</li>
+        <li><span style="color:#facc15">● Racer</span> — fast, fragile (1 HP)</li>
+        <li><span style="color:#a78bfa">● Bulwark</span> — slow, tank (3 HP)</li>
+      </ul>
+      <p style="margin-top:10px"><b>Tips:</b></p>
+      <ul>
+        <li>Don't stand still — circle-strafe</li>
+        <li>Slash has 0.35s cooldown, 0.15s active — time it</li>
+        <li>Clear waves quickly for bonus +50</li>
+        <li>You get 0.8s invulnerability after hit (flash)</li>
+      </ul>
+      <div style="margin-top:12px;padding:10px;border-radius:12px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);font-size:12px">
+        <strong>Gauntlet Loop</strong> — A tight arena test. How many loops can you close?
+        <div style="margin-top:6px;display:flex;gap:8px">
+          <button class="btn ghost" id="pauseBtn" style="padding:6px 10px;font-size:11px">Pause [P]</button>
+          <button class="btn ghost" id="muteBtn" style="padding:6px 10px;font-size:11px">🔊 Sound</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer>Gauntlet Loop • Built self-contained • No external services • Keyboard + mouse + touch</footer>
+
+<script type="module">
+import { createGame } from './game.js';
+
+const canvas = document.getElementById('game');
+const game = createGame(canvas, {
+  onHUD: updateHUD,
+  onShake: () => {
+    const card = document.getElementById('arenaCard');
+    card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+  },
+  onGameOver: (stats)=>{
+    document.getElementById('finalStats').textContent = `You fell on wave ${stats.wave} with ${stats.score} points • ${stats.kills} kills • ${stats.time}`;
+    showOverlay('gameOver');
+    updateBest(stats.score);
+  },
+  onWave: (w)=> {
+    // subtle flash
+  }
+});
+
+function updateBest(score){
+  const best = Number(localStorage.getItem('gauntlet-best')||0);
+  if(score>best) localStorage.setItem('gauntlet-best', String(score));
+  document.getElementById('bestScore').textContent = localStorage.getItem('gauntlet-best')||0;
+}
+updateBest(0);
+
+function updateHUD(s){
+  document.getElementById('score').textContent = s.score;
+  document.getElementById('scoreM').textContent = s.score;
+  document.getElementById('wave').textContent = s.wave;
+  document.getElementById('waveM').textContent = s.wave;
+  document.getElementById('waveBadge').textContent = s.wave;
+  document.getElementById('kills').textContent = s.kills;
+  document.getElementById('enemyCountBadge').textContent = `${s.alive} enemies`;
+  document.getElementById('enemiesLeft').textContent = `${s.remaining} left`;
+  document.getElementById('waveProgress').style.width = `${s.waveProgress*100}%`;
+  const t = Math.floor(s.time/60).toString().padStart(2,'0') + ':' + Math.floor(s.time%60).toString().padStart(2,'0');
+  document.getElementById('timeAlive').textContent = t;
+  // hearts
+  const hearts = document.getElementById('hearts');
+  hearts.innerHTML='';
+  for(let i=0;i<s.maxHp;i++){
+    const d=document.createElement('div');
+    d.className='heart '+(i<s.hp ? 'full' : 'empty');
+    d.textContent='♥';
+    hearts.appendChild(d);
+  }
+}
+
+function showOverlay(name){
+  document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('show'));
+  if(name) document.getElementById(name+'Overlay').classList.add('show');
+}
+
+// inputs
+document.getElementById('playBtn').onclick = ()=>{ showOverlay(null); game.start(); canvas.focus(); };
+document.getElementById('howBtn').onclick = ()=>{
+  alert('Gauntlet Loop — How to play:\n\n• WASD / Arrows to move\n• Space, Click, or tap SLASH to attack (wide arc in front of you)\n• Enemies chase you — keep moving!\n• 5 health — you flash invulnerable after hit\n• Clear waves to score. R to restart, P to pause.');
+};
+document.getElementById('resumeBtn').onclick = ()=>{ showOverlay(null); game.togglePause(false); };
+document.getElementById('pauseBtn').onclick = ()=> game.togglePause();
+document.getElementById('muteBtn').onclick = (e)=>{
+  const m = game.toggleMute();
+  e.target.textContent = m ? '🔇 Muted' : '🔊 Sound';
+};
+document.getElementById('restartBtn').onclick = ()=>{ showOverlay(null); game.restart(); };
+document.getElementById('restartTop').onclick = ()=>{ showOverlay(null); game.restart(); };
+document.getElementById('shareBtn').onclick = async ()=>{
+  const text = `I scored ${document.getElementById('score').textContent} on Gauntlet Loop wave ${document.getElementById('wave').textContent}!`;
+  try{ await navigator.clipboard.writeText(text); alert('Copied: '+text); } catch{ alert(text); }
+};
+
+canvas.addEventListener('click', ()=>{ if(game.state==='playing') game.attack(); });
+window.addEventListener('keydown', (e)=>{
+  if(e.code==='Space'){ e.preventDefault(); if(game.state==='playing') game.attack(); }
+  if(e.key==='r' || e.key==='R'){ showOverlay(null); game.restart(); }
+  if(e.key==='p' || e.key==='P'){ 
+    if(game.state==='playing' || game.state==='paused'){
+      const paused = game.togglePause();
+      showOverlay(paused ? 'pause' : null);
+    }
+  }
+  if(e.key==='Enter' && game.state==='gameOver'){ showOverlay(null); game.restart(); }
+});
+
+// touch dpad
+document.querySelectorAll('.dpad button').forEach(btn=>{
+  const dir = btn.dataset.dir;
+  const set = (v)=>{
+    if(dir==='up') game.keys.up=v;
+    if(dir==='down') game.keys.down=v;
+    if(dir==='left') game.keys.left=v;
+    if(dir==='right') game.keys.right=v;
+  };
+  btn.addEventListener('touchstart', (e)=>{e.preventDefault(); set(true);});
+  btn.addEventListener('touchend', (e)=>{e.preventDefault(); set(false);});
+  btn.addEventListener('mousedown', ()=>set(true));
+  btn.addEventListener('mouseup', ()=>set(false));
+  btn.addEventListener('mouseleave', ()=>set(false));
+});
+document.getElementById('touchAttack').addEventListener('touchstart', (e)=>{e.preventDefault(); game.attack();});
+document.getElementById('touchAttack').addEventListener('click', ()=>game.attack());
+
+// initial HUD
+updateHUD(game.getHUD());
+
+// focus canvas for keyboard
+canvas.tabIndex=1000;
+</script>
+</body>
+</html>
