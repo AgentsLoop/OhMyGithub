@@ -371,7 +371,7 @@ jobs:
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
-            'Now verify the completed app. Start the app server, run browser tests, fix any failures, and confirm the app works on port 3000. Do not create a branch or pull request; the workflow will handle both.' \
+            'Now verify the completed app. Run the unit and browser tests, fix any failures, and confirm the app serves correctly on port 3000. If you start a server for testing, run it in the background, stop it after the check, and then exit immediately. Do not leave a foreground server or repeat tool calls. Do not create a branch or pull request; the workflow will handle both.' \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
       - name: Expose verified app
