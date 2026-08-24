@@ -299,7 +299,7 @@ jobs:
           printf '%s\n' "$prompt" > "$PROMPT_FILE"
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
-          nohup bash -c '"$1" run --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
+          nohup bash -c '"$1" run --auto --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
             _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" \
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
@@ -379,6 +379,7 @@ jobs:
           [[ "$code" == 0 ]]
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           "$OPENCODE_BIN" run \
+            --auto \
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
