@@ -15,7 +15,7 @@ is committed.
 
 ## OpenCode GitHub Actions
 
-The issue-triggered workflow uses `opencode/nemotron-3.5-lightning-free` and the GitHub Actions
+The issue-triggered workflow uses `opencode/muse-spark-1.2-contributor-free` and the GitHub Actions
 token. It does not require an `OPENCODE_API_KEY` repository secret.
 
 Trigger it by commenting `/oc <request>` or `/opencode <request>` on an issue

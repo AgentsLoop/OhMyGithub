@@ -94,7 +94,7 @@ That is the whole user-facing workflow. GitHub Actions handles the runner, OpenC
 Labels let you control the workflow without editing YAML.
 
 ```text
-model/opencode/nemotron-3.5-lightning-free
+model/opencode/muse-spark-1.2-contributor-free
 skill/load-sketchfab-threejs
 skill/gauntlet-loop
 ```
