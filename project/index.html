@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHAMBER 09 - Portal Puzzle</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+</head>
+<body>
+<div id="hud">
+  <div class="hud-top">
+    <div class="brand">
+      <span class="brand-accent">APERTURE</span> — TEST CHAMBER 09
+      <span class="badge">PORTAL</span>
+    </div>
+    <div class="stats">
+      <span id="stat-puzzles">Puzzles: 0/2</span>
+      <span id="stat-time">00:00</span>
+    </div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="center-msg">Click to enter chamber</div>
+  <div id="portal-indicator">
+    <div class="pi blue"><span class="dot"></span> BLUE <span id="pi-blue">—</span></div>
+    <div class="pi orange"><span class="dot"></span> ORANGE <span id="pi-orange">—</span></div>
+  </div>
+</div>
+
+<div id="panel">
+  <h2>CONTROLS</h2>
+  <div class="keys">
+    <div class="krow"><span class="k">W A S D</span> Move</div>
+    <div class="krow"><span class="k">MOUSE</span> Look around</div>
+    <div class="krow"><span class="k">SPACE</span> Jump</div>
+    <div class="krow"><span class="k">LMB</span> <span class="col b">Blue portal</span></div>
+    <div class="krow"><span class="k">RMB</span> <span class="col o">Orange portal</span></div>
+    <div class="krow"><span class="k">R</span> Reset chamber</div>
+    <div class="krow"><span class="k">ESC</span> Release cursor</div>
+  </div>
+  <div class="divider"></div>
+  <h3>MISSION</h3>
+  <ol id="mission">
+    <li id="m1"><span class="check">○</span> Cross the gap — use portals on the white panels</li>
+    <li id="m2"><span class="check">○</span> Reach the high exit — portal to the upper platform</li>
+    <li id="m3"><span class="check">○</span> Enter the EXIT door</li>
+  </ol>
+  <div class="divider"></div>
+  <div class="tips">
+    <strong>Tips:</strong> Portal momentum is preserved. Shoot walls, floor or ceiling with a bright white pattern.
+    If stuck, press <b>R</b>.
+    <div class="progress"><div id="progress-bar" style="width:0%"></div></div>
+  </div>
+  <div class="actions">
+    <button id="btn-reset">↺ Reset (R)</button>
+    <button id="btn-enter">▶ Enter chamber</button>
+  </div>
+</div>
+
+<div id="overlay-win" class="hidden">
+  <div class="win-card">
+    <div class="win-icon">◈</div>
+    <h1>TEST COMPLETE</h1>
+    <p>Chamber 09 solved. Subjects showed adequate spatial reasoning.</p>
+    <div class="win-stats">
+      <span id="win-time">Time: 00:00</span>
+      <span id="win-portals">Portals: 0</span>
+    </div>
+    <button id="btn-restart">↺ Run again</button>
+    <div class="hint">Cake is not a lie.</div>
+  </div>
+</div>
+
+<div id="blocker">
+  <div class="blocker-inner">
+    <h1>CHAMBER 09</h1>
+    <p>First-person portal puzzle — traverse, preserve momentum, exit.</p>
+    <button id="btn-play">CLICK TO CALIBRATE</button>
+    <div class="sub">WASD + Mouse &nbsp;|&nbsp; LMB blue &nbsp;|&nbsp; RMB orange</div>
+  </div>
+</div>
+
+<canvas id="c"></canvas>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
