@@ -6,6 +6,11 @@
 - [Temporary Mac SSH access](wiki/access.md)
 - [Testing and verification](wiki/testing.md)
 
+## Git delivery
+
+After every code change, commit and push the change. For small code changes, amend
+the current commit and push the amended commit instead of creating another commit.
+
 ## OpenCode GitHub Actions
 
 The issue-triggered workflow uses `opencode/nemotron-3.5-lightning-free` and the GitHub Actions
