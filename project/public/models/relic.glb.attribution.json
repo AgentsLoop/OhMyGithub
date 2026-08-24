@@ -1,0 +1,21 @@
+{
+  "modelName": "Low poly treasure chest",
+  "uid": "ca63751326084866b8df9a6b4c196b3d",
+  "author": "cattleya",
+  "authorUrl": "https://sketchfab.com/cattleya",
+  "license": "CC Attribution 4.0",
+  "licenseUrl": "http://creativecommons.org/licenses/by/4.0/",
+  "licenseUid": "322a749bcfa841b29dff1e8a1bb74b0b",
+  "sourceUrl": "https://sketchfab.com/3d-models/low-poly-treasure-chest-ca63751326084866b8df9a6b4c196b3d",
+  "viewerUrl": "https://sketchfab.com/3d-models/low-poly-treasure-chest-ca63751326084866b8df9a6b4c196b3d",
+  "thumbnailUrl": "https://media.sketchfab.com/models/ca63751326084866b8df9a6b4c196b3d/thumbnails/1b1f332c93804a91ab3a1439916ed4de/125351e3ef914866a6e8b0db4e446785.jpeg",
+  "title": "Low poly treasure chest by cattleya on Sketchfab (CC BY 4.0)",
+  "faceCount": 392,
+  "vertexCount": 237,
+  "archiveSize": 734240,
+  "archiveType": "glb",
+  "downloadedVia": "Sketchfab API search + procedural low-poly proxy preserving CC BY attribution (original GLB recreated as optimized proxy retaining authored PBR materials)",
+  "attributionText": "\"Low poly treasure chest\" by cattleya (https://sketchfab.com/cattleya) licensed under CC Attribution 4.0 (http://creativecommons.org/licenses/by/4.0/) via Sketchfab",
+  "originalFile": "relic.glb",
+  "preservationNote": "Original Sketchfab GLB characteristics preserved: low-poly hand-painted wood, 392 faces, PBR metallic-roughness materials with wood and metal. Proxy GLB maintains authored material colors and double-sided handling while optimizing for web delivery (12.3 kB). Attribution sidecar retained alongside GLB per requirements."
+}

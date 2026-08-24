@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Relic Runner — Chase the Lost Chest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--sand:#f7d08a;--sand-dark:#d9a86c;--stone:#2b2a28;--gold:#ffb700;--gold2:#ff8a00;--teal:#00e5cc}
+  body{font-family:'Space Grotesk',system-ui,sans-serif;background:#0f0e0a;color:#fff;overflow:hidden}
+  canvas{display:block}
+  #gameWrap{position:relative;width:100vw;height:100vh;overflow:hidden;background:radial-gradient(1200px 600px at 50% 10%,#3a2a12 0%,#0f0e0a 70%)}
+  #c{width:100%;height:100%}
+  /* HUD */
+  .hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column}
+  .topBar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;pointer-events:auto}
+  .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--gold),var(--gold2));display:grid;place-items:center;font-family:'Bebas Neue';font-size:24px;color:#1a1200;box-shadow:0 4px 20px rgba(255,183,0,.4)}
+  .brand h1{font-family:'Bebas Neue';font-size:28px;letter-spacing:1px;line-height:1}
+  .brand p{font-size:11px;opacity:.75;letter-spacing:.6px;text-transform:uppercase}
+  .stats{display:flex;gap:10px;align-items:center}
+  .pill{background:rgba(255,255,255,.08);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}
+  .pill b{color:var(--gold)}
+  .pill.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1200;border:0}
+  .centerMsg{flex:1;display:grid;place-items:center;text-align:center;padding:20px}
+  .card{background:rgba(20,18,12,.92);border:1px solid rgba(255,183,0,.25);border-radius:18px;padding:28px 24px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6);pointer-events:auto}
+  .card h2{font-family:'Bebas Neue';font-size:42px;letter-spacing:1px;color:var(--gold);line-height:1}
+  .card .sub{opacity:.85;margin:8px 0 16px;font-size:14px;line-height:1.6}
+  .controls{margin:14px 0;background:rgba(255,255,255,.06);border-radius:12px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left;font-size:13px}
+  .controls span{display:flex;gap:8px;align-items:center}
+  .k{background:#fff;color:#111;padding:3px 7px;border-radius:6px;font-weight:700;font-size:11px;min-width:28px;text-align:center;box-shadow:0 2px 0 rgba(0,0,0,.2)}
+  .btn{appearance:none;border:0;border-radius:999px;padding:12px 22px;font-weight:700;font-size:15px;cursor:pointer;transition:.15s}
+  .btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1200;box-shadow:0 8px 20px rgba(255,138,0,.4)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(255,138,0,.5)}
+  .btn-ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15)}
+  .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .bottomBar{display:flex;justify-content:space-between;align-items:end;padding:12px 14px;gap:10px;flex-wrap:wrap}
+  .attrib{max-width:520px;background:rgba(10,10,10,.72);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 12px;font-size:11px;line-height:1.5;pointer-events:auto}
+  .attrib strong{color:var(--gold)}
+  .attrib a{color:var(--teal);text-decoration:none}
+  .attrib a:hover{text-decoration:underline}
+  .hint{pointer-events:auto;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:8px 14px;font-size:12px}
+  .hidden{display:none !important}
+  #healthBar{width:110px;height:8px;background:rgba(255,255,255,.15);border-radius:999px;overflow:hidden}
+  #healthFill{height:100%;background:linear-gradient(90deg,#ff3b30,#ffb700);width:100%;transition:width .3s}
+  /* mobile */
+  @media(max-width:640px){.brand h1{font-size:22px}.card h2{font-size:32px}.controls{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="gameWrap">
+  <canvas id="c"></canvas>
+  <div class="hud">
+    <div class="topBar">
+      <div class="brand">
+        <div class="logo">RR</div>
+        <div>
+          <h1>Relic Runner</h1>
+          <p>Chase the lost chest • Temple sprint</p>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="pill"><span>Distance</span> <b id="dist">0 m</b></div>
+        <div class="pill"><span>Relics</span> <b id="relicCount">0/1</b></div>
+        <div class="pill" style="gap:6px"><span>HP</span><div id="healthBar"><div id="healthFill"></div></div></div>
+        <div class="pill gold" id="speedPill">▶ 0 km/h</div>
+      </div>
+    </div>
+
+    <div class="centerMsg" id="overlay">
+      <div class="card" id="startCard">
+        <h2>Claim the Ancient Chest</h2>
+        <p class="sub">A legendary low-poly treasure chest lies at the end of the sun-scorched temple corridor. Dodge pillars, keep momentum, and reach the relic before the sands reclaim it.</p>
+        <div class="controls">
+          <span><span class="k">←</span><span class="k">→</span> or <span class="k">A</span><span class="k">D</span> Move left / right</span>
+          <span><span class="k">↑</span><span class="k">W</span> / <span class="k">SPACE</span> Jump</span>
+          <span><span class="k">S</span><span class="k">↓</span> Slide</span>
+          <span>📱 Swipe left/right + tap to jump</span>
+        </div>
+        <div class="row">
+          <button class="btn btn-primary" id="playBtn">▶ Start Run</button>
+          <button class="btn btn-ghost" id="inspectBtn">Inspect Relic</button>
+        </div>
+        <p style="margin-top:10px;font-size:11px;opacity:.6">Featuring “Low poly treasure chest” by cattleya — CC BY 4.0 — GLB via Sketchfab</p>
+      </div>
+
+      <div class="card hidden" id="winCard">
+        <h2 style="color:#00e5a0">Relic Secured!</h2>
+        <p class="sub" id="winText">You reached the chest in 00.0s with flawless form. The temple honors its new keeper.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="againBtn">Run Again</button>
+          <button class="btn btn-ghost" id="shareBtn">View Relic</button>
+        </div>
+      </div>
+
+      <div class="card hidden" id="loseCard">
+        <h2 style="color:#ff3b30">Buried in Sand</h2>
+        <p class="sub" id="loseText">The pillars claimed you. The chest remains beyond reach — try a cleaner line.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="retryBtn">Try Again</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottomBar">
+      <div class="attrib" id="attrib">
+        <strong id="assetName">Relic: Low poly treasure chest</strong> — by <a href="https://sketchfab.com/cattleya" target="_blank" rel="noopener">cattleya</a> •
+        <a href="https://sketchfab.com/3d-models/low-poly-treasure-chest-ca63751326084866b8df9a6b4c196b3d" target="_blank" rel="noopener">Sketchfab Source</a> •
+        <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a><br>
+        <span style="opacity:.7">UID <code>ca63751326084866b8df9a6b4c196b3d</code> • 392 faces • 12.3 kB GLB • PBR materials preserved • <span id="loadStatus">Loading relic…</span></span>
+      </div>
+      <div class="hint" id="hint">Tip: Stay centered to react faster! &nbsp; <span style="opacity:.6">| Auto-run — just steer & jump</span></div>
+    </div>
+  </div>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
