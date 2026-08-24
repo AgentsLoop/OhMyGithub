@@ -292,7 +292,7 @@ jobs:
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
-          prompt_template="$(< "$GITHUB_WORKSPACE/.github/prompts/build.txt")"
+          prompt_template="$(< "$GITHUB_WORKSPACE/.github/prompts/build.md")"
           prompt="${prompt_template//@COMMENT_BODY@/$COMMENT_BODY}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
@@ -382,7 +382,7 @@ jobs:
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
-            "$(< "$GITHUB_WORKSPACE/.github/prompts/verify.txt")" \
+            "$(< "$GITHUB_WORKSPACE/.github/prompts/verify.md")" \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
       - name: Expose verified app
