@@ -514,11 +514,13 @@ jobs:
           set -euo pipefail
           BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
           git add -A -- project
-          if git diff --cached --quiet; then
+          if ! git diff --cached --quiet; then
+            git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
+          fi
+          if git diff --quiet "origin/$BASE_BRANCH..HEAD" -- project; then
             echo 'OpenCode made no changes; no pull request will be created.'
             exit 0
           fi
-          git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
           git push --set-upstream origin "$BRANCH_NAME"
           TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
           TITLE="${TITLE:0:120}"
