@@ -43,6 +43,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
+      TRIGGER_ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
     steps:
       - name: Checkout repository
@@ -72,6 +73,14 @@ jobs:
       - name: Exclude shared skills from generated changes
         shell: bash
         run: echo '/project/.agents/' >> .git/info/exclude
+
+      - name: Install worker instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d "$PROJECT_DIR"
+          cp "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
+          cmp --silent "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
 
       - name: Sync OpenCode labels
         uses: actions/github-script@v7
@@ -226,6 +235,7 @@ jobs:
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
         shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
           install -d -m 700 "$OPENCODE_WEB_DIR"
@@ -241,7 +251,16 @@ jobs:
             | bash -s -- --version "$OPENCODE_VERSION"
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           [[ -x "$OPENCODE_BIN" ]]
-          nohup "$OPENCODE_BIN" web --auto --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
+          install -d -m 700 "$HOME/.config/opencode"
+          cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "permission": {
+              "*": "allow"
+            }
+          }
+          EOF
+          nohup "$OPENCODE_BIN" web --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
           for _ in {1..45}; do
@@ -530,7 +549,36 @@ jobs:
         env:
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
 
+      - name: Publish worker completion report
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          "$OPENCODE_BIN" run --auto \
+            --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+            --session "${{ steps.opencode_run.outputs.session_id }}" \
+            --model "${{ steps.opencode_labels.outputs.model }}" \
+            "The public game is verified at $APP_URL. Follow ./Agents.md now: capture and commit final playable-game screenshots under screenshots/ using final-* filenames, push the current branch, and post the final completion comment to issue #$TRIGGER_ISSUE_NUMBER. Include this public game URL, embedded screenshots, the final commit, deployment and test status, and known limitations. Do not create a pull request." \
+            > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
+
+      - name: Verify final screenshots exist
+        id: final_evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
+            \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
+            -printf '%f\n' 2>/dev/null | sort)
+          if [[ "${#screenshots[@]}" -eq 0 ]]; then
+            echo 'No final screenshots found under project/screenshots/.'
+            exit 1
+          fi
+          printf '%s\n' "${screenshots[@]}"
+          printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+
       - name: Create pull request
+        id: delivery
         shell: bash
         run: |
           set -euo pipefail
@@ -544,27 +592,48 @@ jobs:
             exit 0
           fi
           git push --set-upstream origin "$BRANCH_NAME"
+          FINAL_COMMIT="$(git rev-parse HEAD)"
           TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
           TITLE="${TITLE:0:120}"
-          gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
+          PR_URL="$(gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
             --title "$TITLE" \
-            --body "Automated implementation requested in comment:\n\n$COMMENT_BODY"
+            --body "Automated implementation requested in comment:\n\n$COMMENT_BODY")"
+          printf 'commit=%s\npr_url=%s\n' "$FINAL_COMMIT" "$PR_URL" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Post verified app URL
+      - name: Post final game report
         if: success() && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
           APP_URL: ${{ env.APP_URL }}
+          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
+          PR_URL: ${{ steps.delivery.outputs.pr_url }}
+          SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
+            const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${process.env.FINAL_COMMIT}`;
+            const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
+            const images = screenshots.map((name) => {
+              const path = `project/screenshots/${name}`.split('/').map(encodeURIComponent).join('/');
+              const url = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${process.env.FINAL_COMMIT}/${path}`;
+              return `![Final game screenshot: ${name}](${url})`;
+            });
+            const body = [
+              '✅ **Game complete and publicly verified.**', '',
+              `Public game: ${process.env.APP_URL}`,
+              `Final commit: ${commitUrl}`,
+              `Pull request: ${process.env.PR_URL}`,
+              'Deployment status: verified through the public URL.',
+              'Known limitations: see the worker progress and completion notes above.',
+              '', '### Final screenshots', '', ...images
+            ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: number,
-              body: `✅ Verified app is live:\n\n${process.env.APP_URL}`
+              body
             });
 
       - name: Mark issue complete

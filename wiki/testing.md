@@ -16,6 +16,12 @@ actionlint .github/workflows/opencode.yml
 git diff --check
 ```
 
+Focused completion-evidence checks should also confirm that the workflow copies
+`agents.template.md` to `project/Agents.md`, and that a run fails before delivery
+when no `project/screenshots/final-*` image exists. A successful run must leave a
+final issue comment containing the public URL, final commit, PR, and embedded
+screenshots served from that immutable commit.
+
 Watch a running workflow with live per-step logs using the same internal
 endpoints as the GitHub Actions web UI:
 
