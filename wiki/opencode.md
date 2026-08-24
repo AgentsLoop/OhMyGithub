@@ -47,14 +47,19 @@ opencode github run
 The workflow now sends the comment text directly to `opencode run --attach`.
 
 Before starting OpenCode, the workflow checks out `agents-dev/skills` into
-`.agents`. OpenCode discovers project skills from `.agents/skills/**/SKILL.md`.
+`project/.agents`. OpenCode discovers project skills from
+`project/.agents/skills/**/SKILL.md`.
+The workflow excludes this nested skills checkout through `.git/info/exclude`
+so it cannot be included in the generated app commit.
 The workflow verifies the discovered skill list through OpenCode's `/skill`
 endpoint and synchronizes `model/<provider>/<name>` and `skill/<name>` labels
 in the repository.
 This keeps the regular OpenCode session while making branch and PR behavior
 explicit and reviewable in YAML.
 
-The Web UI still needs to be connected to the same project. OpenCode's server
+The workflow uses `$GITHUB_WORKSPACE/project` as OpenCode's working directory,
+so generated app files stay under the repository's `project/` directory. The
+Web UI still needs to be connected to that same project. OpenCode's server
 loads project instances per request using the `x-opencode-directory` header.
 A tunneled browser request does not know the runner's `$GITHUB_WORKSPACE`, so
 the UI can appear empty even while `opencode github run` is actively working.
@@ -67,7 +72,7 @@ opencode github run
         v
 shared OpenCode session/database
         ^
-        | x-opencode-directory: $GITHUB_WORKSPACE
+        | x-opencode-directory: $PROJECT_DIR
         |
 local header-injecting proxy
         ^
@@ -76,7 +81,7 @@ trycloudflare tunnel -> browser Web UI
 ```
 
 The workflow tunnels a minimal local nginx reverse proxy that injects
-`x-opencode-directory: $GITHUB_WORKSPACE` before forwarding requests to
+`x-opencode-directory: $PROJECT_DIR` before forwarding requests to
 OpenCode Web, including WebSocket upgrade headers. The access comment points
 to the encoded worktree/session route, so the browser opens the live run
 directly. A loaded Web UI or healthy tunnel alone does not prove session
