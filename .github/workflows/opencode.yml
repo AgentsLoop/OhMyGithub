@@ -40,6 +40,7 @@ jobs:
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
       PROJECT_DIR: ${{ github.workspace }}/project
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
       COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
@@ -228,7 +229,16 @@ jobs:
         run: |
           set -euo pipefail
           install -d -m 700 "$OPENCODE_WEB_DIR"
-          curl --fail --silent --show-error --location https://opencode.ai/install | bash
+          OPENCODE_VERSION="$(
+            curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              https://api.github.com/repos/anomalyco/opencode/releases/latest \
+              | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p'
+          )"
+          [[ "$OPENCODE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          curl --fail --silent --show-error --location https://opencode.ai/install \
+            | bash -s -- --version "$OPENCODE_VERSION"
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           [[ -x "$OPENCODE_BIN" ]]
           nohup "$OPENCODE_BIN" web --auto --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
