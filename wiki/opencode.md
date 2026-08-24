@@ -44,6 +44,12 @@ opencode github run
 ```
 
 The workflow now sends the comment text directly to `opencode run --attach`.
+
+Before starting OpenCode, the workflow checks out `agents-dev/skills` into
+`.agents`. OpenCode discovers project skills from `.agents/skills/**/SKILL.md`.
+The workflow verifies the discovered skill list through OpenCode's `/skill`
+endpoint and synchronizes `model/<provider>/<name>` and `skill/<name>` labels
+in the repository.
 This keeps the regular OpenCode session while making branch and PR behavior
 explicit and reviewable in YAML.
 

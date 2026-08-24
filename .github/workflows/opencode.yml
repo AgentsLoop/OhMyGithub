@@ -58,6 +58,66 @@ jobs:
             lolgames_tunnel
           persist-credentials: false
 
+      - name: Checkout shared OpenCode skills
+        uses: actions/checkout@v6
+        with:
+          repository: agents-dev/skills
+          path: .agents
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Sync OpenCode labels
+        uses: actions/github-script@v7
+        env:
+          OPENCODE_MODEL: opencode/nemotron-3.5-lightning-free
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+
+            const modelLabel = `model/${process.env.OPENCODE_MODEL}`;
+            const skillsRoot = path.join(process.env.GITHUB_WORKSPACE, '.agents', 'skills');
+            const skillNames = fs.existsSync(skillsRoot)
+              ? fs.readdirSync(skillsRoot, { withFileTypes: true })
+                  .filter((entry) => entry.isDirectory())
+                  .filter((entry) => fs.existsSync(path.join(skillsRoot, entry.name, 'SKILL.md')))
+                  .map((entry) => entry.name)
+              : [];
+
+            const labels = [
+              {
+                name: modelLabel,
+                color: '5319E7',
+                description: `OpenCode model: ${process.env.OPENCODE_MODEL}`
+              },
+              ...skillNames.map((name) => ({
+                name: `skill/${name}`,
+                color: '1D76DB',
+                description: `OpenCode skill: ${name}`
+              }))
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ...label
+                });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+                await github.rest.issues.updateLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description
+                });
+              }
+            }
+
+            core.info(`Synchronized ${labels.length} labels: ${labels.map(({ name }) => name).join(', ')}`);
+
       - name: Start AgentsWeb SSH session
         id: agentsweb
         shell: bash
@@ -157,6 +217,19 @@ jobs:
           done
           [[ -n "${WEB_URL:-}" ]]
           printf 'url=%s\n' "$WEB_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Verify shared skills are visible to OpenCode
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(find "$GITHUB_WORKSPACE/.agents/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -type f | wc -l | tr -d ' ')"
+          skills="$(curl --fail --silent --show-error \
+            -H "x-opencode-directory: $GITHUB_WORKSPACE" \
+            "http://127.0.0.1:$OPENCODE_PROXY_PORT/skill")"
+          actual="$(jq 'length' <<<"$skills")"
+          echo "OpenCode reported $actual skills; repository contains $expected shared skills."
+          jq -e 'length > 0' <<<"$skills" >/dev/null
+          [[ "$actual" -ge "$expected" ]]
 
       - name: Configure Git identity
         shell: bash
