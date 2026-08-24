@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Asteroid Sprint</title>
+<style>
+  :root {
+    --bg: #070b1a;
+    --panel: #111a33;
+    --accent: #4ef2ff;
+    --accent2: #ff3b7f;
+    --text: #e6f0ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -10%, #1a2a6b 0%, var(--bg) 55%),
+                var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+  header {
+    text-align: center;
+    padding: 16px 12px 8px;
+    width: 100%;
+    max-width: 560px;
+  }
+  h1 {
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
+    text-shadow: 0 0 14px rgba(78,242,255,0.6), 0 0 32px rgba(255,59,127,0.35);
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-top: 6px;
+  }
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 480px;
+    margin: 10px auto 8px;
+    padding: 0 8px;
+    gap: 8px;
+  }
+  .score-box {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(78,242,255,0.25);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(6px);
+    min-width: 130px;
+    text-align: center;
+  }
+  .score-box span { color: var(--accent); }
+  .controls-hint {
+    font-size: 0.72rem;
+    opacity: 0.65;
+    text-align: right;
+    line-height: 1.3;
+  }
+  .game-wrap {
+    position: relative;
+    width: min(92vw, 480px);
+    aspect-ratio: 480 / 720;
+    background: linear-gradient(180deg, #0a1333 0%, #050814 100%);
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(78,242,255,0.22);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5,8,20,0.72);
+    backdrop-filter: blur(4px);
+    text-align: center;
+    padding: 20px;
+    gap: 14px;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h2 {
+    font-size: clamp(1.8rem, 8vw, 2.8rem);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent2);
+    text-shadow: 0 0 16px rgba(255,59,127,0.6);
+  }
+  .overlay p { opacity: 0.9; max-width: 32ch; line-height: 1.4; }
+  .btn {
+    appearance: none;
+    border: none;
+    background: linear-gradient(180deg, var(--accent) 0%, #2ad4e0 100%);
+    color: #06131a;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 12px 26px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 6px 22px rgba(78,242,255,0.45), 0 1px 0 rgba(255,255,255,0.6) inset;
+    transition: transform 120ms ease, filter 120ms ease;
+  }
+  .btn:hover { transform: translateY(-1px) scale(1.02); filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.98); }
+  .btn.secondary {
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: none;
+  }
+  .mobile-controls {
+    display: none;
+    gap: 12px;
+    margin-top: 12px;
+    width: min(92vw, 480px);
+    justify-content: space-between;
+  }
+  .mobile-controls button {
+    flex: 1;
+    padding: 16px 10px;
+    font-size: 1.35rem;
+    border-radius: 14px;
+    border: 1px solid rgba(78,242,255,0.2);
+    background: rgba(255,255,255,0.07);
+    color: var(--text);
+    font-weight: 700;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .mobile-controls button:active { background: rgba(78,242,255,0.18); }
+  @media (max-width: 640px) {
+    .mobile-controls { display: flex; }
+    .controls-hint { display: none; }
+    header { padding-top: 12px; }
+  }
+  .start-hint {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    opacity: 0.85;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  footer {
+    margin: 14px 0 18px;
+    font-size: 0.74rem;
+    opacity: 0.5;
+    text-align: center;
+    padding: 0 12px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Asteroid</span> Sprint</h1>
+  <p class="subtitle">Dodge the rocks. Survive the sprint.</p>
+</header>
+
+<div class="hud">
+  <div class="score-box" aria-live="polite">Score: <span id="score">0</span></div>
+  <div class="controls-hint">Move: ← → or A / D<br>Touch & drag to steer</div>
+</div>
+
+<div class="game-wrap" id="gameWrap">
+  <canvas id="game" width="480" height="720" aria-label="Asteroid Sprint game"></canvas>
+  <div id="startOverlay" class="overlay">
+    <h2 style="color: var(--accent); text-shadow: 0 0 16px rgba(78,242,255,0.6);">Ready?</h2>
+    <p>Dodge falling asteroids. Use <b>Arrow keys</b> or <b>A / D</b>. On mobile, drag or use the buttons below.</p>
+    <button id="startBtn" class="btn">Start Sprint</button>
+  </div>
+  <div id="gameOverOverlay" class="overlay hidden" role="alert">
+    <h2>Game Over</h2>
+    <p>Your score: <strong id="finalScore">0</strong></p>
+    <button id="restartBtn" class="btn">Restart</button>
+  </div>
+  <div id="pauseHint" class="start-hint">Press P to pause</div>
+</div>
+
+<div class="mobile-controls" aria-hidden="false">
+  <button id="leftBtn" aria-label="Move left">◀ Left</button>
+  <button id="rightBtn" aria-label="Move right">Right ▶</button>
+</div>
+
+<footer>Tip: survive longer for bonus points — every second counts.</footer>
+
+<script type="module">
+import { createInitialState, updateGame, resetGame } from './game.js';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('gameWrap');
+const scoreEl = document.getElementById('score');
+const finalScoreEl = document.getElementById('finalScore');
+const startOverlay = document.getElementById('startOverlay');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const leftBtn = document.getElementById('leftBtn');
+const rightBtn = document.getElementById('rightBtn');
+const pauseHint = document.getElementById('pauseHint');
+
+const state = createInitialState();
+
+let direction = 0;
+let keys = new Set();
+let running = false;
+let paused = false;
+let lastTime = 0;
+let animationId = 0;
+
+// Handle responsive canvas scaling without changing logic coordinates
+function resizeCanvas() {
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const rect = canvas.getBoundingClientRect();
+  // keep internal resolution fixed at 480x720 for logic simplicity, scale via CSS only
+  // But adjust for DPR for crispness if needed: we keep 480x720 logical, scaled by CSS.
+  // No resize of width/height needed because CSS handles it.
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function computeDirection() {
+  let dir = 0;
+  if (keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) dir -= 1;
+  if (keys.has('ArrowRight') || keys.has('d') || keys.has('D')) dir += 1;
+  // clamp to -1..1
+  if (dir > 0) dir = 1;
+  if (dir < 0) dir = -1;
+  return dir;
+}
+
+function setDirectionFromKeys() {
+  direction = computeDirection();
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'p' || e.key === 'P') {
+    paused = !paused;
+    pauseHint.textContent = paused ? 'Paused — press P to resume' : 'Press P to pause';
+    pauseHint.style.opacity = '1';
+    if (!paused && running) { lastTime = performance.now(); requestAnimationFrame(loop); }
+    return;
+  }
+  if (['ArrowLeft','ArrowRight','a','A','d','D'].includes(e.key)) {
+    keys.add(e.key);
+    // prevent scrolling
+    if (e.key.startsWith('Arrow')) e.preventDefault();
+    setDirectionFromKeys();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  keys.delete(e.key);
+  keys.delete(e.key.toLowerCase());
+  keys.delete(e.key.toUpperCase());
+  // handle case-insensitive
+  if (e.key.toLowerCase() === 'a' || e.key.toLowerCase() === 'd') {
+    // remove both cases
+    keys.delete('a'); keys.delete('A'); keys.delete('d'); keys.delete('D');
+    // re-add if other still held? simplified: recompute from remaining keys by checking?
+    // Instead, clear and rely on next keydown – simpler: keep set as is, but we cleared above.
+    // Re-evaluate not needed; direction will be 0 unless other key held.
+    // To support holding A and tapping D, we need proper tracking – do full recompute by not clearing ambiguous.
+  }
+  setDirectionFromKeys();
+});
+
+// Fix sticky: better tracking with code
+let heldLeft = false;
+let heldRight = false;
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft' || k === 'a') heldLeft = true;
+  if (k === 'arrowright' || k === 'd') heldRight = true;
+  direction = (heldRight ? 1 : 0) + (heldLeft ? -1 : 0);
+  if (direction > 1) direction = 1;
+  if (direction < -1) direction = -1;
+});
+window.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft' || k === 'a') heldLeft = false;
+  if (k === 'arrowright' || k === 'd') heldRight = false;
+  direction = (heldRight ? 1 : 0) + (heldLeft ? -1 : 0);
+});
+
+// Mobile buttons
+function bindHold(btn, dir) {
+  const down = (e) => { e.preventDefault(); direction = dir; heldLeft = dir === -1; heldRight = dir === 1; };
+  const up = (e) => { e.preventDefault(); direction = 0; heldLeft = false; heldRight = false; };
+  btn.addEventListener('touchstart', down, {passive:false});
+  btn.addEventListener('touchend', up, {passive:false});
+  btn.addEventListener('touchcancel', up, {passive:false});
+  btn.addEventListener('mousedown', down);
+  btn.addEventListener('mouseup', up);
+  btn.addEventListener('mouseleave', up);
+}
+bindHold(leftBtn, -1);
+bindHold(rightBtn, 1);
+
+// Touch drag steering
+let touchActive = false;
+let touchX = 0;
+canvas.addEventListener('touchstart', (e) => {
+  touchActive = true;
+  const rect = canvas.getBoundingClientRect();
+  touchX = e.touches[0].clientX - rect.left;
+  e.preventDefault();
+}, {passive:false});
+canvas.addEventListener('touchmove', (e) => {
+  if (!touchActive) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.touches[0].clientX - rect.left;
+  const cssWidth = rect.width;
+  // convert touch delta to direction or direct position
+  const logicalX = (x / cssWidth) * 480; // map to game coords
+  // move ship directly toward touch for more responsive mobile
+  const target = logicalX - state.ship.width/2;
+  // set direction based on difference
+  const diff = target - state.ship.x;
+  if (Math.abs(diff) < 4) direction = 0;
+  else direction = diff > 0 ? 1 : -1;
+  // also snap a bit for faster response
+  if (Math.abs(diff) > 60) {
+    state.ship.x += Math.sign(diff) * 8;
+    state.ship.x = Math.max(0, Math.min(480 - state.ship.width, state.ship.x));
+  }
+  e.preventDefault();
+}, {passive:false});
+canvas.addEventListener('touchend', (e) => {
+  touchActive = false;
+  direction = 0;
+  e.preventDefault();
+}, {passive:false});
+
+// Mouse drag for desktop testing
+let mouseDown = false;
+canvas.addEventListener('pointerdown', (e) => { mouseDown = true; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', (e) => {
+  if (!mouseDown || touchActive) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const logicalX = (x / rect.width) * 480;
+  const target = logicalX - state.ship.width/2;
+  const diff = target - state.ship.x;
+  if (Math.abs(diff) > 3) direction = diff > 0 ? 1 : -1;
+  else direction = 0;
+  if (Math.abs(diff) > 40) {
+    state.ship.x += Math.sign(diff) * 6;
+  }
+});
+canvas.addEventListener('pointerup', () => { mouseDown = false; direction = computeDirection(); });
+
+function loop(now) {
+  if (!running || paused) return;
+  const dt = Math.min(0.033, (now - lastTime) / 1000);
+  lastTime = now;
+
+  // use held direction, but if touchActive already set, use that computed direction
+  const dir = direction;
+  updateGame(state, dt, dir);
+
+  draw();
+
+  scoreEl.textContent = Math.floor(state.score).toString();
+
+  if (state.gameOver) {
+    running = false;
+    finalScoreEl.textContent = Math.floor(state.score).toString();
+    gameOverOverlay.classList.remove('hidden');
+    pauseHint.style.display = 'none';
+    return;
+  }
+
+  animationId = requestAnimationFrame(loop);
+}
+
+function drawStars() {
+  ctx.fillStyle = '#050814';
+  ctx.fillRect(0,0,480,720);
+  // subtle starfield
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  const seed = 12345;
+  for (let i=0;i<70;i++) {
+    const x = (i*73 % 480);
+    const y = (i*137 % 720);
+    const offset = (state.elapsed * 30 * (0.3 + (i%3)*0.3)) % 720;
+    const yy = (y + offset) % 720;
+    const alpha = 0.35 + (i % 5) * 0.12;
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(x, yy, 1.2, 1.2);
+  }
+  ctx.globalAlpha = 1;
+  // nebula
+  const grad = ctx.createRadialGradient(240, 180, 40, 240, 180, 420);
+  grad.addColorStop(0, 'rgba(78,242,255,0.08)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,480,720);
+}
+
+function drawShip() {
+  const s = state.ship;
+  ctx.save();
+  ctx.translate(s.x + s.width/2, s.y + s.height/2);
+
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(0, 18, 14, 6, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // body
+  ctx.fillStyle = '#e9f6ff';
+  ctx.strokeStyle = '#4ef2ff';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(0, -s.height/2 + 2);
+  ctx.lineTo(-s.width/2 + 4, s.height/2 - 4);
+  ctx.lineTo(-6, s.height/2 - 10);
+  ctx.lineTo(6, s.height/2 - 10);
+  ctx.lineTo(s.width/2 - 4, s.height/2 - 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // cockpit
+  ctx.fillStyle = '#4ef2ff';
+  ctx.beginPath();
+  ctx.ellipse(0, -2, 7, 9, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath();
+  ctx.ellipse(-1.5, -5, 3, 4, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // engine flame
+  const flame = 6 + Math.sin(state.elapsed * 18) * 2;
+  ctx.fillStyle = '#ff3b7f';
+  ctx.beginPath();
+  ctx.moveTo(-7, s.height/2 - 10);
+  ctx.lineTo(0, s.height/2 - 10 + flame);
+  ctx.lineTo(7, s.height/2 - 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ffbe3b';
+  ctx.beginPath();
+  ctx.moveTo(-4, s.height/2 - 10);
+  ctx.lineTo(0, s.height/2 - 10 + flame*0.6);
+  ctx.lineTo(4, s.height/2 - 10);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawAsteroid(a) {
+  ctx.save();
+  ctx.translate(a.x + a.size/2, a.y + a.size/2);
+  ctx.rotate(a.rotation);
+  ctx.fillStyle = '#8a7d75';
+  ctx.strokeStyle = '#3d351f';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const r = a.size/2;
+  for (let i=0;i<a.points;i++) {
+    const ang = (i / a.points) * Math.PI*2;
+    const rad = r * (0.78 + Math.sin(i*1.7)*0.12 + Math.cos(i*2.3)*0.08);
+    const x = Math.cos(ang)*rad;
+    const y = Math.sin(ang)*rad;
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // craters
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath();
+  ctx.arc(-r*0.25, -r*0.2, r*0.18, 0, Math.PI*2);
+  ctx.arc(r*0.3, r*0.2, r*0.14, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function draw() {
+  drawStars();
+  for (const a of state.asteroids) drawAsteroid(a);
+  drawShip();
+  // vignette
+  const vg = ctx.createLinearGradient(0,0,0,720);
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(0,0,0,0.35)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0,0,480,720);
+}
+
+function startGame() {
+  resetGame(state);
+  direction = 0;
+  heldLeft = false; heldRight = false;
+  scoreEl.textContent = '0';
+  startOverlay.classList.add('hidden');
+  gameOverOverlay.classList.add('hidden');
+  pauseHint.style.display = 'block';
+  pauseHint.textContent = 'Press P to pause';
+  running = true;
+  paused = false;
+  lastTime = performance.now();
+  draw();
+  cancelAnimationFrame(animationId);
+  animationId = requestAnimationFrame(loop);
+}
+
+startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
+
+// allow Enter/Space to start/restart
+window.addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && (!running || state.gameOver)) {
+    if (!startOverlay.classList.contains('hidden') || !gameOverOverlay.classList.contains('hidden')) {
+      e.preventDefault();
+      startGame();
+    }
+  }
+});
+
+// initial draw
+draw();
+
+// Auto-focus for desktop
+canvas.setAttribute('tabindex','0');
+canvas.focus();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "asteroid-sprint",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Asteroid Sprint - dodge falling asteroids",
+  "scripts": {
+    "start": "npx --yes http-server . -p 3000 --cors -c-1",
+    "test": "vitest run --reporter=verbose",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0",
+    "http-server": "^14.1.1",
+    "jsdom": "^24.0.0"
+  }
+}
