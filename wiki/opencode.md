@@ -18,8 +18,11 @@ comment. Bot-authored events are ignored, so status comments do not recurse.
 5. Starts `opencode run --attach` against the same OpenCode installation and
    server-backed session store, then posts a direct URL to that live session.
 6. Verifies SSH connectivity.
-7. Waits for OpenCode, pushes the branch, and creates the pull request in YAML.
-8. Keeps SSH and the web UI available for 30 minutes after the prompt ends,
+7. Runs a second verification prompt, starts the app, exposes it through a
+   separate temporary trycloudflare.com tunnel, and verifies the public URL.
+8. Pushes the branch and creates the pull request in YAML.
+9. Keeps SSH, the OpenCode Web UI, and the app available for 30 minutes after
+   verification,
    then marks the comment closed and terminates both tunnels.
 
 The comment URL opens `/<encoded-worktree>/session/<session-id>` rather than

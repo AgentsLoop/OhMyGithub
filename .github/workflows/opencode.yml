@@ -38,6 +38,7 @@ jobs:
       OPENCODE_WEB_PORT: 4096
       OPENCODE_PROXY_PORT: 4097
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
+      APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
       COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
     steps:
@@ -183,7 +184,7 @@ jobs:
           PROMPT_FILE="$OPENCODE_WEB_DIR/prompt.txt"
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
-          printf '%s\n\nWork directly on the current branch. Do not create a branch or pull request; the workflow will handle both.' "$COMMENT_BODY" > "$PROMPT_FILE"
+          printf '%s\n\nBuild the requested game fully, run the unit tests, and work directly on the current branch. Do not create a branch or pull request; the workflow will handle both.' "$COMMENT_BODY" > "$PROMPT_FILE"
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
           nohup bash -c '"$1" run --attach "http://127.0.0.1:$2" --model opencode/nemotron-3.5-lightning-free "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
@@ -251,7 +252,7 @@ jobs:
             });
             core.setOutput('comment_id', result.data.id);
 
-      - name: Wait for OpenCode and create pull request
+      - name: Verify app with second OpenCode prompt
         shell: bash
         run: |
           set -euo pipefail
@@ -263,6 +264,44 @@ jobs:
           code="$(cat "$OPENCODE_WEB_DIR/opencode-run.exit")"
           echo "OpenCode exited with code $code"
           [[ "$code" == 0 ]]
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          "$OPENCODE_BIN" run \
+            --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+            --model opencode/nemotron-3.5-lightning-free \
+            'Now verify the completed app. Start the app server, run browser tests, fix any failures, and confirm the app works on port 3000. Do not create a branch or pull request; the workflow will handle both.' \
+            > "$OPENCODE_WEB_DIR/verification.log" 2>&1
+
+      - name: Expose verified app
+        id: app_tunnel
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run start -- --port "$APP_PORT" > "$OPENCODE_WEB_DIR/app.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/app.pid"
+          for _ in {1..60}; do
+            curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT" >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$APP_PORT" >/dev/null
+          "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate \
+            --url "http://127.0.0.1:$APP_PORT" \
+            > "$OPENCODE_WEB_DIR/app-cloudflared.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/app-cloudflared.pid"
+          APP_URL=''
+          for _ in {1..60}; do
+            APP_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' \
+              "$OPENCODE_WEB_DIR/app-cloudflared.log" | head -n 1)"
+            [[ -n "$APP_URL" ]] && break
+            sleep 1
+          done
+          [[ -n "$APP_URL" ]]
+          curl --fail --silent --show-error --max-time 20 "$APP_URL" >/dev/null
+          echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
+
+      - name: Create pull request
+        shell: bash
+        run: |
+          set -euo pipefail
           BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
           if git diff --quiet "origin/$BASE_BRANCH"...HEAD; then
             echo 'OpenCode made no changes; no pull request will be created.'
@@ -276,6 +315,21 @@ jobs:
             --body "Automated implementation requested in comment:\n\n$COMMENT_BODY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post verified app URL
+        if: success()
+        uses: actions/github-script@v7
+        env:
+          APP_URL: ${{ env.APP_URL }}
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.issue.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: number,
+              body: `✅ Verified app is live:\n\n${process.env.APP_URL}`
+            });
 
       - name: Keep temporary access available for 30 minutes
         if: success()
@@ -304,6 +358,8 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/nginx.pid" ]] && sudo kill "$(cat "$OPENCODE_WEB_DIR/nginx.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode-run.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/app-cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app-cloudflared.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/app.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
           [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
           sudo pkill -f 'sshd.*2222' 2>/dev/null || true
           rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"
