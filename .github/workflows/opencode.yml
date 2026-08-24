@@ -231,7 +231,7 @@ jobs:
           curl --fail --silent --show-error --location https://opencode.ai/install | bash
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           [[ -x "$OPENCODE_BIN" ]]
-          nohup "$OPENCODE_BIN" web --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
+          nohup "$OPENCODE_BIN" web --auto --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
           for _ in {1..45}; do
