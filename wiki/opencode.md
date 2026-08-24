@@ -58,6 +58,10 @@ endpoint and synchronizes `model/<provider>/<name>` and `skill/<name>` labels
 in the repository.
 This keeps the regular OpenCode session while making branch and PR behavior
 explicit and reviewable in YAML.
+Model labels are refreshed from the live OpenCode catalog on each run and are
+limited to models with zero input, output, and cache-read cost. Default GitHub
+labels are removed, and the triggering issue is marked `in progress`,
+`complete`, or `failed` as the job advances.
 
 The workflow uses `$GITHUB_WORKSPACE/project` as OpenCode's working directory,
 so generated app files stay under the repository's `project/` directory. The

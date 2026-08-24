@@ -81,7 +81,19 @@ jobs:
             const fs = require('node:fs');
             const path = require('node:path');
 
-            const modelLabel = `model/${process.env.OPENCODE_MODEL}`;
+            const catalog = await fetch('https://models.opencode.ai/api.json').then(async (response) => {
+              if (!response.ok) throw new Error(`OpenCode model catalog returned ${response.status}`);
+              return response.json();
+            });
+            const models = Object.values(catalog.opencode?.models ?? {})
+              .filter((model) => model.cost?.input === 0 && model.cost?.output === 0 && model.cost?.cache_read === 0)
+              .map((model) => model.id)
+              .filter(Boolean)
+              .sort();
+            if (!models.includes(process.env.OPENCODE_MODEL.slice('opencode/'.length))) {
+              throw new Error(`Configured model is missing from the OpenCode catalog: ${process.env.OPENCODE_MODEL}`);
+            }
+
             const skillsRoot = path.join(process.env.PROJECT_DIR, '.agents', 'skills');
             const skillNames = fs.existsSync(skillsRoot)
               ? fs.readdirSync(skillsRoot, { withFileTypes: true })
@@ -91,11 +103,14 @@ jobs:
               : [];
 
             const labels = [
-              {
-                name: modelLabel,
+              { name: 'in progress', color: 'FBCA04', description: 'OpenCode workflow is running' },
+              { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
+              { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
+              ...models.map((model) => ({
+                name: `model/opencode/${model}`,
                 color: '5319E7',
-                description: `OpenCode model: ${process.env.OPENCODE_MODEL}`
-              },
+                description: `OpenCode model: opencode/${model}`
+              })),
               ...skillNames.map((name) => ({
                 name: `skill/${name}`,
                 color: '1D76DB',
@@ -122,7 +137,50 @@ jobs:
               }
             }
 
-            core.info(`Synchronized ${labels.length} labels: ${labels.map(({ name }) => name).join(', ')}`);
+            const managedPrefixes = ['model/', 'skill/'];
+            const defaultLabels = new Set([
+              'bug', 'documentation', 'duplicate', 'enhancement', 'good first issue',
+              'help wanted', 'invalid', 'question', 'wontfix'
+            ]);
+            const existing = await github.paginate(github.rest.issues.listLabelsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            const desired = new Set(labels.map(({ name }) => name));
+            for (const label of existing) {
+              if (defaultLabels.has(label.name) ||
+                  (managedPrefixes.some((prefix) => label.name.startsWith(prefix)) && !desired.has(label.name))) {
+                await github.rest.issues.deleteLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name
+                });
+              }
+            }
+
+            core.info(`Synchronized ${labels.length} labels from the live OpenCode catalog and shared skills`);
+
+      - name: Mark issue in progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.issue.number;
+            const statuses = ['in progress', 'complete', 'failed'];
+            for (const status of statuses) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: number, name: status
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, labels: ['in progress']
+            });
 
       - name: Start AgentsWeb SSH session
         id: agentsweb
@@ -483,6 +541,36 @@ jobs:
               repo: context.repo.repo,
               issue_number: number,
               body: `✅ Verified app is live:\n\n${process.env.APP_URL}`
+            });
+
+      - name: Mark issue complete
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.issue.number;
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, name: 'in progress'
+            }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, labels: ['complete']
+            });
+
+      - name: Mark issue failed
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.issue.number;
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, name: 'in progress'
+            }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, labels: ['failed']
             });
 
       - name: Keep temporary access available for 30 minutes
