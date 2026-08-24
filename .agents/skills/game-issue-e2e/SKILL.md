@@ -28,11 +28,16 @@ The test is complete only when all of these are true:
 
 ## Procedure
 
-1. Confirm `gh auth status` and identify the repository with `gh repo view`.
-2. Create a new issue with `gh issue create`. Put `/oc` in the title or body;
+1. Before starting the test, inspect the working tree with `git status --short`.
+   Stage and commit all current changes, then push the current branch. Verify
+   that the working tree is clean and the pushed commit is the branch tip
+   before creating the issue or triggering any Action. Do not start the test
+   with uncommitted or unpushed changes.
+2. Confirm `gh auth status` and identify the repository with `gh repo view`.
+3. Create a new issue with `gh issue create`. Put `/oc` in the title or body;
    do not add a comment because this specifically tests the `issues` trigger.
    Ask for a concrete playable game and include its functional requirements.
-3. Locate the newest `opencode.yml` run with:
+4. Locate the newest `opencode.yml` run with:
 
    ```sh
    gh run list --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
@@ -40,17 +45,17 @@ The test is complete only when all of these are true:
 
    Confirm its event is `issues` and its title matches the new issue. Monitor
    it with `gh run watch <run-id> --exit-status --repo <owner>/<repo>`.
-4. After completion, inspect the job steps. Require success for `Run OpenCode
+5. After completion, inspect the job steps. Require success for `Run OpenCode
    and locate its web session`, `Verify app with second OpenCode prompt`,
    `Expose verified app`, `Create pull request`, and `Post verified app URL`.
    Do not treat the first OpenCode Web UI URL as the app URL.
-5. Read the issue comments and extract the final comment containing
+6. Read the issue comments and extract the final comment containing
    `Verified app is live`. Validate that URL with `curl --fail --max-time 20`.
-6. Find the PR whose head is `opencode/<run-id>`. Check its state and merge
+7. Find the PR whose head is `opencode/<run-id>`. Check its state and merge
    status, then fetch the exact head commit into an isolated temporary
    worktree. Run `npm ci`, `npm test`, and any project-specific runtime check.
    Remove the temporary worktree after the test.
-7. Report the issue, run, PR, both-prompt evidence, app URL, and test results.
+8. Report the issue, run, PR, both-prompt evidence, app URL, and test results.
    If the run is still active, report exactly which step is active and do not
    claim the app is complete.
 
