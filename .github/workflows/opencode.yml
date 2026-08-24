@@ -127,7 +127,7 @@ jobs:
           SSH_PORT=$((32000 + GITHUB_RUN_NUMBER % 1000))
           echo "SSH_PORT=$SSH_PORT" >> "$GITHUB_ENV"
           sudo apt-get update
-          sudo apt-get install -y openssh-server
+          sudo apt-get install -y openssh-server tmux
           install -d -m 700 "$SSH_DIR"
           ssh-keygen -t ed25519 -f "$SSH_KEY" -N '' -q
           chmod 600 "$SSH_KEY"
@@ -286,7 +286,7 @@ jobs:
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
-          printf '%s\n\nBuild the requested game fully, run the unit tests, and work directly on the current branch. Do not create a branch or pull request; the workflow will handle both.\n\nWorkflow label context: model/%s; skills: %s. Use the listed skills when relevant.' \
+          printf '%s\n\nBuild the requested game fully, run the unit tests, and work directly on the current branch. Do not create a branch or pull request; the workflow will handle both. Start the app server in a tmux session named app-server, bind it to port 3000, and leave that tmux session running for verification.\n\nWorkflow label context: model/%s; skills: %s. Use the listed skills when relevant.' \
             "$COMMENT_BODY" "$OPENCODE_MODEL" "$skill_text" > "$PROMPT_FILE"
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
@@ -372,7 +372,7 @@ jobs:
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
-            'Now verify the completed app. Start the app server, run browser tests, fix any failures, and confirm the app works on port 3000. Do not create a branch or pull request; the workflow will handle both.' \
+            'Now verify the completed app. Ensure the app server is running in the tmux session named app-server on port 3000, run browser tests, fix any failures, and confirm the app works on port 3000. Do not create a branch or pull request; the workflow will handle both.' \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
       - name: Expose verified app
@@ -492,6 +492,7 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode-run.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/app-cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app-cloudflared.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/app.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
+          tmux kill-session -t app-server 2>/dev/null || true
           [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
           sudo pkill -f 'sshd.*2222' 2>/dev/null || true
           rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"
