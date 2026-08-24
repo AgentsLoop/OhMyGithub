@@ -23,8 +23,10 @@ comment. Bot-authored events are ignored, so status comments do not recurse.
 7. Runs a second verification prompt in the same OpenCode session as the build,
    starts the app, and exposes it through a
    separate temporary trycloudflare.com tunnel, and verifies the public URL.
-8. Detects both uncommitted generated files and commits already created by
-   OpenCode, then pushes the branch and creates the pull request in YAML.
+8. Verifies the app through the public tunnel. If verification fails, sends a
+   remediation prompt to the same OpenCode session and retries up to three
+   times. Detects both uncommitted generated files and commits already created
+   by OpenCode, then pushes the branch and creates the pull request in YAML.
 9. Keeps SSH, the OpenCode Web UI, and the app available for 30 minutes after
    verification,
    then marks the comment closed and terminates both tunnels.
