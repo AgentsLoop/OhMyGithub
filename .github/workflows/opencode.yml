@@ -245,23 +245,52 @@ jobs:
           git fetch origin "$BASE_BRANCH"
           git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
 
+      - name: Resolve OpenCode model and skill labels
+        id: opencode_labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.issue.number;
+            const response = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: number,
+              per_page: 100
+            });
+            const names = response.data.map(({ name }) => name);
+            const modelLabels = names.filter((name) => name.startsWith('model/'));
+            if (modelLabels.length > 1) {
+              core.setFailed(`Expected at most one model/* label, found: ${modelLabels.join(', ')}`);
+              return;
+            }
+            const model = modelLabels[0]?.slice('model/'.length) || 'opencode/nemotron-3.5-lightning-free';
+            const skills = names.filter((name) => name.startsWith('skill/'))
+              .map((name) => name.slice('skill/'.length)).sort();
+            core.setOutput('model', model);
+            core.setOutput('skills_json', JSON.stringify(skills));
+            core.info(`Resolved model=${model}; skills=${skills.join(', ') || '(none)'}`);
+
       - name: Run OpenCode and locate its web session
         id: opencode_run
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
+          OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
+          OPENCODE_SKILLS: ${{ steps.opencode_labels.outputs.skills_json }}
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           PROMPT_FILE="$OPENCODE_WEB_DIR/prompt.txt"
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
-          printf '%s\n\nBuild the requested game fully, run the unit tests, and work directly on the current branch. Do not create a branch or pull request; the workflow will handle both.' "$COMMENT_BODY" > "$PROMPT_FILE"
+          skill_text="$(jq -r 'if length == 0 then \"(none)\" else join(\", \" ) end' <<<"$OPENCODE_SKILLS")"
+          printf '%s\n\nBuild the requested game fully, run the unit tests, and work directly on the current branch. Do not create a branch or pull request; the workflow will handle both.\n\nWorkflow label context: model/%s; skills: %s. Use the listed skills when relevant.' \
+            "$COMMENT_BODY" "$OPENCODE_MODEL" "$skill_text" > "$PROMPT_FILE"
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
-          nohup bash -c '"$1" run --attach "http://127.0.0.1:$2" --model opencode/nemotron-3.5-lightning-free "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
-            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" \
+          nohup bash -c '"$1" run --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
+            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" \
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
           SESSION_ID=''
@@ -341,7 +370,7 @@ jobs:
           "$OPENCODE_BIN" run \
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
-            --model opencode/nemotron-3.5-lightning-free \
+            --model "${{ steps.opencode_labels.outputs.model }}" \
             'Now verify the completed app. Start the app server, run browser tests, fix any failures, and confirm the app works on port 3000. Do not create a branch or pull request; the workflow will handle both.' \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
