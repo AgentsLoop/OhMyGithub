@@ -14,7 +14,7 @@ blocked. Each update must include:
 - a short summary of completed work;
 - the current status and known blockers (write `None` when there are none);
 - links to relevant pushed commits and any available public preview;
-- embedded screenshots for each newly completed UI or gameplay milestone.
+- one screenshot showing the latest newly completed UI or gameplay milestone.
 
 Save milestone screenshots under `screenshots/`. Before embedding one in an
 issue comment, commit it, push the current branch, and use an immutable URL in
@@ -24,9 +24,18 @@ this form:
 https://raw.githubusercontent.com/$GITHUB_REPOSITORY/<commit-sha>/project/screenshots/<file-name>
 ```
 
-Embed the image with Markdown (`![description](url)`) in the same progress
-comment. Never claim a UI or gameplay milestone is complete without opening the
-running game and capturing visible evidence.
+Embed the screenshot in an expandable block in the same progress comment:
+
+```html
+<details>
+<summary>Screenshot</summary>
+<img src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/<commit-sha>/project/screenshots/<file-name>" alt="Description of the visible milestone">
+</details>
+```
+
+Use only one screenshot per progress comment. Never claim a UI or gameplay
+milestone is complete without opening the running game and capturing visible
+evidence.
 
 ## Completion requirements
 
@@ -42,7 +51,7 @@ Before declaring the game complete:
    - the final commit link;
    - deployment and test status;
    - known limitations (write `None` when there are none);
-   - all final screenshots embedded directly in the comment.
+   - final screenshots embedded in expandable blocks in the comment.
 
 The workflow may also publish a completion comment from the committed evidence.
 Do not create a pull request yourself; the workflow owns pull-request creation.
