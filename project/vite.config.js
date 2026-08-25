@@ -9,9 +9,7 @@ export default defineConfig({
     headers: {
       'Access-Control-Allow-Origin': '*'
     },
-    hmr: {
-      host: 'localhost'
-    }
+    hmr: false
   },
   preview: {
     port: 3000,
