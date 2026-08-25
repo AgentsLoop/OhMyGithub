@@ -24,8 +24,9 @@ comment. Bot-authored events are ignored, so status comments do not recurse.
 7. Verifies SSH connectivity.
 8. Replaces the access comment with a live full-session OpenCode response rendered
    as Markdown, including expandable reasoning and tool input/output details, and
-   refreshes it about every 10 seconds while the run is active; the last response
-   remains on the issue after the run exits.
+   refreshes it about every 10 seconds while the run is active; it expects the
+   current OpenCode `{ data: [...] }` message response and leaves the last response
+   on the issue after the run exits.
 9. Runs a second verification prompt in the same OpenCode session as the build,
    starts the app, and exposes it through a
    separate temporary trycloudflare.com tunnel, and verifies the public URL.
