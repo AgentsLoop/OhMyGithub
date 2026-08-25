@@ -489,8 +489,8 @@ jobs:
                     "**Error**\n\n```text\n" + (.state.error | printable) + "\n```\n\n"
                   else "" end) +
                   "</details>";
-                .data |
-                reverse |
+                (if type == "array" then . elif (.data? | type) == "array" then .data else [] end) |
+                  reverse |
                   map(
                     "### " + ((.info.role // "message") | ascii_upcase) + "\n\n" +
                     ([.parts[]? |
