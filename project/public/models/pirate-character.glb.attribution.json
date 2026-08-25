@@ -1,0 +1,29 @@
+{
+  "uid": "23473493628b4a0089eab5f6ed129c71",
+  "name": "Stylized Pirate Laughing",
+  "author": "walterpalladino",
+  "authorUrl": "https://sketchfab.com/walterpalladino",
+  "license": "CC Attribution",
+  "licenseUrl": null,
+  "modelUrl": "https://sketchfab.com/3d-models/none-23473493628b4a0089eab5f6ed129c71",
+  "thumbnailUrl": "https://media.sketchfab.com/models/23473493628b4a0089eab5f6ed129c71/thumbnails/498e71f8f74242b28eba62a3b51fb593/e95546152b1a4352aa7c28f45c8e721b.jpeg",
+  "glbBytes": 793652,
+  "faceCount": 2842,
+  "vertexCount": 5764,
+  "textureCount": 0,
+  "textureMaxResolution": 0,
+  "animationCount": 1,
+  "animations": [
+    {
+      "uid": "426d205583ed46668c75ca4d11093516",
+      "name": "mixamo.com",
+      "url": "https://media.sketchfab.com/models/23473493628b4a0089eab5f6ed129c71/b3e694e54fbc4486a1bdae4d7886c45b/animations/426d205583ed46668c75ca4d11093516.bin.gz",
+      "size": 669892,
+      "duration": 9.767,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-01-28T16:44:32.088485",
+      "updatedAt": "2023-01-28T16:44:32.088498"
+    }
+  ]
+}
