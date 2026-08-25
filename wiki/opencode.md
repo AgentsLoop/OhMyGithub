@@ -22,17 +22,20 @@ comment. Bot-authored events are ignored, so status comments do not recurse.
 6. Starts `opencode run --attach` against the same OpenCode installation and
    server-backed session store, then posts a direct URL to that live session.
 7. Verifies SSH connectivity.
-8. Runs a second verification prompt in the same OpenCode session as the build,
+8. Replaces the access comment with a live full-session OpenCode response and
+   refreshes it about every 10 seconds while the run is active; the last response
+   remains on the issue after the run exits.
+9. Runs a second verification prompt in the same OpenCode session as the build,
    starts the app, and exposes it through a
    separate temporary trycloudflare.com tunnel, and verifies the public URL.
-9. Verifies the app through the public tunnel. If verification fails, sends a
+10. Verifies the app through the public tunnel. If verification fails, sends a
    remediation prompt to the same OpenCode session and retries up to three
    times. Detects both uncommitted generated files and commits already created
    by OpenCode, then pushes the branch and creates the pull request in YAML.
-10. Gives the verified public URL back to the worker, requires committed final
+11. Gives the verified public URL back to the worker, requires committed final
     browser screenshots, and embeds immutable screenshot URLs with the game,
     commit, and PR links in the triggering issue.
-11. Keeps SSH, the OpenCode Web UI, and the app available for 30 minutes after
+12. Keeps SSH, the OpenCode Web UI, and the app available for 30 minutes after
    verification,
    then marks the comment closed and terminates both tunnels.
 

@@ -451,6 +451,48 @@ jobs:
             });
             core.setOutput('comment_id', result.data.id);
 
+      - name: Start live OpenCode response comment
+        id: response_comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
+          SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
+          ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
+          cat > "$TRACKER" <<'TRACKER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          while :; do
+            payload="$(curl --fail --silent --show-error \
+              -H "x-opencode-directory: $PROJECT_DIR" \
+              "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" 2>/dev/null || true)"
+            if [[ -n "$payload" ]]; then
+              rendered="$(jq -S . <<<"$payload" 2>/dev/null || printf '%s' "$payload")"
+              # GitHub rejects oversized comments; retain the newest complete response.
+              if (( ${#rendered} > 60000 )); then
+                rendered="[Older response content omitted at the GitHub comment limit.]\n${rendered: -59900}"
+              fi
+              body=$'🟡 **OpenCode response (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n<details open>\n<summary>Full session response</summary>\n\n```json\n'"$rendered"$'\n```\n\n</details>'
+              gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
+                -f body="$body" >/dev/null || true
+            fi
+            [[ -f "$OPENCODE_WEB_DIR/response-comment.done" ]] && break
+            sleep 10
+          done
+          TRACKER
+          chmod 700 "$TRACKER"
+          # The tracker is intentionally independent of the step shell so it can poll
+          # while later workflow steps run; cleanup stops it at the end of the job.
+          nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
+            OPENCODE_WEB_DIR="$OPENCODE_WEB_DIR" SESSION_ID="$SESSION_ID" \
+            COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
+            "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
+
       - name: Verify app with second OpenCode prompt
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
@@ -561,6 +603,7 @@ jobs:
             --model "${{ steps.opencode_labels.outputs.model }}" \
             "The public game is verified at $APP_URL. Follow ./Agents.md now: capture and commit final playable-game screenshots under screenshots/ using final-* filenames, push the current branch, and post the final completion comment to issue #$TRIGGER_ISSUE_NUMBER. Include this public game URL, embedded screenshots, the final commit, deployment and test status, and known limitations. Do not create a pull request." \
             > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
+          touch "$OPENCODE_WEB_DIR/response-comment.done"
 
       - name: Verify final screenshots exist
         id: final_evidence
@@ -693,6 +736,7 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/nginx.pid" ]] && sudo kill "$(cat "$OPENCODE_WEB_DIR/nginx.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode-run.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/response-comment-tracker.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/response-comment-tracker.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/app-cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app-cloudflared.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/app.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
           tmux kill-session -t app-server 2>/dev/null || true
