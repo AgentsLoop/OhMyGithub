@@ -451,6 +451,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
           SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
+          OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
           REPOSITORY: ${{ github.repository }}
         run: |
@@ -508,7 +509,7 @@ jobs:
               if (( ${#rendered} > 60000 )); then
                 rendered="${rendered:0:59900}\n\n[Response shortened at the GitHub comment limit.]"
               fi
-              body=$'🟡 **OpenCode response (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n<details>\n<summary>Full OpenCode response</summary>\n\n'"$rendered"$'\n\n</details>'
+              body=$'🟡 **OpenCode response (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n🌐 **OpenCode Web UI:** '"$OPENCODE_WEB_URL"$'\n\n<details>\n<summary>Full OpenCode response</summary>\n\n'"$rendered"$'\n\n</details>'
               gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
                 -f body="$body" >/dev/null || true
             fi
