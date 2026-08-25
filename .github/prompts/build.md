@@ -1,7 +1,5 @@
 @COMMENT_BODY@
 
-Read and follow `./Agents.md` before starting. Build the requested game fully, run the unit tests, and work directly on the current branch. Post milestone progress and screenshots to the triggering GitHub issue as required by `./Agents.md`. Do not create a branch or pull request; the workflow will handle both. Start the app server in a tmux session named app-server, bind it to port 3000, and leave that tmux session running for verification.
-
 Mandatory workflow skills: @SKILL_TEXT@. Before implementing, read every listed skill's `SKILL.md` and follow its instructions for this request. If a listed skill applies to the requested feature or assets, you must use it; do not substitute a generic or procedural workaround when the skill provides the required workflow. For example, when `load-sketchfab-threejs` is listed, use it to obtain and integrate at least one suitable Sketchfab/GLB asset, preserve attribution, and verify that asset renders in the browser. If a listed skill genuinely does not apply, state why in the completion report.
 
 Mandatory orchestration: before declaring the game complete, use OpenCode's `task` tool to launch separate child sessions for:
