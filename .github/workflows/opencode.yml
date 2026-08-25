@@ -471,12 +471,26 @@ jobs:
               -H "x-opencode-directory: $PROJECT_DIR" \
               "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" 2>/dev/null || true)"
             if [[ -n "$payload" ]]; then
-              rendered="$(jq -S . <<<"$payload" 2>/dev/null || printf '%s' "$payload")"
+              rendered="$(jq -r '
+                if type == "array" then
+                  map(
+                    "### " + ((.info.role // "message") | ascii_upcase) + "\n\n" +
+                    ([.parts[]? |
+                      if .type == "text" then .text
+                      elif .type == "tool" then "**Tool:** `" + (.tool // "unknown") + "`"
+                      elif .type == "reasoning" then "<details><summary>Reasoning</summary>\n\n" + (.text // "") + "\n\n</details>"
+                      else empty
+                      end
+                    ] | map(select(length > 0)) | join("\n\n"))
+                  ) | join("\n\n---\n\n")
+                else tostring
+                end
+              ' <<<"$payload" 2>/dev/null || printf '%s' "$payload")"
               # GitHub rejects oversized comments; retain the newest complete response.
               if (( ${#rendered} > 60000 )); then
                 rendered="[Older response content omitted at the GitHub comment limit.]\n${rendered: -59900}"
               fi
-              body=$'🟡 **OpenCode response (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n<details open>\n<summary>Full session response</summary>\n\n```json\n'"$rendered"$'\n```\n\n</details>'
+              body=$'🟡 **OpenCode response (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n<details open>\n<summary>Full session response</summary>\n\n'"$rendered"$'\n\n</details>'
               gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
                 -f body="$body" >/dev/null || true
             fi
