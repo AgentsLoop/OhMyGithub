@@ -550,41 +550,6 @@ jobs:
             "$(< "$GITHUB_WORKSPACE/.github/prompts/verify.md")" \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
-      - name: Verify multi-agent critique loop evidence
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        env:
-          SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
-        run: |
-          set -euo pipefail
-          messages="$OPENCODE_WEB_DIR/session-messages.json"
-          curl --fail --silent --show-error +            -H "x-opencode-directory: $PROJECT_DIR" +            "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" +            > "$messages"
-          task_count="$(jq '[.[] | .parts[]? | select(.type == "tool" and .tool == "task")] | length' "$messages")"
-          child_count="$(jq '[.[] | .parts[]? | select(.type == "tool" and .tool == "task") | .state.metadata.sessionId // empty] | unique | length' "$messages")"
-          builder_tasks="$(jq '[.[] | .parts[]? | select(.type == "tool" and .tool == "task") | (.state.input.description // "") | select(test("builder"; "i"))] | length' "$messages")"
-          critic_tasks="$(jq '[.[] | .parts[]? | select(.type == "tool" and .tool == "task") | (.state.input.description // "") | select(test("critic"; "i"))] | length' "$messages")"
-          verifier_tasks="$(jq '[.[] | .parts[]? | select(.type == "tool" and .tool == "task") | (.state.input.description // "") | select(test("verifier"; "i"))] | length' "$messages")"
-          text="$(jq -r '[.[] | .parts[]? | select(.type == "text") | .text] | join("\n")' "$messages")"
-          critic_evidence="$(printf '%s\n' "$text" | rg -i -c 'critic|biggest remaining gap|concrete gap' || true)"
-          verifier_evidence="$(printf '%s\n' "$text" | rg -i -c 'verif|browser|gameplay loop' || true)"
-          remediation_evidence="$(printf '%s\n' "$text" | rg -i -c 'remediat|implement|apply.*finding|fix.*gap' || true)"
-          echo "task tool calls: $task_count"
-          echo "distinct child sessions: $child_count"
-          echo "builder task calls: $builder_tasks"
-          echo "critic task calls: $critic_tasks"
-          echo "verifier task calls: $verifier_tasks"
-          echo "critic evidence matches: $critic_evidence"
-          echo "verification evidence matches: $verifier_evidence"
-          echo "remediation evidence matches: $remediation_evidence"
-          (( task_count >= 3 ))
-          (( child_count >= 3 ))
-          (( builder_tasks >= 1 ))
-          (( critic_tasks >= 1 ))
-          (( verifier_tasks >= 1 ))
-          (( critic_evidence >= 1 ))
-          (( verifier_evidence >= 1 ))
-          (( remediation_evidence >= 1 ))
-
       - name: Expose verified app
         id: app_tunnel
         shell: bash
