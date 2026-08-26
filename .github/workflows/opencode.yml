@@ -36,6 +36,7 @@ jobs:
       OPENCODE_ENABLE_EXA: "true"
       OPENCODE_ENABLE_EXPERIMENTAL_MODELS: "true"
       OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS: "true"
+      OPENCODE_EXPERIMENTAL_WEBSOCKETS: "true"
       GH_TOKEN: ${{ github.token }}
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
