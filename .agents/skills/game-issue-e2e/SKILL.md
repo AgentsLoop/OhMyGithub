@@ -31,8 +31,9 @@ skill labels are:
   game-building requests.
 - `skill/image-search` — use when the request needs web image discovery or
   image-search assets.
-- `skill/load-sketchfab-threejs` — use for Sketchfab, GLB, Three.js, or
-  PlayCanvas model-loading/material/animation requests.
+- `skill/load-sketchfab-threejs` — required for 3D game requests; use it for
+  Sketchfab, GLB, Three.js, or PlayCanvas model-loading/material/animation
+  requests.
 - `skill/mcp-duckgo` — use when the request explicitly requires DuckDuckGo/MCP
   search support.
 
@@ -56,6 +57,11 @@ the test report.
    `gh issue create --label <label> ...`. Put `/oc` in the title or body; do
    not add a comment because this specifically tests the `issues` trigger.
    Ask for a concrete playable game and include its functional requirements.
+   For any 3D game, also pass `--label skill/load-sketchfab-threejs` when that
+   label exists, and require the issue prompt to use the
+   `load-sketchfab-threejs` skill for a suitable downloadable GLB asset while
+   preserving attribution and verifying geometry, materials, and animations.
+   Do not add this label or requirement to a 2D/canvas-only game.
    If multiple skills are needed, pass one `--label` option per matching
    label. Record the issue's final labels and verify them with
    `gh issue view <issue-number> --json labels`.
