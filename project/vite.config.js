@@ -3,11 +3,18 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0',
-    strictPort: false
+    strictPort: false,
+    allowedHosts: true,
+    cors: true,
+    hmr: {
+      clientPort: 443
+    }
   },
   preview: {
     port: 3000,
-    host: '0.0.0.0'
+    host: '0.0.0.0',
+    allowedHosts: true,
+    cors: true
   },
   test: {
     environment: 'jsdom',
