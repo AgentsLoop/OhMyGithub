@@ -21,11 +21,6 @@ requests, commits, releases, public app URLs, and Codex tasks/threads rather
 than reporting only their numbers or plain text. For Codex tasks/threads, use
 the `codex://threads/<thread-id>` URL format.
 
-OpenCode issue response comments must keep each tool response together in one
-`Output` JSON code block. Include the tool name and status outside the block,
-and put the available input, output/result, and error fields inside that single
-block instead of emitting separate Input, Output, or Error fences.
-
 ## OpenCode GitHub Actions
 
 The issue-triggered workflow uses `opencode/muse-spark-1.2-contributor-free` and the GitHub Actions
