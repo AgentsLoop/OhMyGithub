@@ -48,10 +48,6 @@ jobs:
           fetch-depth: 1
           # OpenCode must be able to push its generated branch/PR with GITHUB_TOKEN.
           persist-credentials: true
-          sparse-checkout: |
-            .github
-            project
-          sparse-checkout-cone-mode: true
 
       - name: Checkout AgentsWeb tunnel client
         uses: actions/checkout@v6
@@ -73,6 +69,14 @@ jobs:
       - name: Exclude shared skills from generated changes
         shell: bash
         run: echo '/project/.agents/' >> .git/info/exclude
+
+      - name: Install worker instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d "$PROJECT_DIR"
+          cp "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
+          cmp --silent "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
 
       - name: Sync OpenCode labels
         uses: actions/github-script@v7
