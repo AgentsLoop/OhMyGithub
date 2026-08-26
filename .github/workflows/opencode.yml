@@ -33,6 +33,8 @@ jobs:
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
       PROJECT_DIR: ${{ github.workspace }}/project
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      OPENCODE_ENABLE_EXA: "true"
+      OPENCODE_ENABLE_EXPERIMENTAL_MODELS: "true"
       OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS: "true"
       GH_TOKEN: ${{ github.token }}
       APP_PORT: 3000
