@@ -13,6 +13,14 @@ the current commit and push the amended commit instead of creating another commi
 Before running any workflow, verify that the working tree is clean and everything
 is committed.
 
+## Links in handoffs
+
+When a relevant URL or stable identifier exists, include a clickable Markdown
+link in the user-facing response. Link GitHub issues, Actions runs, pull
+requests, commits, releases, public app URLs, and Codex tasks/threads rather
+than reporting only their numbers or plain text. For Codex tasks/threads, use
+the `codex://threads/<thread-id>` URL format.
+
 ## OpenCode GitHub Actions
 
 The issue-triggered workflow uses `opencode/muse-spark-1.2-contributor-free` and the GitHub Actions
