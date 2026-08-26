@@ -463,51 +463,12 @@ jobs:
               -H "x-opencode-directory: $PROJECT_DIR" \
               "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" 2>/dev/null || true)"
             if [[ -n "$payload" ]]; then
-              rendered="$(jq -r '
-                def clip($limit):
-                  if type == "string" and length > $limit then .[0:$limit] + "\n...[truncated]..."
-                  else . end;
-                def printable:
-                  if type == "string" then . else tojson end | clip(4000);
-                def tool_part:
-                  "**Tool: `" + (.tool // .name // "unknown") + "` — " +
-                  (.state.status // "unknown") + "**\n\n" +
-                  (if .state.input? != null then
-                    "**Input**\n\n```json\n" + (.state.input | printable) + "\n```\n\n"
-                  else "" end) +
-                  (if (.state.output? // .state.result?) != null then
-                    "**Output**\n\n```text\n" + ((.state.output // .state.result) | printable) + "\n```\n\n"
-                  elif .state.content? != null and (.state.content | length) > 0 then
-                    "**Output**\n\n```text\n" + (.state.content | printable) + "\n```\n\n"
-                  else "" end) +
-                  (if .state.error? != null then
-                    "**Error**\n\n```text\n" + (.state.error | printable) + "\n```\n\n"
-                  else "" end) +
-                  "";
-                (if type == "array" then . elif (.data? | type) == "array" then .data else [] end) |
-                  reverse |
-                  map({role: ((.info.role // "message") | ascii_upcase), content:
-                    ([.parts[]? |
-                      if .type == "text" then select((.synthetic // false) | not) | (.text // "")
-                      elif .type == "tool" then tool_part
-                      elif .type == "reasoning" then "**Reasoning**\n\n" + (.text // "")
-                      elif .type == "file" then "**Attachment:** `" + (.filename // .mime // .mediaType // "file") + "`"
-                      else empty
-                      end
-                    ] | map(select(length > 0)) | join("\n\n"))}) |
-                  reduce .[] as $item ([ ];
-                    if ($item.role == "USER" and any(.[]; .role == "USER" and .content == $item.content))
-                    then .
-                    else . + [$item]
-                    end) |
-                  map("### " + .role + "\n\n" + .content) |
-                  join("\n\n---\n\n")
-              ' <<<"$payload" 2>/dev/null || printf '%s' "$payload")"
+              rendered="$(jq -S . <<<"$payload" 2>/dev/null || printf '%s' "$payload")"
               # GitHub rejects oversized comments; retain the newest complete response.
               if (( ${#rendered} > 60000 )); then
                 rendered="${rendered:0:59900}\n\n[Response shortened at the GitHub comment limit.]"
               fi
-              body=$'🟡 **OpenCode response (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n🌐 **OpenCode Web UI:** '"$OPENCODE_WEB_URL"$'\n\n<details>\n<summary>Full OpenCode response</summary>\n\n'"$rendered"$'\n\n</details>'
+              body=$'🟡 **OpenCode response (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n🌐 **OpenCode Web UI:** '"$OPENCODE_WEB_URL"$'\n\n<details>\n<summary>Full OpenCode response</summary>\n\n```json\n'"$rendered"$'\n```\n\n</details>'
               gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
                 -f body="$body" >/dev/null || true
             fi
