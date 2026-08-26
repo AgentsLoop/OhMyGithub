@@ -57,17 +57,12 @@ camera.position.set(0, 1.68, 8);
 
 const controls = new PointerLockControls(camera, document.body);
 let sens = 1.0;
-document.getElementById('sensUp').onclick = () => { sens = Math.min(2.2, sens + 0.15); hintTxt.textContent = `Sensitivity: ${sens.toFixed(2)}x`; };
-document.getElementById('sensDown').onclick = () => { sens = Math.max(0.35, sens - 0.15); hintTxt.textContent = `Sensitivity: ${sens.toFixed(2)}x`; };
+controls.pointerSpeed = sens;
+document.getElementById('sensUp').onclick = () => { sens = Math.min(2.2, sens + 0.15); controls.pointerSpeed = sens; hintTxt.textContent = `Sensitivity: ${sens.toFixed(2)}x`; };
+document.getElementById('sensDown').onclick = () => { sens = Math.max(0.35, sens - 0.15); controls.pointerSpeed = sens; hintTxt.textContent = `Sensitivity: ${sens.toFixed(2)}x`; };
 playBtn.addEventListener('click', () => controls.lock());
 controls.addEventListener('lock', () => { blocker.style.display = 'none'; });
 controls.addEventListener('unlock', () => { blocker.style.display = 'flex'; });
-const origOnMouseMove = controls.onMouseMove.bind(controls);
-controls.onMouseMove = (e) => {
-  if (!controls.isLocked) return;
-  const ev = { movementX: e.movementX * sens, movementY: e.movementY * sens };
-  origOnMouseMove(ev);
-};
 
 // --- Postprocessing ---
 const composer = new EffectComposer(renderer);
