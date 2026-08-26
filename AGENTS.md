@@ -42,6 +42,12 @@ logs are unavailable until completion. Use `bash scripts/ssh-run-log.sh <run-id>
 for the live Actions log over SSH. Do not use tight `for` loops around `gh run list`,
 which needlessly consume GitHub API rate limit.
 
+When the user asks to check a live OpenCode workflow, always pull the runner logs
+over SSH first, using `scripts/ssh-run-log.sh` or a targeted SSH read from the
+same runner. Base the answer on those logs before discussing whether an action
+is confirmed; do not lead with a generic inability-to-confirm statement when
+live log evidence can be collected.
+
 For real-time inspection from a live temporary SSH session, use the helper:
 
 ```sh
