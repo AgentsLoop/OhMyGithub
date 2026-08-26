@@ -24,6 +24,8 @@ requests, commits, releases, public app URLs, and Codex tasks/threads rather
 than reporting only their numbers or plain text. For Codex tasks/threads, use
 the `codex://threads/<thread-id>` URL format.
 
+When mentioning a commit, append its relative age in hours or days.
+
 ## OpenCode GitHub Actions
 
 The issue-triggered workflow uses `opencode/muse-spark-1.2-contributor-free` and the GitHub Actions
