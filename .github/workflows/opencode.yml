@@ -615,20 +615,43 @@ jobs:
             > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
           touch "$OPENCODE_WEB_DIR/response-comment.done"
 
-      - name: Verify final screenshots exist
+      - name: Request and verify final screenshots
         id: final_evidence
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
-            \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
-            -printf '%f\n' 2>/dev/null | sort)
-          if [[ "${#screenshots[@]}" -eq 0 ]]; then
-            echo 'No final screenshots found under project/screenshots/.'
-            exit 1
-          fi
-          printf '%s\n' "${screenshots[@]}"
-          printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
+          SCREENSHOT_PROMPT='The final screenshot evidence is still missing. Use the already verified public game and a real browser now, capture at least one meaningful playable-game screenshot, save it under screenshots/ with a filename beginning with final- (for example screenshots/final-gameplay.png), commit and push it on the current branch, and update the triggering issue with the immutable screenshot URL. Do not just explain or claim completion without creating the image. Keep all work inside project/ and do not create a pull request.'
+
+          for attempt in 1 2 3; do
+            mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
+              \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
+              -printf '%f\n' 2>/dev/null | sort)
+            if [[ "${#screenshots[@]}" -gt 0 ]]; then
+              printf '%s\n' "${screenshots[@]}"
+              printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+              printf 'screenshots_status=present\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "No final screenshots found under project/screenshots/ (attempt $attempt/3)."
+            if [[ "$attempt" -lt 3 ]]; then
+              echo "Sending OpenCode screenshot remediation prompt before retry $((attempt + 1))/3."
+              if ! "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
+                --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+                --session "$SESSION_ID" \
+                --model '${{ steps.opencode_labels.outputs.model }}' \
+                "$SCREENSHOT_PROMPT" \
+                > "$OPENCODE_WEB_DIR/screenshot-fix-$attempt.log" 2>&1; then
+                echo "OpenCode screenshot remediation failed on attempt $attempt; continuing to the next evidence check."
+              fi
+            fi
+          done
+
+          echo 'Final screenshots are still missing after three remediation attempts; continuing with delivery.'
+          printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"
+          printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
 
       - name: Create pull request
         id: delivery
@@ -700,6 +723,7 @@ jobs:
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
+          SCREENSHOTS_STATUS: ${{ steps.final_evidence.outputs.screenshots_status }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
           OPENCODE_RELEASE_ASSETS: ${{ steps.opencode_release.outputs.assets_json }}
         with:
@@ -713,6 +737,9 @@ jobs:
               const url = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${process.env.FINAL_COMMIT}/${path}`;
               return `![Final game screenshot: ${name}](${url})`;
             });
+            const screenshotStatus = process.env.SCREENSHOTS_STATUS === 'present'
+              ? 'Final screenshot evidence: present.'
+              : 'Final screenshot evidence: missing after two automated follow-ups; the task completed, but screenshot capture still needs attention.';
             const body = [
               '✅ **Game complete and publicly verified.**', '',
               `Public game: ${process.env.APP_URL}`,
@@ -722,6 +749,7 @@ jobs:
               '', '### OpenCode response and logs', '',
               ...releaseAssets.map(({ name, url }) => `- [${name}](${url})`),
               'Deployment status: verified through the public URL.',
+              screenshotStatus,
               'Known limitations: see the worker progress and completion notes above.',
               '', '### Final screenshots', '', ...images
             ].join('\n');

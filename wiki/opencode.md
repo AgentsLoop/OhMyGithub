@@ -33,9 +33,11 @@ comment. Bot-authored events are ignored, so status comments do not recurse.
    remediation prompt to the same OpenCode session and retries up to three
    times. Detects both uncommitted generated files and commits already created
    by OpenCode, then pushes the branch and creates the pull request in YAML.
-11. Gives the verified public URL back to the worker, requires committed final
+11. Gives the verified public URL back to the worker, requests committed final
     browser screenshots, and embeds immutable screenshot URLs with the game,
-    commit, and PR links in the triggering issue.
+    commit, and PR links in the triggering issue. If screenshots are missing,
+    it sends up to two follow-up prompts to the same OpenCode session before
+    continuing delivery with a warning.
 12. Creates a uniquely tagged GitHub release containing the final OpenCode
     response JSON and safe runner log files, then adds the release and asset
     download links to the final issue comment.
