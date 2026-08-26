@@ -476,7 +476,7 @@ jobs:
                 def tool_part:
                   "**Tool: `" + (.tool // .name // "unknown") + "` — " +
                   (.state.status // "unknown") + "**\n\n" +
-                  "**Output**\n\n```json\n" +
+                  "**Output**\n\n```md\n" +
                   ({input: .state.input?,
                     output: (.state.output? // .state.result? // .state.content?),
                     error: .state.error?} |

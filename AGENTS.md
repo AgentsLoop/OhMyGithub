@@ -22,7 +22,7 @@ than reporting only their numbers or plain text. For Codex tasks/threads, use
 the `codex://threads/<thread-id>` URL format.
 
 OpenCode issue response comments must keep each tool response together in one
-`Output` JSON code block. Include the tool name and status outside the block,
+`Output` Markdown (`md`) code block. Include the tool name and status outside the block,
 and put the available input, output/result, and error fields inside that single
 block instead of emitting separate Input, Output, or Error fences.
 
