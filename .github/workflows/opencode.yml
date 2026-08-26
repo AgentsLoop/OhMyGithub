@@ -471,10 +471,10 @@ jobs:
               "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" 2>/dev/null || true)"
             if [[ -n "$payload" ]]; then
               rendered="$(jq -S . <<<"$payload" 2>/dev/null || printf '%s' "$payload")"
-              # GitHub rejects oversized comments; retain both the beginning and
-              # final lines so completion details are not lost.
+              # GitHub rejects oversized comments; retain only the final lines
+              # so completion details are not lost.
               if (( ${#rendered} > 60000 )); then
-                rendered="${rendered:0:50000}\n\n[...middle of response shortened at the GitHub comment limit...]\n\n${rendered: -9500}"
+                rendered="[Earlier response omitted. Final lines follow.]\n\n${rendered: -9500}"
               fi
               body=$'🟡 **OpenCode response (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n🌐 **OpenCode Web UI:** '"$OPENCODE_WEB_URL"$'\n\n```json\n'"$rendered"$'\n```'
               gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
