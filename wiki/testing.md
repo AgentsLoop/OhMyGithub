@@ -66,13 +66,3 @@ bash scripts/ssh-run-log.sh <run-id>
 The helper checks the AgentsWeb broker `/api/registrations` endpoint first when
 `BROKER_API_TOKEN` is available (or when `../../sshworker/workers-dashboard/.env`
 contains it), then falls back to the workflow issue comments.
-
-For compact OpenCode-specific diagnostics, use:
-
-```sh
-bash scripts/ssh-run-oc-stats.sh <run-id>
-```
-
-It copies a small collector to the temporary runner, queries the local OpenCode
-session there, and reports child task IDs/results, recent text, screenshots, and
-relevant files without streaming the full Actions log.
