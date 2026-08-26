@@ -13,8 +13,8 @@ comment. Bot-authored events are ignored, so status comments do not recurse.
 ## What the job does
 
 1. Checks out the repository with persisted `GITHUB_TOKEN` credentials.
-2. Copies `agents.template.md` to `project/Agents.md` so the worker receives
-   issue-update, screenshot, and completion-report requirements.
+2. Sparse-checks out `.github/` and `project/`, where `project/Agents.md`
+   provides the issue-update, screenshot, and completion-report requirements.
 3. Starts an ephemeral AgentsWeb SSH tunnel.
 4. Starts the OpenCode web UI and publishes it through a temporary public
    trycloudflare.com tunnel.
