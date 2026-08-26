@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIPlay FPS — Tactical Range</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0e14;font-family:'Segoe UI',system-ui,sans-serif}
+  canvas{display:block}
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none;user-select:none;color:#fff}
+  #crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24px;height:24px;pointer-events:none}
+  #crosshair .h{position:absolute;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.8)}
+  #crosshair .h-h{left:0;top:50%;width:24px;height:1.5px;transform:translateY(-50%)}
+  #crosshair .h-v{left:50%;top:0;width:1.5px;height:24px;transform:translateX(-50%)}
+  #crosshair .dot{position:absolute;left:50%;top:50%;width:3px;height:3px;background:#ff2b2b;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 6px rgba(255,40,40,.9)}
+  #crosshair::after{content:'';position:absolute;left:50%;top:50%;width:8px;height:8px;border:1px solid rgba(255,255,255,.25);border-radius:50%;transform:translate(-50%,-50%)}
+  #topbar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:14px 18px;background:linear-gradient(180deg,rgba(0,0,0,.65),transparent)}
+  #topbar .stat{font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+  #topbar .val{font-size:26px;font-weight:800;letter-spacing:.02em;line-height:1}
+  #topbar .val small{font-size:13px;font-weight:600;opacity:.7}
+  #scoreBox{text-align:right}
+  #bottombar{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;padding:16px 20px 18px;background:linear-gradient(0deg,rgba(0,0,0,.78),transparent 85%)}
+  #weaponInfo{display:flex;align-items:baseline;gap:12px}
+  #ammo{font-size:42px;font-weight:900;letter-spacing:-.02em;line-height:1;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+  #ammo small{font-size:18px;font-weight:600;opacity:.6}
+  #ammoName{font-size:11px;letter-spacing:.14em;opacity:.55;text-transform:uppercase}
+  #healthWrap{display:flex;align-items:center;gap:10px}
+  #healthBar{width:180px;height:8px;background:rgba(255,255,255,.15);border-radius:999px;overflow:hidden}
+  #healthFill{height:100%;width:100%;background:linear-gradient(90deg,#1ce06a,#0aa84a);transition:width .2s}
+  #healthVal{font-size:13px;font-weight:700;opacity:.9;min-width:36px;text-align:right}
+  #hitmarker{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;transition:transform .08s,opacity .12s}
+  #hitmarker.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  #hitmarker span{position:absolute;background:#fff;box-shadow:0 0 8px rgba(255,255,255,.9)}
+  #hitX{width:26px;height:26px;position:relative}
+  #hitX span:nth-child(1){width:14px;height:2px;left:50%;top:50%;transform:translate(-50%,-50%) rotate(45deg)}
+  #hitX span:nth-child(2){width:14px;height:2px;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-45deg)}
+  #hitX span:nth-child(3){width:6px;height:6px;left:50%;top:50%;transform:translate(-50%,-50%);border:1.5px solid #fff;background:transparent;border-radius:50%;box-shadow:none}
+  /* Menus */
+  #blocker{position:fixed;inset:0;background:rgba(6,10,16,.88);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:10}
+  #menu{width:min(560px,92vw);background:linear-gradient(180deg,rgba(30,38,52,.98),rgba(16,22,33,.98));border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:28px 28px 22px;box-shadow:0 24px 64px rgba(0,0,0,.6);text-align:center;color:#e8eef6}
+  #menu h1{font-size:28px;letter-spacing:-.02em;font-weight:900;text-transform:uppercase;line-height:1}
+  #menu h1 em{font-style:normal;color:#2ee57a}
+  #menu .sub{margin:8px 0 18px;font-size:13px;color:#9aa8bd;letter-spacing:.06em;text-transform:uppercase}
+  #menu .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left;margin:16px 0}
+  .k{font-size:12px;color:#8ea0ba} .k b{color:#e6eef9}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px 18px;background:#2ee57a;color:#0a1410;font-weight:900;letter-spacing:.08em;text-transform:uppercase;border:0;border-radius:10px;cursor:pointer;font-size:14px;box-shadow:0 8px 24px rgba(46,229,122,.35)}
+  .btn:hover{background:#3cf08a}
+  .hint{margin-top:12px;font-size:11px;color:#7d8da8}
+  .row{margin-top:10px;display:flex;gap:10px}
+  .row .ghost{flex:1;padding:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#c7d4ea;border-radius:10px;font-size:12px;cursor:pointer}
+  #timerBar{position:absolute;top:0;left:0;height:3px;background:#2ee57a;transition:width .2s linear;box-shadow:0 0 10px rgba(46,229,122,.6)}
+  #damageVignette{position:fixed;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 120px 40px rgba(255,30,30,.9);transition:opacity .15s}
+  #killfeed{position:absolute;top:64px;right:16px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .kf{font-size:11px;letter-spacing:.04em;background:rgba(0,0,0,.55);border-left:3px solid #2ee57a;padding:6px 10px;border-radius:6px;animation:kfIn .2s ease}
+  @keyframes kfIn{from{transform:translateX(12px);opacity:0}to{transform:none;opacity:1}}
+  #compass{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.18em;color:rgba(255,255,255,.55);text-transform:uppercase}
+  #compass b{color:#fff}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="hud">
+  <div id="timerBar" style="width:100%"></div>
+  <div id="compass"><span>W</span><b>— N —</b><span>E</span></div>
+  <div id="crosshair"><div class="h h-h"></div><div class="h h-v"></div><div class="dot"></div></div>
+  <div id="hitmarker"><div id="hitX"><span></span><span></span><span></span></div></div>
+  <div id="topbar">
+    <div><div class="stat">Score</div><div class="val" id="scoreVal">0</div></div>
+    <div id="scoreBox"><div class="stat">Time</div><div class="val" id="timeVal">02:00</div><div class="stat" id="targetsVal" style="margin-top:4px">8 targets</div></div>
+  </div>
+  <div id="killfeed"></div>
+  <div id="bottombar">
+    <div id="weaponInfo">
+      <div><div id="ammo">30<small> / 90</small></div><div id="ammoName">5.56 NATO — M4A1  •  SEMI / AUTO</div></div>
+      <div style="margin-left:18px;font-size:11px;opacity:.55;line-height:1.4">[LMB] Fire  • [R] Reload  • [Q] ADS  • [Shift] Sprint</div>
+    </div>
+    <div id="healthWrap">
+      <div style="text-align:right"><div style="font-size:11px;letter-spacing:.12em;opacity:.6;text-transform:uppercase">Armor</div><div id="healthBar"><div id="healthFill"></div></div></div>
+      <div id="healthVal">100</div>
+    </div>
+  </div>
+  <div id="damageVignette"></div>
+</div>
+
+<div id="blocker">
+  <div id="menu">
+    <h1>Tactical <em>Range</em> — FPS</h1>
+    <div class="sub">Close-Quarters Training Facility  •  MWIII / BO6 Inspired</div>
+    <div class="grid">
+      <div class="k"><b>WASD</b> Move</div><div class="k"><b>Mouse</b> Look</div>
+      <div class="k"><b>Shift</b> Sprint  •  <b>Space</b> Jump</div><div class="k"><b>LMB</b> Fire  •  <b>R</b> Reload  •  <b>Q</b> ADS</div>
+    </div>
+    <button class="btn" id="playBtn">▶ &nbsp; Enter Facility — Click to Lock</button>
+    <div class="row"><button class="ghost" id="sensDown">Sens −</button><button class="ghost" id="sensUp">Sens +</button></div>
+    <div class="hint" id="hintTxt">Tip: Click the button, then move mouse to look. ESC to unlock. Runs on port 3000.</div>
+    <div class="hint" style="opacity:.5">COD bar: photoreal PBR, volumetric fog, animated viewmodel, ragdolls, particle FX — skeleton below, compare via JUDGE.</div>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
