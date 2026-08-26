@@ -441,7 +441,7 @@ jobs:
               '```sh', process.env.SSH_COMMAND, '```', '',
               '🌐 **Live OpenCode web session is ready.**', '',
               `URL: ${process.env.OPENCODE_WEB_URL}`, '',
-              'This opens the currently running `/oc` session directly. Access remains available while OpenCode runs and for 30 minutes afterwards.'
+              'This opens the currently running `/oc` session directly. Access remains available while OpenCode runs and for 5 hours afterwards.'
             ].join('\n');
             const result = await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: number, body
@@ -708,10 +708,10 @@ jobs:
               issue_number: number, labels: ['failed']
             });
 
-      - name: Keep temporary access available for 30 minutes
+      - name: Keep temporary access available for 5 hours
         if: success()
         shell: bash
-        run: sleep 1800
+        run: sleep 18000
 
       - name: Mark SSH session closed
         if: always() && steps.access_comment.outputs.comment_id != ''
