@@ -476,18 +476,13 @@ jobs:
                 def tool_part:
                   "**Tool: `" + (.tool // .name // "unknown") + "` — " +
                   (.state.status // "unknown") + "**\n\n" +
-                  (if .state.input? != null then
-                    "**Input**\n\n```json\n" + (.state.input | printable) + "\n```\n\n"
-                  else "" end) +
-                  (if (.state.output? // .state.result?) != null then
-                    "**Output**\n\n```text\n" + ((.state.output // .state.result) | printable) + "\n```\n\n"
-                  elif .state.content? != null and (.state.content | length) > 0 then
-                    "**Output**\n\n```text\n" + (.state.content | printable) + "\n```\n\n"
-                  else "" end) +
-                  (if .state.error? != null then
-                    "**Error**\n\n```text\n" + (.state.error | printable) + "\n```\n\n"
-                  else "" end) +
-                  "";
+                  "**Output**\n\n```json\n" +
+                  ({input: .state.input?,
+                    output: (.state.output? // .state.result? // .state.content?),
+                    error: .state.error?} |
+                    with_entries(select(.value != null)) |
+                    tojson | clip(12000)) +
+                  "\n```";
                 (if type == "array" then . elif (.data? | type) == "array" then .data else [] end) |
                   reverse |
                   map({role: ((.info.role // "message") | ascii_upcase), content:
