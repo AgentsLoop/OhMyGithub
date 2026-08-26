@@ -1,7 +1,18 @@
 import { defineConfig } from 'vite';
 export default defineConfig({
-  server: { port: 3000, host: '0.0.0.0' },
-  preview: { port: 3000, host: '0.0.0.0' },
+  server: {
+    port: 3000,
+    host: '0.0.0.0',
+    cors: true,
+    allowedHosts: true,
+    hmr: { clientPort: 443 },
+  },
+  preview: {
+    port: 3000,
+    host: '0.0.0.0',
+    cors: true,
+    allowedHosts: true,
+  },
   test: {
     environment: 'jsdom',
     globals: true,
