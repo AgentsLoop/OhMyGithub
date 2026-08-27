@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>SHADOW PROTOCOL — AAA Tactical FPS</title>
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Oxanium:wght@500;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--accent:#ff3b30;--accent2:#ffcc00;--bg:#0a0e13}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Rajdhani',system-ui,sans-serif;user-select:none}
+canvas{display:block;width:100% !important;height:100% !important}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+#topbar{position:absolute;top:0;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:linear-gradient(180deg,rgba(0,0,0,.85),rgba(0,0,0,0));border-bottom:1px solid rgba(255,255,255,.08)}
+#topbar .brand{font-family:'Oxanium',sans-serif;font-weight:800;letter-spacing:.14em;font-size:13px;color:#fff;display:flex;align-items:center;gap:10px}
+#topbar .brand b{color:var(--accent)}
+#topbar .right{display:flex;gap:14px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,.85);letter-spacing:.08em}
+.pill{border:1px solid rgba(255,255,255,.18);padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.06);backdrop-filter:blur(8px)}
+#crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:28px;height:28px}
+#crosshair .dot{position:absolute;left:50%;top:50%;width:3px;height:3px;background:#fff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 6px rgba(255,255,255,.9),0 0 12px rgba(255,255,255,.4)}
+#crosshair .line{position:absolute;background:rgba(255,255,255,.95);box-shadow:0 0 4px rgba(0,0,0,.6)}
+#crosshair .l{left:0;top:50%;width:8px;height:1.5px;transform:translateY(-50%)}
+#crosshair .r{right:0;top:50%;width:8px;height:1.5px;transform:translateY(-50%)}
+#crosshair .t{left:50%;top:0;width:1.5px;height:8px;transform:translateX(-50%)}
+#crosshair .b{left:50%;bottom:0;width:1.5px;height:8px;transform:translateX(-50%)}
+#crosshair.hit .dot{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+#healthWrap{position:absolute;left:18px;bottom:18px;display:flex;align-items:center;gap:14px}
+#healthBar{width:220px;height:10px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.15);border-radius:999px;overflow:hidden;backdrop-filter:blur(6px)}
+#healthFill{height:100%;width:100%;background:linear-gradient(90deg,#ff3b30,#ff6a00);box-shadow:0 0 12px rgba(255,59,48,.6);transition:width .2s}
+#healthText{font-family:'Oxanium',sans-serif;font-weight:800;color:#fff;font-size:18px;text-shadow:0 2px 10px rgba(0,0,0,.7)}
+#healthText small{font-size:11px;opacity:.7;letter-spacing:.1em}
+#ammoWrap{position:absolute;right:18px;bottom:18px;text-align:right;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.1);padding:10px 16px;border-radius:10px;backdrop-filter:blur(8px)}
+#ammoNum{font-family:'Oxanium',sans-serif;font-weight:800;font-size:28px;color:#fff;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.6)}
+#ammoNum span{color:rgba(255,255,255,.5);font-size:16px}
+#ammoLbl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;color:rgba(255,255,255,.6);margin-top:2px}
+#magBar{width:100%;height:3px;background:rgba(255,255,255,.15);margin-top:6px;border-radius:999px;overflow:hidden}
+#magFill{height:100%;background:var(--accent2);width:100%;transition:width .15s}
+#killfeed{position:absolute;right:18px;top:58px;display:flex;flex-direction:column;gap:6px;align-items:flex-end;max-width:320px}
+.kill{font-family:'JetBrains Mono',monospace;font-size:11px;color:#fff;background:rgba(0,0,0,.65);border-left:3px solid var(--accent);padding:6px 10px;border-radius:4px;backdrop-filter:blur(6px);animation:slideIn .25s ease}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+#hitmarker{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24px;height:24px;pointer-events:none;opacity:0;transition:opacity .08s}
+#hitmarker.show{opacity:1}
+#hitmarker i{position:absolute;background:#fff;width:2px;height:10px;box-shadow:0 0 6px rgba(255,255,255,.9)}
+#hitmarker i:nth-child(1){left:2px;top:2px;transform:rotate(45deg)}
+#hitmarker i:nth-child(2){right:2px;top:2px;transform:rotate(-45deg)}
+#hitmarker i:nth-child(3){left:2px;bottom:2px;transform:rotate(-45deg)}
+#hitmarker i:nth-child(4){right:2px;bottom:2px;transform:rotate(45deg)}
+#hitmarker.hs i{background:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+#damageVignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(180,0,0,.55) 100%);opacity:0;transition:opacity .12s;pointer-events:none}
+#damageVignette.show{opacity:1}
+#centerMsg{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);text-align:center;pointer-events:auto}
+#centerMsg h1{font-family:'Oxanium',sans-serif;font-weight:800;font-size:42px;letter-spacing:.08em;color:#fff;text-shadow:0 4px 30px rgba(0,0,0,.7),0 0 40px rgba(255,59,48,.25);line-height:.95}
+#centerMsg h1 b{color:var(--accent)}
+#centerMsg p{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.18em;color:rgba(255,255,255,.7);margin-top:10px}
+#btnPlay{margin-top:18px;pointer-events:auto;cursor:pointer;background:linear-gradient(180deg,#ff3b30,#c40000);color:#fff;border:none;padding:14px 36px;font-family:'Oxanium',sans-serif;font-weight:800;letter-spacing:.14em;font-size:14px;border-radius:2px;box-shadow:0 8px 24px rgba(255,59,48,.45),inset 0 1px 0 rgba(255,255,255,.25);transition:transform .08s,filter .15s}
+#btnPlay:hover{filter:brightness(1.08);transform:translateY(-1px)}
+#btnPlay:active{transform:translateY(0)}
+#controlsHint{position:absolute;bottom:92px;left:50%;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:640px}
+.kbd{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.85);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-bottom-width:2px;padding:5px 8px;border-radius:6px;backdrop-filter:blur(6px)}
+#minimap{position:absolute;left:18px;top:58px;width:150px;height:150px;background:rgba(6,10,14,.72);border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;backdrop-filter:blur(10px)}
+#minimap canvas{width:100% !important;height:100% !important}
+#minimapLbl{position:absolute;top:6px;left:8px;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.16em;color:rgba(255,255,255,.6)}
+#weaponName{position:absolute;right:18px;bottom:98px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;color:rgba(255,255,255,.7);text-align:right}
+#overlay{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 35%,rgba(20,30,45,.85) 0%,rgba(5,8,12,.92) 70%);z-index:20;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:24px}
+#overlay.hidden{display:none}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:.035;background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.5"/></svg>');mix-blend-mode:overlay}
+#scope{position:fixed;inset:0;display:none;z-index:11;pointer-events:none}
+#scope.on{display:block}
+#scope::before,#scope::after{content:"";position:absolute;left:50%;top:50%;background:rgba(0,0,0,.92)}
+#scope::before{width:100%;height:40%;transform:translate(-50%,-50%);border-top:220px solid #000;border-bottom:220px solid #000;box-sizing:border-box;background:transparent}
+@media(max-width:700px){#minimap{display:none}#healthWrap{left:10px;bottom:10px}#ammoWrap{right:10px;bottom:10px}#centerMsg h1{font-size:28px}}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div id="hud">
+  <div id="topbar">
+    <div class="brand"><span style="width:10px;height:10px;background:var(--accent);display:inline-block;transform:skew(-12deg)"></span> SHADOW <b>PROTOCOL</b> <span style="opacity:.45;font-weight:400;letter-spacing:.08em">| GRID-7 FACILITY</span></div>
+    <div class="right">
+      <span class="pill" id="hudKills">KILLS 0 / 12</span>
+      <span class="pill" id="hudTime">03:00</span>
+      <span class="pill" id="hudFps">60 FPS</span>
+    </div>
+  </div>
+  <div id="minimap"><div id="minimapLbl">TAC-MAP • GRID 7</div><canvas id="miniCanvas" width="300" height="300"></canvas></div>
+  <div id="killfeed"></div>
+  <div id="crosshair"><div class="line l"></div><div class="line r"></div><div class="line t"></div><div class="line b"></div><div class="dot"></div></div>
+  <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+  <div id="damageVignette"></div>
+  <div id="weaponName">M4A1 SOPMOD • 5.56×45 • AUTO</div>
+  <div id="healthWrap">
+    <div id="healthBar"><div id="healthFill"></div></div>
+    <div id="healthText">100<small> HP</small></div>
+  </div>
+  <div id="ammoWrap">
+    <div id="ammoNum">30<span> / 90</span></div>
+    <div id="ammoLbl">MAG • RESERVE • PRESS [R] RELOAD</div>
+    <div id="magBar"><div id="magFill"></div></div>
+  </div>
+  <div id="controlsHint">
+    <span class="kbd">WASD MOVE</span><span class="kbd">SHIFT SPRINT</span><span class="kbd">MOUSE AIM</span><span class="kbd">LMB FIRE</span><span class="kbd">RMB ADS</span><span class="kbd">R RELOAD</span><span class="kbd">SPACE JUMP</span>
+  </div>
+</div>
+<div id="scope"></div>
+<div id="overlay">
+  <div id="centerMsg">
+    <h1>SHADOW<br><b>PROTOCOL</b></h1>
+    <p>TACTICAL FPS • SECURE THE FACILITY • ELIMINATE HOSTILES</p>
+    <button id="btnPlay">▶ &nbsp; DEPLOY OPERATOR</button>
+    <p style="margin-top:14px;opacity:.55;letter-spacing:.1em">CLICK TO LOCK POINTER • ESC TO PAUSE • HEADSHOTS DEAL 2× DAMAGE</p>
+    <p style="opacity:.35;margin-top:6px;font-size:10px">AAA PBR • DYNAMIC SHADOWS • VOLUMETRIC FOG • PROCEDURAL WEAPON SYSTEM</p>
+  </div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
