@@ -105,6 +105,17 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
 .cacheBoon .boonIcon{background:rgba(46,229,160,0.13);border-color:rgba(46,229,160,0.38);color:#2ee5a0}
 .shardBoon{border-color:rgba(255,176,32,0.4);color:#ffb020}
 .shardBoon .boonIcon{background:rgba(255,176,32,0.14);border-color:rgba(255,176,32,0.4);color:#ffb020}
+/* ── Persistence & Pause ── */
+#seedStat{min-width:110px}
+#pauseCard{width:min(480px,92vw);text-align:center}
+#pauseCard h1{color:var(--accent)}
+.historyList{margin:12px 0;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.historyList div{background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:center}
+.historyList b{display:block;font-size:20px;color:var(--accent)}
+.historyList label{font-size:9px;letter-spacing:0.12em;opacity:0.6}
+#historyCard{width:min(560px,92vw)}
+.boonHistoryRow{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+.boonHistoryRow span{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:rgba(17,22,30,0.7)}
 /* ── Boss (Merge Titan) ── */
 #bossHud{position:fixed;top:68px;left:50%;transform:translateX(-50%);width:min(640px,92vw);pointer-events:none;z-index:19;display:flex;flex-direction:column;align-items:center;gap:6px}
 #bossHud.hidden{display:none !important}
@@ -121,7 +132,7 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
 .shockRing i{position:absolute;width:18%;aspect-ratio:1;border:2px solid rgba(255,59,107,0.55);border-radius:50%;box-shadow:0 0 24px rgba(255,59,107,0.45),inset 0 0 18px rgba(255,59,107,0.25);animation:shockExpand 0.85s ease-out forwards}
 @keyframes shockExpand{0%{transform:scale(0.1);opacity:0.95}100%{transform:scale(8);opacity:0}}
 </style>
-  <script type="module" crossorigin src="/assets/index-KdzTZkSm.js"></script>
+  <script type="module" crossorigin src="/assets/index-MaXIqjZt.js"></script>
 </head>
 <body>
 <canvas id="canvas"></canvas>
@@ -141,6 +152,7 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
       <div class="stat" style="min-width:160px"><label>CORE INTEGRITY</label><strong id="hp">100%</strong><div class="healthbar"><i id="hpbar"></i></div></div>
     </div>
     <div class="stats" style="align-items:center">
+      <div class="stat" id="seedStat"><label>SEED</label><strong id="seedDisp">P0 · VOID</strong><div style="font-size:9px;opacity:0.5" id="seedSub">palette 0</div></div>
       <div class="stat"><label>PLAYER HP</label><strong id="php">100</strong></div>
       <div class="stat"><label>ENEMIES</label><strong id="ecount">0</strong></div>
       <div id="boonHud" class="hidden" style="pointer-events:none"></div>
@@ -157,6 +169,11 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
       <div class="row">
         <button class="btn primary" id="playBtn">► ENTER LOOP 1</button>
         <button class="btn" id="howBtn">How isolation works</button>
+        <button class="btn" id="historyBtn">◆ RUN HISTORY</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn ghost" id="abandonMenuBtn" style="font-size:11px;opacity:0.7">⌫ ABANDON RUN</button>
+        <span style="font-size:11px;opacity:0.5;align-self:center">clears boons / loop but keeps history</span>
       </div>
       <div class="hint" style="margin-top:10px">3 GLB models loaded: Arena Low Poly, Low-poly Robot, Low Poly Knight — all CC Attribution, attribution preserved.</div>
     </div>
@@ -184,10 +201,35 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
       <div class="boonGrid" id="boonChoices"></div>
       <div class="hint" style="margin-top:6px">Press <span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span> or click a card. Choice persists next loop. HUD shows active boons.</div>
     </div>
+    <div class="card hidden" id="historyCard">
+      <h1>RUN <em>HISTORY</em></h1>
+      <p style="font-size:12px;opacity:0.7">Persisted in <code>localStorage</code> — survives reload. Abandon Run clears current loop/boons but never wipes history.</p>
+      <div class="historyList" id="historyList">
+        <div><label>BEST LOOP</label><b id="histBest">1</b></div>
+        <div><label>TOTAL CLEARS</label><b id="histClears">0</b></div>
+        <div><label>TOTAL SCORE</label><b id="histScore">0</b></div>
+      </div>
+      <div class="boonHistoryRow" id="histBoons"></div>
+      <div style="font-size:11px;opacity:0.55;margin-top:8px" id="histRuns">Runs: 0 · Seed palette: 0</div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn primary" id="historyCloseBtn">Close</button>
+        <button class="btn ghost" id="historyClearBtn" style="font-size:11px">Clear History</button>
+      </div>
+    </div>
+    <div class="card hidden" id="pauseCard">
+      <h1>⏸ PAUSED</h1>
+      <p style="opacity:0.7">Isolation frozen — press <span class="kbd">Esc</span> or Resume to continue. Abandon wipes loop/boons but keeps history.</p>
+      <p style="font-size:12px;opacity:0.6">SEED <b id="pauseSeed" style="color:var(--accent)">P0</b> · LOOP <b id="pauseLoop">1</b> · BOONS <b id="pauseBoons">none</b></p>
+      <div class="row" style="justify-content:center;margin-top:12px">
+        <button class="btn primary" id="resumeBtn">▶ RESUME</button>
+        <button class="btn ghost" id="abandonBtn">⌫ ABANDON RUN</button>
+      </div>
+      <div class="hint" style="margin-top:10px"><span class="kbd">Esc</span> toggle pause</div>
+    </div>
   </div>
   <div class="foot">
-    <div class="hint">Built for /loop isolated-worktree regression · Three r160 · Vite · GLTFLoader · CC Attribution preserved</div>
-    <div class="controls"><span id="fps">60 fps</span> · <span>Isolation: <b id="iso">STABLE</b></span></div>
+    <div class="hint">Built for /loop isolated-worktree regression · Three r160 · Vite · GLTFLoader · CC Attribution preserved · <span class="kbd">Esc</span> pause</div>
+    <div class="controls"><button id="audioToggle" class="btn" style="font-size:11px;padding:4px 10px;pointer-events:auto">🔊 AUDIO</button><span id="fps">60 fps</span> · <span>Isolation: <b id="iso">STABLE</b></span></div>
   </div>
 </div>
 <div id="countdown" class="hidden"><div id="countdownNum"></div><div id="countdownLabel"></div><div id="countdownSub"></div></div>

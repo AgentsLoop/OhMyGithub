@@ -38,6 +38,107 @@ const bossHudEl = document.getElementById('bossHud');
 const bossBarEl = document.getElementById('bossBar');
 const bossHpTextEl = document.getElementById('bossHpText');
 const titanIncomingEl = document.getElementById('titanIncoming');
+// persistence & pause refs
+const seedDispEl = document.getElementById('seedDisp');
+const seedSubEl = document.getElementById('seedSub');
+const historyBtn = document.getElementById('historyBtn');
+const historyCard = document.getElementById('historyCard');
+const historyCloseBtn = document.getElementById('historyCloseBtn');
+const historyClearBtn = document.getElementById('historyClearBtn');
+const pauseCard = document.getElementById('pauseCard');
+const abandonBtn = document.getElementById('abandonBtn');
+const abandonMenuBtn = document.getElementById('abandonMenuBtn');
+const histBestEl = document.getElementById('histBest');
+const histClearsEl = document.getElementById('histClears');
+const histScoreEl = document.getElementById('histScore');
+const histBoonsEl = document.getElementById('histBoons');
+const histRunsEl = document.getElementById('histRuns');
+
+// ── Persistence (localStorage run history) ──
+const HIST_KEY = 'isolated-arena-history-v1';
+const SEED_NAMES = ['VOID','CRIMSON','TEAL'];
+function defaultHistory(){ return { bestLoop: 1, totalClears: 0, totalScore: 0, boonsAcquired:{pulse:0,cache:0,shard:0}, runs:0, lastSeed:0 }; }
+let runHistory = defaultHistory();
+try{
+  const raw = localStorage.getItem(HIST_KEY);
+  if(raw){ const p=JSON.parse(raw); runHistory={...defaultHistory(), ...p, boonsAcquired:{...defaultHistory().boonsAcquired, ...(p.boonsAcquired||{})}}; }
+}catch(e){}
+function saveHistory(){
+  try{ localStorage.setItem(HIST_KEY, JSON.stringify(runHistory)); }catch(e){}
+}
+function seedName(n){ return SEED_NAMES[n%3]||'VOID'; }
+function updateSeedDisplay(){
+  const s = loop%3;
+  if(seedDispEl) seedDispEl.textContent = `P${s} · ${seedName(s)}`;
+  if(seedSubEl) seedSubEl.textContent = loop===1 ? 'palette 0 — run start' : `palette ${s} · loop ${loop}`;
+  const ps = document.getElementById('pauseSeed'); if(ps) ps.textContent = `P${s} · ${seedName(s)}`;
+  const pl = document.getElementById('pauseLoop'); if(pl) pl.textContent = String(loop);
+  const pb = document.getElementById('pauseBoons'); if(pb){
+    const tot = activeBoons.pulse+activeBoons.cache+activeBoons.shard;
+    pb.textContent = tot? `P×${activeBoons.pulse} C×${activeBoons.cache} S×${activeBoons.shard}` : 'none';
+  }
+}
+function renderHistoryCard(){
+  if(histBestEl) histBestEl.textContent = String(runHistory.bestLoop);
+  if(histClearsEl) histClearsEl.textContent = String(runHistory.totalClears);
+  if(histScoreEl) histScoreEl.textContent = String(runHistory.totalScore);
+  if(histBoonsEl){
+    histBoonsEl.innerHTML = `
+      <span style="border-color:rgba(53,208,255,0.35);color:#35d0ff">◎ PULSE ×${runHistory.boonsAcquired.pulse}</span>
+      <span style="border-color:rgba(46,229,160,0.38);color:#2ee5a0">⚡ CACHE ×${runHistory.boonsAcquired.cache}</span>
+      <span style="border-color:rgba(255,176,32,0.4);color:#ffb020">✦ SHARD ×${runHistory.boonsAcquired.shard}</span>`;
+  }
+  if(histRunsEl) histRunsEl.textContent = `Runs (abandons+resets): ${runHistory.runs} · Current seed P${loop%3} · Best loop ${runHistory.bestLoop}`;
+}
+function recordClear(scoreGained){
+  runHistory.totalClears += 1;
+  runHistory.totalScore += scoreGained;
+  runHistory.bestLoop = Math.max(runHistory.bestLoop, loop);
+  saveHistory();
+  renderHistoryCard();
+}
+function recordBoon(id){
+  if(runHistory.boonsAcquired[id]!==undefined) runHistory.boonsAcquired[id]+=1;
+  // also bestLoop already tracked
+  saveHistory();
+  renderHistoryCard();
+}
+function doAbandonRun(){
+  const hadProgress = loop>1 || score>0 || (activeBoons.pulse+activeBoons.cache+activeBoons.shard)>0;
+  // preserve history, clear run
+  activeBoons={pulse:0,cache:0,shard:0}; recomputeBoonModifiers(); updateBoonHud();
+  loop=1; score=0; dispScore=0; coreHp=100; dispCore=100; playerHp=100; dispPlayer=100;
+  gameState='menu';
+  overlay.style.display='flex';
+  startCard.classList.remove('hidden');
+  howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden'); pauseCard.classList.add('hidden'); historyCard.classList.add('hidden');
+  bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
+  // history runs increment if had progress
+  if(hadProgress) runHistory.runs+=1;
+  runHistory.bestLoop = Math.max(runHistory.bestLoop, 1);
+  saveHistory(); renderHistoryCard(); updateSeedDisplay(); updateHUD();
+  log('⌫ Run abandoned — boons/loop cleared · history preserved');
+}
+let pausedPrevState=null;
+function togglePause(){
+  if(gameState==='playing'){
+    pausedPrevState = gameState;
+    gameState='paused';
+    pauseCard.classList.remove('hidden');
+    historyCard.classList.add('hidden'); startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden');
+    overlay.style.display='flex';
+    updateSeedDisplay();
+    ensureAudio(); duckDrone(0.05, 0.9);
+    log('⏸ Paused — Esc to resume');
+  } else if(gameState==='paused'){
+    gameState = pausedPrevState || 'playing';
+    pausedPrevState=null;
+    pauseCard.classList.add('hidden');
+    overlay.style.display='none';
+    ensureAudio(); if(droneStarted) updateDroneIntensity();
+    log('▶ Resumed');
+  }
+}
 
 // ── Boon definitions (Hades-style, stackable, persist for run) ──
 const BOONS = [
@@ -361,13 +462,20 @@ function triggerHitFlash(type){
 }
 function triggerHitStop(ms=60){
   hitStopTimer=Math.max(hitStopTimer, ms/1000);
+  if(ms>=60) duckDrone(0.12, 0.35);
 }
-// cheap beep via WebAudio
+// WebAudio — beeps + continuous drone (critic 3)
 let audioCtx=null;
-function beep(freq=880, dur=0.08, vol=0.12){
+let droneOsc1=null, droneOsc2=null, droneGain=null, droneFilter=null, droneLfo=null, droneLfoGain=null, droneNoise=null, droneNoiseGain=null, droneStarted=false, droneMuted=false;
+function ensureAudio(){
   try{
     if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
     if(audioCtx.state==='suspended') audioCtx.resume();
+  }catch(e){}
+}
+function beep(freq=880, dur=0.08, vol=0.12){
+  try{
+    ensureAudio(); if(!audioCtx) return;
     const o=audioCtx.createOscillator(); const g=audioCtx.createGain();
     o.type='square'; o.frequency.value=freq;
     g.gain.value=vol;
@@ -375,6 +483,77 @@ function beep(freq=880, dur=0.08, vol=0.12){
     o.start(); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
     o.stop(audioCtx.currentTime+dur);
   }catch(e){}
+}
+function initDrone(){
+  try{
+    ensureAudio(); if(!audioCtx || droneStarted) { updateDroneIntensity(); return; }
+    if(localStorage.getItem('isolated-arena-muted')==='1') droneMuted=true;
+    droneGain = audioCtx.createGain(); droneGain.gain.value = droneMuted ? 0 : 0.14;
+    droneFilter = audioCtx.createBiquadFilter(); droneFilter.type='lowpass'; droneFilter.frequency.value=400; droneFilter.Q.value=0.6;
+    // drone osc1: 55Hz saw (A1), osc2: 110Hz sine (A2) detuned
+    droneOsc1 = audioCtx.createOscillator(); droneOsc1.type='sawtooth'; droneOsc1.frequency.value=55;
+    droneOsc2 = audioCtx.createOscillator(); droneOsc2.type='sine'; droneOsc2.frequency.value=110;
+    droneOsc1.detune.value=-7; droneOsc2.detune.value=7;
+    const mixGain1=audioCtx.createGain(); mixGain1.gain.value=0.45;
+    const mixGain2=audioCtx.createGain(); mixGain2.gain.value=0.38;
+    droneOsc1.connect(mixGain1); droneOsc2.connect(mixGain2);
+    mixGain1.connect(droneFilter); mixGain2.connect(droneFilter);
+    // LFO 0.3Hz on detune for subtle movement
+    droneLfo = audioCtx.createOscillator(); droneLfo.type='sine'; droneLfo.frequency.value=0.32;
+    droneLfoGain = audioCtx.createGain(); droneLfoGain.gain.value=8;
+    droneLfo.connect(droneLfoGain); droneLfoGain.connect(droneOsc1.detune); droneLfoGain.connect(droneOsc2.detune);
+    // noise pad — 2s looped buffer pinkish
+    const bufSize = audioCtx.sampleRate*2;
+    const buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    let last=0;
+    for(let i=0;i<bufSize;i++){ const white=Math.random()*2-1; last= (last + 0.02*white)/(1+0.02); data[i]= last*3.5; }
+    const src = audioCtx.createBufferSource(); src.buffer=buffer; src.loop=true;
+    droneNoiseGain = audioCtx.createGain(); droneNoiseGain.gain.value=0.06;
+    const noiseFilter=audioCtx.createBiquadFilter(); noiseFilter.type='lowpass'; noiseFilter.frequency.value=900;
+    src.connect(noiseFilter); noiseFilter.connect(droneNoiseGain); droneNoiseGain.connect(droneFilter);
+    droneNoise = src;
+    droneFilter.connect(droneGain); droneGain.connect(audioCtx.destination);
+    droneOsc1.start(); droneOsc2.start(); droneLfo.start(); src.start();
+    droneStarted=true;
+    updateDroneIntensity();
+    // resume on visibility change
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) ensureAudio(); });
+  }catch(e){}
+}
+function updateDroneIntensity(){
+  if(!droneGain || !audioCtx) return;
+  const palette = loop % 3;
+  const base = 0.08 + loop*0.015 + (palette===1?0.04:0);
+  const target = droneMuted ? 0 : Math.min(0.22, base);
+  const now = audioCtx.currentTime;
+  droneGain.gain.cancelScheduledValues(now);
+  droneGain.gain.linearRampToValueAtTime(target, now+0.6);
+  if(droneFilter){
+    const f = 380 + loop*22 + (palette===2?80:0);
+    droneFilter.frequency.linearRampToValueAtTime(Math.min(900,f), now+0.6);
+  }
+}
+function duckDrone(amount=0.06, dur=0.45){
+  if(!droneGain || !audioCtx || droneMuted) return;
+  const now=audioCtx.currentTime;
+  const cur = droneGain.gain.value;
+  droneGain.gain.cancelScheduledValues(now);
+  droneGain.gain.setValueAtTime(cur, now);
+  droneGain.gain.linearRampToValueAtTime(Math.max(0, cur*amount), now+0.05);
+  droneGain.gain.linearRampToValueAtTime(cur, now+dur);
+}
+function toggleDroneMute(){
+  droneMuted=!droneMuted;
+  try{ localStorage.setItem('isolated-arena-muted', droneMuted?'1':'0'); }catch(e){}
+  if(droneGain && audioCtx){
+    droneGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    droneGain.gain.linearRampToValueAtTime(droneMuted?0:0.14, audioCtx.currentTime+0.25);
+  }
+  updateDroneIntensity();
+  const btn=document.getElementById('audioToggle');
+  if(btn) btn.textContent = droneMuted ? '🔇 MUTED' : '🔊 AUDIO';
+  btn.style.opacity = droneMuted? '0.6':'1';
 }
 
 // ── Merge Titan Boss (Loop 3/6/9...) ──
@@ -467,6 +646,7 @@ function doBossShockwave(){
   const dmgPlayer= bossPhase===2? 18:12;
   const dmgCore= bossPhase===2? 12:7;
   // player hit if alive (arena-wide per spec — always)
+  duckDrone(0.08, 0.9);
   takeDamagePlayer(dmgPlayer);
   triggerShake(1.4);
   triggerHitFlash('coreHit');
@@ -792,7 +972,12 @@ async function startLoop(){
   bossHudEl.classList.add('hidden');
   titanIncomingEl.classList.add('hidden');
   breachActive=false; breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
+  // hide persistence overlays
+  if(pauseCard) pauseCard.classList.add('hidden');
+  if(historyCard) historyCard.classList.add('hidden');
   applyChamberMutation(loop);
+  updateSeedDisplay();
+  updateDroneIntensity();
   if(isBossLoop) log(`◈ Loop ${loop} — TITAN LOOP — Merge Titan emerges`);
   else log(`→ Loop ${loop} isolated checkout — spawning ${waveTotal} conflicts`);
   updateHUD(); updateBossHud();
@@ -850,6 +1035,7 @@ function pickBoon(id){
   const b = BOONS.find(x=>x.id===id);
   if(!b) return;
   activeBoons[id] = (activeBoons[id]||0)+1;
+  recordBoon(id);
   recomputeBoonModifiers();
   updateBoonHud();
   beep({pulse:880, cache:660, shard:1040}[id]||880,0.16,0.13);
@@ -896,7 +1082,9 @@ function pickBoon(id){
   }, 380);
 }
 function winLoop(){
-  score+= 200 + loop*50 + Math.round(coreHp);
+  const gained = 200 + loop*50 + Math.round(coreHp);
+  score+= gained;
+  recordClear(gained);
   scoreEl.classList.add('bump');
   setTimeout(()=>scoreEl.classList.remove('bump'),300);
   updateHUD();
@@ -920,6 +1108,14 @@ let lastSpawn=0;
 let spawnInterval=1.25;
 
 function tick(dt){
+  // paused freeze — still render but no game logic
+  if(gameState==='paused'){
+    const t=performance.now()*0.001;
+    if(playerMixer) playerMixer.update(0);
+    // keep camera stable but still render
+    renderer.render(scene, camera);
+    return;
+  }
   // hitstop freeze — skip most tick but keep rendering once
   if(hitStopTimer>0){
     hitStopTimer-=dt;
@@ -1360,22 +1556,37 @@ addEventListener('resize',()=>{
 });
 
 // UI wiring
-document.getElementById('playBtn').onclick=startLoop;
+document.getElementById('playBtn').onclick=()=>{ initDrone(); startLoop(); };
+document.getElementById('audioToggle').onclick=toggleDroneMute;
+document.getElementById('audioToggle').textContent = (localStorage.getItem('isolated-arena-muted')==='1') ? '🔇 MUTED' : '🔊 AUDIO';
 document.getElementById('howBtn').onclick=()=>{ startCard.classList.add('hidden'); howCard.classList.remove('hidden'); };
 document.getElementById('backBtn').onclick=()=>{ howCard.classList.add('hidden'); startCard.classList.remove('hidden'); };
 document.getElementById('retryBtn').onclick=()=>{ overlay.style.display='none'; boonCard.classList.add('hidden'); startLoop(); };
 document.getElementById('menuBtn').onclick=()=>{
-  deadCard.classList.add('hidden'); boonCard.classList.add('hidden'); winCard.classList.add('hidden');
+  deadCard.classList.add('hidden'); boonCard.classList.add('hidden'); winCard.classList.add('hidden'); pauseCard.classList.add('hidden'); historyCard.classList.add('hidden');
   startCard.classList.remove('hidden'); overlay.style.display='flex'; gameState='menu';
   coreHp=100; dispCore=100; loop=1; score=0; dispScore=0;
   activeBoons={pulse:0,cache:0,shard:0}; recomputeBoonModifiers(); updateBoonHud();
   bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); isBossLoop=false; bossGroup=null;
-  updateHUD(); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
+  updateHUD(); updateSeedDisplay(); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
   log('Run reset — boons cleared');
+  // increment runs history
+  runHistory.runs+=1; runHistory.bestLoop=Math.max(runHistory.bestLoop,1); saveHistory(); renderHistoryCard();
 };
 document.getElementById('nextBtn').onclick=()=>{ winCard.classList.add('hidden'); loop++; coreHp=Math.min(100, coreHp+12); startLoop(); };
 
 addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(gameState==='playing' || gameState==='paused'){
+      e.preventDefault();
+      togglePause();
+    } else if(!historyCard.classList.contains('hidden')){
+      historyCard.classList.add('hidden');
+      if(gameState==='menu') startCard.classList.remove('hidden');
+      else if(gameState==='paused') pauseCard.classList.remove('hidden');
+    }
+    return;
+  }
   if(e.key==='r' && gameState==='dead') document.getElementById('retryBtn').click();
   if(e.key==='Enter' && gameState==='won') document.getElementById('nextBtn').click();
   if(gameState==='boon'){
@@ -1385,14 +1596,44 @@ addEventListener('keydown',e=>{
   }
 });
 
+// history & pause wiring
+if(historyBtn) historyBtn.onclick=()=>{
+  renderHistoryCard();
+  startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden'); pauseCard.classList.add('hidden');
+  historyCard.classList.remove('hidden');
+  overlay.style.display='flex';
+  if(gameState==='menu' || gameState==='dead' || gameState==='won') {/* keep state */}
+  log('History opened');
+};
+if(historyCloseBtn) historyCloseBtn.onclick=()=>{
+  historyCard.classList.add('hidden');
+  if(gameState==='paused'){ pauseCard.classList.remove('hidden'); }
+  else { startCard.classList.remove('hidden'); overlay.style.display='flex'; }
+};
+if(historyClearBtn) historyClearBtn.onclick=()=>{
+  runHistory=defaultHistory(); saveHistory(); renderHistoryCard();
+  log('History cleared');
+};
+if(abandonBtn) abandonBtn.onclick=()=> doAbandonRun();
+if(abandonMenuBtn) abandonMenuBtn.onclick=()=> doAbandonRun();
+const resumeBtn=document.getElementById('resumeBtn');
+if(resumeBtn) resumeBtn.onclick=()=> togglePause();
+if(pauseCard) pauseCard.addEventListener('click',e=>{ if(e.target===pauseCard) togglePause(); });
+
 updateHUD();
 updateBoonHud();
+updateSeedDisplay();
+renderHistoryCard();
 log('Worktree arena ready — awaiting loop start');
 
 // expose for verifier
 window.__arena={
-  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks }),
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3)}),
   getBoons:()=>({...activeBoons}),
+  getHistory:()=>{ try{ return JSON.parse(JSON.stringify(runHistory)); }catch(e){ return {...runHistory}; } },
   pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); },
   spawnTitanForTest:()=>{ if(gameState==='playing' && !bossGroup){ isBossLoop=true; pendingBoonPicks=2; waveTotal=1; spawnTitan(); showTitanIncoming(); updateBossHud(); } },
+  abandonForTest:()=> doAbandonRun(),
+  togglePauseForTest:()=> togglePause(),
+  getSeed:()=> loop%3,
 };
