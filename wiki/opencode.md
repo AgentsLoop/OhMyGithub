@@ -29,9 +29,11 @@ standard `opencode run` path.
 8. Replaces the access comment with aggregate OpenCode progress statistics and
    refreshes it about every 10 seconds while the run is active. The report also
    counts active child sessions from `/session/status` and all descendant
-   subagent sessions from their `parentID` lineage. Message text, reasoning,
-   prompts, and tool details are never rendered in the live comment; full logs
-   are published only in the completion release.
+   subagent sessions from their `parentID` lineage. It also reports inferred
+   image-context model calls by following image MIME attachments through each
+   session transcript. Message text, reasoning, prompts, and tool details are
+   never rendered in the live comment; full logs are published only in the
+   completion release.
 9. Runs a second verification prompt in the same OpenCode session as the build,
    starts the app, and exposes it through a
    separate temporary trycloudflare.com tunnel, and verifies the public URL.

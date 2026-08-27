@@ -23,6 +23,11 @@ standard `opencode run` path. The configured
 `noInterruptOnUserMessage: true` option should remain visible in the generated
 OpenCode config.
 
+The log-release step must copy and upload only non-empty `.log`/`.json` files;
+empty service logs such as `nginx.log` can make GitHub's upload API return
+`400 Bad Content-Length`. The OpenCode response JSON remains required and must
+be non-empty.
+
 Focused completion-evidence checks should also confirm that the workflow copies
 `agents.template.md` to `project/Agents.md`, and that a run sends up to two
 same-session follow-up prompts when no `project/screenshots/final-*` image
