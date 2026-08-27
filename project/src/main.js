@@ -30,6 +30,44 @@ const mobileControlsEl = document.getElementById('mobileControls');
 const joystickEl = document.getElementById('joystick');
 const joyStickEl = document.getElementById('joyStick');
 const actionBtnEl = document.getElementById('actionBtn');
+const boonCard = document.getElementById('boonCard');
+const boonChoicesEl = document.getElementById('boonChoices');
+const boonDescEl = document.getElementById('boonDesc');
+const boonHudEl = document.getElementById('boonHud');
+
+// ── Boon definitions (Hades-style, stackable, persist for run) ──
+const BOONS = [
+  { id:'pulse', name:'PULSE OVERCLOCK', short:'PULSE', desc:'+40% pulse radius<br>+15% damage per stack', icon:'◎', cls:'pulseBoon', color:'#35d0ff', detail:'Projects larger, brighter pulses' },
+  { id:'cache', name:'WORKTREE CACHE', short:'CACHE', desc:'+1 dash charge (faster CD)<br>+20% move speed', icon:'⚡', cls:'cacheBoon', color:'#2ee5a0', detail:'Dashes feel weightless' },
+  { id:'shard', name:'CONFLICT SHARD', short:'SHARD', desc:'+2 projectiles per pulse<br>Spread volley', icon:'✦', cls:'shardBoon', color:'#ffb020', detail:'Each pulse fires a fan' },
+];
+let activeBoons = { pulse:0, cache:0, shard:0 };
+let boonModifiers = { dmgMult:1, radiusMult:1, speedMult:1, dashCdMult:1, extraProjectiles:0 };
+function recomputeBoonModifiers(){
+  boonModifiers.dmgMult = 1 + activeBoons.pulse*0.15;
+  boonModifiers.radiusMult = 1 + activeBoons.pulse*0.40;
+  boonModifiers.speedMult = 1 + activeBoons.cache*0.20;
+  // each cache stack: -22% dash cooldown (stack multiplicatively, floor 0.32s)
+  const cacheStacks = activeBoons.cache;
+  boonModifiers.dashCdMult = Math.max(0.35, Math.pow(0.78, cacheStacks));
+  boonModifiers.extraProjectiles = activeBoons.shard*2;
+}
+function updateBoonHud(){
+  const total = activeBoons.pulse + activeBoons.cache + activeBoons.shard;
+  if(total===0){ boonHudEl.classList.add('hidden'); boonHudEl.innerHTML=''; return; }
+  boonHudEl.classList.remove('hidden');
+  const pills=[];
+  for(const b of BOONS){
+    const n=activeBoons[b.id];
+    if(n>0){
+      pills.push(`<span class="boonPill ${b.cls}" title="${b.name} x${n}"><i>${b.icon}</i> ${b.short} <b>×${n}</b></span>`);
+    }
+  }
+  boonHudEl.innerHTML = pills.join('');
+  // small bump anim
+  boonHudEl.animate([{transform:'scale(0.92)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(0.34,1.56,0.64,1)'});
+}
+let pendingBoonOffer = [];
 
 function log(msg){
   const d=document.createElement('div');
@@ -123,7 +161,7 @@ let breachActive=false;
 
 // state
 let loop=1, score=0, coreHp=100, playerHp=100, waveKill=0, waveTotal=0, elapsed=0, waveActive=false, gameState='menu';
-let enemies=[], bullets=[], particles=[], sparks=[];
+let enemies=[], bullets=[], enemyBullets=[], particles=[], sparks=[];
 let keys={};
 let mouse = new THREE.Vector2(0,0);
 let aimDir = new THREE.Vector3(1,0,0);
@@ -334,24 +372,51 @@ function beep(freq=880, dur=0.08, vol=0.12){
   }catch(e){}
 }
 
-function shoot(){
-  const now=performance.now();
-  if(now-lastShot<180) return;
-  lastShot=now;
-  const dir = aimDir.clone();
-  const b = new THREE.Mesh(new THREE.SphereGeometry(0.14,10,10), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x35d0ff, emissiveIntensity:2 }));
-  b.position.copy(player.position).add(new THREE.Vector3(0,0.6,0)).add(dir.clone().multiplyScalar(0.6));
-  b.userData={ vel: dir.multiplyScalar(18), life:1.6, dmg: 26 };
+function spawnSingleBullet(dirVec){
+  const r = 0.14 * boonModifiers.radiusMult;
+  const dmg = Math.round(26 * boonModifiers.dmgMult);
+  const col = activeBoons.pulse>0 ? 0x7ae8ff : 0x35d0ff;
+  const b = new THREE.Mesh(new THREE.SphereGeometry(r,10,10), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:col, emissiveIntensity: 1.9 + activeBoons.pulse*0.3 }));
+  b.position.copy(player.position).add(new THREE.Vector3(0,0.6,0)).add(dirVec.clone().multiplyScalar(0.6));
+  b.userData={ vel: dirVec.clone().multiplyScalar(18), life:1.6, dmg, hitRadius: 0.85 * boonModifiers.radiusMult };
   b.castShadow=false;
+  // subtle scale pulse for overclock
+  if(activeBoons.pulse>0) b.scale.setScalar(1.05);
   scene.add(b);
   bullets.push(b);
-  const flash = new THREE.PointLight(0x35d0ff, 6, 4);
-  flash.position.copy(b.position);
+}
+function shoot(){
+  const now=performance.now();
+  const cd = activeBoons.pulse>0 ? 160 : 180;
+  if(now-lastShot<cd) return;
+  lastShot=now;
+  const baseDir = aimDir.clone();
+  const extra = boonModifiers.extraProjectiles;
+  // spawn burst light once
+  const flash = new THREE.PointLight(activeBoons.pulse>0?0x7ae8ff:0x35d0ff, 6 + activeBoons.pulse*1.2, 4 + boonModifiers.radiusMult);
+  flash.position.copy(player.position).add(new THREE.Vector3(0,0.6,0)).add(baseDir.clone().multiplyScalar(0.6));
   scene.add(flash);
   setTimeout(()=>scene.remove(flash),80);
-  player.position.add(dir.clone().multiplyScalar(-0.06));
-  // subtle shoot shake
-  if(gameState==='playing') triggerShake(0.6);
+  if(extra===0){
+    spawnSingleBullet(baseDir);
+  } else {
+    const total = extra+1;
+    const spreadDeg = Math.min(42, 14 + total*3);
+    const half = (total-1)/2;
+    for(let i=0;i<total;i++){
+      const off = (i - half) * (spreadDeg / Math.max(1,total-1));
+      const rad = off*Math.PI/180;
+      const dir = baseDir.clone();
+      const cos=Math.cos(rad), sin=Math.sin(rad);
+      const nx = dir.x*cos - dir.z*sin;
+      const nz = dir.x*sin + dir.z*cos;
+      dir.set(nx,0,nz).normalize();
+      spawnSingleBullet(dir);
+    }
+  }
+  player.position.add(baseDir.clone().multiplyScalar(-0.06));
+  if(gameState==='playing') triggerShake(activeBoons.pulse>0?0.75:0.6);
+  if(extra>0) beep(960,0.06,0.07);
 }
 
 function spawnEnemy(){
@@ -361,7 +426,24 @@ function spawnEnemy(){
   const g = new THREE.Group();
   let mesh;
   const isElite = (waveKill + enemies.length) % 5 === 4 || Math.random()<0.15; // every ~5th is elite
-  if(robotModel){
+  // second archetype: ranged spitter (uses knight.glb) vs melee robot — 35% ranged
+  const isRanged = Math.random()<0.35;
+  const archetype = isRanged ? 'ranged' : 'melee';
+  if(archetype==='ranged' && knightModel && knightModel!==null){
+    // use original knight.glb (non-rigged) for spitter — tint blueish
+    mesh = knightModel.scene.clone(true);
+    const box=new THREE.Box3().setFromObject(mesh); const size=new THREE.Vector3(); box.getSize(size);
+    const c=new THREE.Vector3(); box.getCenter(c); mesh.position.sub(c);
+    const s= (isElite?1.25:0.95) / Math.max(size.x,size.y,size.z);
+    mesh.scale.setScalar(s);
+    mesh.rotation.y=Math.PI;
+    mesh.traverse(o=>{ if(o.isMesh){
+      o.castShadow=true;
+      o.material = o.material.clone();
+      if(isElite){ o.material.emissive=new THREE.Color(0x5500ff); o.material.emissiveIntensity=0.85; o.material.color=new THREE.Color(0xa0a0ff); }
+      else { o.material.emissive=new THREE.Color(0x2244aa); o.material.emissiveIntensity=0.45; o.material.color=new THREE.Color(0x8aa0ff); }
+    }});
+  } else if(robotModel){
     mesh = robotModel.scene.clone(true);
     const box=new THREE.Box3().setFromObject(mesh); const size=new THREE.Vector3(); box.getSize(size);
     const c=new THREE.Vector3(); box.getCenter(c); mesh.position.sub(c);
@@ -373,27 +455,42 @@ function spawnEnemy(){
       if(isElite){ o.material = o.material.clone(); o.material.emissive=new THREE.Color(0xff1133); o.material.emissiveIntensity=0.9; o.material.color=new THREE.Color(0xff9aa0); }
     }});
   } else {
-    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(isElite?0.42:0.32,isElite?0.9:0.7,4,10), new THREE.MeshStandardMaterial({color:isElite?0xff1a3d:0xff3b6b, emissive:isElite?0x880010:0x550010, emissiveIntensity:isElite?0.9:0.6}));
+    const col = archetype==='ranged'? 0x5590ff : 0xff3b6b;
+    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(isElite?0.42:0.32,isElite?0.9:0.7,4,10), new THREE.MeshStandardMaterial({color:isElite?0xff1a3d:col, emissive:isElite?0x880010: (archetype==='ranged'?0x1a3a80:0x550010), emissiveIntensity:isElite?0.9:0.6}));
     mesh.position.y=0.6;
     mesh.castShadow=true;
   }
   const holder=new THREE.Group(); holder.add(mesh);
   g.add(holder);
   g.position.copy(pos);
-  g.userData={ holder, hp: isElite? 140+loop*12 : 70+loop*8, speed: isElite? 2.8+loop*0.2 : 2.2+loop*0.18+Math.random()*0.6, maxHp: isElite?140+loop*12:70+loop*8, elite:isElite, bob:Math.random()*Math.PI*2 };
-  const bar = new THREE.Mesh(new THREE.PlaneGeometry(isElite?1.1:0.9, isElite?0.11:0.08), new THREE.MeshBasicMaterial({color:isElite?0xff1a3d:0xff3b6b, side:THREE.DoubleSide}));
+  const baseHp = archetype==='ranged' ? (isElite? 110+loop*10 : 55+loop*7) : (isElite? 140+loop*12 : 70+loop*8);
+  const baseSpeed = archetype==='ranged' ? (isElite? 2.0+loop*0.14 : 1.7+loop*0.12) : (isElite? 2.8+loop*0.2 : 2.2+loop*0.18+Math.random()*0.6);
+  g.userData={ holder, hp: baseHp, speed: baseSpeed, maxHp: baseHp, elite:isElite, bob:Math.random()*Math.PI*2, archetype, shootCd: 1.2+Math.random()*0.8 };
+  const barColor = archetype==='ranged' ? (isElite?0x7a5cff:0x5590ff) : (isElite?0xff1a3d:0xff3b6b);
+  const bar = new THREE.Mesh(new THREE.PlaneGeometry(isElite?1.1:0.9, isElite?0.11:0.08), new THREE.MeshBasicMaterial({color:barColor, side:THREE.DoubleSide}));
   bar.position.set(0, isElite?1.65:1.45,0);
   g.add(bar);
   g.userData.bar=bar;
   if(isElite){
-    const aura=new THREE.Mesh(new THREE.RingGeometry(0.85,0.95,16), new THREE.MeshBasicMaterial({color:0xff3b6b, transparent:true, opacity:0.35, side:THREE.DoubleSide}));
+    const aura=new THREE.Mesh(new THREE.RingGeometry(0.85,0.95,16), new THREE.MeshBasicMaterial({color:barColor, transparent:true, opacity:0.35, side:THREE.DoubleSide}));
     aura.rotation.x=-Math.PI/2; aura.position.y=0.03;
     g.add(aura); g.userData.aura=aura;
   }
+  if(archetype==='ranged'){
+    const ring=new THREE.Mesh(new THREE.RingGeometry(0.65,0.70,12), new THREE.MeshBasicMaterial({ color:0x5590ff, transparent:true, opacity:0.22, side:THREE.DoubleSide }));
+    ring.rotation.x=-Math.PI/2; ring.position.y=0.04;
+    g.add(ring); g.userData.rangeRing=ring;
+  }
   scene.add(g);
   enemies.push(g);
-  burst(pos, isElite?0xff1a3d:0xff3b6b, isElite?14:8);
+  burst(pos, isElite?0xff1a3d: (archetype==='ranged'?0x5590ff:0xff3b6b), isElite?14:8);
   if(isElite) beep(440,0.12,0.10);
+}
+function spawnEnemyProjectile(from, dir){
+  const b=new THREE.Mesh(new THREE.SphereGeometry(0.11,8,8), new THREE.MeshStandardMaterial({ color:0x8ab4ff, emissive:0x3355ff, emissiveIntensity:1.6 }));
+  b.position.copy(from).add(new THREE.Vector3(0,0.9,0)).add(dir.clone().multiplyScalar(0.4));
+  b.userData={ vel: dir.clone().multiplyScalar(11), life:3.0, dmg: 12+loop*1.5 };
+  scene.add(b); enemyBullets.push(b);
 }
 function burst(pos, color, n=10){
   for(let i=0;i<n;i++){
@@ -516,13 +613,55 @@ async function runCountdown(loopNum){
   countdownNum.classList.remove('anim');
 }
 
+let hazardGroup=null;
+function clearHazards(){ if(hazardGroup){ scene.remove(hazardGroup); hazardGroup.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); hazardGroup=null; } }
+function applyChamberMutation(loopNum){
+  clearHazards();
+  const palettes = [
+    { bg:0x080a0f, fog:0x080a0f, hemi:0xffffff, dir:0xffffff, rim:0x35d0ff },
+    { bg:0x0f0a12, fog:0x120a1a, hemi:0xffd0e8, dir:0xffb0d0, rim:0xff3b6b },
+    { bg:0x0a0f14, fog:0x0a1e22, hemi:0xb0fff0, dir:0x80ffcc, rim:0x2ee5a0 },
+  ];
+  const p = palettes[loopNum % palettes.length];
+  scene.background.setHex(p.bg);
+  scene.fog = new THREE.Fog(p.fog, 35, 70);
+  // update lights
+  scene.children.forEach(o=>{ if(o.isHemisphereLight) o.color.setHex(p.hemi); });
+  dir.color.setHex(p.dir);
+  rim.color.setHex(p.rim);
+  coreRing.material.color.setHex(loopNum%3===1?0xff3b6b:0x35d0ff);
+  // hazard pillars — 4 at radius 7.5, pulse damage
+  hazardGroup = new THREE.Group();
+  for(let i=0;i<4;i++){
+    const ang=i*Math.PI/2 + (loopNum*0.3);
+    const x=Math.cos(ang)*7.5, z=Math.sin(ang)*7.5;
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.65,2.4,12), new THREE.MeshStandardMaterial({ color:p.rim, emissive:p.rim, emissiveIntensity:0.55, transparent:true, opacity:0.92 }));
+    pillar.position.set(x,1.2,z);
+    pillar.castShadow=true; pillar.receiveShadow=true;
+    pillar.userData={ baseEmissive:0.55, pulsePhase: i*1.6 };
+    const ring=new THREE.Mesh(new THREE.RingGeometry(0.9,1.05,16), new THREE.MeshBasicMaterial({ color:p.rim, transparent:true, opacity:0.28, side:THREE.DoubleSide }));
+    ring.rotation.x=-Math.PI/2; ring.position.y=0.06;
+    const g=new THREE.Group(); g.add(pillar); g.add(ring); g.position.set(0,0,0);
+    // keep pillars at world pos: use group wrapper
+    const holder=new THREE.Group(); holder.position.set(x,0,z); holder.add(pillar); holder.add(ring);
+    // store hazard position for tick
+    holder.userData={ hazard:true, pillar, ring, damageTick:0 };
+    hazardGroup.add(holder);
+  }
+  scene.add(hazardGroup);
+  log(`◈ Chamber mutated — palette ${loopNum%3} + 4 hazard pillars`);
+}
+
 async function startLoop(){
   waveKill=0;
-  waveTotal = Math.min(28, 6 + loop*3);
+  // critic gap fix: denser horde vs Hades/VS — 90 cap, faster spawns, burst start
+  waveTotal = Math.min(90, 18 + loop*8);
   elapsed=0;
   waveActive=true;
   enemies.forEach(e=>scene.remove(e)); enemies.length=0;
   bullets.forEach(b=>scene.remove(b)); bullets.length=0;
+  // also clear enemy projectiles if present
+  if(typeof enemyBullets!=='undefined') enemyBullets.forEach(b=>scene.remove(b));
   player.position.set(0,0,6);
   playerHp=100; dispPlayer=100; lastPlayerHp=100;
   if(coreHp<=0) { coreHp=100; dispCore=100; }
@@ -533,7 +672,9 @@ async function startLoop(){
   howCard.classList.add('hidden');
   deadCard.classList.add('hidden');
   winCard.classList.add('hidden');
+  boonCard.classList.add('hidden');
   breachActive=false; breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
+  applyChamberMutation(loop);
   log(`→ Loop ${loop} isolated checkout — spawning ${waveTotal} conflicts`);
   updateHUD();
   await runCountdown(loop);
@@ -541,24 +682,80 @@ async function startLoop(){
   gameState='playing';
   lastSpawn=performance.now();
   showWaveAnnouncer(`WAVE ${loop} — ${waveTotal} CONFLICTS`);
-  log(`▶ Wave ${loop} active — defend the core`);
-  for(let i=0;i<3;i++) setTimeout(()=>{ if(gameState==='playing') spawnEnemy(); }, i*420);
+  log(`▶ Wave ${loop} active — defend the core — hazard ring active`);
+  // burst-spawn 3-5 at start for VS density
+  const burstN = 3 + Math.floor(Math.random()*3) + Math.min(2, Math.floor(loop/2));
+  for(let i=0;i<burstN;i++) setTimeout(()=>{ if(gameState==='playing') spawnEnemy(); }, i*180);
 }
 
-function winLoop(){
-  gameState='won';
-  winCard.classList.remove('hidden');
-  startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden');
+function showBoonChoice(){
+  gameState='boon';
   overlay.style.display='flex';
+  startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden');
+  boonCard.classList.remove('hidden');
+  // pick 3 boons shuffled, show 3 (or 2 if early loops? spec says 2-3)
+  const shuffled=[...BOONS].sort(()=>Math.random()-0.5);
+  pendingBoonOffer = shuffled.slice(0,3);
+  boonDescEl.innerHTML = `Loop <b style="color:var(--accent)">${loop}</b> cleared — Integrity ${Math.round(coreHp)}%. Pick one <b>Hades boon</b> to persist for the rest of the run.`;
+  boonChoicesEl.innerHTML='';
+  pendingBoonOffer.forEach((b, idx)=>{
+    const owned = activeBoons[b.id];
+    const stackLabel = owned>0 ? `OWNED ×${owned} → ×${owned+1}` : 'NEW BOON';
+    const div=document.createElement('button');
+    div.className=`boonChoice ${b.cls}`;
+    div.setAttribute('data-boon', b.id);
+    div.innerHTML=`
+      <span class="boonKey">${idx+1}</span>
+      <div class="boonIcon">${b.icon}</div>
+      <h3>${b.name}</h3>
+      <p>${b.desc}</p>
+      <div class="boonMeta">${stackLabel} · ${b.detail}</div>
+    `;
+    div.onclick=()=> pickBoon(b.id);
+    boonChoicesEl.appendChild(div);
+  });
+  log(`◆ Choose a Boon — ${pendingBoonOffer.map(b=>b.short).join(' / ')}`);
+  // keyboard hint handled globally
+}
+function pickBoon(id){
+  const b = BOONS.find(x=>x.id===id);
+  if(!b) return;
+  activeBoons[id] = (activeBoons[id]||0)+1;
+  recomputeBoonModifiers();
+  updateBoonHud();
+  // feedback burst + sound
+  beep({pulse:880, cache:660, shard:1040}[id]||880,0.16,0.13);
+  triggerShake(0.5);
+  // flash
+  boonCard.querySelectorAll('.boonChoice').forEach(el=>{
+    if(el.getAttribute('data-boon')===id) el.classList.add('selected');
+    el.style.pointerEvents='none';
+  });
+  log(`◆ Boon acquired: ${b.name} ×${activeBoons[id]} ${b.desc.replace('<br>',' ')}`);
+  setTimeout(()=>{
+    boonCard.classList.add('hidden');
+    // now show win card with updated boon context
+    gameState='won';
+    winCard.classList.remove('hidden');
+    overlay.style.display='flex';
+    const mods = [];
+    if(activeBoons.pulse) mods.push(`Pulse ×${activeBoons.pulse}`);
+    if(activeBoons.cache) mods.push(`Cache ×${activeBoons.cache}`);
+    if(activeBoons.shard) mods.push(`Shard ×${activeBoons.shard}`);
+    const modStr = mods.length ? `Active: ${mods.join(' · ')}` : '';
+    document.getElementById('winText').textContent=`Worktree loop ${loop} regression passed. Integrity ${Math.round(coreHp)}%. ${modStr} Next checkout harder (+3 enemies, +8% speed).`;
+  }, 380);
+}
+function winLoop(){
   score+= 200 + loop*50 + Math.round(coreHp);
-  // bump score
   scoreEl.classList.add('bump');
   setTimeout(()=>scoreEl.classList.remove('bump'),300);
   updateHUD();
-  document.getElementById('winText').textContent=`Worktree loop ${loop} regression passed. Integrity ${Math.round(coreHp)}%. Next checkout gets harder (+3 enemies, +8% speed).`;
-  log(`✓ Loop ${loop} stable — advancing`);
+  log(`✓ Loop ${loop} stable — choose a boon`);
   breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on'); breachActive=false;
-  showWaveAnnouncer(`✓ LOOP ${loop} STABLE`,1800);
+  showWaveAnnouncer(`✓ LOOP ${loop} STABLE — CHOOSE BOON`,1800);
+  // delay boon UI slightly for announcement
+  setTimeout(()=> showBoonChoice(), 600);
 }
 function failLoop(){
   gameState='dead';
@@ -660,11 +857,13 @@ function tick(dt){
     if(keys['a']) mv.x-=1;
     if(keys['d']) mv.x+=1;
     if(mv.lengthSq()>0){
-      mv.normalize().multiplyScalar(6.2*dt);
+      mv.normalize().multiplyScalar(6.2*dt*boonModifiers.speedMult);
       if(keys['shift'] && dashCd<=0){
-        mv.multiplyScalar(3.2);
-        dashCd=0.9;
-        burst(player.position, 0xffffff, 10);
+        const dashMult = 3.2 + (activeBoons.cache>0?0.2:0);
+        mv.multiplyScalar(dashMult);
+        dashCd=0.9 * boonModifiers.dashCdMult;
+        burst(player.position, activeBoons.cache>0?0x2ee5a0:0xffffff, 10 + activeBoons.cache*4);
+        if(activeBoons.cache>0) beep(740,0.08,0.08);
       }
       const np = player.position.clone().add(mv);
       const d = Math.hypot(np.x, np.z);
@@ -675,9 +874,9 @@ function tick(dt){
     if(dashCd>0) dashCd-=dt;
     if(keys[' '] ) shoot();
 
-    // Vampire-Survivors density: 40 cap, accelerating curve per loop
-    spawnInterval = Math.max(0.38, 1.1 * Math.pow(0.88, waveKill) - loop*0.04);
-    const cap = Math.min(40, 14 + Math.floor(loop*2.2));
+    // Vampire-Survivors density: 90 cap, faster accelerating curve (critic fix)
+    spawnInterval = Math.max(0.12, 0.55 * Math.pow(0.82, waveKill) - loop*0.02);
+    const cap = Math.min(90, 35 + Math.floor(loop*5));
     if(performance.now()-lastSpawn > spawnInterval*1000){
       if(enemies.length < waveTotal - waveKill && enemies.length < cap){
         if(Math.random()<0.92){
@@ -692,11 +891,40 @@ function tick(dt){
       const toCore = core.position.clone().sub(e.position); toCore.y=0;
       const toPlayer = player.position.clone().sub(e.position); toPlayer.y=0;
       const distPlayer = toPlayer.length();
-      const target = distPlayer<6 ? toPlayer : toCore;
-      if(target.lengthSq()>0.01){ target.normalize().multiplyScalar(e.userData.speed*dt); e.position.add(target); }
-      if(target.lengthSq()>1e-4) e.userData.holder.rotation.y = Math.atan2(target.x, target.z);
+      const distCore = toCore.length();
+      const isRanged = e.userData.archetype==='ranged';
+      // ranged: keep 7-8m from target, circle and shoot
+      if(isRanged){
+        const ideal = e.userData.elite? 6.5 : 7.5;
+        const target = distPlayer<10 ? toPlayer : toCore;
+        const d = target.length();
+        if(d > ideal+0.8){
+          target.normalize().multiplyScalar(e.userData.speed*dt); e.position.add(target);
+        } else if(d < ideal-0.8){
+          target.normalize().multiplyScalar(-e.userData.speed*0.7*dt); e.position.add(target);
+        } else {
+          // strafe
+          const perp = new THREE.Vector3(-target.z,0,target.x).normalize().multiplyScalar(e.userData.speed*0.6*dt * (Math.sin(t*1.7 + e.userData.bob)>0?1:-1));
+          e.position.add(perp);
+        }
+        if(target.lengthSq()>1e-4) e.userData.holder.rotation.y = Math.atan2(target.x, target.z);
+        // shoot cooldown
+        e.userData.shootCd -= dt;
+        if(e.userData.shootCd<=0){
+          const aim = distPlayer<12 ? toPlayer.clone().normalize() : toCore.clone().normalize();
+          aim.y=0; aim.normalize();
+          spawnEnemyProjectile(e.position, aim);
+          e.userData.shootCd = e.userData.elite? 1.1 : 1.6;
+          if(e.userData.rangeRing) { e.userData.rangeRing.material.opacity=0.55; setTimeout(()=>{ if(e.userData.rangeRing) e.userData.rangeRing.material.opacity=0.22; },120); }
+        }
+        if(e.userData.rangeRing) e.userData.rangeRing.rotation.z += dt*1.8;
+      } else {
+        const target = distPlayer<6 ? toPlayer : toCore;
+        if(target.lengthSq()>0.01){ target.normalize().multiplyScalar(e.userData.speed*dt); e.position.add(target); }
+        if(target.lengthSq()>1e-4) e.userData.holder.rotation.y = Math.atan2(target.x, target.z);
+      }
       e.userData.bar.lookAt(camera.position);
-      // bob for static robots + aura spin for elite
+      // bob for static + aura spin for elite
       if(e.userData.aura) e.userData.aura.rotation.z += dt*2.5;
       e.userData.holder.position.y = Math.sin(t*3.2 + e.userData.bob)*0.06 * (e.userData.elite?0.5:1);
       if(e.position.distanceTo(core.position)<1.35){
@@ -721,6 +949,52 @@ function tick(dt){
         player.position.add(push);
       }
     }
+    // hazard pillars pulse + damage
+    if(hazardGroup){
+      hazardGroup.children.forEach(h=>{
+        const pillar=h.userData.pillar;
+        const pulse = 0.55 + Math.sin(t*2.8 + pillar.userData.pulsePhase)*0.25;
+        pillar.material.emissiveIntensity = pulse;
+        pillar.material.opacity = 0.78 + Math.sin(t*3.0 + pillar.userData.pulsePhase)*0.15;
+        // scale ring pulse
+        const ring=h.children[1]||h.userData.ring;
+        if(ring) { ring.material.opacity = 0.18 + Math.sin(t*2.2 + pillar.userData.pulsePhase)*0.12; ring.rotation.z += 0.02; }
+        // damage ticks
+        h.userData.damageTick = (h.userData.damageTick||0) - dt;
+        if(h.userData.damageTick<=0){
+          if(player.position.distanceTo(h.position)<1.15) { takeDamagePlayer(14*dt*2.5); h.userData.damageTick=0.22; triggerHitFlash('playerHit'); }
+          else if(core.position.distanceTo(h.position)<1.4) { coreHp=Math.max(0,coreHp - 9*dt); if(Math.random()<0.1) triggerHitFlash('coreHit'); h.userData.damageTick=0.35; if(coreHp<=0) failLoop(); }
+          else h.userData.damageTick=0.08;
+        }
+      });
+    }
+    // enemy projectiles
+    for(let i=enemyBullets.length-1;i>=0;i--){
+      const b=enemyBullets[i];
+      b.position.add(b.userData.vel.clone().multiplyScalar(dt));
+      b.userData.life-=dt;
+      // trail
+      if(Math.random()<0.4){
+        const tt=new THREE.Mesh(new THREE.SphereGeometry(0.03,6,6), new THREE.MeshBasicMaterial({color:0x5590ff, transparent:true, opacity:0.5}));
+        tt.position.copy(b.position); tt.userData={ life:0.2, vel:new THREE.Vector3() }; scene.add(tt); particles.push(tt);
+      }
+      if(b.position.distanceTo(player.position)<0.65){
+        takeDamagePlayer(b.userData.dmg);
+        triggerShake(0.9, b.userData.vel);
+        triggerHitFlash('playerHit');
+        beep(320,0.10,0.12);
+        burst(b.position, 0x5590ff, 6);
+        scene.remove(b); enemyBullets.splice(i,1);
+        continue;
+      }
+      if(b.position.distanceTo(core.position)<1.0){
+        coreHp=Math.max(0,coreHp - b.userData.dmg*0.35); coreFlashTimer=0.22; triggerHitFlash('coreHit'); burst(b.position, 0x5590ff,5);
+        scene.remove(b); enemyBullets.splice(i,1);
+        if(coreHp<=0) failLoop();
+        continue;
+      }
+      if(b.userData.life<=0 || b.position.length()>24){ scene.remove(b); enemyBullets.splice(i,1); }
+    }
 
     for(let i=bullets.length-1;i>=0;i--){
       const b=bullets[i];
@@ -733,8 +1007,9 @@ function tick(dt){
         scene.add(t2); particles.push(t2);
       }
       let hitIdx=-1;
+      const hitR = b.userData.hitRadius || 0.85;
       for(let j=0;j<enemies.length;j++){
-        if(b.position.distanceTo(enemies[j].position)<0.85){ hitIdx=j; break; }
+        if(b.position.distanceTo(enemies[j].position)<hitR){ hitIdx=j; break; }
       }
       if(hitIdx!==-1){
         const e=enemies[hitIdx];
@@ -833,17 +1108,34 @@ addEventListener('resize',()=>{
 document.getElementById('playBtn').onclick=startLoop;
 document.getElementById('howBtn').onclick=()=>{ startCard.classList.add('hidden'); howCard.classList.remove('hidden'); };
 document.getElementById('backBtn').onclick=()=>{ howCard.classList.add('hidden'); startCard.classList.remove('hidden'); };
-document.getElementById('retryBtn').onclick=()=>{ overlay.style.display='none'; startLoop(); };
-document.getElementById('menuBtn').onclick=()=>{ deadCard.classList.add('hidden'); startCard.classList.remove('hidden'); overlay.style.display='flex'; gameState='menu'; coreHp=100; dispCore=100; loop=1; score=0; dispScore=0; updateHUD(); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on'); };
-document.getElementById('nextBtn').onclick=()=>{ loop++; coreHp=Math.min(100, coreHp+12); startLoop(); };
+document.getElementById('retryBtn').onclick=()=>{ overlay.style.display='none'; boonCard.classList.add('hidden'); startLoop(); };
+document.getElementById('menuBtn').onclick=()=>{
+  deadCard.classList.add('hidden'); boonCard.classList.add('hidden'); winCard.classList.add('hidden');
+  startCard.classList.remove('hidden'); overlay.style.display='flex'; gameState='menu';
+  coreHp=100; dispCore=100; loop=1; score=0; dispScore=0;
+  activeBoons={pulse:0,cache:0,shard:0}; recomputeBoonModifiers(); updateBoonHud();
+  updateHUD(); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
+  log('Run reset — boons cleared');
+};
+document.getElementById('nextBtn').onclick=()=>{ winCard.classList.add('hidden'); loop++; coreHp=Math.min(100, coreHp+12); startLoop(); };
 
 addEventListener('keydown',e=>{
   if(e.key==='r' && gameState==='dead') document.getElementById('retryBtn').click();
   if(e.key==='Enter' && gameState==='won') document.getElementById('nextBtn').click();
+  if(gameState==='boon'){
+    if(e.key==='1') pendingBoonOffer[0] && pickBoon(pendingBoonOffer[0].id);
+    if(e.key==='2') pendingBoonOffer[1] && pickBoon(pendingBoonOffer[1].id);
+    if(e.key==='3') pendingBoonOffer[2] && pickBoon(pendingBoonOffer[2].id);
+  }
 });
 
 updateHUD();
+updateBoonHud();
 log('Worktree arena ready — awaiting loop start');
 
 // expose for verifier
-window.__arena={ getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded }) };
+window.__arena={
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers} }),
+  getBoons:()=>({...activeBoons}),
+  pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); }
+};
