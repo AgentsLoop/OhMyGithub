@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StarCraft 3D — Sector Command</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',system-ui,Arial,sans-serif}
+  #canvas{width:100%;height:100%;display:block}
+  #ui{position:fixed;inset:0;pointer-events:none}
+  /* Top bar */
+  #topbar{position:absolute;top:0;left:0;right:0;height:44px;background:linear-gradient(180deg,#0b1a2e 0%,#0a1424 100%);border-bottom:2px solid #1e3a5f;display:flex;align-items:center;gap:18px;padding:0 16px;color:#cde;pointer-events:auto}
+  #topbar .res{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;letter-spacing:.02em}
+  #topbar .res .ico{width:14px;height:14px;border-radius:2px;display:inline-block}
+  #topbar .res .val{color:#fff;min-width:38px}
+  #supply{margin-left:6px}
+  #topbar .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  button.ui{pointer-events:auto;background:linear-gradient(180deg,#2a4a7a,#1a335a);color:#e8f0ff;border:1px solid #3b5e8f;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.03em}
+  button.ui:hover{background:linear-gradient(180deg,#325a94,#25406e)}
+  button.ui:disabled{opacity:.45;cursor:not-allowed}
+  #buildbar{position:absolute;top:48px;left:12px;background:rgba(8,18,36,.92);border:1px solid #2a4a6a;border-radius:8px;padding:8px 10px;display:flex;gap:8px;pointer-events:auto;backdrop-filter:blur(6px)}
+  #buildbar .b{width:72px;text-align:center}
+  #buildbar .b button{width:100%;height:56px;background:#11213b;border:1px solid #2d4a6e;border-radius:6px;color:#cde;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:700}
+  #buildbar .b button:hover{border-color:#4a7abf;background:#1a2f4d}
+  #buildbar .b small{font-size:10px;opacity:.85;font-weight:600}
+  /* Selection panel */
+  #selpanel{position:absolute;bottom:12px;left:12px;width:420px;background:rgba(8,18,36,.93);border:1px solid #2a4a6a;border-radius:10px;padding:10px 12px;pointer-events:auto;color:#cde;display:flex;flex-direction:column;gap:8px}
+  #selpanel h3{font-size:13px;color:#8ec5ff;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+  #selpanel .grid{display:flex;gap:6px;flex-wrap:wrap}
+  #selpanel .grid button{padding:7px 9px;font-size:11px}
+  #selgrid{display:flex;gap:6px;flex-wrap:wrap;min-height:28px}
+  .chip{padding:4px 7px;border-radius:6px;background:#132a4a;border:1px solid #2d4a6e;font-size:11px;color:#b8d4f0}
+  /* Minimap */
+  #minimapWrap{position:absolute;bottom:12px;right:12px;width:200px;height:200px;background:#081222;border:2px solid #2a4a6a;border-radius:8px;overflow:hidden;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+  #minimap{width:100%;height:100%;display:block;cursor:pointer}
+  #minimapWrap .label{position:absolute;bottom:4px;left:6px;font-size:10px;color:#8eaecf;letter-spacing:.08em}
+  /* Toast */
+  #toast{position:absolute;top:60px;left:50%;transform:translateX(-50%);background:#7a1a1a;color:#fff;padding:8px 14px;border-radius:8px;font-weight:700;font-size:12px;display:none;pointer-events:none;border:1px solid #a33}
+  /* Drag selection box */
+  #selbox{position:absolute;border:1px solid #5df; background:rgba(80,220,255,.12);display:none;pointer-events:none}
+  /* Win/lose modal */
+  #modal{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);pointer-events:auto}
+  #modal .card{background:linear-gradient(180deg,#0f2442,#0a1a33);border:1px solid #2e4a6e;border-radius:12px;padding:20px 22px;min-width:340px;text-align:center;color:#d8ecff}
+  #modal h2{font-size:22px;margin-bottom:8px}
+  #controlsHint{position:absolute;top:50px;right:12px;background:rgba(8,18,36,.88);border:1px solid #2a4a6a;border-radius:8px;padding:8px 10px;color:#9bbbd8;font-size:11px;line-height:1.5;pointer-events:none;max-width:220px}
+  #controlsHint kbd{background:#1a2f4a;border:1px solid #2d4a6e;border-bottom-width:2px;border-radius:4px;padding:1px 5px;font-size:10px;color:#cde;margin-right:2px}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="ui">
+  <div id="topbar">
+    <div class="res"><span class="ico" style="background:#4fc3f7;box-shadow:0 0 6px #4fc3f7"></span> Minerals <span class="val" id="minVal">600</span></div>
+    <div class="res"><span class="ico" style="background:#81c784"></span> Gas <span class="val" id="gasVal">0</span></div>
+    <div class="res"><span class="ico" style="background:#ffb74d"></span> Supply <span class="val" id="supVal">6/10</span></div>
+    <div class="res" style="margin-left:10px;gap:4px"><span style="font-size:11px;opacity:.8">Wave</span> <span id="waveVal" style="color:#fff;font-weight:800">1</span> <span style="font-size:11px;opacity:.6" id="waveTimer">— 30s</span></div>
+    <div class="right">
+      <button class="ui" id="btnSave">Save</button>
+      <button class="ui" id="btnRestart">Restart</button>
+      <span style="font-size:10px;opacity:.6;letter-spacing:.08em">STAR SECTOR • 3D RTS</span>
+    </div>
+  </div>
+
+  <div id="buildbar">
+    <div class="b"><button id="btnBarracks">▣<span>Barracks</span><small>150 M</small></button></div>
+    <div class="b"><button id="btnSupply">▦<span>Supply</span><small>100 M</small></button></div>
+    <div class="b"><button id="btnSCV">◉<span>SCV</span><small>50 M • 5s</small></button></div>
+    <div class="b"><button id="btnMarine">⬢<span>Marine</span><small>60 M • 7s</small></button></div>
+    <div class="b"><button id="btnTank">⬣<span>Tank</span><small>120 M 20 G</small></button></div>
+  </div>
+
+  <div id="controlsHint">
+    <div><kbd>LMB</kbd> select · <kbd>Drag</kbd> box · <kbd>Shift</kbd> add</div>
+    <div><kbd>RMB</kbd> move / attack · <kbd>A</kbd> attack-move</div>
+    <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> groups · <kbd>Ctrl+1</kbd> save</div>
+    <div><kbd>Mouse Wheel</kbd> zoom · <kbd>MMB drag</kbd> orbit</div>
+    <div style="opacity:.6;margin-top:4px">Right-click mineral to mine • Select SCV then Barracks/Supply to place ghost → click ground</div>
+  </div>
+
+  <div id="selpanel">
+    <h3 id="selTitle">No selection — drag to select SCVs/Marines</h3>
+    <div id="selgrid"></div>
+    <div class="grid" id="actionGrid"></div>
+    <div style="font-size:10px;opacity:.6">StarCraft 3D — Sector Command. Procedural Three.js. Build, expand, destroy enemy Command Center at north.</div>
+  </div>
+
+  <div id="minimapWrap"><canvas id="minimap" width="200" height="200"></canvas><span class="label">MINIMAP — click to jump</span></div>
+  <div id="toast"></div>
+  <div id="selbox"></div>
+
+  <div id="modal">
+    <div class="card">
+      <h2 id="modalTitle">Victory!</h2>
+      <p id="modalBody" style="opacity:.85;font-size:13px;line-height:1.5;margin-bottom:12px">You destroyed the enemy Command Center.</p>
+      <button class="ui" id="modalBtn">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap" style="display:none">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
