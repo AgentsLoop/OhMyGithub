@@ -144,6 +144,24 @@ curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
 Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
 ```
 
+## Iteration 6 — floor/wall bump + bevel highlight + enemy variation (gauntlet loop)
+
+**Builder `ses_fbc8346e2ffeeqmEx80NJYF4jG` (parallel):** `project/src/main.js:311,481,665` wall `bumpScale 0.018→0.035` + floor `bumpMap` `drawImage` cloned grout canvas `bumpScale:0.035` — grout catches `dir` light more, mitigates flat pastel. `502-508` extra `bevelHi` strip `0xffffff 0.016×0.645 roughness 0.28 metal 0.14` at `h-0.212` atop `bevelTop 0xf2f6fb` — specular hi-light mimics chamfer. Enemy `111,131,1020-1050,1355` `envMapIntensity 1.25→1.35` + per-spawn `hue ±0.02→±0.035 val ±0.04→±0.05` + `sat ±0.04` + `envJitter 1.38±0.19 (1.19-1.57)` + per-mat `metal±0.045 rough±0.04` + visor pulse `0.18→0.26` — breaks clone uniformity. Preserves `allowedHosts:true`, attribution, sparse `project/` only.
+
+**Critic `ses_fbc824a1cffeKG50ptPmFFz7sS` (independent, blind vs Halo Infinite Streets/Bazaar/The Pit, https://mat-busy-devel-paragraph.trycloudflare.com 200 + http://127.0.0.1:3000 200 tmux app-server:3000 + screenshots final-*.png 213-486KB): Halo wins decisively — still bleached toy-box at 8-15m despite wash fixes; no fog/sky tweak closes it. Single biggest gap — fully procedural fake trim-sheet vs Halo authored tiled albedo(0.75+)+normal+roughness+AO+45° chamfer/bevel+edge-wear/decals: `21` Fog `0xa8bed8 38,85` + `22` bg `0x8ea6c6` + `25` sky `SphereGeometry 120 MeshBasicMaterial 0xc9d6ea BackSide` light-agnostic + `60-61` ACES 1.20 + `54` vignette `0.52` cannot cure white balance, `209-315` floor Canvas 1024 `#d2d8e2` mottles+`2px` grout+`10px` fake cavity stroke + broken streaks still drawn grout not cavity AO, `290-293` `bumpMap` is `drawImage(c)` of same color canvas `bumpScale 0.035` zero real normal perturb no `aoMap/normalMap`, `352-466` walls `512 #e6edf7` reusing color as `bumpMap 0.035` fake height, `485` flat Box 12×5.5×0.6 `0xffffff roughness 0.79 metal 0.06`, `504-513` bevelTop `0.038 #f2f6fb` + bevelHi `0.016 #ffffff` + bevelBot `0.042 #c2cddd` thin box strips not chamfered trim mesh with baked cavity AO, seams/rivets decal hacks not grunge masks; same faked on `createElevatedPlatform() 570-583` reusing `wallTexs`; robot `b2a34296 7204f 0 textures` hacked `103-169` random metal/rough + CubeCamera 128 + weapon `55d74d7 1967f scale 0.095` cone flash no hands — until authored tiled `albedo+normal+rough+AO` + bevel geometry, Streets readability never arrives. Sparse `git sparse-checkout list → project` only, `vite.config.js:5,10 allowedHosts:true`, `tmux app-server:3000` alive `curl 200` `/models/*.glb 200`.
+
+**Verifier `ses_fbc81a5d0ffe5WAY23pujy9hNC` (parallel):** PASS — `vite v5.4.21 building 9 modules ✓ built in 1.70s` `dist/assets/index-BYpEAF7t.js 651.20k gzip 169.96k` (+0.61k vs 650.59k), `dist/index.html 9.69k`, `curl http://127.0.0.1:3000 200` 9708 `vite preview --host 0.0.0.0 --port 3000`, `curl -H Host 200` + `curl https://mat-busy-devel-paragraph.trycloudflare.com 200` cf-ray, `/models/*.glb` 200 both, `vite.config.js:1-12` `allowedHosts:true` host 0.0.0.0 port 3000, `git sparse-checkout list → project` `core.sparseCheckout=true` `tmux ls app-server:1 windows`, `src/main.js:1554 lines` 13/13 mechanics (WASD, pointerLock, joystick, sprint, dash 0.22/1.1, heat 0.085, HUD, enemy chase, platform height, wave, particles) pass, Playwright both URLs title `NEXUS ARENA` canvas 1280×720 WebGL true HUD hp100 GLB 200 pass (warnings `PCFSoftShadowMap deprecated`, `WebGL context different type`, `GPU stall` benign).
+
+**Remediation applied this iteration:** acknowledged `bumpScale 0.035` + `bevelHi` + enemy `envMapIntensity 1.35` + hue/sat jitter mitigate flatness/clone uniformity but still procedural `drawImage` fake normal vs Halo baked `normalMap` + bevel mesh + edge-wear; floor grout remains line not chamfer. Next iteration needs authored tiled `albedo+normal+roughness+AO` library + bevel geometry + edge-wear mask to close gap.
+
+**Re-verification after builder+remediation:**
+```
+npm run build ✓ 651.20k gzip 169.96k (9 modules, 1.70s) vs 650.59k prev (+0.61k)
+curl http://127.0.0.1:3000 200 9708
+curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
+Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
+```
+
 ## How to re-verify
 
 ```bash

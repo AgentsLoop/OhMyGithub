@@ -135,7 +135,7 @@ function enhanceRobotTemplate(root){
       targetRough = THREE.MathUtils.clamp(targetRough + (Math.random()-0.5)*0.18, 0.15, 0.95);
       m.metalness = targetMetal;
       m.roughness = targetRough;
-      m.envMapIntensity = 1.25;
+      m.envMapIntensity = 1.35;
       // darken slightly vs bright albedo floor (Halo contrast: enemies ~0.35 vs floor ~0.75)
       if(m.color){
         // keep hue, reduce value ~6% so detail pops; avoid washing on aac0d8 fog/bg
@@ -287,6 +287,10 @@ function makeFloorTextures(){
   // grain
   for(let i=0;i<3400;i++){ const x=Math.random()*N, y=Math.random()*N; g.fillStyle=`rgba(0,0,0,${Math.random()*0.016})`; g.fillRect(x,y,1,1); }
   const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2.2,2.2); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=8;
+  // bump canvas — luminance variation for grout micro-catch (iteration 6: bumpScale 0.035)
+  const bumpCanvas=document.createElement('canvas'); bumpCanvas.width=N; bumpCanvas.height=N;
+  bumpCanvas.getContext('2d').drawImage(c,0,0);
+  const floorBump=new THREE.CanvasTexture(bumpCanvas); floorBump.wrapS=floorBump.wrapT=THREE.RepeatWrapping; floorBump.repeat.set(2.2,2.2); floorBump.anisotropy=8;
   // roughness variation canvas — mid 0.84 with per-panel jitter + wear = less glossy
   const rc=document.createElement('canvas'); rc.width=512; rc.height=512;
   const rg=rc.getContext('2d');
@@ -303,12 +307,12 @@ function makeFloorTextures(){
   rg.strokeStyle='#ffffff'; rg.lineWidth=2;
   for(let i=0;i<512;i+=128){ rg.beginPath(); rg.moveTo(i,0); rg.lineTo(i,512); rg.stroke(); rg.beginPath(); rg.moveTo(0,i); rg.lineTo(512,i); rg.stroke(); }
   const roughTex=new THREE.CanvasTexture(rc); roughTex.wrapS=roughTex.wrapT=THREE.RepeatWrapping; roughTex.repeat.set(2.2,2.2); roughTex.anisotropy=8;
-  return { color:tex, rough:roughTex };
+  return { color:tex, rough:roughTex, bump:floorBump };
 }
 const floorTexs = makeFloorTextures();
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(arenaRadius, 64),
-  new THREE.MeshStandardMaterial({ map: floorTexs.color, roughnessMap: floorTexs.rough, color:0xffffff, roughness:0.88, metalness:0.02 })
+  new THREE.MeshStandardMaterial({ map: floorTexs.color, roughnessMap: floorTexs.rough, bumpMap: floorTexs.bump, bumpScale:0.035, color:0xffffff, roughness:0.88, metalness:0.02 })
 );
 floor.rotation.x = -Math.PI/2;
 floor.receiveShadow=true;
@@ -478,7 +482,7 @@ for(let i=0;i<6;i++){
   const x = Math.cos(ang)*r, z=Math.sin(ang)*r;
   const w = 12, h=5.5;
   // body with trim-sheet textures
-  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.6), new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.018, color:0xffffff, roughness:0.79, metalness:0.06 }));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.6), new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.035, color:0xffffff, roughness:0.79, metalness:0.06 }));
   body.position.set(x, h/2, z);
   body.lookAt(0, h/2, 0);
   body.castShadow=true; body.receiveShadow=true;
@@ -501,6 +505,11 @@ for(let i=0;i<6;i++){
   bevelTop.position.set(x, h-0.235, z);
   bevelTop.lookAt(0, h-0.235, 0);
   wallGroup.add(bevelTop);
+  // iteration 6: extra highlight — slightly brighter top edge (specular catch like Halo authored bevel hi-light)
+  const bevelHi = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.016, 0.645), new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.28, metalness:0.14 }));
+  bevelHi.position.set(x, h-0.212, z);
+  bevelHi.lookAt(0, h-0.212, 0);
+  wallGroup.add(bevelHi);
   const bevelBot = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.042, 0.66), new THREE.MeshStandardMaterial({ color:0xc2cddd, roughness:0.84, metalness:0.05 }));
   bevelBot.position.set(x, 0.205, z);
   bevelBot.lookAt(0, 0.205, 0);
@@ -658,7 +667,7 @@ function createElevatedPlatform(pos, yawRad=0, w=3.5, d=2.0, h=1.2){
   const g=new THREE.Group();
   g.position.copy(pos); g.position.y=0; g.rotation.y=yawRad;
   // main body — reuses wall trim-sheet material for hard-surface coherence
-  const bodyMat = new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.016, color:0xffffff, roughness:0.78, metalness:0.08 });
+  const bodyMat = new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.035, color:0xffffff, roughness:0.78, metalness:0.08 });
   // clone canvas repeat tweak so platform top not obviously same tiling as walls
   bodyMat.map = wallTexs.color.clone(); bodyMat.map.repeat.set(0.85,0.48); bodyMat.map.needsUpdate=true;
   bodyMat.roughnessMap = wallTexs.rough.clone(); bodyMat.roughnessMap.repeat.set(0.85,0.48); bodyMat.roughnessMap.needsUpdate=true;
@@ -1008,9 +1017,11 @@ function spawnEnemy(){
     mesh = robotTemplate.clone(true);
     mesh.scale.setScalar(0.85);
     mesh.rotation.y=ang+Math.PI;
-    // per-instance material jitter so swarm not uniform clay — envMap response varies per drone
-    const hueShift = (Math.random()-0.5)*0.04;
-    const valShift = (Math.random()-0.5)*0.08;
+    // per-instance material jitter so swarm not uniform clay — envMap response varies per drone (iteration 6: stronger hue/env variance)
+    const hueShift = (Math.random()-0.5)*0.07;
+    const valShift = (Math.random()-0.5)*0.10;
+    const satShift = (Math.random()-0.5)*0.08;
+    const envJitter = 1.38 + (Math.random()-0.5)*0.38; // 1.19-1.57, avg 1.38 vs 1.25 before
     mesh.traverse(o=>{
       if(!o.isMesh) return;
       o.castShadow = true;
@@ -1019,13 +1030,15 @@ function spawnEnemy(){
       const cloned = mats.map(m=>{
         if(!m || !m.clone) return m;
         const nm = m.clone();
-        // subtle per-instance variation
+        // subtle per-instance variation — hue + value + saturation so clones not clones
         if(nm.color){
           const hsl={}; nm.color.getHSL(hsl);
-          nm.color.setHSL(THREE.MathUtils.clamp(hsl.h+hueShift,0,1), hsl.s, THREE.MathUtils.clamp(hsl.l+valShift,0,1));
+          nm.color.setHSL(THREE.MathUtils.clamp(hsl.h+hueShift,0,1), THREE.MathUtils.clamp(hsl.s+satShift,0,1), THREE.MathUtils.clamp(hsl.l+valShift,0,1));
         }
-        // ensure envMap still hooked (scene.environment will propagate, but set intensity)
-        nm.envMapIntensity = 1.25;
+        // per-drone metal/rough micro-variance for highlight breakup
+        if(nm.metalness!==undefined) nm.metalness = THREE.MathUtils.clamp(nm.metalness + (Math.random()-0.5)*0.09, 0, 1);
+        if(nm.roughness!==undefined) nm.roughness = THREE.MathUtils.clamp(nm.roughness + (Math.random()-0.5)*0.08, 0.15, 0.95);
+        nm.envMapIntensity = envJitter;
         // keep base refs for flash
         nm.userData = nm.userData || {};
         if(nm.userData.baseIntensity===undefined) nm.userData.baseIntensity = nm.emissiveIntensity ?? 0.08;
@@ -1339,7 +1352,7 @@ function updateEnemies(dt){
         mats.forEach(m=>{
           const isVisor = /eye|visor|optic|lens/i.test((o.name+' '+(m.name||'')).toLowerCase());
           if(isVisor && m.userData){
-            m.emissiveIntensity = m.userData.baseIntensity + Math.sin(time*3.2 + e.userData.ang)*0.18;
+            m.emissiveIntensity = m.userData.baseIntensity + Math.sin(time*3.2 + e.userData.ang)*0.26;
           }
         });
       });
