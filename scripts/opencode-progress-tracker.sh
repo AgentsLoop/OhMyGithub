@@ -2,6 +2,25 @@
 set -euo pipefail
 
 started_at="$(date +%s)"
+
+vision_calls() {
+  jq -r '
+    def has_image($message):
+      any((($message.parts // [])[]?);
+        (.type == "file" and ((.mime // .mediaType // "") | startswith("image/"))) or
+        (.type == "tool" and any(((.state.attachments // [])[]?.mime?); ((. // "") | startswith("image/"))))
+      );
+    reduce .[] as $message ({ seen: false, calls: 0 };
+      if $message.info.role == "assistant" then
+        .calls += (if .seen then 1 else 0 end)
+        | .seen = (.seen or has_image($message))
+      else
+        .seen = (.seen or has_image($message))
+      end
+    ) | .calls
+  '
+}
+
 while :; do
   payload="$(curl --fail --silent --show-error \
     -H "x-opencode-directory: $PROJECT_DIR" \
@@ -59,37 +78,17 @@ while :; do
           end;
       ($sessions | descendants($sessions; $root))[]
     ')"
-    vision_messages="$(jq -cn --arg id "$SESSION_ID" --argjson messages "$payload" '{($id): $messages}')"
+    vision_count="$(vision_calls <<<"$payload")"
     while IFS= read -r subagent_id; do
       [[ -n "$subagent_id" ]] || continue
       subagent_payload="$(curl --fail --silent --show-error \
         -H "x-opencode-directory: $PROJECT_DIR" \
         "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$subagent_id/message" 2>/dev/null || true)"
       if jq -e 'type == "array"' >/dev/null 2>&1 <<<"$subagent_payload"; then
-        vision_messages="$(jq -cn \
-          --arg id "$subagent_id" \
-          --argjson current "$vision_messages" \
-          --argjson messages "$subagent_payload" \
-          '$current + {($id): $messages}')"
+        subagent_vision_count="$(vision_calls <<<"$subagent_payload")"
+        vision_count=$((vision_count + subagent_vision_count))
       fi
     done <<<"$subagent_ids"
-    vision_count="$(jq -nr --argjson messages "$vision_messages" '
-      def has_image:
-        any(.parts[]?;
-          (.type == "file" and ((.mime // .mediaType // "") | startswith("image/"))) or
-          (.type == "tool" and any(.state.attachments[]?.mime?; ((. // "") | startswith("image/"))))
-        );
-      [ $messages | to_entries[] |
-        reduce .value[] as $message ({ seen: false, calls: 0 };
-          if $message.info.role == "assistant" then
-            .calls += (if .seen then 1 else 0 end)
-            | .seen = (.seen or ($message | has_image))
-          else
-            .seen = (.seen or ($message | has_image))
-          end
-        )
-      ] | map(.calls) | add
-    ')"
     changed_count="$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
     elapsed_seconds="$(( $(date +%s) - started_at ))"
     body="🟡 **OpenCode progress (live)**
