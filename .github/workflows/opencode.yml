@@ -836,16 +836,14 @@ jobs:
         shell: bash
         run: sleep 18000
 
-      - name: Mark SSH session closed
+      - name: Append SSH session closed
         if: always() && steps.access_comment.outputs.comment_id != ''
         uses: actions/github-script@v7
-        env:
-          COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
         with:
           script: |
-            await github.rest.issues.updateComment({
+            await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo,
-              comment_id: Number(process.env.COMMENT_ID),
+              issue_number: context.issue.number,
               body: `🔒 **AgentsWeb SSH session closed.**\n\nTemporary access for [run #${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) has expired.`
             });
 
