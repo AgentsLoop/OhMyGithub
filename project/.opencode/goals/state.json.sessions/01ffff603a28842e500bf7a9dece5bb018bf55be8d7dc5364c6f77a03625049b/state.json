@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "goals": [],
+  "results": [
+    {
+      "condition": "starcraft\n\nMandatory workflow skills: (none). Before implementing, read every listed skill's `SKILL.md` and follow its instructions for this request. If a listed skill applies to the requested feature or assets, you must use it; do not substitute a generic or procedural workaround when the skill provides the required workflow. For example, when `load-sketchfab-threejs` is listed, use it to obtain and integrate at least one suitable Sketchfab/GLB asset, preserve attribution, and verify that asset renders in the browser. If a listed skill genuinely does not apply, state why in the completion report.\n\nMandatory orchestration: before declaring the game complete, use OpenCode's `task` tool to launch separate child sessions for:\n\n- builder: implement or improve the game feature;\n- critic: independently inspect the current browser result against a concrete named reference and report the single biggest remaining gap;\n- verifier: run browser checks and verify the gameplay loop.\n\nLaunch independent builder/critic work as parallel background subagents when supported. Wait for all child sessions, apply the critic's concrete finding through an implementation or remediation step, and run verification again afterward. Do not claim a critique loop ran unless the task tool returns distinct child session IDs and the critic produces a concrete finding. If the task tool is unavailable, stop and report the blocker instead of silently doing the work in one agent.",
+      "state": "achieved",
+      "reason": "",
+      "evidence": "StarCraft Sector Command RTS playable at project/index.html:1 (1002 lines). Features: Terran CC/Barracks/Depot/Refinery building (placeMode ghost, supply cap), SCV mineral/vespene gathering loop with return-to-CC, Marine/Tank training queue, Zerg wave spawning (diff-scaled), drag-select/attack-move/right-click combat with projectiles, minimap with pan, camera zoom/pan, topbar resources. Critic gap fixed: Fog of War (seen/visible Uint8Array, updateFog() circular vision 6-12 tiles, overlay dark 0.48/0.86, enemy culling, minimap fog, toggle button #fogBtn). Builder task ses_fbd22d407ffegCLLH4iWSY2gZI, critic ses_fbd1baae5ffepmt73db21bx16d (named StarCraft 1998/SC2 reference), verifier ses_fbd1654b9ffe48mbpbOZU8JfP7 + re-verify ses_fbd0acf75ffeXRwA40UgNxkzr9 all PASS (node --check syntax PASS, curl 200). Screenshots project/screenshots/final-overlay.png and final-game.png (188K each) captured via headless chrome. Commit dca8a3b93c5bfacc89e68f9a358083383117ff0d pushed to origin/opencode/33064712887.",
+      "blockedReason": "",
+      "turnCount": 0,
+      "totalTokens": 85095,
+      "usage": {
+        "input": 237081,
+        "output": 25239,
+        "reasoning": 2182,
+        "cacheRead": 2204599,
+        "cacheWrite": 0,
+        "cost": 0,
+        "costKnown": true
+      },
+      "startedAt": 1787827852975,
+      "finishedAt": 1787830080437,
+      "lastStatus": "Goal completed.",
+      "lastCheckpoint": {
+        "summary": "[goal:evidence] StarCraft Sector Command RTS playable at project/index.html:1 (1002 lines). Features: Terran CC/Barracks/Depot/Refinery building (placeMode ghost, supply cap), SCV mineral/vespene gathering loop with return-to-CC, Marine/Tank training queue, Zerg wave spawning (d…",
+        "timestamp": 1787830080436
+      },
+      "checkpoints": [
+        {
+          "summary": "[goal:evidence] StarCraft Sector Command RTS playable at project/index.html:1 (1002 lines). Features: Terran CC/Barracks/Depot/Refinery building (placeMode ghost, supply cap), SCV mineral/vespene gathering loop with return-to-CC, Marine/Tank training queue, Zerg wave spawning (d…",
+          "timestamp": 1787830080436
+        }
+      ],
+      "history": [
+        {
+          "type": "set",
+          "detail": "Goal created with limits: 10 auto-continues, 900s, 200,000 context tokens.",
+          "timestamp": 1787827852977
+        },
+        {
+          "type": "completed",
+          "detail": "Assistant marked the goal complete with evidence: StarCraft Sector Command RTS playable at project/index.html:1 (1002 lines). Features: Terran CC/Barracks/Depot/Refinery building (placeMode ghost, supply cap), SCV mineral/vespene gathering loop with return-to-CC, Marine/Tank training queue, Zerg wave spawning (diff-scaled), drag-select/attack-move/right-click combat with projectiles, minimap with…",
+          "timestamp": 1787830080436
+        }
+      ],
+      "sessionID": "ses_fbd27eb70fferXgfhuYw6ETqo0"
+    }
+  ],
+  "archives": [
+    {
+      "sessionID": "ses_fbd27eb70fferXgfhuYw6ETqo0",
+      "results": [
+        {
+          "condition": "starcraft\n\nMandatory workflow skills: (none). Before implementing, read every listed skill's `SKILL.md` and follow its instructions for this request. If a listed skill applies to the requested feature or assets, you must use it; do not substitute a generic or procedural workaround when the skill provides the required workflow. For example, when `load-sketchfab-threejs` is listed, use it to obtain and integrate at least one suitable Sketchfab/GLB asset, preserve attribution, and verify that asset renders in the browser. If a listed skill genuinely does not apply, state why in the completion report.\n\nMandatory orchestration: before declaring the game complete, use OpenCode's `task` tool to launch separate child sessions for:\n\n- builder: implement or improve the game feature;\n- critic: independently inspect the current browser result against a concrete named reference and report the single biggest remaining gap;\n- verifier: run browser checks and verify the gameplay loop.\n\nLaunch independent builder/critic work as parallel background subagents when supported. Wait for all child sessions, apply the critic's concrete finding through an implementation or remediation step, and run verification again afterward. Do not claim a critique loop ran unless the task tool returns distinct child session IDs and the critic produces a concrete finding. If the task tool is unavailable, stop and report the blocker instead of silently doing the work in one agent.",
+          "state": "achieved",
+          "reason": "",
+          "evidence": "StarCraft Sector Command RTS playable at project/index.html:1 (1002 lines). Features: Terran CC/Barracks/Depot/Refinery building (placeMode ghost, supply cap), SCV mineral/vespene gathering loop with return-to-CC, Marine/Tank training queue, Zerg wave spawning (diff-scaled), drag-select/attack-move/right-click combat with projectiles, minimap with pan, camera zoom/pan, topbar resources. Critic gap fixed: Fog of War (seen/visible Uint8Array, updateFog() circular vision 6-12 tiles, overlay dark 0.48/0.86, enemy culling, minimap fog, toggle button #fogBtn). Builder task ses_fbd22d407ffegCLLH4iWSY2gZI, critic ses_fbd1baae5ffepmt73db21bx16d (named StarCraft 1998/SC2 reference), verifier ses_fbd1654b9ffe48mbpbOZU8JfP7 + re-verify ses_fbd0acf75ffeXRwA40UgNxkzr9 all PASS (node --check syntax PASS, curl 200). Screenshots project/screenshots/final-overlay.png and final-game.png (188K each) captured via headless chrome. Commit dca8a3b93c5bfacc89e68f9a358083383117ff0d pushed to origin/opencode/33064712887.",
+          "blockedReason": "",
+          "turnCount": 0,
+          "totalTokens": 85095,
+          "usage": {
+            "input": 237081,
+            "output": 25239,
+            "reasoning": 2182,
+            "cacheRead": 2204599,
+            "cacheWrite": 0,
+            "cost": 0,
+            "costKnown": true
+          },
+          "startedAt": 1787827852975,
+          "finishedAt": 1787830080437,
+          "lastStatus": "Goal completed.",
+          "lastCheckpoint": {
+            "summary": "[goal:evidence] StarCraft Sector Command RTS playable at project/index.html:1 (1002 lines). Features: Terran CC/Barracks/Depot/Refinery building (placeMode ghost, supply cap), SCV mineral/vespene gathering loop with return-to-CC, Marine/Tank training queue, Zerg wave spawning (d…",
+            "timestamp": 1787830080436
+          },
+          "checkpoints": [
+            {
+              "summary": "[goal:evidence] StarCraft Sector Command RTS playable at project/index.html:1 (1002 lines). Features: Terran CC/Barracks/Depot/Refinery building (placeMode ghost, supply cap), SCV mineral/vespene gathering loop with return-to-CC, Marine/Tank training queue, Zerg wave spawning (d…",
+              "timestamp": 1787830080436
+            }
+          ],
+          "history": [
+            {
+              "type": "set",
+              "detail": "Goal created with limits: 10 auto-continues, 900s, 200,000 context tokens.",
+              "timestamp": 1787827852977
+            },
+            {
+              "type": "completed",
+              "detail": "Assistant marked the goal complete with evidence: StarCraft Sector Command RTS playable at project/index.html:1 (1002 lines). Features: Terran CC/Barracks/Depot/Refinery building (placeMode ghost, supply cap), SCV mineral/vespene gathering loop with return-to-CC, Marine/Tank training queue, Zerg wave spawning (diff-scaled), drag-select/attack-move/right-click combat with projectiles, minimap with…",
+              "timestamp": 1787830080436
+            }
+          ],
+          "sessionID": "ses_fbd27eb70fferXgfhuYw6ETqo0"
+        }
+      ]
+    }
+  ],
+  "orderedSessions": []
+}
