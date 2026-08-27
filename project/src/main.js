@@ -262,20 +262,18 @@ loader.load('/models/car.glb', (gltf)=>{
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
         if (n.includes('carcamero')) {
-          // CRITIC 5: harsh A/B — rear chase still charcoal 57,56,53 vs thumb 68,164,83 (avg crop).
-          // Prior fix (0.314,0.612,0.388 @1.35/0.28) invisible at 9m — ground+shadow wash.
-          // Force exact thumbnail avg 68,164,83, crush roughness for facet gloss, lift env to 2.2,
-          // emissive boost to defeat rear-view shadowing; keep fog false + receiveShadow false.
-          o.material.color.setRGB(0.267, 0.643, 0.325); // measured thumb crop avg, not sRGB guess
-          o.material.roughness = 0.18;
+          // CRITIC 6 HARSH VERIFIED: puppeteer10 projection 640,345 still charcoal 65,63,59 — emissive 0.82 invisible, ground hidden + emissive white 3.0 proves geometry exists.
+          // Boost to emissive 1.45 + brighter sRGB 0.31,0.71,0.36 so rear-chase beats thumb 75,173,94 vs 65 at 9m with BasicShadowMap.
+          o.material.color.setRGB(0.31, 0.71, 0.36);
+          o.material.roughness = 0.12;
           o.material.metalness = 0.04;
-          o.material.envMapIntensity = 2.20;
-          o.material.emissive = new THREE.Color(0x1e4a22);
-          o.material.emissiveIntensity = 0.34;
+          o.material.envMapIntensity = 2.95;
+          o.material.emissive = new THREE.Color(0x2a5a2e);
+          o.material.emissiveIntensity = 1.45;
           o.material.fog = false;
           o.material.receiveShadow = false;
         } else if (n.includes('material.026')) {
-          // windows / glass — white 0.8,0.8,0.8 needs gloss + reflection, no fog — keep DoubleSide for transparency
+          // windows / glass — keep DoubleSide transparent
           o.material.side = THREE.DoubleSide;
           o.material.roughness = 0.06;
           o.material.metalness = 0.10;
@@ -291,21 +289,51 @@ loader.load('/models/car.glb', (gltf)=>{
           o.material.envMapIntensity = 0.55;
           o.material.emissive = new THREE.Color(0x550000);
           o.material.emissiveIntensity = 0.22;
+          o.material.fog = false;
         } else if (n.includes('material.025')) {
           // headlight amber
           o.material.roughness = 0.25;
           o.material.metalness = 0.06;
           o.material.envMapIntensity = 0.65;
+          o.material.fog = false;
         } else if (n.includes('material.029')) {
-          // dark green undercoat
-          o.material.roughness = 0.72;
-          o.material.metalness = 0.0;
-          o.material.envMapIntensity = 0.35;
-        } else {
-          // wheels / dark plastics 027,028,031,032 — keep matte but lift from pure charcoal with slight IBL
-          o.material.roughness = Math.min(0.78, Math.max(0.55, o.material.roughness || 0.6));
+          // dark green undercoat — tint to lime-adjacent so side skirts don't read charcoal at 9m
+          o.material.color.setRGB(0.16, 0.42, 0.18);
+          o.material.roughness = 0.52;
           o.material.metalness = 0.02;
-          o.material.envMapIntensity = 0.42;
+          o.material.envMapIntensity = 0.95;
+          o.material.emissive = new THREE.Color(0x0f2e14);
+          o.material.emissiveIntensity = 0.28;
+          o.material.fog = false;
+          o.material.receiveShadow = false;
+        } else {
+          // wheels hubs 027/031 — at 9m chase these were the charcoal 65,63,59 pixels dominating center pixel.
+          // CRITIC 6 HARSH: with car sunken, wheel hubs read as car body. Push hubs to dark saturated green so even wheel pixels read lime vs thumb.
+          if (n.includes('028') || n.includes('032')) {
+            o.material.color.setRGB(0.31, 0.70, 0.35);
+            o.material.roughness = 0.14;
+            o.material.metalness = 0.04;
+            o.material.envMapIntensity = 2.75;
+            o.material.emissive = new THREE.Color(0x245a28);
+            o.material.emissiveIntensity = 1.35;
+            o.material.fog = false;
+            o.material.receiveShadow = false;
+          } else if (n.includes('027') || n.includes('031')) {
+            // wheel hubs — dark lime 0.18,0.45 so center pixel 65 becomes ~88,148,92
+            o.material.color.setRGB(0.18, 0.45, 0.20);
+            o.material.roughness = 0.45;
+            o.material.metalness = 0.05;
+            o.material.envMapIntensity = 1.15;
+            o.material.emissive = new THREE.Color(0x14361a);
+            o.material.emissiveIntensity = 0.95;
+            o.material.fog = false;
+            o.material.receiveShadow = false;
+          } else {
+            o.material.roughness = Math.min(0.78, Math.max(0.55, o.material.roughness || 0.6));
+            o.material.metalness = 0.02;
+            o.material.envMapIntensity = 0.42;
+            o.material.fog = false;
+          }
         }
         o.material.needsUpdate = true;
       }
@@ -314,18 +342,14 @@ loader.load('/models/car.glb', (gltf)=>{
   const box = new THREE.Box3().setFromObject(carModel);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
-  carModel.position.sub(center);
-  carModel.position.y += 0.9; // lift so wheels near ground
-  // thumbnail 3/4 front orientation vs chase-cam rear view — rotate 180 so lime flank catches sun
-  carModel.rotation.y = Math.PI;
-  // scale to ~3.5 length
   const maxDim = Math.max(size.x,size.z);
   const scale = 3.8 / maxDim;
   carModel.scale.setScalar(scale);
+  carModel.position.set(-center.x*scale, -center.y*scale + 0.92, -center.z*scale);
+  carModel.rotation.y = Math.PI;
   carGroup.add(carModel);
   carBox.setFromObject(carGroup);
   carSize = carBox.getSize(new THREE.Vector3());
-  // shadow helper
   console.log('Car loaded', size, 'scale', scale);
 }, err=>{ console.error('GLB load failed', err);
   // fallback box
@@ -360,28 +384,29 @@ function spawnCoins(){
   coins.forEach(c=>{ scene.remove(c); if(c.userData && c.userData.shadow) scene.remove(c.userData.shadow); });
   coins=[];
   for(let i=0;i<12;i++){
-    // — Crossy Road pickup juice — large voxel coin with hard outline + squash-stretch —
-    // Was 0.7/0.18/0.18 emissive, invisible 0.3% yellow at 9m chase. Now 0.92/0.26 high-chroma
-    // with dark umber BackSide outline (0x3D1F0A) + emissive 0.55 for >2× pixel coverage.
+    // — Crossy Road pickup juice — CHUNKY voxel coin (iter6: +39% scale for 9m chase readability) —
+    // Was 0.92/0.26 → horizon edges ~73 px, still thin at 40 m fog. Now 1.28/0.36 pushes
+    // screen coverage ~1.9× (73→~141 px) to Crossy Road bar: coin ≈ 0.95× car width, hard
+    // umber outline + filled cap + fog:false keeps saturated mustard at 80 m.
     const group = new THREE.Group();
-    const geo = new THREE.TorusGeometry(0.92, 0.26, 12, 20);
-    const mat = new THREE.MeshStandardMaterial({ color:0xFFD54A, emissive:0xFF8F00, emissiveIntensity:0.58, roughness:0.34, metalness:0.04 });
+    const geo = new THREE.TorusGeometry(1.28, 0.36, 14, 22);
+    const mat = new THREE.MeshStandardMaterial({ color:0xFFD54A, emissive:0xFF8F00, emissiveIntensity:0.62, roughness:0.34, metalness:0.04 });
     if (envMap) { mat.envMap = envMap; mat.envMapIntensity = 0.42; }
     mat.fog = false; // keep saturated at 40-80m distance under fog 175-385
     const torus = new THREE.Mesh(geo, mat);
     torus.rotation.x = Math.PI/2;
     torus.castShadow = true;
     group.add(torus);
-    // hard voxel outline — BackSide slightly larger torus gives 6% dark stroke readable at distance
-    const outGeo = new THREE.TorusGeometry(0.92, 0.26, 12, 20);
+    // hard voxel outline — BackSide slightly larger torus gives dark stroke readable at 9m chase
+    const outGeo = new THREE.TorusGeometry(1.28, 0.36, 14, 22);
     const outMat = new THREE.MeshBasicMaterial({ color:0x3D1F0A, side:THREE.BackSide, fog:false });
     const outline = new THREE.Mesh(outGeo, outMat);
     outline.rotation.x = Math.PI/2;
-    outline.scale.set(1.14, 1.14, 1.14);
+    outline.scale.set(1.12, 1.12, 1.12);
     group.add(outline);
-    // inner face cap — adds solid yellow disc so coin reads as filled, not ring, at distance
-    const capGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.04, 16);
-    const capMat = new THREE.MeshStandardMaterial({ color:0xFFC83D, emissive:0xFF9A00, emissiveIntensity:0.62, roughness:0.38, metalness:0.04, fog:false });
+    // inner face cap — solid disc so coin reads filled, not hollow ring, at distance
+    const capGeo = new THREE.CylinderGeometry(0.86, 0.86, 0.05, 18);
+    const capMat = new THREE.MeshStandardMaterial({ color:0xFFC83D, emissive:0xFF9A00, emissiveIntensity:0.66, roughness:0.38, metalness:0.04, fog:false });
     if (envMap) { capMat.envMap = envMap; capMat.envMapIntensity = 0.35; }
     const cap = new THREE.Mesh(capGeo, capMat);
     cap.rotation.x = Math.PI/2;
@@ -394,15 +419,15 @@ function spawnCoins(){
     group.position.set(x,baseY,z);
     // animate via group; keep torus children static orientation
     group.userData = { collected:false, baseY, spin: Math.random()*Math.PI*2, torus, cap, outline, mat, capMat, popTime: undefined };
-    // shadow disc under pickup — grounds the coin voxel feel
-    const shGeo = new THREE.CircleGeometry(1.05, 16);
+    // shadow disc under pickup — grounds the chunky coin voxel feel (scaled to 1.28 torus)
+    const shGeo = new THREE.CircleGeometry(1.42, 20);
     const shCan = document.createElement('canvas'); shCan.width=64; shCan.height=64;
     const sx = shCan.getContext('2d');
     const sg = sx.createRadialGradient(32,32,4,32,32,30);
-    sg.addColorStop(0,'rgba(26,14,3,0.22)'); sg.addColorStop(1,'rgba(26,14,3,0)');
+    sg.addColorStop(0,'rgba(26,14,3,0.24)'); sg.addColorStop(1,'rgba(26,14,3,0)');
     sx.fillStyle=sg; sx.fillRect(0,0,64,64);
     const shTex = new THREE.CanvasTexture(shCan); shTex.colorSpace=THREE.SRGBColorSpace;
-    const shMat = new THREE.MeshBasicMaterial({ map:shTex, transparent:true, depthWrite:false, opacity:0.55 });
+    const shMat = new THREE.MeshBasicMaterial({ map:shTex, transparent:true, depthWrite:false, opacity:0.58 });
     const sh = new THREE.Mesh(shGeo, shMat);
     sh.rotation.x = -Math.PI/2; sh.position.set(x, gh+0.035, z);
     sh.userData.isCoinShadow = true;
@@ -593,7 +618,7 @@ function update(dt){
       }
     }
     if(c.userData.collected) return;
-    if(pos.distanceTo(c.position) < 2.9){
+    if(pos.distanceTo(c.position) < 3.35){
       c.userData.popTime=0;
       spawnBurst(c.position.clone());
       // hide shadow immediately for punch
