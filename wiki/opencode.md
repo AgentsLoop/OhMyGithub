@@ -48,8 +48,8 @@ standard `opencode run` path. A `/goal` trigger also automatically adds the
     it sends up to two follow-up prompts to the same OpenCode session before
     continuing delivery with a warning.
 12. Creates a uniquely tagged GitHub release containing the final OpenCode
-    response JSON and safe runner log files, then adds the release and asset
-    download links to the final issue comment.
+    response JSON and safe runner log files, then adds only the release link
+    to the final issue comment.
 13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
    verification,
    then marks the comment closed and terminates both tunnels.

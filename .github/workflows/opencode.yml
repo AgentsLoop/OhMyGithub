@@ -748,34 +748,23 @@ jobs:
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
-          SCREENSHOTS_STATUS: ${{ steps.final_evidence.outputs.screenshots_status }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
-          OPENCODE_RELEASE_ASSETS: ${{ steps.opencode_release.outputs.assets_json }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
             const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${process.env.FINAL_COMMIT}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
-            const releaseAssets = JSON.parse(process.env.OPENCODE_RELEASE_ASSETS || '[]');
             const images = screenshots.map((name) => {
               const path = `project/screenshots/${name}`.split('/').map(encodeURIComponent).join('/');
               const url = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${process.env.FINAL_COMMIT}/${path}`;
               return `![Final game screenshot: ${name}](${url})`;
             });
-            const screenshotStatus = process.env.SCREENSHOTS_STATUS === 'present'
-              ? 'Final screenshot evidence: present.'
-              : 'Final screenshot evidence: missing after two automated follow-ups; the task completed, but screenshot capture still needs attention.';
             const body = [
               '✅ **Game complete and publicly verified.**', '',
               `Public game: ${process.env.APP_URL}`,
               `Final commit: ${commitUrl}`,
               `Pull request: ${process.env.PR_URL}`,
               `OpenCode logs release: ${process.env.OPENCODE_RELEASE_URL}`,
-              '', '### OpenCode response and logs', '',
-              ...releaseAssets.map(({ name, url }) => `- [${name}](${url})`),
-              'Deployment status: verified through the public URL.',
-              screenshotStatus,
-              'Known limitations: see the worker progress and completion notes above.',
               '', '### Final screenshots', '', ...images
             ].join('\n');
             await github.rest.issues.createComment({
