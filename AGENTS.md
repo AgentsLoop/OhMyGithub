@@ -5,7 +5,6 @@
 - [OpenCode workflow](wiki/opencode.md)
 - [Temporary Mac SSH access](wiki/access.md)
 - [Testing and verification](wiki/testing.md)
-- [Runner log gotchas](wiki/gotchas.md)
 
 ## Main project file
 
