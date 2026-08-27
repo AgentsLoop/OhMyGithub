@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // ===== AAA FPS — SHADOW PROTOCOL =====
 // PBR, CSM shadows, fog, procedural rifle, raycast combat, nav-ai
@@ -39,6 +42,9 @@ let raycaster = new THREE.Raycaster();
 let audioCtx;
 let miniCtx, miniCanvas;
 let lastFpsUpdate=0, frameCount=0;
+let composer=null, bloomPass=null, useBloom=true;
+// bullet hole texture cache
+let bulletHoleTex=null, bloodHoleTex=null;
 
 // DOM
 const overlay = document.getElementById('overlay');
@@ -99,6 +105,14 @@ function init(){
   renderer.toneMappingExposure = 1.45;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   document.body.appendChild(renderer.domElement);
+  // --- AAA post: UnrealBloom for emissive strips (COD IW 9.0 style) ---
+  try{
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.52, 0.48, 0.12);
+    bloomPass.threshold = 0.85; bloomPass.strength = 0.55; bloomPass.radius = 0.38;
+    composer.addPass(bloomPass);
+  }catch(e){ console.warn('[bloom] disabled', e); composer=null; useBloom=false; }
 
   controls = new PointerLockControls(camera, document.body);
   controls.addEventListener('lock', ()=>{ if(gameState==='menu' && kills===0 && playerHP===CONFIG.playerMaxHP) startGame(); else if(gameState==='playing'){}; overlay.classList.add('hidden'); audioInit(); });
@@ -166,6 +180,36 @@ function makePBRCanvas(base, accent, scale){
   cx.strokeStyle=accent; cx.lineWidth=2; cx.strokeRect(4,4,504,504);
   const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(scale,scale); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=8; return tex;
 }
+function getBulletHoleTexture(kind='concrete'){
+  if(kind==='blood' && bloodHoleTex) return bloodHoleTex;
+  if(kind==='concrete' && bulletHoleTex) return bulletHoleTex;
+  const c=document.createElement('canvas'); c.width=128; c.height=128;
+  const cx=c.getContext('2d'); cx.clearRect(0,0,128,128);
+  if(kind==='blood'){
+    // blood splat
+    cx.fillStyle='rgba(60,0,0,0)'; cx.fillRect(0,0,128,128);
+    cx.fillStyle='#7a0a0a'; cx.beginPath(); cx.arc(64,64,18,0,Math.PI*2); cx.fill();
+    cx.fillStyle='#b81a1a'; cx.beginPath(); cx.arc(64,64,10,0,Math.PI*2); cx.fill();
+    cx.fillStyle='#4a0000'; for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; const r=18+Math.random()*14; const x=64+Math.cos(a)*r, y=64+Math.sin(a)*r; cx.beginPath(); cx.arc(x,y,3+Math.random()*4,0,Math.PI*2); cx.fill(); }
+    cx.strokeStyle='rgba(120,10,10,0.35)'; cx.lineWidth=1; for(let i=0;i<4;i++){ const a=Math.random()*Math.PI*2; cx.beginPath(); cx.moveTo(64,64); cx.lineTo(64+Math.cos(a)*28,64+Math.sin(a)*28); cx.stroke(); }
+  } else {
+    // concrete bullet hole - dark center + radial cracks + dust ring
+    cx.fillStyle='rgba(0,0,0,0)'; cx.fillRect(0,0,128,128);
+    // outer dust
+    const g=cx.createRadialGradient(64,64,4,64,64,32); g.addColorStop(0,'rgba(10,10,10,0.95)'); g.addColorStop(0.25,'rgba(22,22,22,0.9)'); g.addColorStop(0.5,'rgba(50,50,50,0.35)'); g.addColorStop(1,'rgba(80,80,80,0)');
+    cx.fillStyle=g; cx.beginPath(); cx.arc(64,64,32,0,Math.PI*2); cx.fill();
+    // inner hole
+    cx.fillStyle='#070708'; cx.beginPath(); cx.arc(64,64,7,0,Math.PI*2); cx.fill();
+    cx.fillStyle='#1a1a1c'; cx.beginPath(); cx.arc(64,64,4.5,0,Math.PI*2); cx.fill();
+    // cracks
+    cx.strokeStyle='rgba(0,0,0,0.85)'; cx.lineWidth=1.2; for(let i=0;i<5;i++){ const a=(i/5)*Math.PI*2 + Math.random()*0.3; cx.beginPath(); cx.moveTo(64+Math.cos(a)*6,64+Math.sin(a)*6); cx.lineTo(64+Math.cos(a)*(18+Math.random()*10),64+Math.sin(a)*(18+Math.random()*10)); cx.stroke(); }
+    // highlight rim
+    cx.strokeStyle='rgba(255,255,255,0.08)'; cx.lineWidth=1; cx.beginPath(); cx.arc(64,64,8,0,Math.PI*2); cx.stroke();
+  }
+  const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=4;
+  if(kind==='blood') bloodHoleTex=tex; else bulletHoleTex=tex;
+  return tex;
+}
 
 function buildArena(){
   // Floor — PBR concrete with high-contrast grid + noise for visible PBR (fixes critic)
@@ -220,10 +264,18 @@ function buildArena(){
   colliders.push(new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(0,0.6,-28), new THREE.Vector3(12,1.2,10)));
   // tower
   const towerGeo=new THREE.BoxGeometry(5,7,5); const tower=new THREE.Mesh(towerGeo, new THREE.MeshStandardMaterial({color:0x182028, roughness:0.55, metalness:0.35})); tower.position.set(0,4.1,-28); tower.castShadow=true; scene.add(tower);
-  // light strips emissive
-  const stripGeo=new THREE.BoxGeometry(10,0.08,0.12); const stripMat=new THREE.MeshStandardMaterial({color:0xff3b30, emissive:0xff2200, emissiveIntensity:2.2});
-  const strip=new THREE.Mesh(stripGeo, stripMat); strip.position.set(0,6.9,-25.4); scene.add(strip);
-  const strip2=strip.clone(); strip2.position.set(0,6.9,-30.6); scene.add(strip2);
+   // light strips emissive — bloom makes them glow (COD style)
+   const stripGeo=new THREE.BoxGeometry(10,0.08,0.12); const stripMat=new THREE.MeshStandardMaterial({color:0xff3b30, emissive:0xff2200, emissiveIntensity:3.2});
+   const strip=new THREE.Mesh(stripGeo, stripMat); strip.position.set(0,6.9,-25.4); scene.add(strip);
+   const strip2=strip.clone(); strip2.position.set(0,6.9,-30.6); scene.add(strip2);
+   // second pair for depth
+   const strip3=strip.clone(); strip3.position.set(0,2.8,-25.4); strip3.scale.set(0.7,1,1); scene.add(strip3);
+   // volumetric fog particles (cheap GPU sprites) - light shafts hint
+   const fogGeo=new THREE.BufferGeometry(); const fogCount=90;
+   const fogPos=new Float32Array(fogCount*3); for(let i=0;i<fogCount;i++){ fogPos[i*3]=(Math.random()-0.5)*72; fogPos[i*3+1]=Math.random()*7+0.6; fogPos[i*3+2]=(Math.random()-0.5)*72; }
+   fogGeo.setAttribute('position', new THREE.BufferAttribute(fogPos,3));
+   const fogMat=new THREE.PointsMaterial({color:0x9ab0c6, size:0.55, transparent:true, opacity:0.055, sizeAttenuation:true, depthWrite:false});
+   const fogPoints=new THREE.Points(fogGeo, fogMat); scene.add(fogPoints); scene.userData.fogPoints=fogPoints;
   // fog volume boxes (fake)
   // sky / distant mountains plane
   const skyGeo=new THREE.PlaneGeometry(400,120); const skyMat=new THREE.MeshBasicMaterial({color:0x18202a, transparent:true, opacity:0.9, fog:false});
@@ -381,6 +433,8 @@ function startGame(){
 
 function onResize(){
   camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight);
+  if(composer) composer.setSize(innerWidth, innerHeight);
+  if(bloomPass) bloomPass.resolution.set(innerWidth, innerHeight);
 }
 function onKeyDown(e){
   keys[e.code]=true;
@@ -399,12 +453,16 @@ function doReload(){
   if(isReloading || ammoInMag===CONFIG.magSize || ammoReserve<=0) return;
   isReloading=true; sfxReload();
   weaponGroup.userData.reloadT=0;
+  weaponGroup.userData.reloadDur=1.18;
+  // visual mag drop hint
+  tone(180,0.12,'square',0.14,120);
   setTimeout(()=>{
     const need=CONFIG.magSize - ammoInMag;
     const take=Math.min(need, ammoReserve);
     ammoReserve-=take; ammoInMag+=take;
-    isReloading=false; updateHUD();
-  }, 1150);
+    isReloading=false; weaponGroup.userData.reloadT=0; updateHUD();
+    tone(520,0.09,'square',0.16,720);
+  }, 1180);
 }
 
 function tryShoot(){
@@ -460,22 +518,42 @@ function tryShoot(){
     updateEnemyHP(hit.en.group);
     showHitmarker(hit.hs);
     sfxHit(); if(hit.hs) sfxHeadshot();
-    spawnImpact(end, hit.hs?0xffcc00:0xffffff);
-    // knockback
-    hit.en.group.position.add(dir.clone().multiplyScalar(0.18));
+    // oriented impact: enemy surface -> blood decal on ground behind + particle
+    const n = dir.clone().multiplyScalar(-1);
+    spawnImpact(end, hit.hs?'blood':'concrete', n);
+    // knockback stronger
+    hit.en.group.position.add(dir.clone().multiplyScalar(hit.hs?0.28:0.18));
+    hit.en.group.userData.hitJolt = 0.22;
     if(hit.en.data.hp<=0){
-      killEnemy(hit.en, hit.hs);
+      killEnemy(hit.en, hit.hs, dir);
     }
   } else {
-    // ground/wall impact
-    // ray vs floor
+    // ground/wall impact — compute true point + normal
+    let p=null, normal=null;
     if(dir.y< -0.01){
       const t = (0 - camera.position.y)/dir.y;
       if(t>0 && t<60){
-        const p=camera.position.clone().add(dir.clone().multiplyScalar(t));
-        if(Math.abs(p.x)<39 && Math.abs(p.z)<39) spawnImpact(p, 0x8a8a8a);
+        const cand=camera.position.clone().add(dir.clone().multiplyScalar(t));
+        if(Math.abs(cand.x)<39 && Math.abs(cand.z)<39){ p=cand; normal=new THREE.Vector3(0,1,0); }
       }
     }
+    // wall fallback: ray vs nearest collider plane approx
+    if(!p){
+      // shoot 48 units and project to arena bounds for wall decal
+      const wallP=camera.position.clone().add(dir.clone().multiplyScalar(38));
+      // clamp to wall
+      const clamped=wallP.clone();
+      let hitWall=false;
+      if(Math.abs(clamped.x)>39){ clamped.x=Math.sign(clamped.x)*39; normal=new THREE.Vector3(-Math.sign(clamped.x),0,0); hitWall=true; }
+      if(Math.abs(clamped.z)>39 && !hitWall){ clamped.z=Math.sign(clamped.z)*39; normal=new THREE.Vector3(0,0,-Math.sign(clamped.z)); hitWall=true; }
+      if(hitWall){ clamped.y=THREE.MathUtils.clamp(wallP.y,0.2,6); p=clamped; }
+      else {
+        // generic mid-air puff if no wall
+        p=camera.position.clone().add(dir.clone().multiplyScalar(18 + Math.random()*8));
+        normal=dir.clone().multiplyScalar(-1);
+      }
+    }
+    if(p) spawnImpact(p, 'concrete', normal);
   }
   // camera kick
   camera.rotation.x -= 0.012 * (isADS?0.5:1);
@@ -493,16 +571,55 @@ function spawnTracer(a,b){
   let t=0; const upd=(dt)=>{ t+=dt*14; mat.opacity=1-t; if(t>=1){ scene.remove(line); return false;} return true; };
   particles.push({update:upd});
 }
-function spawnImpact(p, col){
+function spawnImpact(p, kindOrCol, normal){
+  // normalize kind
+  let kind='concrete';
+  if(typeof kindOrCol==='string') kind=kindOrCol;
+  else if(typeof kindOrCol==='number') kind = (kindOrCol===0xffcc00||kindOrCol===0xffffff) ? 'concrete' : 'concrete';
+  if(kind!=='blood' && kind!=='concrete') kind='concrete';
+  const n = (normal && normal.lengthSq()>0.001) ? normal.clone().normalize() : new THREE.Vector3(0,1,0);
+  // dust puff particles (small spheres with gravity)
   const g=new THREE.Group(); g.position.copy(p);
-  const geo=new THREE.SphereGeometry(0.06,6,6); const mat=new THREE.MeshBasicMaterial({color:col});
-  for(let i=0;i<5;i++){ const m=new THREE.Mesh(geo,mat); m.position.set((Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2,(Math.random()-0.5)*0.2); g.add(m); }
+  const isBlood = kind==='blood';
+  const col = isBlood ? 0xc41212 : 0x9a9a9a;
+  const geo=new THREE.SphereGeometry(0.035,5,5); const mat=new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.95});
+  for(let i=0;i< (isBlood?7:5); i++){
+    const mm=new THREE.Mesh(geo, mat.clone());
+    const dir2 = n.clone().add(new THREE.Vector3((Math.random()-0.5)*0.9,(Math.random()-0.1)*0.9,(Math.random()-0.5)*0.9)).normalize();
+    mm.userData.vel = dir2.multiplyScalar(1.2 + Math.random()*1.8);
+    mm.position.copy(new THREE.Vector3().copy(n).multiplyScalar(0.02));
+    g.add(mm);
+  }
+  // spark for concrete
+  if(!isBlood){
+    const sGeo=new THREE.SphereGeometry(0.018,4,4); const sMat=new THREE.MeshBasicMaterial({color:0xffe9a0});
+    for(let i=0;i<2;i++){ const s=new THREE.Mesh(sGeo,sMat.clone()); s.userData.vel=n.clone().add(new THREE.Vector3((Math.random()-0.5),Math.random()*0.6,(Math.random()-0.5))).normalize().multiplyScalar(2.2); s.position.copy(n.clone().multiplyScalar(0.03)); g.add(s); }
+  }
   scene.add(g);
-  let t=0; particles.push({update:(dt)=>{ t+=dt*6; g.children.forEach(c=>{ c.position.y+=dt*1.2; c.material.opacity=1-t; }); g.scale.multiplyScalar(1+dt*1.2); if(t>=1){scene.remove(g);return false} return true}});
-  // decal
-  const dGeo=new THREE.CircleGeometry(0.11,8); const dMat=new THREE.MeshStandardMaterial({color:0x111111, roughness:0.9, transparent:true, opacity:0.9});
-  const d=new THREE.Mesh(dGeo,dMat); d.position.copy(p); d.position.y+=0.02; d.rotation.x=-Math.PI/2; d.rotation.z=Math.random()*Math.PI; scene.add(d); decals.push(d);
-  if(decals.length>40){ const old=decals.shift(); scene.remove(old); }
+  let t=0; particles.push({update:(dt)=>{
+    t+=dt;
+    g.children.forEach(c=>{
+      if(c.userData.vel){ c.userData.vel.y -= 6.5*dt; c.position.add(c.userData.vel.clone().multiplyScalar(dt)); c.material.opacity = Math.max(0, 1 - t*1.6); }
+    });
+    if(t>=0.65){ scene.remove(g); return false; } return true;
+  }});
+  // oriented decal - circle with bullet hole texture facing normal
+  const tex = getBulletHoleTexture(kind);
+  const dGeo=new THREE.CircleGeometry(isBlood?0.18:0.14, 12);
+  const dMat=new THREE.MeshStandardMaterial({map:tex, transparent:true, opacity:0.96, roughness:0.95, metalness:0.02, polygonOffset:true, polygonOffsetFactor:-1, side:THREE.DoubleSide});
+  // for blood, also add small emissive to read on dark floor
+  if(isBlood) dMat.emissive=new THREE.Color(0x220000), dMat.emissiveIntensity=0.25;
+  const d=new THREE.Mesh(dGeo,dMat);
+  // offset slightly along normal to avoid z-fighting
+  d.position.copy(p).add(n.clone().multiplyScalar(0.025));
+  // orient: circle default normal is +Z; we want it to face -n? Use lookAt
+  const lookTarget = p.clone().add(n);
+  d.lookAt(lookTarget);
+  // random roll around normal
+  d.rotateZ(Math.random()*Math.PI*2);
+  d.renderOrder=5;
+  scene.add(d); decals.push(d);
+  if(decals.length>48){ const old=decals.shift(); scene.remove(old); }
 }
 function spawnShell(){
   const geo=new THREE.CylinderGeometry(0.012,0.012,0.03,6); const mat=new THREE.MeshStandardMaterial({color:0xc9a84a, roughness:0.35, metalness:0.7});
@@ -515,15 +632,26 @@ function spawnShell(){
   shells.push({mesh:m, vel, life});
 }
 
-function killEnemy(en, hs){
+function killEnemy(en, hs, dir){
   en.data.alive=false;
   kills++; sfxKill();
-  // death anim: fall
+  // ragdoll-ish death anim: fall with random axis, blood pool, impulse
   en.group.userData.fallT=0;
+  en.group.userData.fallDir = dir ? dir.clone().normalize() : new THREE.Vector3((Math.random()-0.5),0,(Math.random()-0.5)).normalize();
+  en.group.userData.fallRoll = (Math.random()>0.5?1:-1) * (0.7 + Math.random()*0.6);
+  en.group.userData.fallAxis = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), en.group.userData.fallDir).normalize();
+  if(en.group.userData.fallAxis.lengthSq()<0.1) en.group.userData.fallAxis.set(1,0,0);
+  // blood pool under body
+  const poolPos = en.group.position.clone(); poolPos.y=0.02;
+  spawnImpact(poolPos, 'blood', new THREE.Vector3(0,1,0));
+  // extra blood spray at head if headshot
+  if(hs){
+    const hp=en.group.userData.head.getWorldPosition(new THREE.Vector3());
+    spawnImpact(hp, 'blood', dir?dir.clone().multiplyScalar(-1):new THREE.Vector3(0,1,0));
+  }
   killfeedAdd(hs? 'HEADSHOT':'ELIMINATED', en.data.idx);
   updateHUD();
   if(kills>=CONFIG.maxEnemies) winGame();
-  // remove collider relevance? keep
 }
 
 function killfeedAdd(text, id){
@@ -628,22 +756,33 @@ function updateWeapon(dt){
   const targetFov = isADS? CONFIG.adsFov: CONFIG.baseFov;
   camera.fov += (targetFov - camera.fov)* dt*8;
   camera.updateProjectionMatrix();
-  // weapon position lerp
+  // weapon position lerp (overridden during reload)
   const adsPos = new THREE.Vector3(0.0,-0.16,-0.38);
   const hipPos = weaponBasePos.clone();
-  if(isSprinting) hipPos.add(new THREE.Vector3(0.06,0.04,0.08));
+  if(isSprinting && !isReloading) hipPos.add(new THREE.Vector3(0.06,0.04,0.08));
   const targetPos = isADS? adsPos : hipPos;
-  weaponGroup.position.lerp(targetPos, dt*10);
-  // bob + recoil
-  const bobAmp = isADS? 0.006 : isSprinting? 0.045: 0.018;
-  weaponGroup.position.y += Math.sin(bobTime*2)*bobAmp*dt*60*0.02;
-  weaponGroup.position.x += Math.cos(bobTime)*bobAmp*0.5*dt*60*0.02;
-  weaponGroup.rotation.x = THREE.MathUtils.lerp(weaponGroup.rotation.x, -recoil*0.22, dt*14);
-  weaponGroup.rotation.z = THREE.MathUtils.lerp(weaponGroup.rotation.z, Math.sin(bobTime)*0.02, dt*8);
-  // reload anim
   if(isReloading){
-    weaponGroup.rotation.x += Math.sin(Date.now()*0.008)*0.02;
-    weaponGroup.position.y += Math.sin(Date.now()*0.012)*0.004;
+    // COD-style reload: dip down, tilt, then snap back — 4 phases
+    weaponGroup.userData.reloadT = (weaponGroup.userData.reloadT||0) + dt;
+    const t = Math.min(1, weaponGroup.userData.reloadT / (weaponGroup.userData.reloadDur||1.18));
+    // curve: dip 0-0.25, hold 0.25-0.55, insert 0.55-0.85, recover 0.85-1
+    let dip=0, tilt=0, sway=0;
+    if(t<0.22){ const u=t/0.22; dip = THREE.MathUtils.lerp(0,0.22,u); tilt=THREE.MathUtils.lerp(0,0.42,u); sway=THREE.MathUtils.lerp(0,-0.08,u); }
+    else if(t<0.5){ const u=(t-0.22)/0.28; dip=0.22 - u*0.04; tilt=0.42 - u*0.1; sway=-0.08 + u*0.04; }
+    else if(t<0.78){ const u=(t-0.5)/0.28; dip=0.18 + Math.sin(u*Math.PI)*0.03; tilt=0.32 - u*0.22; sway=-0.04 + u*0.02; }
+    else { const u=(t-0.78)/0.22; dip=THREE.MathUtils.lerp(0.18,0,u); tilt=THREE.MathUtils.lerp(0.10,0,u); sway=THREE.MathUtils.lerp(-0.02,0,u); }
+    weaponGroup.position.copy(targetPos).add(new THREE.Vector3(sway, -dip, 0.08*Math.sin(t*Math.PI)));
+    weaponGroup.rotation.x = -tilt + Math.sin(t*Math.PI*2)*0.02;
+    weaponGroup.rotation.z = Math.sin(t*Math.PI)*0.12 * (Math.sin(Date.now()*0.01)>0?1:-1)*0.5;
+    // subtle mag wobble is inherent via tilt
+  } else {
+    weaponGroup.position.lerp(targetPos, dt*10);
+    // bob + recoil
+    const bobAmp = isADS? 0.006 : isSprinting? 0.045: 0.018;
+    weaponGroup.position.y += Math.sin(bobTime*2)*bobAmp*dt*60*0.02;
+    weaponGroup.position.x += Math.cos(bobTime)*bobAmp*0.5*dt*60*0.02;
+    weaponGroup.rotation.x = THREE.MathUtils.lerp(weaponGroup.rotation.x, -recoil*0.22, dt*14);
+    weaponGroup.rotation.z = THREE.MathUtils.lerp(weaponGroup.rotation.z, Math.sin(bobTime)*0.02, dt*8);
   }
   // hide weapon when scoped? keep slight
   weaponGroup.visible = !(isADS && camera.fov<56);
@@ -654,11 +793,25 @@ function updateEnemies(dt){
   enemies.forEach(en=>{
     const g=en.group; const d=g.userData;
     if(!d.alive){
-      d.fallT=(d.fallT||0)+dt*2.2;
-      g.rotation.z = Math.min(Math.PI/2, d.fallT*0.9);
-      g.position.y = THREE.MathUtils.lerp(g.position.y, 0.15, dt*4);
+      d.fallT=(d.fallT||0)+dt*1.9;
+      const prog=Math.min(1, d.fallT);
+      const ease = 1 - Math.pow(1-prog, 2.4);
+      // COD ragdoll lite: fall sideways + slight pitch, with momentum from shot dir
+      const side = d.fallRoll||1;
+      g.rotation.z = ease * Math.PI*0.48 * side;
+      g.rotation.x = ease * 0.28 + Math.sin(ease*Math.PI)*0.08 * side;
+      g.rotation.y += d.fallDir ? d.fallDir.x*dt*0.15 : 0;
+      if(d.hitJolt && d.hitJolt>0){
+        g.position.add(d.fallDir.clone().multiplyScalar(d.hitJolt*dt*3.2));
+        d.hitJolt -= dt*1.4;
+      }
+      g.position.y = THREE.MathUtils.lerp(g.position.y, 0.10 + Math.sin(prog*Math.PI)*0.05, dt*5.5);
+      if(d.hpSprite) d.hpSprite.material.opacity = THREE.MathUtils.lerp(d.hpSprite.material.opacity??1, 0, dt*3);
+      // sink slightly after 3s
+      if(d.fallT>3) g.position.y = THREE.MathUtils.lerp(g.position.y, 0.04, dt*0.6);
       return;
     }
+    if(d.hitJolt && d.hitJolt>0){ g.position.add(d.fallDir?d.fallDir.clone().multiplyScalar(d.hitJolt*dt*2):new THREE.Vector3()); d.hitJolt=Math.max(0,d.hitJolt-dt*2); }
     d.t+=dt;
     const dist=g.position.distanceTo(playerPos);
     // look at player
@@ -752,12 +905,18 @@ function animate(){
   }
   // particles
   for(let i=particles.length-1;i>=0;i--){ if(!particles[i].update(dt)) particles.splice(i,1); }
+  // subtle volumetric drift
+  if(scene.userData.fogPoints){
+    scene.userData.fogPoints.rotation.y += dt*0.02;
+    const mat=scene.userData.fogPoints.material; mat.opacity = 0.055 + Math.sin(elapsed*0.4)*0.008;
+  }
   // minimap 10fps
   if(elapsed - lastFpsUpdate >0.1){ drawMinimap(); }
   // fps counter
   frameCount++; if(elapsed - lastFpsUpdate >0.5){ hudFps.textContent=Math.round(frameCount/0.5)+' FPS'; frameCount=0; lastFpsUpdate=elapsed; updateHUD(); }
 
-  renderer.render(scene,camera);
+  if(useBloom && composer) composer.render();
+  else renderer.render(scene,camera);
 }
 
 init();
