@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>COD: Tactical FPS — Three.js</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#060a12;font-family:'Segoe UI',system-ui,Arial,sans-serif}
+  #canvas{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:none}
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10;color:#fff}
+  #topbar{position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:linear-gradient(180deg,rgba(0,0,0,.85),rgba(0,0,0,0));pointer-events:auto}
+  #logo{font-weight:900;letter-spacing:.12em;font-size:13px;color:#ffd54f}
+  #logo span{color:#fff;opacity:.9}
+  #stats{display:flex;gap:16px;align-items:center}
+  .stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px);padding:8px 14px;border-radius:10px;font-size:12px;letter-spacing:.08em;display:flex;gap:10px;align-items:center}
+  .stat b{color:#ffd54f;font-size:16px;min-width:20px;text-align:center}
+  .stat i{opacity:.6;font-style:normal;font-size:10px}
+  #crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:28px;height:28px}
+  #crosshair:before,#crosshair:after{content:'';position:absolute;background:#fff}
+  #crosshair:before{left:50%;top:0;width:2px;height:100%;transform:translateX(-50%);box-shadow:0 0 8px rgba(255,213,79,.8)}
+  #crosshair:after{top:50%;left:0;width:100%;height:2px;transform:translateY(-50%);box-shadow:0 0 8px rgba(255,213,79,.8)}
+  #crosshair .dot{position:absolute;left:50%;top:50%;width:4px;height:4px;background:#ffd54f;border-radius:50%;transform:translate(-50%,-50%)}
+  #weapon-bar{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:end}
+  .wslot{width:92px;height:64px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.13);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;backdrop-filter:blur(6px)}
+  .wslot.active{background:rgba(255,213,79,.18);border-color:#ffd54f;box-shadow:0 0 16px rgba(255,213,79,.35)}
+  .wslot small{font-size:9px;letter-spacing:.14em;opacity:.7}
+  .wslot strong{font-size:11px}
+  #bottom-left{position:absolute;bottom:18px;left:18px;display:flex;gap:12px;align-items:center}
+  #health{width:220px;height:14px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.18)}
+  #health-fill{height:100%;width:100%;background:linear-gradient(90deg,#ff3b30,#ffd54f);transition:width .2s}
+  #health-text{font-size:11px;letter-spacing:.1em}
+  #hitmarker{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.8);opacity:0;transition:all .08s;font-size:44px;color:#ffd54f;font-weight:900;pointer-events:none;text-shadow:0 0 16px #ffd54f}
+  #hitmarker.show{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+  /* overlays */
+  .overlay{position:fixed;inset:0;background:radial-gradient(800px 400px at 50% 0%,rgba(255,213,79,.18),transparent 70%),linear-gradient(180deg,rgba(6,10,18,.92),rgba(6,10,18,.98));display:flex;align-items:center;justify-content:center;z-index:20;color:#fff;cursor:pointer}
+  .overlay.hidden{display:none}
+  .card{max-width:560px;width:92%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:28px 28px 22px;backdrop-filter:blur(14px);box-shadow:0 20px 60px rgba(0,0,0,.6);text-align:center}
+  .card h1{font-size:28px;letter-spacing:.06em;line-height:1.1}
+  .card h1 em{color:#ffd54f;font-style:normal}
+  .card p{opacity:.75;font-size:13px;line-height:1.6;margin:12px 0 18px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;background:#ffd54f;color:#121212;font-weight:800;letter-spacing:.08em;font-size:13px;padding:12px 22px;border-radius:999px;border:none;cursor:pointer;box-shadow:0 8px 22px rgba(255,213,79,.35)}
+  .btn:active{transform:scale(.98)}
+  .kbd{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-bottom-width:3px;padding:2px 7px;border-radius:6px;font-size:11px;letter-spacing:.04em;margin:0 2px}
+  .grid{position:absolute;inset:0;opacity:.06;background:linear-gradient(rgba(255,255,255,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.3) 1px,transparent 1px);background-size:32px 32px;pointer-events:none}
+  #damage-vignette{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .12s;background:radial-gradient(ellipse at center,transparent 55%,rgba(255,59,48,.55) 100%);z-index:15}
+  #muzzle{position:absolute;left:50%;top:50%;width:120px;height:120px;transform:translate(-10%,-10%);pointer-events:none;opacity:0;z-index:9}
+  /* cinematic post-processing overlay — critic-requested AAA gap fix */
+  #cinematic{position:fixed;inset:0;pointer-events:none;z-index:8;opacity:1}
+  #cinematic:before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 38%,transparent 62%,rgba(0,0,0,.42) 100%);mix-blend-mode:multiply}
+  #cinematic:after{content:'';position:absolute;inset:0;opacity:.07;background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.45"/></svg>');mix-blend-mode:overlay}
+  #ads-hint{position:absolute;right:18px;bottom:92px;font-size:9px;letter-spacing:.14em;opacity:.55;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.14);padding:6px 10px;border-radius:999px;backdrop-filter:blur(6px)}
+  #ads-hint b{color:#ffd54f}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="cinematic"></div>
+<div id="damage-vignette"></div>
+<div id="hitmarker">✕</div>
+<div id="hud">
+  <div id="topbar">
+    <div>
+      <div id="logo">CALL<span> — TACTICAL OPS</span></div>
+      <div style="font-size:10px;opacity:.55;letter-spacing:.14em;margin-top:2px">THREE.JS • 60 FPS • PBR • PHYSICS</div>
+    </div>
+    <div id="stats">
+      <div class="stat"><i>SCORE</i> <b id="score">0</b></div>
+      <div class="stat"><i>KILLS</i> <b id="kills">0</b></div>
+      <div class="stat"><i>AMMO</i> <b id="ammo">30</b><span style="opacity:.6">/90</span></div>
+      <div class="stat"><i>WAVE</i> <b id="wave">1</b></div>
+      <div class="stat" id="timer-stat"><i>TIME</i> <b id="timer">02:00</b></div>
+    </div>
+  </div>
+  <div id="crosshair"><div class="dot"></div></div>
+  <div id="bottom-left">
+    <div id="health"><div id="health-fill"></div></div>
+    <div id="health-text"><span id="hp">100</span> HP</div>
+  </div>
+  <div id="weapon-bar">
+    <div class="wslot active"><small>RIFLE</small><strong>M4A1</strong></div>
+    <div class="wslot"><small>PISTOL</small><strong>M9</strong></div>
+  </div>
+  <div id="ads-hint"><b>RIGHT-CLICK</b> ADS — SCOPED PRECISION</div>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="grid"></div>
+  <div class="card">
+    <div style="font-size:10px;letter-spacing:.2em;opacity:.6">TACTICAL FIRST-PERSON SHOOTER</div>
+    <h1>CALL <em>OF TACTICS</em></h1>
+    <p style="margin-top:6px"> AAA-inspired Three.js FPS. Pointer-lock controls, PBR materials, muzzle flashes, hitmarkers, wave AI and physics recoil. Inspired by <b>Call of Duty: Modern Warfare III</b>.</p>
+    <p style="font-size:11px;opacity:.6"> <span class="kbd">WASD</span> Move &nbsp; <span class="kbd">Mouse</span> Look &nbsp; <span class="kbd">Click</span> Shoot &nbsp; <span class="kbd">R</span> Reload &nbsp; <span class="kbd">Shift</span> Sprint &nbsp; <span class="kbd">Space</span> Jump</p>
+    <button class="btn" id="playBtn">▶ ENGAGE — CLICK TO PLAY</button>
+    <div style="margin-top:12px;font-size:10px;opacity:.45;letter-spacing:.08em">GLB weapon from Sketchfab (attribution preserved) • ACES tone mapping • PCF shadows</div>
+    <div id="attrib" style="margin-top:8px;font-size:9px;opacity:.45"></div>
+  </div>
+</div>
+
+<div id="pauseOverlay" class="overlay hidden">
+  <div class="card">
+    <h1 style="font-size:22px">PAUSED</h1>
+    <p>Press <span class="kbd">ESC</span> to resume. Your progress is saved for this wave.</p>
+    <button class="btn" id="resumeBtn">RESUME</button>
+  </div>
+</div>
+
+<div id="gameOver" class="overlay hidden">
+  <div class="card">
+    <h1 id="goTitle">MISSION COMPLETE</h1>
+    <p id="goDesc">You survived.</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin:10px 0 16px">
+      <div class="stat"><i>FINAL SCORE</i> <b id="finalScore">0</b></div>
+      <div class="stat"><i>KILLS</i> <b id="finalKills">0</b></div>
+    </div>
+    <button class="btn" id="restartBtn">↻ PLAY AGAIN</button>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
