@@ -109,9 +109,7 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 - Tool calls: $tool_count
 - Total subagents executed: $total_subagents
 - Image-context model calls: $vision_count
-- Changed workspace files: $changed_count
-
-_Image-context model calls are inferred from image attachments in the session transcript. Message contents and tool details are hidden. Full logs are published in the completion release._"
+- Changed workspace files: $changed_count"
     if [[ "${PROGRESS_DRY_RUN:-false}" == "true" ]]; then
       printf '%s\n' "$body" > "${PROGRESS_OUTPUT:?PROGRESS_OUTPUT is required in dry-run mode}"
     else
