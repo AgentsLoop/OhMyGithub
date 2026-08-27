@@ -6,7 +6,7 @@ The build and verification prompt templates are stored as Markdown files in
 
 ## Trigger
 
-`/oc <request>`, `/opencode <request>`, `/goal <objective>`, or `/loop <objective>` can appear in a
+`/oc <request>`, `/opencode <request>`, `/goal <objective>`, `/loop <objective>`, or `/omo <request>` can appear in a
 newly created or edited issue/PR title or body, an issue comment, or a
 pull-request review comment. Bot-authored events are ignored, so status
 comments do not recurse. `/goal` selects the installed
@@ -18,6 +18,10 @@ standard `opencode run` path. A `/goal` trigger also automatically adds the
 published completion. Each iteration asks for distinct builder, critic, and
 verifier subagents, publishes to the existing branch/PR, and continues the
 original goal.
+`/omo` additionally installs and configures the OpenCode edition of
+`oh-my-openagent` with Bun before the OpenCode server starts. The installer runs
+non-interactively with provider authentication skipped; it affects only runs
+whose triggering text contains `/omo`.
 
 ## What the job does
 
