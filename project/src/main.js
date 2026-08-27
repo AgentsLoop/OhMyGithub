@@ -385,30 +385,28 @@ function spawnCoins(){
   coins.forEach(c=>{ scene.remove(c); if(c.userData && c.userData.shadow) scene.remove(c.userData.shadow); });
   coins=[];
   for(let i=0;i<12;i++){
-    // — Crossy Road pickup juice — CHUNKY voxel coin (iter6: +39% scale for 9m chase readability) —
-    // Was 0.92/0.26 → horizon edges ~73 px, still thin at 40 m fog. Now 1.28/0.36 pushes
-    // screen coverage ~1.9× (73→~141 px) to Crossy Road bar: coin ≈ 0.95× car width, hard
-    // umber outline + filled cap + fog:false keeps saturated mustard at 80 m.
+    // — Crossy Road pickup juice — ULTRA-CHUNKY voxel coin (iter8 HARSH fix: pickup camouflage at 9m) —
+    // Root cause on 9m chase: 1.28/0.36 torus rendered at 45-70m horizon as ~18×6px sliver, color 0xFFD54A (255,213,74) indistinguishable from sunlit terrace highlight 255,196,84 (delta 17). Sparse 4 components >30px. Fix: 1.75/0.48 pushes screen coverage ~2.6× (≈48×18px at 60m), distinct saturated amber 0xFFB800 (255,184,0) delta 62 from sand, hard 0x3D1F0A outline 22% stroke (was 12%) + filled cap 1.18 radius for solid disc, lifted baseY +1.45 to clear voxel seam, fog:false locked.
     const group = new THREE.Group();
-    const geo = new THREE.TorusGeometry(1.28, 0.36, 14, 22);
-    const mat = new THREE.MeshStandardMaterial({ color:0xFFD54A, emissive:0xFF8F00, emissiveIntensity:0.62, roughness:0.34, metalness:0.04 });
-    if (envMap) { mat.envMap = envMap; mat.envMapIntensity = 0.42; }
-    mat.fog = false; // keep saturated at 40-80m distance under fog 175-385
+    const geo = new THREE.TorusGeometry(1.75, 0.48, 14, 22);
+    const mat = new THREE.MeshStandardMaterial({ color:0xFFB800, emissive:0xFF7A00, emissiveIntensity:0.88, roughness:0.32, metalness:0.03 });
+    if (envMap) { mat.envMap = envMap; mat.envMapIntensity = 0.38; }
+    mat.fog = false; // keep saturated at 40-80m distance under fog 175-385 — distinct from sand highlight
     const torus = new THREE.Mesh(geo, mat);
     torus.rotation.x = Math.PI/2;
     torus.castShadow = true;
     group.add(torus);
-    // hard voxel outline — BackSide slightly larger torus gives dark stroke readable at 9m chase
-    const outGeo = new THREE.TorusGeometry(1.28, 0.36, 14, 22);
+    // hard voxel outline — BackSide larger torus gives 22% dark stroke readable at 9m chase (was 12% too thin at horizon)
+    const outGeo = new THREE.TorusGeometry(1.75, 0.48, 14, 22);
     const outMat = new THREE.MeshBasicMaterial({ color:0x3D1F0A, side:THREE.BackSide, fog:false });
     const outline = new THREE.Mesh(outGeo, outMat);
     outline.rotation.x = Math.PI/2;
-    outline.scale.set(1.12, 1.12, 1.12);
+    outline.scale.set(1.22, 1.22, 1.22);
     group.add(outline);
-    // inner face cap — solid disc so coin reads filled, not hollow ring, at distance
-    const capGeo = new THREE.CylinderGeometry(0.86, 0.86, 0.05, 18);
-    const capMat = new THREE.MeshStandardMaterial({ color:0xFFC83D, emissive:0xFF9A00, emissiveIntensity:0.66, roughness:0.38, metalness:0.04, fog:false });
-    if (envMap) { capMat.envMap = envMap; capMat.envMapIntensity = 0.35; }
+    // inner face cap — larger solid disc (1.18) so coin reads filled not hollow ring at distance
+    const capGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.06, 18);
+    const capMat = new THREE.MeshStandardMaterial({ color:0xFFBE0A, emissive:0xFF8800, emissiveIntensity:0.84, roughness:0.34, metalness:0.03, fog:false });
+    if (envMap) { capMat.envMap = envMap; capMat.envMapIntensity = 0.32; }
     const cap = new THREE.Mesh(capGeo, capMat);
     cap.rotation.x = Math.PI/2;
     group.add(cap);
@@ -416,21 +414,21 @@ function spawnCoins(){
     let x,z;
     do{ x=(Math.random()-0.5)*110; z=(Math.random()-0.5)*110; } while (Math.hypot(x,z)<10);
     const gh = (typeof sampleGroundH === 'function') ? sampleGroundH(x,z) : 0;
-    const baseY = gh + 0.98;
+    const baseY = gh + 1.45;
     group.position.set(x,baseY,z);
     // animate via group; keep torus children static orientation
     group.userData = { collected:false, baseY, spin: Math.random()*Math.PI*2, torus, cap, outline, mat, capMat, popTime: undefined };
-    // shadow disc under pickup — grounds the chunky coin voxel feel (scaled to 1.28 torus)
-    const shGeo = new THREE.CircleGeometry(1.42, 20);
+    // shadow disc under pickup — larger & darker for chunky voxel grounding (1.95 vs 1.42)
+    const shGeo = new THREE.CircleGeometry(1.95, 20);
     const shCan = document.createElement('canvas'); shCan.width=64; shCan.height=64;
     const sx = shCan.getContext('2d');
-    const sg = sx.createRadialGradient(32,32,4,32,32,30);
-    sg.addColorStop(0,'rgba(26,14,3,0.24)'); sg.addColorStop(1,'rgba(26,14,3,0)');
+    const sg = sx.createRadialGradient(32,32,5,32,32,30);
+    sg.addColorStop(0,'rgba(26,14,3,0.32)'); sg.addColorStop(0.35,'rgba(26,14,3,0.22)'); sg.addColorStop(1,'rgba(26,14,3,0)');
     sx.fillStyle=sg; sx.fillRect(0,0,64,64);
     const shTex = new THREE.CanvasTexture(shCan); shTex.colorSpace=THREE.SRGBColorSpace;
-    const shMat = new THREE.MeshBasicMaterial({ map:shTex, transparent:true, depthWrite:false, opacity:0.58 });
+    const shMat = new THREE.MeshBasicMaterial({ map:shTex, transparent:true, depthWrite:false, opacity:0.68 });
     const sh = new THREE.Mesh(shGeo, shMat);
-    sh.rotation.x = -Math.PI/2; sh.position.set(x, gh+0.035, z);
+    sh.rotation.x = -Math.PI/2; sh.position.set(x, gh+0.04, z);
     sh.userData.isCoinShadow = true;
     scene.add(sh);
     group.userData.shadow = sh;
