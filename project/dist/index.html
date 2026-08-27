@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>TASK FORCE 141 — Warehouse Ops | MWIII Inspired FPS</title>
+<meta name="description" content="CoD:MWIII inspired Three.js warehouse FPS — procedural map, ADS, recoil, squad AI."/>
+<link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;800&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0e13;font-family:'JetBrains Mono',monospace}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:none}
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none;user-select:none;color:#e8eef4}
+  #topbar{position:absolute;top:0;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:linear-gradient(180deg,rgba(0,0,0,.78),rgba(0,0,0,0));border-bottom:1px solid rgba(200,220,255,.08)}
+  #topbar .title{font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:.18em;font-size:11px;color:#9bb0c8;text-transform:uppercase}
+  #topbar .title b{color:#e8eef4;letter-spacing:.22em}
+  #scoreBox{font-size:11px;letter-spacing:.08em;color:#c8d6e8}
+  #scoreBox span{color:#ff3b30;font-weight:700}
+  #crosshair{position:absolute;left:50%;top:50%;width:24px;height:24px;transform:translate(-50%,-50%)}
+  #crosshair::before,#crosshair::after{content:'';position:absolute;background:#e8eef4;opacity:.92;box-shadow:0 0 6px rgba(0,0,0,.6)}
+  #crosshair::before{left:50%;top:0;width:2px;height:24px;transform:translateX(-50%)}
+  #crosshair::after{top:50%;left:0;width:24px;height:2px;transform:translateY(-50%)}
+  #crosshair .dot{position:absolute;left:50%;top:50%;width:4px;height:4px;background:#ff3b30;transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 0 8px #ff3b30}
+  #crosshair.ads{opacity:.22;transform:translate(-50%,-50%) scale(.6)}
+  #crosshair.hit{filter:drop-shadow(0 0 8px #ff3b30)}
+  /* bottom HUD */
+  #bottom{position:absolute;bottom:0;left:0;right:0;display:flex;align-items:end;justify-content:space-between;padding:14px 18px 16px;background:linear-gradient(0deg,rgba(0,0,0,.78),rgba(0,0,0,0))}
+  #healthWrap{display:flex;align-items:center;gap:14px}
+  #healthBar{width:220px;height:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);position:relative;overflow:hidden}
+  #healthFill{position:absolute;inset:0;width:100%;background:linear-gradient(90deg,#ff3b30,#ff6a30);transition:width .2s}
+  #healthText{font-size:11px;letter-spacing:.1em;color:#e8eef4}
+  #healthText b{color:#ff3b30}
+  #ammoBox{text-align:right;line-height:1.1}
+  #ammoCount{font-family:'Orbitron',sans-serif;font-size:28px;font-weight:800;letter-spacing:.06em;color:#e8eef4}
+  #ammoCount small{font-size:11px;opacity:.6;font-family:'JetBrains Mono',monospace;letter-spacing:.1em}
+  #ammoHint{font-size:9px;letter-spacing:.16em;color:#9bb0c8;margin-top:2px}
+  /* killfeed */
+  #killfeed{position:absolute;top:56px;right:16px;width:280px;display:flex;flex-direction:column;gap:6px;align-items:end}
+  .kill{font-size:10px;letter-spacing:.06em;background:rgba(0,0,0,.62);border-left:3px solid #ff3b30;padding:6px 10px;color:#e8eef4;backdrop-filter:blur(6px);animation:slide .18s ease}
+  @keyframes slide{from{transform:translateX(14px);opacity:0}to{transform:none;opacity:1}}
+  /* hit marker */
+  #hitmarker{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);opacity:0;pointer-events:none}
+  #hitmarker.show{opacity:1;animation:hit .22s ease}
+  #hitmarker::before,#hitmarker::after{content:'';position:absolute;inset:0;border:2px solid #ff3b30}
+  #hitmarker::before{clip-path:polygon(0 0,45% 0,45% 45%,0 45%)}
+  #hitmarker::after{clip-path:polygon(100% 100%,55% 100%,55% 55%,100% 55%)}
+  @keyframes hit{0%{transform:translate(-50%,-50%) scale(1.6)}100%{transform:translate(-50%,-50%) scale(1)}}
+  /* damage vignette */
+  #vignette{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 120px 40px rgba(255,59,48,.55);transition:opacity .12s}
+  #vignette.show{opacity:1}
+  /* minimap */
+  #minimapWrap{position:absolute;top:56px;left:16px;width:150px;height:150px;background:rgba(8,12,18,.78);border:1px solid rgba(200,220,255,.18);backdrop-filter:blur(6px);overflow:hidden}
+  #minimapWrap::before{content:'TACTICAL MAP';position:absolute;top:4px;left:6px;font-size:7px;letter-spacing:.18em;color:#9bb0c8}
+  #minimap{width:100%;height:100%;display:block}
+  /* overlays */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(10,18,28,.78) 0%,rgba(2,6,12,.92) 70%);backdrop-filter:blur(2px);z-index:10;color:#e8eef4}
+  .card{width:min(560px,90vw);background:rgba(14,20,30,.92);border:1px solid rgba(200,220,255,.14);padding:28px 26px 22px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .card h1{font-family:'Orbitron',sans-serif;font-weight:800;font-size:22px;letter-spacing:.16em;text-transform:uppercase;line-height:1.1}
+  .card h1 i{color:#ff3b30;font-style:normal}
+  .card p{margin-top:10px;font-size:12px;line-height:1.6;color:#b8c6d8}
+  .kbd{display:inline-block;padding:2px 6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;font-size:10px;letter-spacing:.06em;margin:0 2px}
+  .btn{margin-top:18px;display:inline-block;padding:12px 22px;background:#ff3b30;color:#fff;font-family:'Orbitron',sans-serif;font-weight:800;font-size:12px;letter-spacing:.18em;text-transform:uppercase;border:none;cursor:pointer;pointer-events:auto;transition:filter .15s, transform .08s}
+  .btn:hover{filter:brightness(1.08)} .btn:active{transform:scale(.98)}
+  .meta{margin-top:14px;font-size:9px;letter-spacing:.12em;color:#7a8aa0}
+  #hud.hidden{display:none}
+  #pauseOverlay{display:none}
+  #deadOverlay{display:none}
+  #winOverlay{display:none}
+  .statRow{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .stat{flex:1;min-width:120px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:10px 12px}
+  .stat b{font-family:'Orbitron',sans-serif;font-size:18px;color:#ff3b30}
+  .stat span{font-size:9px;letter-spacing:.12em;color:#9bb0c8;display:block;margin-top:2px}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-C21I-gqe.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="topbar">
+    <div class="title"><b>TASK FORCE 141</b> — WAREHOUSE OPS &nbsp; <span style="opacity:.5">|</span> &nbsp; MWIII INSPIRED</div>
+    <div id="scoreBox">SCORE <span id="score">0</span> &nbsp; KILLS <span id="kills">0</span>/10 &nbsp; WAVE <span id="wave">1</span></div>
+  </div>
+  <div id="crosshair"><div class="dot"></div></div>
+  <div id="hitmarker"></div>
+  <div id="vignette"></div>
+  <div id="minimapWrap"><canvas id="minimap" width="150" height="150"></canvas></div>
+  <div id="killfeed"></div>
+  <div id="bottom">
+    <div id="healthWrap">
+      <div id="healthBar"><div id="healthFill"></div></div>
+      <div id="healthText"><b id="hp">100</b> HP</div>
+    </div>
+    <div id="ammoBox">
+      <div id="ammoCount">30 <small>/ 90</small></div>
+      <div id="ammoHint">[R] RELOAD &nbsp; [SHIFT] SPRINT &nbsp; [RMB] ADS &nbsp; [ESC] PAUSE</div>
+    </div>
+  </div>
+</div>
+
+<div id="startOverlay" class="overlay">
+  <div class="card">
+    <h1><i>WAREHOUSE</i> OPS — DARK WAREHOUSE</h1>
+    <p>Modern Warfare III inspired warehouse shooter. Clear the industrial complex. Squad-AI hostiles inspired by the <b>Sisyphus orchestrator</b> — 11 discipline agents cover sectors, flank, and suppress (see <code>docs/omo-integration.md</code>).</p>
+    <p>
+      <span class="kbd">WASD</span> Move &nbsp; <span class="kbd">MOUSE</span> Look &nbsp; <span class="kbd">CLICK</span> Fire &nbsp; <span class="kbd">R</span> Reload &nbsp; <span class="kbd">SHIFT</span> Sprint &nbsp; <span class="kbd">RMB</span> ADS (hold)
+    </p>
+    <p style="color:#7a8aa0;font-size:10px">Tip: Headshots deal 2×. Enemies flank and push when you reload. Watch the minimap — red chevrons are hostiles.</p>
+    <button class="btn" id="playBtn">▶ DEPLOY — CLICK TO LOCK</button>
+    <div class="meta">THREE r160 · Shadows · Procedural weapon (GLB slot: <code>public/models/weapon.glb</code>) · WASD+Mouse · PointerLock</div>
+    <div class="statRow">
+      <div class="stat"><b>10</b><span>KILLS TO EXTRACT</span></div>
+      <div class="stat"><b>30/90</b><span>5.56 NATO · TACTICAL RELOAD</span></div>
+      <div class="stat"><b>SQUAD AI</b><span>OMO-INSPIRED TACTICS</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="pauseOverlay" class="overlay">
+  <div class="card">
+    <h1>TACTICAL <i>PAUSE</i></h1>
+    <p>Pointer lock released. Click resume to re-enter.</p>
+    <button class="btn" id="resumeBtn">RESUME</button>
+    <div class="meta">Press ESC to toggle</div>
+  </div>
+</div>
+
+<div id="deadOverlay" class="overlay">
+  <div class="card" style="border-color:rgba(255,59,48,.4)">
+    <h1 style="color:#ff3b30">KIA — MISSION FAILED</h1>
+    <p>You went down in the warehouse. Enemies overwhelmed your position.</p>
+    <div class="statRow"><div class="stat"><b id="deadScore">0</b><span>FINAL SCORE</span></div><div class="stat"><b id="deadKills">0</b><span>KILLS</span></div></div>
+    <button class="btn" id="retryBtn">RETRY OPS</button>
+  </div>
+</div>
+
+<div id="winOverlay" class="overlay">
+  <div class="card" style="border-color:rgba(80,255,120,.35)">
+    <h1 style="color:#50ff78">EXTRACTION <i>COMPLETE</i></h1>
+    <p>Warehouse secured. All hostiles neutralized. Outstanding operator.</p>
+    <div class="statRow"><div class="stat"><b id="winScore">0</b><span>FINAL SCORE</span></div><div class="stat"><b id="winTime">--</b><span>TIME</span></div></div>
+    <button class="btn" id="againBtn">PLAY AGAIN</button>
+  </div>
+</div>
+
+</body>
+</html>
