@@ -57,24 +57,31 @@ function resize(){
 addEventListener('resize', resize);
 resize();
 
-// lights — Crossy Road crisp voxel lighting: hard sun, restored saturation, no wash
-const hemi = new THREE.HemisphereLight(0xFFF6D6, 0xE8A85C, 0.65);
+// lights — Crossy Road crisp voxel lighting: hard sun + rim for car facet gloss
+const hemi = new THREE.HemisphereLight(0xFFF6D6, 0xE8A85C, 0.75);
 hemi.position.set(0, 40, 0);
 scene.add(hemi);
-const dir = new THREE.DirectionalLight(0xFFF4E0, 1.9);
+const dir = new THREE.DirectionalLight(0xFFF4E0, 2.35);
 dir.position.set(45, 55, 35);
 dir.castShadow = true;
 dir.shadow.mapSize.set(2048,2048);
-dir.shadow.camera.near = 0.5; dir.shadow.camera.far = 260;
-dir.shadow.camera.left=-96; dir.shadow.camera.right=96; dir.shadow.camera.top=96; dir.shadow.camera.bottom=-96;
+// Tightened frustum for hard voxel readability at 9 m chase distance:
+// ±96 → ±48 halves texel size 0.094 → 0.047 u/texel (21.3 texel/m)
+dir.shadow.camera.near = 0.5; dir.shadow.camera.far = 185;
+dir.shadow.camera.left=-48; dir.shadow.camera.right=48; dir.shadow.camera.top=48; dir.shadow.camera.bottom=-48;
+dir.shadow.camera.updateProjectionMatrix();
 dir.shadow.bias = -0.0008;
 dir.shadow.normalBias = 0.012;
 scene.add(dir);
+// rim light — thumbnail facet highlight for lime Carcamero
+const rim = new THREE.DirectionalLight(0xFFF8E0, 1.1);
+rim.position.set(-30, 18, -20);
+scene.add(rim);
 scene.add(new THREE.AmbientLight(0xFFF0C8, 0.15));
 
 // ground — HARD-QUANTIZED VOXEL TERRACES (Crossy Road readability fix)
-// Replaces soft 0.33m micro-terrace (Math.round(h*3)/3, D9A05A->FFECC1 wash, Fog 95-260 + grainTex)
-// with 5 discrete voxel bands, high-saturation crest/trough, baked AO per step, no grain wash.
+// Iter3: tightened AO 0.65-1.18 (was 0.78-1.06 too subtle at 9 m chase) + hard 1.05 m
+// step outline via vertex contour so bands stay legible under fog 175-385.
 const groundGeo = new THREE.PlaneGeometry(400,400, 84,84);
 {
   const p = groundGeo.attributes.position;
@@ -87,10 +94,15 @@ const groundGeo = new THREE.PlaneGeometry(400,400, 84,84);
     new THREE.Color(0xF2C97D), // 3 high — background sand, saturated
     new THREE.Color(0xFFEB9A), // 4 crest — sunlit cream, high sat (was FFECC1/white wash)
   ];
-  // baked AO per voxel step: trough occluded, crest lifted (multiply in linear-ish sRGB)
-  const AO = [0.78, 0.88, 1.0, 1.02, 1.06];
+  // AO widened 0.65-1.18 (was 0.78-1.06): trough 35% darker, crest 18% brighter —
+  // restores Crossy Road band separation at chase-cam distance without touching fog.
+  const AO = [0.65, 0.80, 0.97, 1.08, 1.18];
   const VOXEL_STEP = 1.05; // ~1m discrete jump (was 0.33) — Crossy Road legible bands
   const LEVELS = 5;
+  const SEG = 84;
+  const W = SEG + 1;
+  const qs = new Int8Array(p.count);
+  const hs = new Float32Array(p.count);
   for(let i=0;i<p.count;i++){
     const x = p.getX(i);
     const y = p.getY(i);
@@ -108,13 +120,45 @@ const groundGeo = new THREE.PlaneGeometry(400,400, 84,84);
     // height centered so band 2 (~0) is near ground plane
     const h = q * VOXEL_STEP - 2.2 + 0.42; // +0.42 offsets so playable disc sits ~0.0-0.4
     p.setZ(i, h);
+    qs[i] = q;
+    hs[i] = h;
     // vertex color = palette[q] * AO, minimal hue wobble to preserve band legibility (was ±0.015 HSL, now ±0.006)
     const c = PALETTE[q].clone();
     c.multiplyScalar(AO[q]);
     c.offsetHSL((Math.sin(x*0.018)+Math.cos(y*0.018))*0.006, 0, 0);
-    // clamp after multiply (crest 1.06 may exceed 1)
+    // clamp after multiply (crest 1.18 may exceed 1)
     c.r = Math.min(1, c.r); c.g = Math.min(1, c.g); c.b = Math.min(1, c.b);
     cols.push(c.r,c.g,c.b);
+  }
+  // — hard step outline / vertex contour —
+  // At 9 m chase cam, 1.05 m bands collapse without an explicit seam. Darken
+  // any vertex adjacent (4-neighbour + diagonal) to a different quantized level
+  // toward deep umber 0x3D1F0A. Vertex-based (no extra geometry) so it survives
+  // fog 175-385 and keeps ground matte (env 0.12 unchanged). Mix 42% → ~1 px seam.
+  const OUTLINE = new THREE.Color(0x3D1F0A);
+  const EDGE_MIX = 0.42;
+  for(let i=0;i<p.count;i++){
+    const r = Math.floor(i / W);
+    const cc = i % W;
+    const q = qs[i];
+    let isEdge = false;
+    if(r>0 && qs[i - W] !== q) isEdge = true;
+    if(r<SEG && qs[i + W] !== q) isEdge = true;
+    if(cc>0 && qs[i - 1] !== q) isEdge = true;
+    if(cc<SEG && qs[i + 1] !== q) isEdge = true;
+    if(!isEdge){
+      if(r>0 && cc>0 && qs[i - W - 1] !== q) isEdge = true;
+      if(r>0 && cc<SEG && qs[i - W + 1] !== q) isEdge = true;
+      if(r<SEG && cc>0 && qs[i + W - 1] !== q) isEdge = true;
+      if(r<SEG && cc<SEG && qs[i + W + 1] !== q) isEdge = true;
+    }
+    if(isEdge){
+      const idx = i*3;
+      const cur = new THREE.Color(cols[idx], cols[idx+1], cols[idx+2]);
+      cur.lerp(OUTLINE, EDGE_MIX);
+      if(q <= 1) cur.multiplyScalar(0.94);
+      cols[idx]=cur.r; cols[idx+1]=cur.g; cols[idx+2]=cur.b;
+    }
   }
   groundGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols,3));
   groundGeo.computeVertexNormals();
@@ -204,19 +248,20 @@ loader.load('/models/car.glb', (gltf)=>{
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
         if (n.includes('carcamero')) {
-          // lime body — 80,156,99 thumbnail vs 24,21,16 charcoal fix
-          // lower roughness for facet specular, slight metal boost for coated paint
-          o.material.roughness = 0.42;
-          o.material.metalness = 0.08;
-          o.material.envMapIntensity = 0.85;
+          // lime body — 80,156,99 thumbnail vs 24,21,16 charcoal fix — lift 94% + stop self-shadow darkening
+          o.material.roughness = 0.32;
+          o.material.metalness = 0.12;
+          o.material.envMapIntensity = 1.65;
+          o.material.fog = false;
+          o.material.receiveShadow = false;
         } else if (n.includes('material.026')) {
-          // windows / glass — white 0.8,0.8,0.8 needs gloss + reflection
-          o.material.roughness = 0.08;
-          o.material.metalness = 0.04;
+          // windows / glass — white 0.8,0.8,0.8 needs gloss + reflection, no fog
+          o.material.roughness = 0.06;
+          o.material.metalness = 0.10;
           o.material.transparent = true;
           o.material.opacity = 0.62;
-          o.material.envMapIntensity = 1.35;
-          // faint blue tint for sky reflection readability
+          o.material.envMapIntensity = 1.85;
+          o.material.fog = false;
           o.material.color.setRGB(0.86, 0.92, 0.98);
         } else if (n.includes('material.030')) {
           // taillight red 0.8,0,0
