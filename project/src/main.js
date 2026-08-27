@@ -34,6 +34,10 @@ const boonCard = document.getElementById('boonCard');
 const boonChoicesEl = document.getElementById('boonChoices');
 const boonDescEl = document.getElementById('boonDesc');
 const boonHudEl = document.getElementById('boonHud');
+const bossHudEl = document.getElementById('bossHud');
+const bossBarEl = document.getElementById('bossBar');
+const bossHpTextEl = document.getElementById('bossHpText');
+const titanIncomingEl = document.getElementById('titanIncoming');
 
 // ── Boon definitions (Hades-style, stackable, persist for run) ──
 const BOONS = [
@@ -161,7 +165,8 @@ let breachActive=false;
 
 // state
 let loop=1, score=0, coreHp=100, playerHp=100, waveKill=0, waveTotal=0, elapsed=0, waveActive=false, gameState='menu';
-let enemies=[], bullets=[], enemyBullets=[], particles=[], sparks=[];
+let isBossLoop=false, bossGroup=null, bossShockTimer=4.0, bossDashTimer=2.6, bossPhase=1, pendingBoonPicks=1;
+let enemies=[], bullets=[], enemyBullets=[], particles=[], sparks=[], shockEffects=[];
 let keys={};
 let mouse = new THREE.Vector2(0,0);
 let aimDir = new THREE.Vector3(1,0,0);
@@ -370,6 +375,113 @@ function beep(freq=880, dur=0.08, vol=0.12){
     o.start(); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
     o.stop(audioCtx.currentTime+dur);
   }catch(e){}
+}
+
+// ── Merge Titan Boss (Loop 3/6/9...) ──
+function updateBossHud(){
+  if(!isBossLoop || !bossGroup){ bossHudEl.classList.add('hidden'); return; }
+  bossHudEl.classList.remove('hidden');
+  const hp=Math.max(0,bossGroup.userData.hp), mx=bossGroup.userData.maxHp;
+  const pct=Math.max(0,Math.min(1,hp/mx));
+  bossBarEl.style.width=(pct*100)+'%';
+  bossHpTextEl.textContent=`${Math.round(hp)} / ${mx}` + (bossPhase===2 ? ' — ENRAGED' : '');
+  if(pct<0.35) bossBarEl.style.background='linear-gradient(90deg,#ff0040,#ff6b3b)';
+  else if(pct<0.6) bossBarEl.style.background='linear-gradient(90deg,#ff3b6b,#ffb020)';
+  else bossBarEl.style.background='linear-gradient(90deg,#ff1a3d,#ff6b3b 45%,#ffb020)';
+}
+function showTitanIncoming(){
+  titanIncomingEl.classList.remove('hidden');
+  // retrigger anim
+  const big=titanIncomingEl.querySelector('.titanBig');
+  big.style.animation='none'; void big.offsetWidth; big.style.animation='';
+  beep(110,0.22,0.16); setTimeout(()=>beep(165,0.22,0.16),180); setTimeout(()=>beep(220,0.35,0.18),380);
+  triggerShake(1.9);
+  setTimeout(()=>titanIncomingEl.classList.add('hidden'), 1700);
+}
+function spawnTitan(){
+  const g=new THREE.Group();
+  let mesh;
+  const bossHp = 450 + loop*22 + (loop>6?80:0);
+  const bossScale = 2.2;
+  if(robotModel){
+    mesh=robotModel.scene.clone(true);
+    const box=new THREE.Box3().setFromObject(mesh); const sz=new THREE.Vector3(); box.getSize(sz);
+    const c=new THREE.Vector3(); box.getCenter(c); mesh.position.sub(c);
+    const s= bossScale / Math.max(sz.x,sz.y,sz.z);
+    mesh.scale.setScalar(s);
+    mesh.rotation.y=Math.PI;
+    mesh.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.material=o.material.clone(); o.material.emissive=new THREE.Color(0xff1a3d); o.material.emissiveIntensity=0.95; o.material.color=new THREE.Color(0xff8aa0); }});
+  } else if(knightModel){
+    mesh=knightModel.scene.clone(true);
+    const box=new THREE.Box3().setFromObject(mesh); const sz=new THREE.Vector3(); box.getSize(sz);
+    const c=new THREE.Vector3(); box.getCenter(c); mesh.position.sub(c);
+    mesh.scale.setScalar(bossScale/Math.max(sz.x,sz.y,sz.z));
+    mesh.rotation.y=Math.PI;
+    mesh.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.material=o.material.clone(); o.material.emissive=new THREE.Color(0xff1a3d); o.material.emissiveIntensity=0.9; }});
+  } else {
+    mesh=new THREE.Mesh(new THREE.CapsuleGeometry(0.85,1.6,4,12), new THREE.MeshStandardMaterial({color:0xff1a3d, emissive:0x880010, emissiveIntensity:0.95}));
+    mesh.position.y=0.9; mesh.castShadow=true;
+  }
+  const holder=new THREE.Group(); holder.add(mesh);
+  g.add(holder);
+  const ang=Math.random()*Math.PI*2;
+  const r=14.5;
+  g.position.set(Math.cos(ang)*r,0,Math.sin(ang)*r);
+  g.userData={ holder, hp:bossHp, maxHp:bossHp, speed: 1.35+loop*0.08, isBoss:true, isElite:true, bob:Math.random()*Math.PI*2, archetype:'boss', shootCd:999, dashCd:2.6, shockCd:4.0 };
+  const bar=new THREE.Mesh(new THREE.PlaneGeometry(1.8,0.14), new THREE.MeshBasicMaterial({color:0xff1a3d, side:THREE.DoubleSide}));
+  bar.position.set(0,2.45,0); g.add(bar); g.userData.bar=bar;
+  const aura=new THREE.Mesh(new THREE.RingGeometry(1.25,1.45,20), new THREE.MeshBasicMaterial({color:0xff3b6b, transparent:true, opacity:0.42, side:THREE.DoubleSide}));
+  aura.rotation.x=-Math.PI/2; aura.position.y=0.03; g.add(aura); g.userData.aura=aura;
+  // extra boss ring
+  const bossRing=new THREE.Mesh(new THREE.RingGeometry(1.55,1.68,20), new THREE.MeshBasicMaterial({color:0xffb020, transparent:true, opacity:0.28, side:THREE.DoubleSide}));
+  bossRing.rotation.x=-Math.PI/2; bossRing.position.y=0.04; g.add(bossRing); g.userData.bossRing=bossRing;
+  scene.add(g); enemies.push(g); bossGroup=g;
+  burst(g.position, 0xff1a3d, 18);
+  // light burst
+  const bl=new THREE.PointLight(0xff3b6b, 18, 16); bl.position.copy(g.position).add(new THREE.Vector3(0,1.5,0)); scene.add(bl); setTimeout(()=>scene.remove(bl),420);
+  log(`◈ MERGE TITAN spawned — ${bossHp} HP · 2.2× scale · shockwave 4s · dashes`);
+  updateBossHud();
+}
+function doBossShockwave(){
+  if(!bossGroup) return;
+  const pos=bossGroup.position.clone();
+  // visual expanding ring (3D)
+  const geo=new THREE.RingGeometry(0.5,0.65,32);
+  const mat=new THREE.MeshBasicMaterial({ color: bossPhase===2?0xff6b3b:0xff3b6b, transparent:true, opacity:0.85, side:THREE.DoubleSide });
+  const ring=new THREE.Mesh(geo, mat);
+  ring.rotation.x=-Math.PI/2; ring.position.copy(pos); ring.position.y=0.12;
+  scene.add(ring);
+  let life=0;
+  const animRing={ tick(dt){
+    life+=dt; const s=1+life*9; ring.scale.setScalar(s); ring.material.opacity=Math.max(0,0.85-life*0.95);
+    // affect hazard pillars: flash emissive
+    if(hazardGroup) hazardGroup.children.forEach(h=>{ if(h.userData.pillar) h.userData.pillar.material.emissiveIntensity=0.9+Math.sin(life*18)*0.2; });
+    if(life>0.9){ scene.remove(ring); geo.dispose(); mat.dispose(); return true; }
+    return false;
+  }};
+  // reuse particles array for simple anim
+  shockEffects.push(animRing);
+  // DOM shock flash
+  const dom=document.createElement('div'); dom.className='shockRing'; dom.innerHTML='<i></i>'; document.body.appendChild(dom); setTimeout(()=>dom.remove(),900);
+  // damage: arena-wide — 14 dmg to player, 10 to core, scaled by phase
+  const dmgPlayer= bossPhase===2? 18:12;
+  const dmgCore= bossPhase===2? 12:7;
+  // player hit if alive (arena-wide per spec — always)
+  takeDamagePlayer(dmgPlayer);
+  triggerShake(1.4);
+  triggerHitFlash('coreHit');
+  beep(140,0.18,0.15); setTimeout(()=>beep(90,0.22,0.14),140);
+  // core hit
+  const prev=coreHp;
+  coreHp=Math.max(0, coreHp - dmgCore);
+  coreFlashTimer=0.32;
+  if(coreHp<=0) failLoop();
+  // minor knockback
+  const dir=player.position.clone().sub(pos); dir.y=0; if(dir.lengthSq()>1e-6) player.position.add(dir.normalize().multiplyScalar(0.9));
+  burst(player.position, 0xff3b6b, 8);
+  // log only occasionally
+  if(Math.random()<0.5) log(`◈ Titan shockwave — ${dmgPlayer} dmg · core -${dmgCore}%`);
+  spawnDamageNumber(pos.clone().add(new THREE.Vector3(0,1.8,0)), 'SHOCK!', bossPhase===2?'#ffb020':'#ff3b6b');
 }
 
 function spawnSingleBullet(dirVec){
@@ -654,14 +766,18 @@ function applyChamberMutation(loopNum){
 
 async function startLoop(){
   waveKill=0;
-  // critic gap fix: denser horde vs Hades/VS — 90 cap, faster spawns, burst start
-  waveTotal = Math.min(90, 18 + loop*8);
+  isBossLoop = (loop%3===0);
+  pendingBoonPicks = isBossLoop ? 2 : 1;
+  // critic gap 2: VS flood unconditional — 90 wave, 90 cap, 0.12s constant
+  waveTotal = isBossLoop ? 1 : 90;
   elapsed=0;
   waveActive=true;
   enemies.forEach(e=>scene.remove(e)); enemies.length=0;
+  bossGroup=null; bossPhase=1; bossShockTimer=4.0; bossDashTimer=2.8;
+  shockEffects.length=0;
   bullets.forEach(b=>scene.remove(b)); bullets.length=0;
-  // also clear enemy projectiles if present
   if(typeof enemyBullets!=='undefined') enemyBullets.forEach(b=>scene.remove(b));
+  enemyBullets.length=0;
   player.position.set(0,0,6);
   playerHp=100; dispPlayer=100; lastPlayerHp=100;
   if(coreHp<=0) { coreHp=100; dispCore=100; }
@@ -673,19 +789,28 @@ async function startLoop(){
   deadCard.classList.add('hidden');
   winCard.classList.add('hidden');
   boonCard.classList.add('hidden');
+  bossHudEl.classList.add('hidden');
+  titanIncomingEl.classList.add('hidden');
   breachActive=false; breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
   applyChamberMutation(loop);
-  log(`→ Loop ${loop} isolated checkout — spawning ${waveTotal} conflicts`);
-  updateHUD();
+  if(isBossLoop) log(`◈ Loop ${loop} — TITAN LOOP — Merge Titan emerges`);
+  else log(`→ Loop ${loop} isolated checkout — spawning ${waveTotal} conflicts`);
+  updateHUD(); updateBossHud();
   await runCountdown(loop);
   if(gameState!=='countdown') return;
   gameState='playing';
   lastSpawn=performance.now();
-  showWaveAnnouncer(`WAVE ${loop} — ${waveTotal} CONFLICTS`);
-  log(`▶ Wave ${loop} active — defend the core — hazard ring active`);
-  // burst-spawn 3-5 at start for VS density
-  const burstN = 3 + Math.floor(Math.random()*3) + Math.min(2, Math.floor(loop/2));
-  for(let i=0;i<burstN;i++) setTimeout(()=>{ if(gameState==='playing') spawnEnemy(); }, i*180);
+  if(isBossLoop){
+    spawnTitan();
+    showTitanIncoming();
+    showWaveAnnouncer(`◈ TITAN LOOP ${loop} — MERGE TITAN`, 2600);
+    log(`▶ TITAN INCOMING — defeat the Merge Titan to clear loop ${loop}`);
+  } else {
+    showWaveAnnouncer(`WAVE ${loop} — ${waveTotal} CONFLICTS`);
+    log(`▶ Wave ${loop} active — defend the core — hazard ring active`);
+    // VS flood: initial burst 12 at 120ms per critic
+    for(let i=0;i<12;i++) setTimeout(()=>{ if(gameState==='playing' && !isBossLoop) spawnEnemy(); }, i*120);
+  }
 }
 
 function showBoonChoice(){
@@ -693,10 +818,15 @@ function showBoonChoice(){
   overlay.style.display='flex';
   startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden');
   boonCard.classList.remove('hidden');
-  // pick 3 boons shuffled, show 3 (or 2 if early loops? spec says 2-3)
+  if(pendingBoonPicks>1) bossHudEl.classList.remove('hidden');
   const shuffled=[...BOONS].sort(()=>Math.random()-0.5);
   pendingBoonOffer = shuffled.slice(0,3);
-  boonDescEl.innerHTML = `Loop <b style="color:var(--accent)">${loop}</b> cleared — Integrity ${Math.round(coreHp)}%. Pick one <b>Hades boon</b> to persist for the rest of the run.`;
+  const picksText = pendingBoonPicks>1 ? `Pick <b style="color:#ffb020">${pendingBoonPicks}</b> boons — TITAN REWARD (2×)` : `Pick one <b>Hades boon</b> to persist for the rest of the run.`;
+  const bossNote = isBossLoop ? ' <span style="color:#ff3b6b">◈ TITAN DEFEATED</span>' : '';
+  boonDescEl.innerHTML = `Loop <b style="color:var(--accent)">${loop}</b> cleared — Integrity ${Math.round(coreHp)}%. ${picksText}${bossNote}`;
+  if(pendingBoonPicks>1){
+    boonDescEl.innerHTML += `<br><span style="font-size:11px;opacity:0.7">Pick ${pendingBoonPicks} — ${pendingBoonPicks} remaining</span>`;
+  }
   boonChoicesEl.innerHTML='';
   pendingBoonOffer.forEach((b, idx)=>{
     const owned = activeBoons[b.id];
@@ -714,8 +844,7 @@ function showBoonChoice(){
     div.onclick=()=> pickBoon(b.id);
     boonChoicesEl.appendChild(div);
   });
-  log(`◆ Choose a Boon — ${pendingBoonOffer.map(b=>b.short).join(' / ')}`);
-  // keyboard hint handled globally
+  log(`◆ Choose a Boon — ${pendingBoonOffer.map(b=>b.short).join(' / ')}${pendingBoonPicks>1?' — TITAN 2× picks':''}`);
 }
 function pickBoon(id){
   const b = BOONS.find(x=>x.id===id);
@@ -723,18 +852,37 @@ function pickBoon(id){
   activeBoons[id] = (activeBoons[id]||0)+1;
   recomputeBoonModifiers();
   updateBoonHud();
-  // feedback burst + sound
   beep({pulse:880, cache:660, shard:1040}[id]||880,0.16,0.13);
   triggerShake(0.5);
-  // flash
   boonCard.querySelectorAll('.boonChoice').forEach(el=>{
     if(el.getAttribute('data-boon')===id) el.classList.add('selected');
     el.style.pointerEvents='none';
   });
   log(`◆ Boon acquired: ${b.name} ×${activeBoons[id]} ${b.desc.replace('<br>',' ')}`);
+  pendingBoonPicks--;
+  if(pendingBoonPicks>0){
+    setTimeout(()=>{
+      // refresh choices for second pick, reshuffle
+      const shuffled=[...BOONS].sort(()=>Math.random()-0.5);
+      pendingBoonOffer = shuffled.slice(0,3);
+      boonDescEl.innerHTML = `Titan reward — pick <b style="color:#ffb020">${pendingBoonPicks}</b> more boon${pendingBoonPicks>1?'s':''}!<br><span style="font-size:11px;opacity:0.7">${pendingBoonPicks} remaining</span>`;
+      boonChoicesEl.innerHTML='';
+      pendingBoonOffer.forEach((bb, idx)=>{
+        const owned=activeBoons[bb.id];
+        const stackLabel=owned>0?`OWNED ×${owned} → ×${owned+1}`:'NEW BOON';
+        const div=document.createElement('button');
+        div.className=`boonChoice ${bb.cls}`;
+        div.setAttribute('data-boon',bb.id);
+        div.innerHTML=`<span class="boonKey">${idx+1}</span><div class="boonIcon">${bb.icon}</div><h3>${bb.name}</h3><p>${bb.desc}</p><div class="boonMeta">${stackLabel} · ${bb.detail}</div>`;
+        div.onclick=()=> pickBoon(bb.id);
+        boonChoicesEl.appendChild(div);
+      });
+      log(`◆ Titan bonus — choose ${pendingBoonPicks} more`);
+    }, 380);
+    return;
+  }
   setTimeout(()=>{
     boonCard.classList.add('hidden');
-    // now show win card with updated boon context
     gameState='won';
     winCard.classList.remove('hidden');
     overlay.style.display='flex';
@@ -743,7 +891,8 @@ function pickBoon(id){
     if(activeBoons.cache) mods.push(`Cache ×${activeBoons.cache}`);
     if(activeBoons.shard) mods.push(`Shard ×${activeBoons.shard}`);
     const modStr = mods.length ? `Active: ${mods.join(' · ')}` : '';
-    document.getElementById('winText').textContent=`Worktree loop ${loop} regression passed. Integrity ${Math.round(coreHp)}%. ${modStr} Next checkout harder (+3 enemies, +8% speed).`;
+    const titanStr = isBossLoop ? ' ◈ Titan slain — bonus boon granted.' : '';
+    document.getElementById('winText').textContent=`Worktree loop ${loop} regression passed. Integrity ${Math.round(coreHp)}%. ${modStr}${titanStr} Next checkout harder (+3 enemies, +8% speed).`;
   }, 380);
 }
 function winLoop(){
@@ -759,8 +908,9 @@ function winLoop(){
 }
 function failLoop(){
   gameState='dead';
-  deadCard.classList.remove('hidden'); winCard.classList.add('hidden');
+  deadCard.classList.remove('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden');
   overlay.style.display='flex';
+  bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden');
   log(`✗ Loop ${loop} regression failed — core 0%`);
   triggerShake(2.0);
   triggerHitFlash('coreHit');
@@ -874,12 +1024,30 @@ function tick(dt){
     if(dashCd>0) dashCd-=dt;
     if(keys[' '] ) shoot();
 
-    // Vampire-Survivors density: 90 cap, faster accelerating curve (critic fix)
-    spawnInterval = Math.max(0.12, 0.55 * Math.pow(0.82, waveKill) - loop*0.02);
-    const cap = Math.min(90, 35 + Math.floor(loop*5));
-    if(performance.now()-lastSpawn > spawnInterval*1000){
-      if(enemies.length < waveTotal - waveKill && enemies.length < cap){
-        if(Math.random()<0.92){
+    // Boss shockwave & dash timers (arena-wide)
+    if(isBossLoop && bossGroup){
+      bossShockTimer-=dt;
+      if(bossShockTimer<=0){
+        doBossShockwave();
+        bossShockTimer = bossPhase===2 ? 3.2 : 4.0;
+      }
+      bossDashTimer-=dt;
+      // enraged phase dashes more often
+      if(bossPhase===2) bossDashTimer-=dt*0.6;
+    }
+    // shockEffects (expanding rings)
+    for(let i=shockEffects.length-1;i>=0;i--){
+      const s=shockEffects[i];
+      if(s.tick(dt)) shockEffects.splice(i,1);
+    }
+    if(isBossLoop && bossGroup) updateBossHud();
+
+    // Vampire-Survivors flood: unconditional 90 wave, 0.12s constant, cap 90 — not during boss
+    if(!isBossLoop){
+      spawnInterval = 0.12;
+      const cap = 90;
+      if(enemies.length < waveTotal - waveKill && enemies.length < cap && elapsed>0.4){
+        if(performance.now()-lastSpawn > spawnInterval*1000){
           spawnEnemy();
           lastSpawn=performance.now();
         }
@@ -888,6 +1056,64 @@ function tick(dt){
 
     for(let i=enemies.length-1;i>=0;i--){
       const e=enemies[i];
+      // ── Boss AI (Merge Titan) ──
+      if(e.userData.isBoss){
+        const toCore = core.position.clone().sub(e.position); toCore.y=0;
+        const toPlayer = player.position.clone().sub(e.position); toPlayer.y=0;
+        const dPlayer=toPlayer.length();
+        // phase shift at 50%
+        const pct=e.userData.hp/e.userData.maxHp;
+        if(pct<0.5 && bossPhase===1){
+          bossPhase=2; e.userData.speed*=1.35; isBossLoop=true;
+          log('◈ TITAN ENRAGED — phase 2 · shockwave intensified · dashing faster');
+          beep(200,0.25,0.18); triggerShake(1.6);
+          updateBossHud();
+        }
+        // dash logic: when global timer expires, dash toward player
+        if(!e.userData.dashing && bossDashTimer<=0){
+          e.userData.dashing=true; e.userData.dashTime=0.38;
+          // compute dash dir
+          const dashDir=toPlayer.clone().normalize();
+          e.userData.dashDir=dashDir;
+          burst(e.position, 0xff3b6b, 12);
+          triggerShake(1.2, dashDir);
+          beep(320,0.12,0.14);
+          bossDashTimer = bossPhase===2? 2.0 : 3.0;
+        }
+        if(e.userData.dashing){
+          e.userData.dashTime-=dt;
+          const spd=9.5 + loop*0.15;
+          e.position.add(e.userData.dashDir.clone().multiplyScalar(spd*dt));
+          // dash dust
+          if(Math.random()<0.6) { const d2=new THREE.Mesh(new THREE.SphereGeometry(0.09,6,6), new THREE.MeshBasicMaterial({color:0xff6b3b, transparent:true, opacity:0.55})); d2.position.copy(e.position).add(new THREE.Vector3(0,0.2,0)); d2.userData={life:0.25, vel:new THREE.Vector3()}; scene.add(d2); particles.push(d2); }
+          if(e.userData.dashTime<=0) e.userData.dashing=false;
+        } else {
+          // slow chase player if within 12 or core otherwise
+          const target = dPlayer<13 ? toPlayer : toCore;
+          if(target.lengthSq()>0.01){ target.normalize().multiplyScalar(e.userData.speed*dt); e.position.add(target); }
+        }
+        if(toPlayer.lengthSq()>1e-4) e.userData.holder.rotation.y=Math.atan2(toPlayer.x,toPlayer.z);
+        e.userData.bar.lookAt(camera.position);
+        if(e.userData.aura) e.userData.aura.rotation.z += dt*(bossPhase===2?3.8:2.2);
+        if(e.userData.bossRing) e.userData.bossRing.rotation.z -= dt*(bossPhase===2?2.5:1.4);
+        e.userData.holder.position.y = Math.sin(t*2.2 + e.userData.bob)*0.12;
+        // scale pulse enraged
+        const sPulse = bossPhase===2 ? 1+Math.sin(t*6)*0.025 : 1;
+        e.userData.holder.scale.setScalar(sPulse);
+        // contact damage
+        if(e.position.distanceTo(core.position)<1.85){
+          const prev=coreHp; coreHp=Math.max(0, coreHp - (32*dt));
+          if(coreHp < prev -0.05){ coreFlashTimer=0.28; triggerHitFlash('coreHit'); if(Math.random()<0.12) triggerShake(1.5, toCore); }
+          e.position.add(toCore.normalize().multiplyScalar(-0.12));
+          if(coreHp<=0){ failLoop(); break; }
+        }
+        if(e.position.distanceTo(player.position)<1.35){
+          takeDamagePlayer(24*dt);
+          const push=player.position.clone().sub(e.position).normalize().multiplyScalar(0.06);
+          player.position.add(push);
+        }
+        continue;
+      }
       const toCore = core.position.clone().sub(e.position); toCore.y=0;
       const toPlayer = player.position.clone().sub(e.position); toPlayer.y=0;
       const distPlayer = toPlayer.length();
@@ -1007,9 +1233,11 @@ function tick(dt){
         scene.add(t2); particles.push(t2);
       }
       let hitIdx=-1;
-      const hitR = b.userData.hitRadius || 0.85;
+      const baseHitR = b.userData.hitRadius || 0.85;
       for(let j=0;j<enemies.length;j++){
-        if(b.position.distanceTo(enemies[j].position)<hitR){ hitIdx=j; break; }
+        const ej=enemies[j];
+        const hr = ej.userData.isBoss ? 1.85 : baseHitR;
+        if(b.position.distanceTo(ej.position)<hr){ hitIdx=j; break; }
       }
       if(hitIdx!==-1){
         const e=enemies[hitIdx];
@@ -1018,6 +1246,7 @@ function tick(dt){
         const pct=Math.max(0,e.userData.hp/e.userData.maxHp);
         e.userData.bar.scale.x=pct;
         e.userData.bar.material.color.set(pct<0.3?0xff3b6b:0xffd23b);
+        if(e.userData.isBoss) updateBossHud();
         // white flash hit
         if(e.userData.holder){
           e.userData.holder.traverse(o=>{ if(o.isMesh && o.material){ if(!o.userData.origEmissive){ o.userData.origEmissive=o.material.emissive.clone(); o.userData.origColor=o.material.color.clone(); } o.material.emissive.setHex(0xffffff); setTimeout(()=>{ if(o.material && o.userData.origEmissive){ o.material.emissive.copy(o.userData.origEmissive); if(o.userData.origColor) o.material.color.copy(o.userData.origColor); } }, 55); }});
@@ -1030,20 +1259,46 @@ function tick(dt){
         beep(e.userData.elite? 660: 880, 0.05, 0.09);
         scene.remove(b); bullets.splice(i,1);
         if(e.userData.hp<=0){
+          const wasBoss=!!e.userData.isBoss;
           scene.remove(e);
           enemies.splice(hitIdx,1);
-          burst(e.position, e.userData.elite?0xffcc40:0xff3b6b, e.userData.elite?18:12);
-          spawnDamageNumber(e.position, e.userData.elite?'+85':' +35', '#2ee5a0');
-          score+= e.userData.elite? 85 + loop*5 : 35 + loop*3;
-          scoreEl.classList.add('bump');
-          setTimeout(()=>scoreEl.classList.remove('bump'),180);
-          beep(e.userData.elite? 1200: 620, 0.10, 0.11);
-          waveKill++;
-          waveEl.textContent=`${waveKill} / ${waveTotal}`;
-          if(waveKill%Math.ceil(waveTotal/3)===0 && waveKill<waveTotal){
-            showWaveAnnouncer(`WAVE ${loop} — ${waveKill}/${waveTotal}`,1400);
+          if(wasBoss){
+            bossGroup=null; bossHudEl.classList.add('hidden');
+            burst(e.position, 0xff1a3d, 24);
+            spawnDamageNumber(e.position, '+250', '#ffb020');
+            score+= 250 + loop*15;
+            scoreEl.classList.add('bump'); setTimeout(()=>scoreEl.classList.remove('bump'),180);
+            beep(1200,0.14,0.14); setTimeout(()=>beep(900,0.2,0.14),140);
+            triggerShake(2.0);
+            log('◈ TITAN DEFEATED — spawning 2 minions');
+            // spawn 2 minions on death at boss pos
+            for(let k=0;k<2;k++){
+              const mPos=e.position.clone().add(new THREE.Vector3((Math.random()-0.5)*2,0,(Math.random()-0.5)*2));
+              // force spawn near boss
+              const ang=Math.random()*Math.PI*2; const r=2+Math.random()*1;
+              const backup=spawnEnemy; // reuse logic but place manually
+              // create quick elite minion
+              const g=new THREE.Group(); let mm;
+              if(robotModel){ mm=robotModel.scene.clone(true); const box=new THREE.Box3().setFromObject(mm); const sz=new THREE.Vector3(); box.getSize(sz); const c=new THREE.Vector3(); box.getCenter(c); mm.position.sub(c); mm.scale.setScalar(1.2/Math.max(sz.x,sz.y,sz.z)); mm.rotation.y=Math.PI; mm.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.material=o.material.clone(); o.material.emissive=new THREE.Color(0xff5533); o.material.emissiveIntensity=0.7; }}); } else { mm=new THREE.Mesh(new THREE.CapsuleGeometry(0.32,0.7,4,10), new THREE.MeshStandardMaterial({color:0xff5533})); mm.position.y=0.6; }
+              const holder=new THREE.Group(); holder.add(mm); g.add(holder); g.position.copy(mPos); g.userData={ holder, hp: 70+loop*6, maxHp:70+loop*6, speed:2.4+loop*0.12, elite:true, bob:Math.random()*Math.PI*2, archetype:'melee' }; const bar=new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.08), new THREE.MeshBasicMaterial({color:0xff5533, side:THREE.DoubleSide})); bar.position.set(0,1.45,0); g.add(bar); g.userData.bar=bar; scene.add(g); enemies.push(g);
+            }
+            waveKill++; waveEl.textContent=`${waveKill} / ${waveTotal}`;
+            showWaveAnnouncer('◈ TITAN SLAIN',1800);
+            winLoop();
+          } else {
+            burst(e.position, e.userData.elite?0xffcc40:0xff3b6b, e.userData.elite?18:12);
+            spawnDamageNumber(e.position, e.userData.elite?'+85':' +35', '#2ee5a0');
+            score+= e.userData.elite? 85 + loop*5 : 35 + loop*3;
+            scoreEl.classList.add('bump');
+            setTimeout(()=>scoreEl.classList.remove('bump'),180);
+            beep(e.userData.elite? 1200: 620, 0.10, 0.11);
+            waveKill++;
+            waveEl.textContent=`${waveKill} / ${waveTotal}`;
+            if(waveKill%Math.ceil(waveTotal/3)===0 && waveKill<waveTotal){
+              showWaveAnnouncer(`WAVE ${loop} — ${waveKill}/${waveTotal}`,1400);
+            }
+            if(waveKill>=waveTotal) winLoop();
           }
-          if(waveKill>=waveTotal) winLoop();
         }
         continue;
       }
@@ -1051,7 +1306,7 @@ function tick(dt){
         scene.remove(b); bullets.splice(i,1);
       }
     }
-    if(elapsed>22 && waveKill < waveTotal){
+    if(!isBossLoop && elapsed>22 && waveKill < waveTotal){
       winLoop();
     }
   }
@@ -1114,6 +1369,7 @@ document.getElementById('menuBtn').onclick=()=>{
   startCard.classList.remove('hidden'); overlay.style.display='flex'; gameState='menu';
   coreHp=100; dispCore=100; loop=1; score=0; dispScore=0;
   activeBoons={pulse:0,cache:0,shard:0}; recomputeBoonModifiers(); updateBoonHud();
+  bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); isBossLoop=false; bossGroup=null;
   updateHUD(); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
   log('Run reset — boons cleared');
 };
@@ -1135,7 +1391,8 @@ log('Worktree arena ready — awaiting loop start');
 
 // expose for verifier
 window.__arena={
-  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers} }),
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks }),
   getBoons:()=>({...activeBoons}),
-  pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); }
+  pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); },
+  spawnTitanForTest:()=>{ if(gameState==='playing' && !bossGroup){ isBossLoop=true; pendingBoonPicks=2; waveTotal=1; spawnTitan(); showTitanIncoming(); updateBossHud(); } },
 };
