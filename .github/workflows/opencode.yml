@@ -13,10 +13,13 @@ jobs:
       (github.event.issue.pull_request == null) &&
       (contains(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, '/opencode') ||
+      contains(github.event.comment.body, '/goal') ||
       contains(github.event.issue.body, '/oc') ||
       contains(github.event.issue.body, '/opencode') ||
+      contains(github.event.issue.body, '/goal') ||
       contains(github.event.issue.title, '/oc') ||
-      contains(github.event.issue.title, '/opencode'))
+      contains(github.event.issue.title, '/opencode') ||
+      contains(github.event.issue.title, '/goal'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -33,6 +36,7 @@ jobs:
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
       PROJECT_DIR: ${{ github.workspace }}/project
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      OPENCODE_EXPERIMENTAL: "true"
       OPENCODE_ENABLE_EXA: "true"
       OPENCODE_ENABLE_EXPERIMENTAL_MODELS: "true"
       OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS: "true"
@@ -42,6 +46,7 @@ jobs:
       BRANCH_NAME: opencode/${{ github.run_id }}
       TRIGGER_ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
+      GOAL_REQUEST: ${{ contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -249,9 +254,26 @@ jobs:
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           [[ -x "$OPENCODE_BIN" ]]
           install -d -m 700 "$HOME/.config/opencode"
+          npm install --prefix "$HOME/.config/opencode" --no-save --no-package-lock \
+            --ignore-scripts opencode-goal-plugin@0.8.2
           cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
           {
             "$schema": "https://opencode.ai/config.json",
+            "plugin": [
+              [
+                "opencode-goal-plugin",
+                {
+                  "noInterruptOnUserMessage": true
+                }
+              ]
+            ],
+            "command": {
+              "goal": {
+                "description": "Set a session-scoped goal and auto-continue until complete.",
+                "template": "$ARGUMENTS",
+                "agent": "build"
+              }
+            },
             "permission": {
               "*": "allow",
               "task": "allow"
@@ -370,6 +392,7 @@ jobs:
           OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
           OPENCODE_SKILLS: ${{ steps.opencode_labels.outputs.skills_json }}
+          GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
@@ -378,14 +401,30 @@ jobs:
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
           prompt_template="$(< "$GITHUB_WORKSPACE/.github/prompts/build.md")"
-          prompt="${prompt_template//@COMMENT_BODY@/$COMMENT_BODY}"
+          request_text="$COMMENT_BODY"
+          if [[ "$GOAL_REQUEST" == 'true' ]]; then
+            # The issue marker selects the custom command; do not include the
+            # marker itself in the objective passed to the goal parser.
+            request_text="$(sed -E 's/^[[:space:]]*\/goal([[:space:]]*)?//' <<<"$request_text")"
+          fi
+          prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
           printf '%s\n' "$prompt" > "$PROMPT_FILE"
+          echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
-          nohup bash -c '"$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
-            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" \
+          nohup bash -c '
+            if [[ "$7" == true ]]; then
+              "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
+            else
+              "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1
+            fi
+            code=$?
+            echo "$code" > "$5"
+            exit "$code"
+          ' \
+            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" "$GOAL_REQUEST" \
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
           SESSION_ID=''
@@ -431,10 +470,12 @@ jobs:
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
+          GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const command = process.env.GOAL_REQUEST === 'true' ? '/goal' : '/oc';
             const body = [
               '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
@@ -442,7 +483,7 @@ jobs:
               '```sh', process.env.SSH_COMMAND, '```', '',
               '🌐 **Live OpenCode web session is ready.**', '',
               `URL: ${process.env.OPENCODE_WEB_URL}`, '',
-              'This opens the currently running `/oc` session directly. Access remains available while OpenCode runs and for 5 hours afterwards.'
+              `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
             ].join('\n');
             const result = await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: number, body

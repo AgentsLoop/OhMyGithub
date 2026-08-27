@@ -6,9 +6,13 @@ The build and verification prompt templates are stored as Markdown files in
 
 ## Trigger
 
-`/oc <request>` or `/opencode <request>` can appear in a newly created or
-edited issue/PR title or body, an issue comment, or a pull-request review
-comment. Bot-authored events are ignored, so status comments do not recurse.
+`/oc <request>`, `/opencode <request>`, or `/goal <objective>` can appear in a
+newly created or edited issue/PR title or body, an issue comment, or a
+pull-request review comment. Bot-authored events are ignored, so status
+comments do not recurse. `/goal` selects the installed
+`opencode-goal-plugin`, configures `noInterruptOnUserMessage: true`, and starts
+the runner with `opencode run --command goal`; `/oc` and `/opencode` retain the
+standard `opencode run` path.
 
 ## What the job does
 
@@ -64,6 +68,15 @@ opencode github run
 ```
 
 The workflow now sends the comment text directly to `opencode run --attach`.
+
+For the installed `opencode-goal-plugin`, invoke a goal from the non-interactive
+CLI with `opencode run --command goal "<objective>"`; passing `/goal <objective>`
+as the message sends literal text instead of invoking the custom command. To
+send a follow-up to the same attached session, use `opencode run --attach
+<server-url> --session <session-id> "<message>"`. In this workflow, the
+`/goal` marker is stripped from the objective before it is passed to the
+custom command, and later human messages steer the running goal instead of
+pausing it.
 
 Before starting OpenCode, the workflow checks out `agents-dev/skills` into
 `project/.agents`. OpenCode discovers project skills from

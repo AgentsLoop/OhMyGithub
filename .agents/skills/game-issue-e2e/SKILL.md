@@ -14,7 +14,9 @@ workflow to completion or claim that the game, PR, or public app is finished.
 
 The kickoff is complete when all of these are true:
 
-- A fresh GitHub issue was created with `/oc` in its title or body.
+- A fresh GitHub issue was created with `/goal` in its title or body by
+  default. Use `/oc` only when the caller explicitly requests a standard-mode
+  workflow test.
 - The `issues` event triggered `.github/workflows/opencode.yml`.
 - The initial OpenCode Web UI session link was posted.
 
@@ -68,9 +70,11 @@ for Muse Free always takes precedence over this difficulty check.
 2. Confirm `gh auth status` and identify the repository with `gh repo view`.
 3. Inspect the current labels with `gh label list`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
-   with one `--label` option per applicable label. Put `/oc` in the title or
-   body; do not add a comment because this specifically tests the `issues`
-   trigger.
+   with one `--label` option per applicable label. Put `/goal` in the title or
+   body by default; this specifically exercises the goal plugin and
+   `opencode run --command goal` path. Use `/oc` instead only when the caller
+   explicitly requests the standard OpenCode path. Do not add a comment
+   because this tests the `issues` trigger.
    Ask for a concrete playable game and include its functional requirements.
    For any 3D game, also pass `--label skill/load-sketchfab-threejs` when that
    label exists, and require the issue prompt to use the

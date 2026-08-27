@@ -16,6 +16,13 @@ actionlint .github/workflows/opencode.yml
 git diff --check
 ```
 
+For goal support, also confirm the workflow trigger checks `/goal`, installs
+and configures `opencode-goal-plugin`, and branches the initial invocation to
+`opencode run --command goal` while leaving `/oc` and `/opencode` on the
+standard `opencode run` path. The configured
+`noInterruptOnUserMessage: true` option should remain visible in the generated
+OpenCode config.
+
 Focused completion-evidence checks should also confirm that the workflow copies
 `agents.template.md` to `project/Agents.md`, and that a run sends up to two
 same-session follow-up prompts when no `project/screenshots/final-*` image
