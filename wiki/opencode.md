@@ -18,6 +18,13 @@ standard `opencode run` path. A `/goal` trigger also automatically adds the
 published completion. Each iteration asks for distinct builder, critic, and
 verifier subagents, publishes to the existing branch/PR, and continues the
 original goal.
+An issue labeled `omo` additionally installs and configures the OpenCode Ultimate
+edition of `oh-my-openagent` with Bun before the OpenCode server starts. The
+installer runs non-interactively with provider authentication skipped; `/omo` is
+not a command and does not trigger a run by itself. An `omo`-labeled `/oc` run
+uses OMO's native `goal` command and prepends `ulw` to the objective, matching
+the official OpenCode usage. The Codex Light `ulw-loop` component is not
+recreated or registered for OpenCode.
 
 ## What the job does
 
