@@ -26,6 +26,12 @@ uses OMO's native `goal` command and prepends `ulw` to the objective, matching
 the official OpenCode usage. The Codex Light `ulw-loop` component is not
 recreated or registered for OpenCode.
 
+At delivery, the workflow normalizes the generated `project/` snapshot against
+the base branch. If OpenCode has already pushed the run branch, final delivery
+fetches that ref and force-pushes the normalized snapshot with an explicit
+`--force-with-lease`; this avoids a non-fast-forward failure while protecting
+against a concurrent branch update.
+
 ## What the job does
 
 1. Checks out the repository with persisted `GITHUB_TOKEN` credentials.

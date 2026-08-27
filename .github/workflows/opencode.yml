@@ -752,7 +752,14 @@ jobs:
             echo 'OpenCode made no changes; no pull request will be created.'
             exit 0
           fi
-          git push --set-upstream origin "$BRANCH_NAME"
+          remote_branch_sha="$(git ls-remote origin "refs/heads/$BRANCH_NAME" | awk '{print $1}')"
+          if [[ -n "$remote_branch_sha" ]]; then
+            git fetch origin "$BRANCH_NAME"
+            git push --force-with-lease="refs/heads/$BRANCH_NAME:$remote_branch_sha" \
+              --set-upstream origin "$BRANCH_NAME"
+          else
+            git push --set-upstream origin "$BRANCH_NAME"
+          fi
           FINAL_COMMIT="$(git rev-parse HEAD)"
           TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
           TITLE="${TITLE:0:120}"
