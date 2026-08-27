@@ -38,6 +38,8 @@ let isLocked = false, gameActive = false, gameOver = false;
 let velocity = new THREE.Vector3();
 let position = new THREE.Vector3(0,1.7,14);
 let sprint = false;
+let isAiming = false, aimProgress = 0, walkTime = 0, swayX = 0, swayY = 0, bobIntensity = 0;
+let recoilX = 0, recoilZ = 0;
 
 let ammo = 30, reserve = 90, magSize = 30;
 let shots = 0, hits = 0, score = 0, combo = 0, bestCombo = 0, comboTimer = 0;
@@ -463,8 +465,8 @@ function shoot(){
   playSound('shoot');
   initAudio();
 
-  weaponGroup.position.z = 0.14; weaponGroup.rotation.x = -0.06;
-  setTimeout(()=>{ weaponGroup.position.z=0; weaponGroup.rotation.x=0; }, 60);
+  recoilZ = 0.18; recoilX = -0.07 - Math.random()*0.03;
+  if(isAiming){ recoilZ*=0.55; recoilX*=0.6; }
 
   muzzleLight.intensity = 14; muzzleFlash.material.opacity=1;
   muzzleFlash.scale.set(1,1,1);
@@ -572,7 +574,9 @@ function updateControls(dt){
   if(keys['KeyS']) mv.sub(fwd);
   if(keys['KeyA']) mv.sub(right);
   if(keys['KeyD']) mv.add(right);
-  if(mv.length()>0){ mv.normalize().multiplyScalar(speed*dt); position.add(mv); }
+  const moving = mv.length()>0;
+  if(moving){ mv.normalize().multiplyScalar(speed*dt); position.add(mv); bobIntensity = Math.min(1, bobIntensity + dt*5); walkTime += dt * (sprint? 14:9) * (isAiming?0.4:1); }
+  else { bobIntensity = Math.max(0, bobIntensity - dt*3); walkTime += dt*1.5; }
   position.x = Math.max(-RANGE_WIDTH/2+0.6, Math.min(RANGE_WIDTH/2-0.6, position.x));
   position.z = Math.max(-RANGE_DEPTH+14, Math.min(13.5, position.z));
   position.y = 1.7 + Math.sin(Date.now()*0.0025)*0.015;
@@ -584,6 +588,15 @@ function updateControls(dt){
   if(hitMarkerTimer>0){ hitMarkerTimer-=dt; if(hitMarkerTimer<=0) hitmarkerEl.classList.remove('show'); }
   if(combo>0){ comboTimer-=dt; if(comboTimer<=0) combo=0; }
   updateReload(dt);
+  swayX += (0 - swayX)*dt*8; swayY += (0 - swayY)*dt*8;
+  recoilZ += (0 - recoilZ)*dt*14; recoilX += (0 - recoilX)*dt*14;
+  const bobX = Math.sin(walkTime)*0.018*bobIntensity*(isAiming?0.18:1);
+  const bobY = Math.abs(Math.sin(walkTime*0.5))*0.014*bobIntensity*(isAiming?0.2:1) + Math.sin(walkTime*2)*0.004*bobIntensity;
+  const aimT = aimProgress;
+  const targetFov = isAiming ? 58 : 74;
+  camera.fov += (targetFov - camera.fov)*dt*9; camera.updateProjectionMatrix();
+  const crosshairEl = document.getElementById('crosshair');
+  if(crosshairEl) crosshairEl.style.opacity = isAiming ? '0.22' : '1';
 }
 
 function animate(){
@@ -597,11 +610,29 @@ function animate(){
     updateTargets(dt);
   }
   updateControls(dt);
+  updateWeaponPose(dt);
   updateParticles(dt);
-  if(weaponGroup){
-    weaponGroup.position.lerp(new THREE.Vector3(0,0,0), 0.12);
-  }
   composer.render();
+}
+
+function updateWeaponPose(dt){
+  if(!weaponGroup) return;
+  aimProgress += ((isAiming?1:0) - aimProgress)*dt*10;
+  const aimPos = new THREE.Vector3(0.02,-0.18,-0.38);
+  const hipPos = weaponBasePos;
+  const curPos = new THREE.Vector3().lerpVectors(hipPos, aimPos, aimProgress);
+  const bobX = Math.sin(walkTime)*0.018*bobIntensity*(isAiming?0.18:1);
+  const bobY = Math.abs(Math.sin(walkTime*0.5))*0.014*bobIntensity*(isAiming?0.2:1);
+  curPos.x += bobX + swayX*0.35 + (Math.random()-0.5)*0.002;
+  curPos.y += bobY + swayY*0.25;
+  curPos.z += recoilZ;
+  weaponGroup.position.lerp(curPos, dt*18);
+  const targetRotX = recoilX + bobY*0.8;
+  const targetRotY = swayX*0.35 + bobX*0.9;
+  const targetRotZ = Math.sin(walkTime)*0.025*bobIntensity*(isAiming?0.15:1) + swayX*0.18;
+  weaponGroup.rotation.x += (targetRotX - weaponGroup.rotation.x)*dt*14;
+  weaponGroup.rotation.y += (targetRotY - weaponGroup.rotation.y)*dt*14;
+  weaponGroup.rotation.z += (targetRotZ - weaponGroup.rotation.z)*dt*12;
 }
 
 function startGame(){
@@ -636,11 +667,18 @@ function setupEvents(){
   });
   addEventListener('mousemove', e=>{
     if(!isLocked) return;
-    const sens = 0.0022;
+    const sens = isAiming?0.0011:0.0022;
     yaw -= e.movementX * sens;
     pitch -= e.movementY * sens;
     pitch = Math.max(-1.25, Math.min(1.25, pitch));
+    swayX += e.movementX*0.00012;
+    swayY -= e.movementY*0.00011;
+    swayX = Math.max(-0.06, Math.min(0.06, swayX));
+    swayY = Math.max(-0.05, Math.min(0.05, swayY));
   });
+  addEventListener('mousedown', e=>{ if(e.button===2 && isLocked) isAiming=true; });
+  addEventListener('mouseup', e=>{ if(e.button===2) isAiming=false; });
+  canvas.addEventListener('contextmenu', e=> e.preventDefault());
   document.addEventListener('pointerlockchange', ()=>{
     isLocked = document.pointerLockElement===canvas;
     if(isLocked){ initAudio(); if(!gameActive && !gameOver) startGame(); else if(pauseOverlay.classList.contains('hidden')===false) pauseOverlay.classList.add('hidden'); }
