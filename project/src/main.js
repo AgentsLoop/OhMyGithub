@@ -177,29 +177,98 @@ scene.add(blue2);
 
 // arena — Halo trim-sheet style: higher albedo floor with procedural panel texture, clean walls, limited neon wayfinding
 const arenaRadius = 19;
-// bright concrete trim-sheet floor — Halo albedo 0.75+
-function makeFloorTexture(){
-  const c=document.createElement('canvas'); c.width=1024; c.height=1024;
+// bright concrete trim-sheet floor — Halo albedo 0.75+ with procedural AO / edge wear / roughness variation
+function makeFloorTextures(){
+  const N=1024;
+  const c=document.createElement('canvas'); c.width=N; c.height=N;
   const g=c.getContext('2d');
-  g.fillStyle='#d2d8e2'; g.fillRect(0,0,1024,1024);
-  // 3m panel grid — subtle grout
-  g.strokeStyle='rgba(0,0,0,0.08)'; g.lineWidth=2;
-  for(let i=0;i<1024;i+=256){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,1024); g.stroke(); g.beginPath(); g.moveTo(0,i); g.lineTo(1024,i); g.stroke(); }
+  g.fillStyle='#d2d8e2'; g.fillRect(0,0,N,N);
+  // base variation — large soft mottling (concrete pour)
+  for(let i=0;i<70;i++){
+    const x=Math.random()*N, y=Math.random()*N, r=40+Math.random()*90;
+    const a=0.018+Math.random()*0.022;
+    const grd=g.createRadialGradient(x,y,0,x,y,r);
+    grd.addColorStop(0,`rgba(0,0,0,${a})`);
+    grd.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=grd; g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill();
+  }
+  // subtle warm/cool splotches (edge wear / foot traffic)
+  for(let i=0;i<55;i++){
+    const x=Math.random()*N, y=Math.random()*N, r=14+Math.random()*28;
+    const a=0.025+Math.random()*0.035;
+    g.fillStyle=Math.random()<0.5?`rgba(38,44,64,${a})`:`rgba(90,88,82,${a})`;
+    g.beginPath(); g.ellipse(x,y,r*1.2,r,Math.random()*Math.PI,0,Math.PI*2); g.fill();
+  }
+  // 3m panel grid — main grout + AO darkening along seam (6px soft)
+  g.strokeStyle='rgba(0,0,0,0.075)'; g.lineWidth=2;
+  for(let i=0;i<N;i+=256){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,N); g.stroke(); g.beginPath(); g.moveTo(0,i); g.lineTo(N,i); g.stroke(); }
+  // AO along grout — slightly darker soft edge on one side (fake cavity)
+  g.strokeStyle='rgba(18,22,34,0.055)'; g.lineWidth=10;
+  for(let i=256;i<N;i+=256){
+    g.beginPath(); g.moveTo(i+5,0); g.lineTo(i+5,N); g.stroke();
+    g.beginPath(); g.moveTo(0,i+5); g.lineTo(N,i+5); g.stroke();
+  }
   g.strokeStyle='rgba(0,0,0,0.035)'; g.lineWidth=1;
-  for(let i=128;i<1024;i+=256){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,1024); g.stroke(); }
-  // very subtle noise
-  for(let i=0;i<2500;i++){ const x=Math.random()*1024, y=Math.random()*1024; g.fillStyle=`rgba(0,0,0,${Math.random()*0.018})`; g.fillRect(x,y,1,1); }
-  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2.2,2.2); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=4;
-  return tex;
+  for(let i=128;i<N;i+=256){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,N); g.stroke(); }
+  // fine scratches / hairlines
+  g.strokeStyle='rgba(0,0,0,0.018)'; g.lineWidth=0.7;
+  for(let i=0;i<90;i++){
+    const x=Math.random()*N, y=Math.random()*N, l=22+Math.random()*55;
+    g.beginPath(); g.moveTo(x,y); g.lineTo(x+l*(Math.random()<0.5?1:0), y+l*(Math.random()<0.5?1:0)); g.stroke();
+  }
+  // grain
+  for(let i=0;i<3400;i++){ const x=Math.random()*N, y=Math.random()*N; g.fillStyle=`rgba(0,0,0,${Math.random()*0.016})`; g.fillRect(x,y,1,1); }
+  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2.2,2.2); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=8;
+  // roughness variation canvas — mid 0.84 with per-panel jitter + wear = less glossy
+  const rc=document.createElement('canvas'); rc.width=512; rc.height=512;
+  const rg=rc.getContext('2d');
+  rg.fillStyle='#d6d6d6'; rg.fillRect(0,0,512,512);
+  for(let i=0;i<55;i++){
+    const x=Math.random()*512, y=Math.random()*512, r=18+Math.random()*48;
+    const a=0.10+Math.random()*0.18;
+    const shade=Math.random()<0.5?0:255;
+    rg.fillStyle=`rgba(${shade},${shade},${shade},${a})`;
+    rg.beginPath(); rg.arc(x,y,r,0,Math.PI*2); rg.fill();
+  }
+  for(let i=0;i<2200;i++){ const x=Math.random()*512, y=Math.random()*512; rg.fillStyle=`rgba(0,0,0,${Math.random()*0.08})`; rg.fillRect(x,y,1,1); }
+  // grout is rougher (darker in rough map = smoother? actually white=rough) so brighten seam
+  rg.strokeStyle='#ffffff'; rg.lineWidth=2;
+  for(let i=0;i<512;i+=128){ rg.beginPath(); rg.moveTo(i,0); rg.lineTo(i,512); rg.stroke(); rg.beginPath(); rg.moveTo(0,i); rg.lineTo(512,i); rg.stroke(); }
+  const roughTex=new THREE.CanvasTexture(rc); roughTex.wrapS=roughTex.wrapT=THREE.RepeatWrapping; roughTex.repeat.set(2.2,2.2); roughTex.anisotropy=8;
+  return { color:tex, rough:roughTex };
 }
-const floorTex = makeFloorTexture();
+const floorTexs = makeFloorTextures();
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(arenaRadius, 64),
-  new THREE.MeshStandardMaterial({ map: floorTex, color:0xffffff, roughness:0.84, metalness:0.02 })
+  new THREE.MeshStandardMaterial({ map: floorTexs.color, roughnessMap: floorTexs.rough, color:0xffffff, roughness:0.88, metalness:0.02 })
 );
 floor.rotation.x = -Math.PI/2;
 floor.receiveShadow=true;
 scene.add(floor);
+// contact AO — radial gradient plane (fake AO under crates/walls/pillars)
+function makeAOGradTexture(){
+  const s=128, c=document.createElement('canvas'); c.width=s; c.height=s;
+  const g=c.getContext('2d');
+  const grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grd.addColorStop(0,'rgba(0,0,0,0.55)');
+  grd.addColorStop(0.42,'rgba(0,0,0,0.28)');
+  grd.addColorStop(0.72,'rgba(0,0,0,0.10)');
+  grd.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=grd; g.fillRect(0,0,s,s);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const aoTex = makeAOGradTexture();
+function addContactAO(pos, sx, sz, opacity=0.38){
+  const geo=new THREE.PlaneGeometry(sx, sz);
+  const mat=new THREE.MeshBasicMaterial({ map: aoTex, transparent:true, opacity, depthWrite:false, blending:THREE.MultiplyBlending });
+  mat.polygonOffset=true; mat.polygonOffsetFactor=-1;
+  const m=new THREE.Mesh(geo, mat);
+  m.rotation.x=-Math.PI/2;
+  m.position.set(pos.x, 0.015, pos.z);
+  m.renderOrder=0;
+  scene.add(m);
+  return m;
+}
 // removed GridHelper prototype tell — grout via texture only
 // subtle outer trim ring
 const ringGeo = new THREE.TorusGeometry(arenaRadius-0.1, 0.10, 12, 64);
@@ -248,6 +317,9 @@ for(let i=0;i<6;i++){
   pillar.position.set(Math.cos(ang+Math.PI/6)*(r-1.2), h/2, Math.sin(ang+Math.PI/6)*(r-1.2));
   pillar.castShadow=true;
   wallGroup.add(pillar);
+  // wall base + pillar contact AO
+  addContactAO(new THREE.Vector3(x,0,z), 6.5, 1.25, 0.18);
+  addContactAO(new THREE.Vector3(Math.cos(ang+Math.PI/6)*(r-1.2),0, Math.sin(ang+Math.PI/6)*(r-1.2)), 1.45, 1.45, 0.32);
 }
 // central reactor
 const reactor = new THREE.Group();
@@ -261,8 +333,9 @@ const halo = new THREE.Mesh(new THREE.TorusGeometry(1.6,0.08,12,32), new THREE.M
 halo.rotation.x=Math.PI/2; halo.position.y=0.5;
 reactor.add(halo);
 const halo2 = halo.clone(); halo2.position.y=1.9; halo2.scale.set(1.15,1.15,1);
-reactor.add(halo2);
+  reactor.add(halo2);
 scene.add(reactor);
+addContactAO(new THREE.Vector3(0,0,0), 3.4, 3.4, 0.42);
 
 // crates as cover — Halo verticality: flat crates → 2-high stacks + mid Walls for head-glitch cover
 const crates = [];
@@ -282,6 +355,7 @@ function addCrate(pos, scale=1){
   mesh.userData.radius = 0.9*scale;
   scene.add(mesh);
   crates.push(mesh);
+  addContactAO(pos, 1.55*scale, 1.55*scale, 0.34);
   // removed per-crate point light soup — kept for 2 largest crates only for subtle wayfinding
   if(scale>1.3){
     const l = new THREE.PointLight(0x7af2ff, 1.2, 5);
@@ -309,6 +383,7 @@ function addStack(basePos, levels=2, scale=1){
     scene.add(mesh);
     crates.push(mesh);
   }
+  addContactAO(basePos, 1.5*scale, 1.5*scale, 0.36);
   // stack collision proxy (taller)
   crates[crates.length-1].userData.stackHeight = levels*lift;
 }
@@ -327,6 +402,7 @@ function addCoverWall(pos, yawRad=0, len=3.0, h=1.45){
   // collision radius approx
   g.userData.radius = Math.max(len,0.9)/2;
   scene.add(g); crates.push(g);
+  addContactAO(pos, len*1.08, 1.25, 0.30);
 }
 const cratePositions = [
   new THREE.Vector3(6,0,5), new THREE.Vector3(-5,0,7), new THREE.Vector3(8,0,-4),
@@ -357,6 +433,8 @@ let recoilKick=0, recoilYaw=0, flashTime=0, shakeTime=0;
 let muzzleFlash=null, muzzleLight=null, muzzleCore=null;
 const baseWeaponPos = new THREE.Vector3(0.32, -0.22, -0.48);
 const baseWeaponRot = new THREE.Euler(0, -0.05, 0);
+// inertia sway + breathing
+let swayX=0, swayY=0, swayTX=0, swayTY=0;
 function setupWeapon(){
   if(weaponTemplate){
     weaponMesh = weaponTemplate.clone(true);
@@ -449,6 +527,11 @@ addEventListener('mousemove', e=>{
   if(pointerLocked){
     yaw -= e.movementX*sens;
     pitch -= e.movementY*sens;
+    // weapon inertia — push opposite to look, clamped like Halo
+    swayTX += THREE.MathUtils.clamp(e.movementX*0.00055, -0.06, 0.06);
+    swayTY += THREE.MathUtils.clamp(e.movementY*0.00055, -0.045, 0.045);
+    swayTX = THREE.MathUtils.clamp(swayTX,-0.09,0.09);
+    swayTY = THREE.MathUtils.clamp(swayTY,-0.07,0.07);
   } else if(e.buttons===1 && /Mobi|Android/i.test(navigator.userAgent)){
     yaw -= e.movementX*sens*1.2;
     pitch -= e.movementY*sens*1.2;
@@ -761,17 +844,27 @@ function handleInput(dt){
   } else {
     camera.position.set(0,1.7,0);
   }
-  // view bob + recoil offset (viewmodel stays grounded like Halo)
+  // inertia sway spring (look lag) + breathing
+  swayTX *= Math.pow(0.86, dt*60);
+  swayTY *= Math.pow(0.86, dt*60);
+  swayX += (swayTX - swayX) * dt * 9;
+  swayY += (swayTY - swayY) * dt * 9;
+  // add movement-induced sway (strafe leans weapon)
+  const strafeIn = (keys['KeyA']?1:0)-(keys['KeyD']?1:0) + joyVec.x;
+  swayTX += strafeIn * dt * 0.18;
+  const breathY = Math.sin(time*1.05)*0.006 + Math.sin(time*0.62)*0.004;
+  const breathX = Math.cos(time*0.9)*0.004;
+  // view bob + recoil + sway (viewmodel stays grounded like Halo)
   const moving = move.length()>0.001;
   const kickZ = recoilKick * 0.14;
   const kickY = recoilKick * 0.035;
   const kickPitch = recoilKick * 0.22;
-  viewWeapon.position.x = baseWeaponPos.x + Math.sin(time*9)*(moving?0.012:0.004) + recoilYaw*0.08;
-  viewWeapon.position.y = baseWeaponPos.y + Math.abs(Math.sin(time*18))*(moving?0.012:0.003) - kickY;
-  viewWeapon.position.z = baseWeaponPos.z - kickZ;
-  viewWeapon.rotation.x = baseWeaponRot.x - kickPitch + (overheat ? -0.15 : 0);
-  viewWeapon.rotation.y = baseWeaponRot.y + recoilYaw*0.6;
-  viewWeapon.rotation.z = Math.sin(time*6)*(moving?0.03:0.01) - recoilYaw*0.4;
+  viewWeapon.position.x = baseWeaponPos.x + Math.sin(time*9)*(moving?0.012:0.004) + recoilYaw*0.08 - swayX*0.55 + breathX*(moving?0.2:1);
+  viewWeapon.position.y = baseWeaponPos.y + Math.abs(Math.sin(time*18))*(moving?0.012:0.003) - kickY - swayY*0.45 + breathY*(moving?0.3:1);
+  viewWeapon.position.z = baseWeaponPos.z - kickZ + Math.abs(swayX)*0.06;
+  viewWeapon.rotation.x = baseWeaponRot.x - kickPitch + swayY*1.1 + breathY*0.6 + (overheat ? -0.15 : 0);
+  viewWeapon.rotation.y = baseWeaponRot.y + recoilYaw*0.6 - swayX*1.3;
+  viewWeapon.rotation.z = Math.sin(time*6)*(moving?0.03:0.01) - recoilYaw*0.4 - swayX*0.9;
 }
 
 function updateEnemies(dt){

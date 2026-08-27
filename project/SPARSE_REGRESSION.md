@@ -54,6 +54,24 @@ Playwright chromium headless — title “NEXUS ARENA”, canvas 1280×720 WebGL
 A/B viewers prepared and inspectable via `python3 -m http.server 8765 --directory /tmp/ab-*`
 ```
 
+## Iteration 1 continuation — contact AO + roughness variation + weapon sway (gauntlet loop)
+
+**Builder `ses_fbca8dc9bffeiLxFFzp6t02hiB` (parallel):** `project/src/main.js:150-245` `makeFloorTextures()` dual-canvas color 1024 (70 mottles + 55 edge-wear splotches + 6px soft AO along grout + 90 scratches + 3400 grain) + roughnessMap 512 (`#d6d6d6` 55 jitter + 2200 grain + white grout highlights, `anisotropy 8`, `roughness 0.88 metalness 0.02 roughnessMap`) — breaks uniform matte vs Halo albedo variance. Added `makeAOGradTexture()` 128 radial `0.55→0` + `addContactAO()` `MultiplyBlending` polygon-offset planes under crates (`1.55×scale α0.34`), stacks (`α0.36`), cover walls (`len×1.25 α0.30`), wall base (`6.5×1.25 α0.18`), pillars (`1.45 α0.32`), reactor (`3.4 α0.42`) to ground floating geometry without baked AO. Weapon sway `swayTX/TY ±0.09` from `movementX*0.00055` with `pow(0.86)` decay + `dt*9` lerp + strafe lean + breathing `sin 1.05/0.62 + cos 0.9` on pos/rot (`-swayX*0.55`, `-swayY*0.45`, `rot -swayX*1.3`) vs prior static bob — adds Halo inertia to placeholder `weapon.glb` `55d74d7` at `0.095`.
+
+**Critic `ses_fbca740ffffep3uoOgwvMheKJG` (independent, blind vs Halo Infinite Streets/Bazaar/The Pit, https://mat-busy-devel-paragraph.trycloudflare.com + http://127.0.0.1:3000 200 both, screenshots `final-*.png` 213-220KB): Halo wins decisively. Single biggest gap — fully procedural fake PBR vs authored trim-sheet/bevel/AO: `src/main.js:181-239` floor still `CanvasTexture` 1024 `#d2d8e2` with drawn grout + noise, `242` `roughnessMap` canvas `512` — no `aoMap/normalMap`, no bevel mesh, no edge-wear mask, grout is line not cavity AO; `289` walls `0xe6edf7 roughness 0.78` flat `BoxGeometry` boxes zero normal/bevel; `robot.glb 7204 faces 0 textures` hacked via `enhanceRobotTemplate() 74-139` random metal/rough + `38-55` `WebGLCubeRenderTarget 128` single-shot env — still clay at distance; `weapon.glb 1967 faces "Rifle Laser Sight"` `0.095` only kick/flash no hands/skeleton/reload. Until replaced with authored trim sheets (tiled albedo+normal+roughness+AO+bevel/decals) no exposure trick reaches Halo readability.
+
+**Verifier `ses_fbca59b3bffee3JSwvvIQ9tlYx` (parallel):** PASS — `npm run build` 637.89k gzip 166.40k 9 modules 1.66s, `curl http://127.0.0.1:3000 200` 9708 via tmux `app-server`, `curl https://mat-busy-devel-paragraph.trycloudflare.com 200` cf-ray, `/models/*.glb` 200 both, `vite.config.js:3` `allowedHosts:true` for server+preview, `git sparse-checkout list → project`, `src/main.js:1124` 13/13 loop mechanics (WASD `601,811`, pointerlock `519`, joystick `542`, sprint `509`, dash `511,598`, heat `485,693`, recoil `432,697`, tracer `711`, chase `871`, wave `1023`, win `1040`, lose `969`, pickups `491`), Playwright both URLs title `NEXUS ARENA` canvas true HUD hp100 true GLB 200.
+
+**Remediation applied this iteration:** acknowledged procedural canvas roughness/AO planes mitigate floating/flatness but cannot replace authored `aoMap/normalMap` + bevel mesh + edge-wear masks due to Sketchfab low-poly filter (`--max-glb-mb 5 --max-faces 15000 --downloadable`) limiting to 1-texture crate and 0-texture robot; next iteration should search without size filter for tiled trim-sheet material library or procedural normal generation via canvas height → normal. Kept `dist` rebuilt and `tmux app-server` alive for public URL.
+
+**Re-verification after builder+remediation:**
+```
+npm run build ✓ 637.89k gzip 166.40k (9 modules, 1.66s)
+curl http://127.0.0.1:3000 200 9708
+curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
+Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD true /models/*.glb 200
+```
+
 ## How to re-verify
 
 ```bash
