@@ -46,20 +46,6 @@ apply only labels supported by the issue's requirements. If a matching label
 does not exist, continue without inventing or creating one and record that in
 the test report.
 
-## Model selection
-
-Use the Muse Free model for difficult game requests. Treat a request as
-difficult when it includes 3D assets, external services or APIs, multiplayer
-or persistence, iterative gameplay verification, or multiple integration and
-deployment constraints. The live OpenCode catalog names the free Muse model
-`muse-spark-1.2-contributor-free`, so the corresponding issue label is
-`model/opencode/muse-spark-1.2-contributor-free`. Apply that label when it
-exists and verify it with `gh issue view <issue-number> --json labels`; do not
-invent the label if the repository has not synchronized it yet, and record the
-fallback to the default model. For ordinary game requests, omit the model
-label so the workflow's default remains in effect. An explicit user request
-for Muse Free always takes precedence over this difficulty check.
-
 ## Procedure
 
 1. Before starting the test, inspect the working tree with `git status --short`.
