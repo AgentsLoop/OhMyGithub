@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COD-Level FPS — Operation Crimson Frontier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;800&family=Inter:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;overflow:hidden;background:#060a0f;font-family:'Inter',system-ui,sans-serif}
+    #canvas-wrap{position:fixed;inset:0}
+   canvas{display:block}
+    /* HUD */
+    #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+    #crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24px;height:24px}
+    #crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(255,255,255,.95);box-shadow:0 0 6px rgba(0,0,0,.8)}
+    #crosshair::before{left:11px;top:0;width:2px;height:24px}
+    #crosshair::after{top:11px;left:0;width:24px;height:2px}
+    #crosshair-dot{position:absolute;left:50%;top:50%;width:4px;height:4px;background:#00ff9c;transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 0 8px #00ff9c}
+    #top-bar{position:absolute;top:0;left:0;right:0;height:44px;background:linear-gradient(180deg,rgba(0,0,0,.7),transparent);display:flex;align-items:center;padding:0 18px;gap:16px;color:#cfd8e3;font:700 11px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase}
+    #top-bar b{color:#fff}
+    #compass{flex:1;display:flex;align-items:center;justify-content:center;gap:2px;opacity:.9}
+    #compass span{display:inline-block;width:28px;text-align:center}
+    #bottom-left{position:absolute;left:18px;bottom:18px;display:flex;flex-direction:column;gap:10px}
+    .hud-panel{background:linear-gradient(180deg,rgba(15,22,33,.92),rgba(6,10,15,.96));border:1px solid rgba(255,255,255,.08);border-left:3px solid #00ff9c;backdrop-filter:blur(10px);padding:10px 14px;min-width:210px}
+    .hud-label{font:700 9px 'JetBrains Mono',monospace;letter-spacing:.18em;color:#7a8aa0;text-transform:uppercase;margin-bottom:6px}
+    .hud-value{font:800 22px 'Orbitron',monospace;color:#fff;letter-spacing:.02em}
+    .hud-value small{font:700 12px 'JetBrains Mono',monospace;color:#8ea0b8}
+    #health-bar{height:6px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;margin-top:8px}
+    #health-fill{height:100%;width:100%;background:linear-gradient(90deg,#00ff9c,#00d084);transition:width .2s}
+    #health-fill.low{background:linear-gradient(90deg,#ff3b30,#ff6b30)}
+    #bottom-right{position:absolute;right:18px;bottom:18px;text-align:right}
+    #ammo-panel{min-width:180px}
+    #hitmarker{position:absolute;left:50%;top:50%;width:32px;height:32px;transform:translate(-50%,-50%);opacity:0;transition:opacity .1s}
+    #hitmarker.show{opacity:1}
+    #hitmarker::before,#hitmarker::after{content:'';position:absolute;inset:0;border:2px solid #fff;clip-path:polygon(0 0, 40% 0, 0 40%, 0 0, 100% 100%, 60% 100%, 100% 60%, 100% 100%, 0 0, 40% 0, 0 40%, 0 0)}
+    /* UI overlay screens */
+    .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(800px 600px at 30% 20%, rgba(0,255,156,.12), transparent 60%), linear-gradient(180deg, rgba(6,10,15,.85), rgba(3,6,10,.97));z-index:20;backdrop-filter:blur(4px)}
+    .overlay.hidden{display:none}
+    .card{width:min(640px,92vw);background:linear-gradient(180deg,rgba(18,28,42,.96),rgba(8,12,18,.98));border:1px solid rgba(255,255,255,.07);border-top:2px solid #00ff9c;box-shadow:0 24px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(0,255,156,.08) inset;padding:28px 28px 22px}
+    .eyebrow{font:700 10px 'JetBrains Mono',monospace;letter-spacing:.22em;color:#00ff9c;text-transform:uppercase;margin-bottom:10px}
+    h1{font:800 30px/1.05 'Orbitron',sans-serif;color:#fff;letter-spacing:.02em}
+    h1 span{color:#00ff9c}
+    .sub{margin-top:8px;font:500 13px/1.6 'Inter',sans-serif;color:#a8b8d0}
+    .grid{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .kbd{font:700 11px 'JetBrains Mono',monospace;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-bottom-width:2px;padding:6px 8px;border-radius:6px;color:#e6eef8;text-align:center}
+    .kbd b{color:#00ff9c}
+    .btn{margin-top:18px;width:100%;height:52px;background:linear-gradient(180deg,#00ff9c,#00c87a);color:#02130a;font:800 13px 'Orbitron',sans-serif;letter-spacing:.14em;text-transform:uppercase;border:0;cursor:pointer;box-shadow:0 8px 24px rgba(0,255,156,.35);transition:filter .15s, transform .15s}
+    .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+    .btn:active{transform:translateY(0)}
+    .meta{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;font:600 10px 'JetBrains Mono',monospace;color:#6e7f99;letter-spacing:.08em;text-transform:uppercase}
+    .meta span{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:6px 8px;border-radius:6px}
+    #damage-vignette{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 0 0 rgba(255,40,40,0);transition:box-shadow .2s;z-index:11}
+    #damage-vignette.hit{box-shadow:inset 0 0 120px 40px rgba(255,40,40,.45)}
+    #killfeed{position:absolute;right:14px;top:52px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+    .kill{font:700 11px 'JetBrains Mono',monospace;background:rgba(0,0,0,.65);border-left:2px solid #00ff9c;color:#e6eef8;padding:6px 10px;backdrop-filter:blur(6px)}
+    #scope-overlay{position:fixed;inset:0;background:radial-gradient(circle at center, transparent 180px, rgba(0,0,0,.92) 181px);display:none;z-index:9;pointer-events:none}
+    #scope-overlay.on{display:block}
+    #scope-reticle{position:absolute;left:50%;top:50%;width:220px;height:220px;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.28);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.8) inset}
+    #scope-reticle::before,#scope-reticle::after{content:'';position:absolute;background:rgba(255,255,255,.9)}
+    #scope-reticle::before{left:50%;top:-40vh;width:1px;height:80vh;transform:translateX(-50%)}
+    #scope-reticle::after{top:50%;left:-40vw;width:80vw;height:1px;transform:translateY(-50%)}
+    @media(max-width:640px){h1{font-size:22px}.grid{grid-template-columns:1fr}}
+  </style>
+  <script type="module" crossorigin src="/assets/index-BuGG0dED.js"></script>
+</head>
+<body>
+  <div id="canvas-wrap"></div>
+  <div id="damage-vignette"></div>
+  <div id="scope-overlay"><div id="scope-reticle"></div></div>
+  <div id="hud">
+    <div id="top-bar">
+      <span><b>OP CRIMSON FRONTIER</b> · GRID 38T</span>
+      <div id="compass"><span style="color:#00ff9c">N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span><span>NW</span></div>
+      <span id="timer">00:00</span>
+      <span id="score">SCORE <b>0</b></span>
+    </div>
+    <div id="crosshair"><div id="crosshair-dot"></div></div>
+    <div id="hitmarker"></div>
+    <div id="killfeed"></div>
+    <div id="bottom-left">
+      <div class="hud-panel">
+        <div class="hud-label">Operator Health</div>
+        <div class="hud-value" id="health-text">100 <small>HP</small></div>
+        <div id="health-bar"><div id="health-fill"></div></div>
+      </div>
+      <div class="hud-panel" style="border-left-color:#5aa8ff">
+        <div class="hud-label">Objective</div>
+        <div style="font:600 12px/1.4 'Inter',sans-serif;color:#d6e2f2">Eliminate hostiles. Survive 90 seconds. <span style="color:#00ff9c">Hold the ridge.</span></div>
+      </div>
+    </div>
+    <div id="bottom-right">
+      <div class="hud-panel" id="ammo-panel">
+        <div class="hud-label">Ammunition</div>
+        <div class="hud-value" id="ammo-text">30 <small>/ 90</small></div>
+        <div style="font:600 10px 'JetBrains Mono',monospace;color:#7a8aa0;margin-top:6px;letter-spacing:.1em"><span id="weapon-name">LOW POLY SNIPER RIFLE</span> · 5.56 NATO</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="start-overlay" class="overlay">
+    <div class="card">
+      <div class="eyebrow">Call of Duty-inspired · Three.js · AAA Visual Target</div>
+      <h1>OPERATION<br><span>CRIMSON FRONTIER</span></h1>
+      <p class="sub">A Call of Duty: Modern Warfare III-class first-person shooter built for the browser. PBR materials, ACES filmic tone mapping, cascaded shadows, volumetric fog, tactile recoil, and a true FPS loop — all verified against real MWIII footage.</p>
+      <div class="grid">
+        <div class="kbd"><b>WASD</b> Move · <b>SHIFT</b> Sprint</div>
+        <div class="kbd"><b>MOUSE</b> Look · <b>CLICK</b> Fire</div>
+        <div class="kbd"><b>R</b> Reload · <b>RIGHT CLICK</b> ADS</div>
+        <div class="kbd"><b>SPACE</b> Jump · <b>ESC</b> Pause</div>
+      </div>
+      <button id="play-btn" class="btn">▶ Enter Combat</button>
+      <div class="meta">
+        <span>● 60 FPS target</span><span>● PBR + Shadows</span><span>● GLB Weapon (CC Attribution)</span><span>● Hit markers & Killfeed</span>
+      </div>
+      <div style="margin-top:10px;font:500 11px 'JetBrains Mono',monospace;color:#5b6d8a">Attribution: <span id="attribution-line">Low Poly Sniper Rifle — Alexereth (CC Attribution) via Sketchfab</span></div>
+    </div>
+  </div>
+
+  <div id="pause-overlay" class="overlay hidden">
+    <div class="card">
+      <div class="eyebrow">Paused</div>
+      <h1>GAME <span>PAUSED</span></h1>
+      <p class="sub">Press <b style="color:#00ff9c">ESC</b> or click Resume to re-enter. Mouse is released while paused.</p>
+      <button id="resume-btn" class="btn">Resume</button>
+    </div>
+  </div>
+
+  <div id="dead-overlay" class="overlay hidden">
+    <div class="card" style="border-top-color:#ff3b30">
+      <div class="eyebrow" style="color:#ff5a52">KIA — Mission Failed</div>
+      <h1>OPERATOR <span style="color:#ff3b30">DOWN</span></h1>
+      <p class="sub" id="dead-stats">You were eliminated. Press Respawn to re-enter the ridge.</p>
+      <button id="respawn-btn" class="btn" style="background:linear-gradient(180deg,#ff5a52,#d42a1f)">Respawn</button>
+    </div>
+  </div>
+
+</body>
+</html>
