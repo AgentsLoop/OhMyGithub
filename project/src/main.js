@@ -60,6 +60,9 @@ const histBoonsEl = document.getElementById('histBoons');
 const histRunsEl = document.getElementById('histRuns');
 const tutorialOverlayEl = document.getElementById('tutorialOverlay');
 const firstClearEl = document.getElementById('firstClear');
+const rebindHintEl = document.getElementById('rebindHint');
+const rebindCloseBtn = document.getElementById('rebindCloseBtn');
+const joyDeadzoneEl = document.getElementById('joyDeadzone');
 
 // ── Persistence (localStorage run history) ──
 const HIST_KEY = 'isolated-arena-history-v1';
@@ -274,20 +277,22 @@ const envScene = new THREE.Scene();
 scene.environment = null;
 
 // floor + arena bounds — baked AO via CanvasTexture (soft shadow)
-function createFloorAOTexture(){
+function createFloorAOTextureForPalette(idx){
   const c=document.createElement('canvas'); c.width=512; c.height=512;
   const g=c.getContext('2d');
-  // base
-  g.fillStyle='#0e1a28'; g.fillRect(0,0,512,512);
-  // radial falloff to edges (vignette AO)
+  // palette base: VOID #0e1a28, CRIMSON #1a0e14, TEAL #0e1a1e
+  const bases=['#0e1a28','#1a0e14','#0e1a1e'];
+  const rims=['#35d0ff','#ff3b6b','#2ee5a0'];
+  g.fillStyle=bases[idx]||'#0e1a28'; g.fillRect(0,0,512,512);
+  // rim tint vignette
   const rad=g.createRadialGradient(256,256,0,256,256,256);
   rad.addColorStop(0,'rgba(0,0,0,0)');
   rad.addColorStop(0.52,'rgba(0,0,0,0)');
-  rad.addColorStop(0.70,'rgba(0,0,0,0.16)');
-  rad.addColorStop(0.86,'rgba(0,0,0,0.30)');
-  rad.addColorStop(1,'rgba(0,0,0,0.55)');
+  rad.addColorStop(0.70, idx===1 ? 'rgba(80,10,20,0.12)' : idx===2 ? 'rgba(10,60,45,0.12)' : 'rgba(0,0,0,0.16)');
+  rad.addColorStop(0.86, idx===1 ? 'rgba(90,15,30,0.24)' : idx===2 ? 'rgba(15,80,60,0.24)' : 'rgba(0,0,0,0.30)');
+  rad.addColorStop(1, idx===1 ? 'rgba(45,5,12,0.45)' : idx===2 ? 'rgba(5,35,28,0.45)' : 'rgba(0,0,0,0.55)');
   g.fillStyle=rad; g.fillRect(0,0,512,512);
-  // 4 pillar contact shadows at radius 7.5 (world 18)
+  // 4 pillar contact shadows at radius 7.5 (world 18) — palette aware positions still at cardinal but tinted
   for(let i=0;i<4;i++){
     const ang=i*Math.PI/2;
     const x=256+Math.cos(ang)*(7.5/18*240);
@@ -295,6 +300,10 @@ function createFloorAOTexture(){
     const pg=g.createRadialGradient(x,y,0,x,y,30);
     pg.addColorStop(0,'rgba(0,0,0,0.48)'); pg.addColorStop(0.5,'rgba(0,0,0,0.22)'); pg.addColorStop(1,'rgba(0,0,0,0)');
     g.fillStyle=pg; g.beginPath(); g.arc(x,y,30,0,Math.PI*2); g.fill();
+    // rim tint small
+    const rimCol = rims[idx]||'#35d0ff';
+    g.fillStyle = rimCol + '18'; // hex + alpha
+    g.beginPath(); g.arc(x,y,34,0,Math.PI*2); g.fill();
   }
   // core contact AO
   const cg=g.createRadialGradient(256,256,0,256,256,24);
@@ -306,8 +315,8 @@ function createFloorAOTexture(){
 }
 const floorGeo = new THREE.CircleGeometry(18, 64);
 const floorMat = new THREE.MeshStandardMaterial({ color:0x0e1a28, roughness:0.9, metalness:0.05 });
-const floorAOTexture = createFloorAOTexture();
-floorMat.map = floorAOTexture;
+const floorAOTex = [0,1,2].map(i=> createFloorAOTextureForPalette(i));
+floorMat.map = floorAOTex[0];
 floorMat.needsUpdate = true;
 const floor = new THREE.Mesh(floorGeo, floorMat);
 floor.rotation.x = -Math.PI/2;
@@ -321,14 +330,21 @@ for(let i=1;i<=3;i++){
   ring.position.y=0.02;
   scene.add(ring);
 }
-// walls
+// walls — per-palette mats for chamber identity
 const wallMat = new THREE.MeshStandardMaterial({ color:0x182435, roughness:0.8 });
+const wallMats = [
+  new THREE.MeshStandardMaterial({ color:0x182435, roughness:0.8, emissive:0x35d0ff, emissiveIntensity:0.15 }),
+  new THREE.MeshStandardMaterial({ color:0x2a1820, roughness:0.8, emissive:0xff3b6b, emissiveIntensity:0.55 }),
+  new THREE.MeshStandardMaterial({ color:0x0e2a22, roughness:0.8, emissive:0x2ee5a0, emissiveIntensity:0.65 }),
+];
+const wallMeshes=[];
 for(let i=0;i<4;i++){
   const ang = i*Math.PI/2;
   const w = new THREE.Mesh(new THREE.BoxGeometry(36,2.2,0.6), wallMat);
   w.position.set(Math.cos(ang)*19,1,Math.sin(ang)*19);
   w.rotation.y=-ang;
   w.castShadow=true; w.receiveShadow=true;
+  wallMeshes.push(w);
   scene.add(w);
 }
 
@@ -709,6 +725,17 @@ function beep(freq=880, dur=0.08, vol=0.12){
     o.stop(audioCtx.currentTime+dur);
   }catch(e){}
 }
+// ── (A) Iteration7: haptics helper — navigator.vibrate patterns
+function haptic(pattern){
+  try{ if('vibrate' in navigator) navigator.vibrate(pattern); }catch(e){}
+}
+function toggleRebindHint(force){
+  if(!rebindHintEl) return;
+  const isHidden = rebindHintEl.classList.contains('hidden');
+  const show = typeof force==='boolean' ? force : isHidden;
+  if(show) rebindHintEl.classList.remove('hidden');
+  else rebindHintEl.classList.add('hidden');
+}
 function initDrone(){
   try{
     ensureAudio(); if(!audioCtx || droneStarted) { updateDroneIntensity(); return; }
@@ -873,6 +900,7 @@ function doBossShockwave(){
   // player hit if alive (arena-wide per spec — always)
   duckDrone(0.08, 0.9);
   takeDamagePlayer(dmgPlayer);
+  haptic([80,40,40]);
   triggerShake(1.4);
   triggerHitFlash('coreHit');
   beep(140,0.18,0.15); setTimeout(()=>beep(90,0.22,0.14),140);
@@ -937,6 +965,7 @@ function shoot(){
   }
   player.position.add(baseDir.clone().multiplyScalar(-0.06));
   if(gameState==='playing') triggerShake(activeBoons.pulse>0?0.75:0.6);
+  haptic(20);
   if(extra>0) beep(960,0.06,0.07);
 }
 
@@ -1078,6 +1107,7 @@ function takeDamagePlayer(d){
   if(playerHp < lastPlayerHp - 0.5){
     triggerShake(playerHp<35?1.8:1.1);
     triggerHitFlash('playerHit');
+    haptic(40);
     // bump HUD
     phpEl.classList.add('bump');
     setTimeout(()=>phpEl.classList.remove('bump'),220);
@@ -1204,7 +1234,11 @@ function applyChamberMutation(loopNum){
   dir.color.setHex(p.dir);
   rim.color.setHex(p.rim);
   coreRing.material.color.setHex(paletteIdx===1?0xff3b6b:0x35d0ff);
-  // hazard pillars — mutate gameplay per loop%3 (critic 4): P0=0, P1=4 static, P2=4 rotating/pulsing
+  // floor AO + walls per palette (critic 7)
+  floorMat.map = floorAOTex[paletteIdx];
+  floorMat.needsUpdate = true;
+  wallMeshes.forEach(w=> w.material = wallMats[paletteIdx]);
+  // hazard pillars — mutate gameplay per loop%3 (critic 4+7): P0=0, P1=4 static, P2=4 rotating orbit telegraph
   if(paletteIdx===0){
     log(`◈ Chamber mutated — palette ${paletteIdx} VOID + 0 hazards (clean)`);
     return;
@@ -1222,7 +1256,7 @@ function applyChamberMutation(loopNum){
     const ring=new THREE.Mesh(new THREE.RingGeometry(0.9,1.05,16), new THREE.MeshBasicMaterial({ color:p.rim, transparent:true, opacity:0.28, side:THREE.DoubleSide }));
     ring.rotation.x=-Math.PI/2; ring.position.y=0.06;
     const holder=new THREE.Group(); holder.position.set(x,0,z); holder.add(pillar); holder.add(ring);
-    holder.userData={ hazard:true, pillar, ring, damageTick:0, rotating: paletteIdx===2 };
+    holder.userData={ hazard:true, pillar, ring, damageTick:0, rotating: paletteIdx===2, baseAng: ang };
     hazardGroup.add(holder);
   }
   scene.add(hazardGroup);
@@ -1760,22 +1794,37 @@ function tick(dt){
         player.position.add(push);
       }
     }
-    // hazard pillars pulse + damage — palette 2 rotates (critic 4)
+    // hazard pillars pulse + damage — palette 2 real orbit telegraph (critic 7)
     if(hazardGroup){
-      if(hazardGroup.userData && hazardGroup.userData.paletteIdx===2) hazardGroup.rotation.y += dt*0.35;
       hazardGroup.children.forEach(h=>{
+        // TEAL orbit: each pillar holder orbits at radius 7.5
+        if(h.userData.rotating){
+          const base = h.userData.baseAng;
+          const ang = base + t*0.9;
+          h.position.set(Math.cos(ang)*7.5, 0, Math.sin(ang)*7.5);
+        }
         const pillar=h.userData.pillar;
         const pulse = 0.55 + Math.sin(t*2.8 + pillar.userData.pulsePhase)*0.25;
         pillar.material.emissiveIntensity = pulse;
         pillar.material.opacity = 0.78 + Math.sin(t*3.0 + pillar.userData.pulsePhase)*0.15;
-        // scale ring pulse
+        // ring telegraph — expand 1.2→1.9 over 0.6s before 18 dmg tick if rotating
         const ring=h.children[1]||h.userData.ring;
-        if(ring) { ring.material.opacity = 0.18 + Math.sin(t*2.2 + pillar.userData.pulsePhase)*0.12; ring.rotation.z += 0.02; }
-        // damage ticks
+        if(ring) {
+          if(h.userData.rotating){
+            const cycle = (t*1.8 + pillar.userData.pulsePhase) % 1.0;
+            ring.scale.setScalar(1.2 + cycle*0.7);
+            ring.material.opacity = 0.30 - cycle*0.20;
+          } else {
+            ring.material.opacity = 0.18 + Math.sin(t*2.2 + pillar.userData.pulsePhase)*0.12;
+          }
+          ring.rotation.z += 0.02;
+        }
+        // damage ticks — TEAL does 18 dmg (telegraphed), others 14
         h.userData.damageTick = (h.userData.damageTick||0) - dt;
         if(h.userData.damageTick<=0){
-          if(player.position.distanceTo(h.position)<1.15) { takeDamagePlayer(14*dt*2.5); h.userData.damageTick=0.22; triggerHitFlash('playerHit'); }
-          else if(core.position.distanceTo(h.position)<1.4) { coreHp=Math.max(0,coreHp - 9*dt); if(Math.random()<0.1) triggerHitFlash('coreHit'); h.userData.damageTick=0.35; if(coreHp<=0) failLoop(); }
+          const isTeal = h.userData.rotating;
+          if(player.position.distanceTo(h.position)<1.15) { takeDamagePlayer(isTeal? 18*dt*2.0 : 14*dt*2.5); h.userData.damageTick= isTeal? 0.18 : 0.22; triggerHitFlash('playerHit'); }
+          else if(core.position.distanceTo(h.position)<1.4) { coreHp=Math.max(0,coreHp - (isTeal? 12*dt : 9*dt)); if(Math.random()<0.1) triggerHitFlash('coreHit'); h.userData.damageTick= isTeal? 0.28 : 0.35; if(coreHp<=0) failLoop(); }
           else h.userData.damageTick=0.08;
         }
       });
@@ -1998,7 +2047,23 @@ document.getElementById('menuBtn').onclick=()=>{
 document.getElementById('nextBtn').onclick=()=>{ winCard.classList.add('hidden'); loop++; coreHp=Math.min(100, coreHp+12); startLoop(); };
 
 addEventListener('keydown',e=>{
+  // ── (A) ? rebind hint overlay — shows R retry, Esc pause, 1/2/3 boon, 1/2 doors
+  if(e.key==='?' || (e.shiftKey && e.key==='/') || e.key==='¿'){
+    e.preventDefault();
+    // if any modal hint visible, close; else open
+    if(rebindHintEl && !rebindHintEl.classList.contains('hidden')){
+      toggleRebindHint(false);
+    } else {
+      toggleRebindHint(true);
+      log('⌨ Hints (?): R retry · Esc pause · 1/2/3 boon · 1/2 doors');
+    }
+    return;
+  }
   if(e.key==='Escape'){
+    if(rebindHintEl && !rebindHintEl.classList.contains('hidden')){
+      toggleRebindHint(false);
+      return;
+    }
     if(gameState==='playing' || gameState==='paused'){
       e.preventDefault();
       togglePause();
@@ -2045,6 +2110,14 @@ if(abandonMenuBtn) abandonMenuBtn.onclick=()=> doAbandonRun();
 const resumeBtn=document.getElementById('resumeBtn');
 if(resumeBtn) resumeBtn.onclick=()=> togglePause();
 if(pauseCard) pauseCard.addEventListener('click',e=>{ if(e.target===pauseCard) togglePause(); });
+// ── (A) rebind hint wiring + deadzone ring verification
+if(rebindCloseBtn) rebindCloseBtn.onclick=()=> toggleRebindHint(false);
+if(rebindHintEl) rebindHintEl.addEventListener('click',e=>{ if(e.target===rebindHintEl) toggleRebindHint(false); });
+// deadzone ring: tune to 18px (visual + logical) — already 18, ensure visible
+if(joyDeadzoneEl){
+  joyDeadzoneEl.style.width='36px';
+  joyDeadzoneEl.style.height='36px';
+}
 
 updateHUD();
 updateBoonHud();
@@ -2052,9 +2125,9 @@ updateSeedDisplay();
 renderHistoryCard();
 log('Worktree arena ready — awaiting loop start');
 
-// expose for verifier — includes pooling + fps warning + tutorial/first-clear + doors
+// expose for verifier — includes pooling + fps warning + tutorial/first-clear + doors + iteration7 haptics/rebind/deadzone
 window.__arena={
-  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight, pools: { robotTotal: robotPoolAll.length, knightTotal: knightPoolAll.length, robotAvail: robotPoolAvailable.length, knightAvail: knightPoolAvailable.length, initialized: poolsInitialized }, fps: fpsEl.textContent, fpsColor: fpsEl.style.color }),
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight, pools: { robotTotal: robotPoolAll.length, knightTotal: knightPoolAll.length, robotAvail: robotPoolAvailable.length, knightAvail: knightPoolAvailable.length, initialized: poolsInitialized }, fps: fpsEl.textContent, fpsColor: fpsEl.style.color, rebindHidden: !!(rebindHintEl && rebindHintEl.classList.contains('hidden')), joyDeadzoneSize: joyDeadzoneEl ? joyDeadzoneEl.style.width : null, hasVibrate: ('vibrate' in navigator) }),
   getBoons:()=>({...activeBoons}),
   getHistory:()=>{ try{ return JSON.parse(JSON.stringify(runHistory)); }catch(e){ return {...runHistory}; } },
   pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); },
@@ -2088,4 +2161,14 @@ window.__arena={
   spawnEnemyForTest:()=> { spawnEnemy(); return enemies.length; },
   getFpsState:()=> ({ text: fpsEl.textContent, color: fpsEl.style.color, warning: fpsEl.style.color==='var(--accent2)' }),
   forceLowFpsForTest:()=> { fpsEl.textContent='52 fps'; fpsEl.style.color='var(--accent2)'; fpsEl.style.textShadow='0 0 8px rgba(255,59,107,0.8)'; },
+  // (A) iteration7 haptics & accessibility
+  hapticForTest:(pattern)=> haptic(pattern),
+  hasHaptic:()=> ('vibrate' in navigator),
+  triggerPulseHapticForTest:()=> haptic(20),
+  triggerHitHapticForTest:()=> haptic(40),
+  triggerTitanHapticForTest:()=> haptic([80,40,40]),
+  getRebindState:()=> ({ hidden: !!(rebindHintEl && rebindHintEl.classList.contains('hidden')), elExists: !!rebindHintEl }),
+  toggleRebindForTest:(force)=> toggleRebindHint(force),
+  getJoyDeadzone:()=> ({ width: joyDeadzoneEl ? joyDeadzoneEl.style.width : null, height: joyDeadzoneEl ? joyDeadzoneEl.style.height : null, exists: !!joyDeadzoneEl, deadzonePx: 18, dashThreshold: '18px logical' }),
+  simulateQuestionKeyForTest:()=> { const ev=new KeyboardEvent('keydown',{key:'?'}); window.dispatchEvent(ev); document.dispatchEvent(ev); return !rebindHintEl.classList.contains('hidden'); },
 };
