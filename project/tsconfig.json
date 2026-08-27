@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@rts/contracts": ["packages/contracts/src"],
+      "@rts/simulation": ["packages/simulation/src"],
+      "@rts/simulation-world": ["packages/simulation-world/src"],
+      "@rts/renderer": ["packages/renderer/src"]
+    }
+  },
+  "include": [],
+  "files": []
+}

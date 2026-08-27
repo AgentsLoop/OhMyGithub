@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+*.min.js
+pnpm-lock.yaml
+.agents
+.opencode
+screenshots
+assets

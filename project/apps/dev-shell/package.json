@@ -1,0 +1,31 @@
+{
+  "name": "@rts/dev-shell",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev shell — Vite app with Babylon canvas, React HUD, scenario picker, Worker bridge",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "start": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@rts/contracts": "workspace:*",
+    "@rts/simulation": "workspace:*",
+    "@rts/simulation-world": "workspace:*",
+    "@rts/renderer": "workspace:*",
+    "@babylonjs/core": "^7.32.0",
+    "@babylonjs/loaders": "^7.32.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.8",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.1"
+  }
+}

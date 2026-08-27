@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@rts/contracts": ["../../packages/contracts/src"],
+      "@rts/simulation": ["../../packages/simulation/src"],
+      "@rts/simulation-world": ["../../packages/simulation-world/src"],
+      "@rts/renderer": ["../../packages/renderer/src"]
+    }
+  },
+  "include": ["src/**/*", "vite.config.ts"]
+}

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.sst/
+.opencode/session*
+tmp/
+.env
+.env.local
+*.tsbuildinfo
+.eslintcache
+playwright/.cache
+
+# keep pnpm lock? we will commit after install
+# pnpm-lock.yaml intentionally committed — see docs/pinning.md
