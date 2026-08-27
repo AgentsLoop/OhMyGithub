@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>COVERT VECTOR — FPS Vertical Slice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Orbitron:wght@600;800&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#020408;font-family:'Inter',system-ui,sans-serif}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none;user-select:none;color:#e8f0ff}
+  #topbar{position:absolute;top:0;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:linear-gradient(180deg,rgba(8,16,28,0.92),rgba(8,16,28,0.45));border-bottom:1px solid rgba(96,200,255,0.25);backdrop-filter:blur(8px)}
+  #objective{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#7de2ff}
+  #objective b{color:#fff;font-size:12px;letter-spacing:0.12em}
+  #timer{font-family:'JetBrains Mono',monospace;font-size:12px;color:#a9ff8a}
+  #center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center}
+  #crosshair{width:28px;height:28px;position:relative;transition:transform 0.07s}
+  #crosshair::before,#crosshair::after{content:"";position:absolute;background:#e8f0ff;box-shadow:0 0 8px rgba(120,220,255,0.9)}
+  #crosshair::before{left:50%;top:0;width:2px;height:28px;transform:translateX(-50%);clip-path:polygon(0 0,100% 0,100% 8px,60% 8px,60% 20px,100% 20px,100% 28px,0 28px,0 20px,40% 20px,40% 8px,0 8px)}
+  #crosshair::after{top:50%;left:0;width:28px;height:2px;transform:translateY(-50%);clip-path:polygon(0 0,8px 0,8px 40%,20px 40%,20px 0,28px 0,28px 100%,20px 100%,20px 60%,8px 60%,8px 100%,0 100%)}
+  #crosshair.hit{transform:translate(-50%,-50%) scale(1.35)}
+  #hitmarker{position:absolute;width:18px;height:18px;opacity:0;transition:opacity 0.12s}
+  #hitmarker.show{opacity:1}
+  #hitmarker::before,#hitmarker::after{content:"";position:absolute;inset:0;border:2px solid #ff3b3b;clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%)}
+  #hitmarker::before{transform:rotate(45deg) scale(0.9)}
+  #bottom{position:absolute;bottom:0;left:0;right:0;padding:14px 18px;display:flex;align-items:flex-end;justify-content:space-between;background:linear-gradient(0deg,rgba(4,10,18,0.96),transparent)}
+  #healthBlock{display:flex;gap:14px;align-items:center}
+  #healthBarWrap{width:220px;height:10px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);overflow:hidden;transform:skewX(-12deg)}
+  #healthBar{height:100%;width:100%;background:linear-gradient(90deg,#ff2a2a,#ff7a00);box-shadow:0 0 12px rgba(255,60,30,0.6);transition:width 0.25s}
+  #healthText{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px;letter-spacing:0.06em}
+  #healthText small{font-size:11px;opacity:0.7}
+  #ammoBlock{text-align:right}
+  #ammo{font-family:'Orbitron',monospace;font-size:34px;font-weight:800;letter-spacing:0.02em;line-height:1;color:#fff;text-shadow:0 0 18px rgba(120,220,255,0.6)}
+  #ammo small{font-size:14px;color:#9ecbff}
+  #reserve{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.12em;color:#8fb8ff;margin-top:2px}
+  #weaponName{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#7de2ff}
+  #killfeed{position:absolute;top:58px;right:14px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .kill{font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 10px;background:rgba(0,0,0,0.55);border-left:3px solid #ff3b3b;backdrop-filter:blur(6px);animation:slideIn 0.2s ease}
+  @keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+  #damageVignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(255,0,30,0.28) 100%);opacity:0;transition:opacity 0.15s;pointer-events:none}
+  #damageVignette.show{opacity:1}
+  /* Menus */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(800px 600px at 50% 20%,rgba(40,120,255,0.18),transparent 70%),linear-gradient(180deg,rgba(2,6,14,0.88),rgba(2,6,14,0.96));backdrop-filter:blur(10px);z-index:10}
+  .card{width:min(640px,92vw);background:linear-gradient(180deg,rgba(18,28,44,0.96),rgba(10,16,26,0.98));border:1px solid rgba(120,200,255,0.22);box-shadow:0 20px 80px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,255,255,0.06);padding:28px;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#00e5ff,#7b61ff,#ff3b5e)}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:#7de2ff;margin-bottom:10px}
+  h1{font-family:'Orbitron',sans-serif;font-weight:800;font-size:34px;letter-spacing:0.04em;line-height:1;color:#fff}
+  h1 span{color:#00e5ff}
+  .subtitle{margin-top:8px;font-size:13px;line-height:1.6;color:#b9c9e8}
+  .grid{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stat{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);padding:10px 12px}
+  .stat label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.16em;color:#8fb8ff;text-transform:uppercase}
+  .stat b{font-family:'Orbitron',monospace;font-size:13px;color:#fff;display:block;margin-top:2px}
+  .controls{margin-top:16px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#c9d8f5}
+  .controls kbd{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-bottom-width:2px;padding:2px 6px;border-radius:4px;font-size:10px;color:#fff}
+  .btn{margin-top:18px;width:100%;padding:14px 18px;background:linear-gradient(90deg,#00d1ff,#6a5cff);border:0;color:#fff;font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;font-size:13px;cursor:pointer;box-shadow:0 8px 24px rgba(80,120,255,0.4);transition:transform 0.08s,filter 0.15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:active{transform:scale(0.98)}
+  .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.18);box-shadow:none}
+  #hud.hidden,#victory.hidden,#defeat.hidden,#menu.hidden{display:none}
+  #compass{position:absolute;top:46px;left:50%;transform:translateX(-50%);width:420px;height:22px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent);border-top:1px solid rgba(255,255,255,0.08);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.2em;color:#8fb8ff}
+  #compass b{color:#fff;margin:0 8px}
+  #minimap{position:absolute;bottom:92px;left:18px;width:140px;height:140px;background:rgba(0,0,0,0.5);border:1px solid rgba(120,200,255,0.25);backdrop-filter:blur(6px);overflow:hidden}
+  #minimap canvas{width:100%;height:100%;display:block}
+  #minimapLabel{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.16em;color:#7de2ff}
+  #notif{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Orbitron',sans-serif;font-weight:800;font-size:28px;letter-spacing:0.12em;color:#fff;text-shadow:0 0 24px rgba(0,229,255,0.8);opacity:0;pointer-events:none;transition:opacity 0.2s}
+  #notif.show{opacity:1}
+  #attribution{position:absolute;bottom:6px;right:8px;font-family:'JetBrains Mono',monospace;font-size:7px;color:rgba(255,255,255,0.35);text-align:right;line-height:1.4;max-width:320px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="topbar">
+    <div id="objective">OPERATION: VECTOR — ELIMINATE HOSTILES <b id="objCount">0 / 8</b></div>
+    <div id="timer">00:00</div>
+  </div>
+  <div id="compass"><span>W</span><b>·</b><span>NW</span><b>·</b><span>N</span><b style="color:#00e5ff">▲ YOU</b><span>N</span><b>·</b><span>NE</span><b>·</b><span>E</span></div>
+  <div id="center">
+    <div style="position:relative;width:28px;height:28px">
+      <div id="crosshair"></div>
+      <div id="hitmarker"></div>
+    </div>
+  </div>
+  <div id="killfeed"></div>
+  <div id="damageVignette"></div>
+  <div id="notif"></div>
+  <div id="minimap"><canvas id="mini" width="140" height="140"></canvas><div id="minimapLabel">TACTICAL MAP</div></div>
+  <div id="bottom">
+    <div id="healthBlock">
+      <div style="width:48px;height:48px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);display:grid;place-items:center;font-family:'Orbitron',sans-serif;font-weight:800;color:#ff3b3b">HP</div>
+      <div>
+        <div id="healthText">100 <small>/ 100</small></div>
+        <div id="healthBarWrap"><div id="healthBar"></div></div>
+      </div>
+    </div>
+    <div id="ammoBlock">
+      <div id="weaponName">CC-AR2 • 5.56MM • AUTO</div>
+      <div id="ammo">30 <small>/ 90</small></div>
+      <div id="reserve">TAP [R] TO RELOAD • [SHIFT] SPRINT • [C] CROUCH</div>
+    </div>
+  </div>
+  <div id="attribution"></div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="card">
+    <div class="eyebrow">VERTICAL SLICE • THREE.JS • 60 FPS TARGET</div>
+    <h1>COVERT <span>VECTOR</span></h1>
+    <p class="subtitle">A Call-of-Duty-inspired facility breach. Infiltrate the industrial sector, eliminate 8 hostile drones, survive their counter-fire. Built as a playable AAA-style vertical slice — PBR lighting, viewmodel, hit-feedback, and tactical movement.</p>
+    <div class="grid">
+      <div class="stat"><label>Bar</label><b>MW III / Warzone feel</b></div>
+      <div class="stat"><label>Objective</label><b>Eliminate 8 hostiles</b></div>
+      <div class="stat"><label>Time</label><b>~2–4 min per run</b></div>
+      <div class="stat"><label>Engine</label><b>Three.js + GLTFLoader</b></div>
+    </div>
+    <div class="controls" style="margin-top:16px">
+      <kbd>WASD</kbd><span>Move • Sprint with Shift</span>
+      <kbd>MOUSE</kbd><span>Look • Click to fire • Right-click ADS</span>
+      <kbd>R</kbd><span>Reload • <kbd>Space</kbd> Jump • <kbd>C</kbd> Crouch</span>
+      <kbd>ESC</kbd><span>Pause / unlock cursor</span>
+    </div>
+    <button class="btn" id="playBtn">▶ INSERT — LOCK AND LOAD</button>
+    <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fb8ff;text-align:center;opacity:0.8">Headphones recommended • Click to lock pointer • Chrome / Edge best</div>
+  </div>
+</div>
+
+<div id="victory" class="overlay hidden">
+  <div class="card" style="text-align:center">
+    <div class="eyebrow" style="color:#a9ff8a">OPERATION COMPLETE</div>
+    <h1 style="font-size:36px">MISSION<br><span style="color:#a9ff8a">ACCOMPLISHED</span></h1>
+    <p class="subtitle" id="victoryStats">All hostiles neutralized. Facility secured.</p>
+    <button class="btn" id="againBtn">↻ REINSERT</button>
+    <button class="btn secondary" id="menuBtnV">MENU</button>
+  </div>
+</div>
+
+<div id="defeat" class="overlay hidden">
+  <div class="card" style="text-align:center;border-color:rgba(255,59,59,0.3)">
+    <div class="eyebrow" style="color:#ff6b6b">KIA — OPERATION FAILED</div>
+    <h1 style="font-size:36px">FLATLINE</h1>
+    <p class="subtitle" id="defeatStats">You were neutralized. The sector remains hostile.</p>
+    <button class="btn" style="background:linear-gradient(90deg,#ff3b3b,#ff7a00)" id="retryBtn">↻ REDEPLOY</button>
+    <button class="btn secondary" id="menuBtnD">MENU</button>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
