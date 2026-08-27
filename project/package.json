@@ -1,0 +1,17 @@
+{
+  "name": "cod-fps",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "test": "node tests/run-tests.mjs"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}
