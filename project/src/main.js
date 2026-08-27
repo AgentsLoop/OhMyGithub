@@ -248,10 +248,15 @@ loader.load('/models/car.glb', (gltf)=>{
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
         if (n.includes('carcamero')) {
-          // lime body — 80,156,99 thumbnail vs 24,21,16 charcoal fix — lift 94% + stop self-shadow darkening
-          o.material.roughness = 0.32;
-          o.material.metalness = 0.12;
-          o.material.envMapIntensity = 1.65;
+          // lime body — thumbnail 80,156,99 vs GLB 24,163,12 + rear-view darkness fix
+          // Harsh A/B: chase-cam rear view hid lime (57,56,53 charcoal flat vs thumb 67,181,96)
+          // Force thumbnail sRGB, lift with emissive, lower roughness for facet gloss at 9m
+          o.material.color.setRGB(0.314, 0.612, 0.388); // exact thumb pick, not dark GLB
+          o.material.roughness = 0.28;
+          o.material.metalness = 0.05;
+          o.material.envMapIntensity = 1.35;
+          o.material.emissive = new THREE.Color(0x1e3a1e);
+          o.material.emissiveIntensity = 0.18;
           o.material.fog = false;
           o.material.receiveShadow = false;
         } else if (n.includes('material.026')) {
@@ -295,6 +300,8 @@ loader.load('/models/car.glb', (gltf)=>{
   const center = box.getCenter(new THREE.Vector3());
   carModel.position.sub(center);
   carModel.position.y += 0.9; // lift so wheels near ground
+  // thumbnail 3/4 front orientation vs chase-cam rear view — rotate 180 so lime flank catches sun
+  carModel.rotation.y = Math.PI;
   // scale to ~3.5 length
   const maxDim = Math.max(size.x,size.z);
   const scale = 3.8 / maxDim;
@@ -334,21 +341,58 @@ let running = false;
 let gameOver = false;
 
 function spawnCoins(){
-  coins.forEach(c=>scene.remove(c));
+  coins.forEach(c=>{ scene.remove(c); if(c.userData && c.userData.shadow) scene.remove(c.userData.shadow); });
   coins=[];
   for(let i=0;i<12;i++){
-    const geo = new THREE.TorusGeometry(0.7,0.18,8,16);
-    const mat = new THREE.MeshStandardMaterial({color:0xffc83d, emissive:0xaa6a00, emissiveIntensity:0.18, roughness:0.4, metalness:0.08});
-    const m = new THREE.Mesh(geo, mat);
-    m.rotation.x = Math.PI/2;
+    // — Crossy Road pickup juice — large voxel coin with hard outline + squash-stretch —
+    // Was 0.7/0.18/0.18 emissive, invisible 0.3% yellow at 9m chase. Now 0.92/0.26 high-chroma
+    // with dark umber BackSide outline (0x3D1F0A) + emissive 0.55 for >2× pixel coverage.
+    const group = new THREE.Group();
+    const geo = new THREE.TorusGeometry(0.92, 0.26, 12, 20);
+    const mat = new THREE.MeshStandardMaterial({ color:0xFFD54A, emissive:0xFF8F00, emissiveIntensity:0.58, roughness:0.34, metalness:0.04 });
+    if (envMap) { mat.envMap = envMap; mat.envMapIntensity = 0.42; }
+    mat.fog = false; // keep saturated at 40-80m distance under fog 175-385
+    const torus = new THREE.Mesh(geo, mat);
+    torus.rotation.x = Math.PI/2;
+    torus.castShadow = true;
+    group.add(torus);
+    // hard voxel outline — BackSide slightly larger torus gives 6% dark stroke readable at distance
+    const outGeo = new THREE.TorusGeometry(0.92, 0.26, 12, 20);
+    const outMat = new THREE.MeshBasicMaterial({ color:0x3D1F0A, side:THREE.BackSide, fog:false });
+    const outline = new THREE.Mesh(outGeo, outMat);
+    outline.rotation.x = Math.PI/2;
+    outline.scale.set(1.14, 1.14, 1.14);
+    group.add(outline);
+    // inner face cap — adds solid yellow disc so coin reads as filled, not ring, at distance
+    const capGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.04, 16);
+    const capMat = new THREE.MeshStandardMaterial({ color:0xFFC83D, emissive:0xFF9A00, emissiveIntensity:0.62, roughness:0.38, metalness:0.04, fog:false });
+    if (envMap) { capMat.envMap = envMap; capMat.envMapIntensity = 0.35; }
+    const cap = new THREE.Mesh(capGeo, capMat);
+    cap.rotation.x = Math.PI/2;
+    group.add(cap);
+
     let x,z;
     do{ x=(Math.random()-0.5)*110; z=(Math.random()-0.5)*110; } while (Math.hypot(x,z)<10);
     const gh = (typeof sampleGroundH === 'function') ? sampleGroundH(x,z) : 0;
-    const baseY = gh + 0.95;
-    m.position.set(x,baseY,z);
-    m.castShadow=true;
-    m.userData = { collected:false, baseY, spin: Math.random()*Math.PI };
-    scene.add(m); coins.push(m);
+    const baseY = gh + 0.98;
+    group.position.set(x,baseY,z);
+    // animate via group; keep torus children static orientation
+    group.userData = { collected:false, baseY, spin: Math.random()*Math.PI*2, torus, cap, outline, mat, capMat, popTime: undefined };
+    // shadow disc under pickup — grounds the coin voxel feel
+    const shGeo = new THREE.CircleGeometry(1.05, 16);
+    const shCan = document.createElement('canvas'); shCan.width=64; shCan.height=64;
+    const sx = shCan.getContext('2d');
+    const sg = sx.createRadialGradient(32,32,4,32,32,30);
+    sg.addColorStop(0,'rgba(26,14,3,0.22)'); sg.addColorStop(1,'rgba(26,14,3,0)');
+    sx.fillStyle=sg; sx.fillRect(0,0,64,64);
+    const shTex = new THREE.CanvasTexture(shCan); shTex.colorSpace=THREE.SRGBColorSpace;
+    const shMat = new THREE.MeshBasicMaterial({ map:shTex, transparent:true, depthWrite:false, opacity:0.55 });
+    const sh = new THREE.Mesh(shGeo, shMat);
+    sh.rotation.x = -Math.PI/2; sh.position.set(x, gh+0.035, z);
+    sh.userData.isCoinShadow = true;
+    scene.add(sh);
+    group.userData.shadow = sh;
+    scene.add(group); coins.push(group);
   }
 }
 function spawnObstacles(){
@@ -367,35 +411,58 @@ function spawnObstacles(){
     scene.add(m); obstacles.push(m);
   }
 }
-// juice: particles + scale pop
+// juice: particles + scale pop — Crossy Road squash-stretch + high-coverage burst
 const burstParticles = [];
 let camKick = 0;
 let scorePunch = 0;
 function spawnBurst(at){
-  for(let i=0;i<12;i++){
-    const g = new THREE.CircleGeometry(0.12, 6);
-    const m = new THREE.MeshBasicMaterial({ color: 0xFFD23F, transparent:true, opacity:0.95, side:THREE.DoubleSide });
+  // 18 sparkles (was 12×0.12) — larger 0.20, two-tone yellow/amber for pixel coverage + star flash
+  const cols = [0xFFF176, 0xFFD23F, 0xFFB000, 0xFFFDE7];
+  for(let i=0;i<18;i++){
+    const isStar = i < 4;
+    const g = isStar ? new THREE.PlaneGeometry(0.42,0.42) : new THREE.CircleGeometry(0.20, 8);
+    const m = new THREE.MeshBasicMaterial({ color: cols[i%cols.length], transparent:true, opacity:0.98, side:THREE.DoubleSide, fog:false, depthWrite:false });
     const p = new THREE.Mesh(g,m);
-    p.position.copy(at); p.position.y += 0.6;
-    p.userData.vel = new THREE.Vector3((Math.random()-0.5)*10, Math.random()*6+2, (Math.random()-0.5)*10);
-    p.userData.life = 0; p.userData.max = 0.45 + Math.random()*0.15;
+    p.position.copy(at); p.position.y += 0.65;
+    const ang = (i/18)*Math.PI*2 + Math.random()*0.3;
+    const spd = 5 + Math.random()*7;
+    p.userData.vel = new THREE.Vector3(Math.cos(ang)*spd, 3.5+Math.random()*6.5, Math.sin(ang)*spd);
+    p.userData.life = 0; p.userData.max = 0.52 + Math.random()*0.22;
+    p.userData.spinZ = (Math.random()-0.5)*12;
+    p.userData.isStar = isStar;
+    p.userData.baseScale = isStar ? 1.0 : 0.95+Math.random()*0.35;
     scene.add(p); burstParticles.push(p);
   }
-  // ring
-  const rg = new THREE.RingGeometry(0.2,0.26,24);
-  const rm = new THREE.MeshBasicMaterial({ color:0xFFF6A0, transparent:true, opacity:0.9, side:THREE.DoubleSide });
-  const ring = new THREE.Mesh(rg, rm);
-  ring.rotation.x = -Math.PI/2; ring.position.copy(at); ring.position.y += 0.12;
-  ring.userData.life=0; ring.userData.max=0.32; ring.userData.isRing=true;
-  scene.add(ring); burstParticles.push(ring);
+  // double ring + central flash disc
+  for(let k=0;k<2;k++){
+    const rg = new THREE.RingGeometry(0.22 + k*0.10, 0.30 + k*0.12, 28);
+    const rm = new THREE.MeshBasicMaterial({ color: k===0?0xFFF6A0:0xFFB000, transparent:true, opacity: k===0?0.92:0.65, side:THREE.DoubleSide, fog:false, depthWrite:false });
+    const ring = new THREE.Mesh(rg, rm);
+    ring.rotation.x = -Math.PI/2; ring.position.copy(at); ring.position.y += 0.10 + k*0.04;
+    ring.userData.life=0; ring.userData.max=0.38 + k*0.06; ring.userData.isRing=true; ring.userData.ringK=k;
+    scene.add(ring); burstParticles.push(ring);
+  }
+  const fg = new THREE.CircleGeometry(0.28, 16);
+  const fm = new THREE.MeshBasicMaterial({ color:0xFFFFFF, transparent:true, opacity:0.95, side:THREE.DoubleSide, fog:false, depthWrite:false });
+  const flash = new THREE.Mesh(fg, fm);
+  flash.rotation.x = -Math.PI/2; flash.position.copy(at); flash.position.y += 0.14;
+  flash.userData.life=0; flash.userData.max=0.14; flash.userData.isFlash=true;
+  scene.add(flash); burstParticles.push(flash);
 }
 function updateBursts(dt){
   for(let i=burstParticles.length-1;i>=0;i--){
     const p=burstParticles[i]; p.userData.life+=dt;
     const t=p.userData.life/p.userData.max;
     if(t>=1){ scene.remove(p); burstParticles.splice(i,1); continue; }
-    if(p.userData.isRing){ p.scale.setScalar(1+t*6); p.material.opacity=0.9*(1-t); }
-    else { p.position.addScaledVector(p.userData.vel, dt); p.userData.vel.y -= 14*dt; p.material.opacity=0.95*(1-t); p.scale.setScalar(1+ t*0.6); }
+    if(p.userData.isRing){ p.scale.setScalar(1+t*(6 + p.userData.ringK*2)); p.material.opacity=(p.userData.ringK===0?0.92:0.65)*(1-t); }
+    else if(p.userData.isFlash){ p.scale.setScalar(1+t*3.5); p.material.opacity=0.95*(1-t*1.2); }
+    else {
+      p.position.addScaledVector(p.userData.vel, dt);
+      p.userData.vel.y -= 15*dt;
+      p.material.opacity=0.98*(1-t);
+      if(p.userData.isStar) p.rotation.z += p.userData.spinZ*dt;
+      p.scale.setScalar(p.userData.baseScale*(1+ t*0.55));
+    }
   }
 }
 
@@ -405,7 +472,9 @@ function resetGame(){
   pos.set(0,0,0); yaw=0; speed=0; steer=0;
   score=0; collected=0; timeLeft=60; gameOver=false;
   scoreEl.textContent='0'; coinsEl.textContent='0/12';
-  coins.forEach(c=>c.userData.collected=false, c.visible=true);
+  // cleanup old shadows before respawn
+  coins.forEach(c=>{ if(c.userData.shadow) scene.remove(c.userData.shadow); });
+  coins.forEach(c=>{ c.userData.collected=false; c.visible=true; if(c.userData.shadow) c.userData.shadow.visible=true; c.scale.set(1,1,1); c.userData.popTime=undefined; });
   spawnCoins(); spawnObstacles();
   if(!running){ running=true; overlay.classList.add('hidden'); lastTime=performance.now(); }
 }
@@ -468,35 +537,60 @@ function update(dt){
   contactShadow.scale.set(stretch*punch, 1, (1/stretch)*punch);
   contactShadow.material.opacity = (0.88 + Math.min(0.06, Math.abs(tilt)*0.2)) * (scorePunch>0?1.15:1);
 
-  // coin collection — Crossy Road juice: pop, burst, HUD punch, cam kick
+  // coin collection — Crossy Road juice: squash-stretch pop, burst, HUD punch, cam kick
   coins.forEach(c=>{
     if(c.userData.collected) return;
-    // scale pop if animating
     if(c.userData.popTime!==undefined){
       c.userData.popTime+=dt;
-      const t=c.userData.popTime/0.22;
-      if(t>=1){ c.visible=false; c.userData.collected=true; }
-      else {
-        const s = t<0.45 ? 1 + t*1.4 : 1.63 - (t-0.45)*1.15;
-        c.scale.setScalar(Math.max(0.01,s));
-        c.material.emissiveIntensity = 0.18 + t*1.8;
+      const t=c.userData.popTime/0.36;
+      if(t>=1){
+        c.visible=false; c.userData.collected=true;
+        if(c.userData.shadow) c.userData.shadow.visible=false;
+      } else {
+        // anticipation squash (0-0.12), stretch launch (0.12-0.30), settle bounce (0.30-1)
+        let sx=1, sy=1, sz=1, yOff=0;
+        if(t < 0.12){
+          const k = t/0.12;
+          sx = 1 + k*0.45; sy = 1 - k*0.62; sz = sx; yOff = -k*0.08;
+        } else if(t < 0.30){
+          const k = (t-0.12)/0.18;
+          sx = 1.45 - k*0.85; sy = 0.38 + k*1.32; sz = sx; yOff = k*0.72;
+        } else if(t < 0.58){
+          const k = (t-0.30)/0.28;
+          sx = 0.60 + k*0.62; sy = 1.70 - k*0.88; sz = sx; yOff = 0.72 - k*0.45;
+          // shrink while fading
+          const s = 1 - k*0.55;
+          sx *= s; sy *= s; sz *= s;
+        } else {
+          const k = (t-0.58)/0.42;
+          const s = 0.45 * (1 - k);
+          sx = sy = sz = Math.max(0.02, s);
+          yOff = 0.27 * (1 - k);
+        }
+        c.scale.set(sx, sy, sz);
+        c.position.y = c.userData.baseY + yOff;
+        c.rotation.y += dt*8.5;
+        // emissive flash
+        if(c.userData.mat) c.userData.mat.emissiveIntensity = 0.58 + t*2.2;
+        if(c.userData.capMat) c.userData.capMat.emissiveIntensity = 0.62 + t*2.0;
+        if(c.userData.shadow) c.userData.shadow.material.opacity = 0.55*(1-t);
       }
     }
     if(c.userData.collected) return;
-    if(pos.distanceTo(c.position)<2.4){
-      // start pop animation instead of instant hide
+    if(pos.distanceTo(c.position) < 2.9){
       c.userData.popTime=0;
-      spawnBurst(c.position);
-      camKick = 0.42;
-      scorePunch = 0.18;
-      contactShadow.scale.set(1.45,1,1.45);
+      spawnBurst(c.position.clone());
+      // hide shadow immediately for punch
+      // keep burst visible
+      camKick = 0.55;
+      scorePunch = 0.22;
+      contactShadow.scale.set(1.55,1,1.55);
       score+=100; collected++;
       scoreEl.textContent=String(score);
       coinsEl.textContent=`${collected}/12`;
-      // HUD punch
-      scoreEl.style.transform='scale(1.35)'; coinsEl.parentElement.style.transform='scale(1.08)';
-      setTimeout(()=>{ scoreEl.style.transform=''; if(coinsEl.parentElement) coinsEl.parentElement.style.transform=''; }, 140);
-      if(collected===12){ score+=500; scoreEl.textContent=String(score); setTimeout(win, 220); }
+      scoreEl.style.transform='scale(1.40)'; coinsEl.parentElement.style.transform='scale(1.10)';
+      setTimeout(()=>{ scoreEl.style.transform=''; if(coinsEl.parentElement) coinsEl.parentElement.style.transform=''; }, 160);
+      if(collected===12){ score+=500; scoreEl.textContent=String(score); setTimeout(win, 260); }
     }
   });
   // obstacle collision (simple push back)
@@ -515,12 +609,28 @@ function update(dt){
   if(timeLeft<=0){ timeLeft=0; lose(); }
   timerEl.textContent=`Time ${timeLeft.toFixed(1)}s`;
   speedEl.textContent=`${Math.round(Math.abs(speed)*12)} km/h`;
-  // animate coins
+  // animate coins — idle squash-stretch + bob (Crossy Road juice)
+  const nowSec = performance.now()*0.001;
   coins.forEach(c=>{
     if(c.userData.collected) return;
     if(c.userData.popTime===undefined){
-      c.rotation.y += dt*2.2;
-      c.position.y = c.userData.baseY + Math.sin(performance.now()*0.003 + c.userData.spin)*0.18;
+      const bob = Math.sin(nowSec*2.2 + c.userData.spin)*0.22;
+      const bob2 = Math.sin(nowSec*3.1 + c.userData.spin*1.4);
+      c.rotation.y += dt*1.85 + Math.abs(bob)*0.6*dt;
+      c.position.y = c.userData.baseY + bob + Math.sin(nowSec*4.5 + c.userData.spin)*0.03;
+      // squash-stretch: crest stretches Y, trough squashes
+      const sy = 1 + bob*0.38 + bob2*0.03;
+      const sx = 1 - bob*0.19 - bob2*0.015;
+      c.scale.set(sx, sy, sx);
+      // emissive pulse 0.58 ±0.12 keeps yellow saturated under fog
+      if(c.userData.mat) c.userData.mat.emissiveIntensity = 0.58 + (bob2*0.5+0.5)*0.22;
+      if(c.userData.capMat) c.userData.capMat.emissiveIntensity = 0.62 + (bob2*0.5+0.5)*0.18;
+      if(c.userData.shadow){
+        c.userData.shadow.position.y = c.userData.baseY - 0.94;
+        c.userData.shadow.material.opacity = 0.52 - Math.abs(bob)*0.22;
+        const shS = 1 - Math.abs(bob)*0.18;
+        c.userData.shadow.scale.set(shS, shS, 1);
+      }
     }
   });
   updateBursts(dt);
