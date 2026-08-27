@@ -9,6 +9,7 @@
 ## Main project file
 
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
+In issue comments and workflow instructions, `oc` means OpenCode.
 
 ## Git delivery
 
