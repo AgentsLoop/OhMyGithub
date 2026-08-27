@@ -23,6 +23,10 @@ standard `opencode run` path. The configured
 `noInterruptOnUserMessage: true` option should remain visible in the generated
 OpenCode config.
 
+When a request contains `/goal`, verify that label synchronization creates the
+`/Goal` label and that `Mark issue in progress` applies it alongside
+`in progress`. Standard `/oc` and `/opencode` requests must not receive `/Goal`.
+
 The log-release step must copy and upload only non-empty `.log`/`.json` files;
 empty service logs such as `nginx.log` can make GitHub's upload API return
 `400 Bad Content-Length`. The OpenCode response JSON remains required and must

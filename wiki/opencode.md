@@ -12,7 +12,8 @@ pull-request review comment. Bot-authored events are ignored, so status
 comments do not recurse. `/goal` selects the installed
 `opencode-goal-plugin`, configures `noInterruptOnUserMessage: true`, and starts
 the runner with `opencode run --command goal`; `/oc` and `/opencode` retain the
-standard `opencode run` path.
+standard `opencode run` path. A `/goal` trigger also automatically adds the
+`/Goal` GitHub issue label.
 
 ## What the job does
 
@@ -57,6 +58,13 @@ The comment URL opens `/<encoded-worktree>/session/<session-id>` rather than
 the web home page. This matters because the web home page stores its project
 selection in the browser, while the runner's project exists only on the
 temporary GitHub Actions filesystem.
+
+## Local tracker test
+
+On macOS, run `./scripts/test-opencode-progress-tracker.sh`. It starts a local
+mock OpenCode HTTP server with nested, active, and completed child sessions,
+including user and tool image attachments, then asserts the three derived
+progress counters.
 
 The workflow uses the built-in OpenCode model path and does not require an
 `OPENCODE_API_KEY` secret. Branch creation, pushing, and pull-request creation
