@@ -464,7 +464,11 @@ jobs:
             This request has the `omo` issue label. Use oh-my-openagent's `ulw-loop` continuation behavior for the ongoing work: keep the original objective active, continue after each verified iteration, and do not stop after the first successful pass. Preserve the workflow's evidence, commit, and push requirements.
           EOF
           fi
-          echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
+          if [[ "$OMO_REQUEST" == 'true' ]]; then
+            echo 'OpenCode invocation mode: omo-ulw-loop'
+          else
+            echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
+          fi
           if [[ "$LOOP_REQUEST" == 'true' ]]; then
             cat >> "$PROMPT_FILE" <<'EOF'
 
@@ -474,7 +478,9 @@ jobs:
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
           nohup bash -c '
-            if [[ "$7" == true ]]; then
+            if [[ "$8" == true ]]; then
+              "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" --command ulw-loop "$(cat "$3")" > "$4" 2>&1
+            elif [[ "$7" == true ]]; then
               "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
             else
               "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1
@@ -483,7 +489,7 @@ jobs:
             echo "$code" > "$5"
             exit "$code"
           ' \
-            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" "$GOAL_REQUEST" \
+            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" "$GOAL_REQUEST" "$OMO_REQUEST" \
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
           SESSION_ID=''

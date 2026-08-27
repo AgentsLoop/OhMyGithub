@@ -21,10 +21,10 @@ original goal.
 An issue labeled `omo` additionally installs and configures the OpenCode edition
 of `oh-my-openagent` with Bun before the OpenCode server starts. The installer
 runs non-interactively with provider authentication skipped; `/omo` is not a
-command and does not trigger a run by itself.
-For an `omo`-labeled `/oc` run, the workflow also adds an explicit `ulw-loop`
-continuation directive to the OpenCode prompt so the OMO harness keeps the
-original objective active across verified iterations.
+command and does not trigger a run by itself. An `omo`-labeled `/oc` run invokes
+OpenCode with `--command ulw-loop` and adds an explicit continuation directive
+so the OMO harness keeps the original objective active across verified
+iterations.
 
 ## What the job does
 
