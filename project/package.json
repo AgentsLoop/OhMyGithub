@@ -8,6 +8,7 @@
     "serve": "python3 -m http.server 3000"
   },
   "devDependencies": {
+    "playwright": "1.47",
     "vitest": "^1.6.0"
   },
   "dependencies": {
