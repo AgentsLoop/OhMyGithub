@@ -37,7 +37,9 @@ jobs:
       OPENCODE_WEB_PORT: 4096
       OPENCODE_PROXY_PORT: 4097
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
-      PROJECT_DIR: ${{ github.workspace }}/project
+      WORKTREE_DIR: /tmp/opencode-worktree-${{ github.run_id }}
+      PROJECT_DIR: /tmp/opencode-worktree-${{ github.run_id }}/project
+      ROOT_PROJECT_DIR: ${{ github.workspace }}/project
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       OPENCODE_EXPERIMENTAL: "true"
       OPENCODE_ENABLE_EXA: "true"
@@ -73,13 +75,30 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: agents-dev/skills
-          path: project/.agents
+          path: .agents
           fetch-depth: 1
           persist-credentials: false
 
       - name: Exclude shared skills from generated changes
         shell: bash
-        run: echo '/project/.agents/' >> .git/info/exclude
+        run: echo '/.agents/' >> .git/info/exclude
+
+      - name: Prepare isolated OpenCode worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          git fetch origin "$BASE_BRANCH"
+          git worktree add --detach "$WORKTREE_DIR" "origin/$BASE_BRANCH"
+          git -C "$WORKTREE_DIR" sparse-checkout init --no-cone
+          git -C "$WORKTREE_DIR" sparse-checkout set project
+          install -d "$PROJECT_DIR/.agents"
+          cp -a "$GITHUB_WORKSPACE/.agents/." "$PROJECT_DIR/.agents/"
+          cp "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
+          cmp --silent "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
+          touch "$PROJECT_DIR/.gitignore"
+          grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
+            printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
 
       - name: Install worker instructions
         shell: bash
@@ -741,16 +760,9 @@ jobs:
           if git ls-remote --exit-code origin "refs/heads/$BRANCH_NAME" >/dev/null 2>&1; then
             git fetch origin "$BRANCH_NAME"
           fi
-          bash "$GITHUB_WORKSPACE/scripts/normalize-opencode-project.sh" \
-            "origin/$BASE_BRANCH" "OpenCode: ${COMMENT_BODY%%$'\n'*}"
-          # Dependencies are runtime-only and must never be included in the generated PR.
-          touch "$PROJECT_DIR/.gitignore"
-          grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
-            printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
-          git add -A -- project
-          if ! git diff --cached --quiet; then
-            git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
-          fi
+          bash "$GITHUB_WORKSPACE/scripts/sync-opencode-project.sh" \
+            "$PROJECT_DIR" "$ROOT_PROJECT_DIR" "origin/$BASE_BRANCH" \
+            "OpenCode: ${COMMENT_BODY%%$'\n'*}"
           if git diff --quiet "origin/$BASE_BRANCH..HEAD" -- project; then
             echo 'OpenCode made no changes; no pull request will be created.'
             exit 0
@@ -761,7 +773,7 @@ jobs:
             git push --force-with-lease="refs/heads/$BRANCH_NAME:$remote_branch_sha" \
               --set-upstream origin "$BRANCH_NAME"
           else
-          git push --force-with-lease --set-upstream origin "$BRANCH_NAME"
+            git push --set-upstream origin "$BRANCH_NAME"
           fi
           FINAL_COMMIT="$(git rev-parse HEAD)"
           TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
@@ -908,8 +920,9 @@ jobs:
             echo "OpenCode loop iteration $iteration exited with code $code."
 
             git fetch origin "$BRANCH_NAME"
-            bash "$GITHUB_WORKSPACE/scripts/normalize-opencode-project.sh" \
-              "origin/$BRANCH_NAME" "OpenCode loop iteration $iteration"
+            bash "$GITHUB_WORKSPACE/scripts/sync-opencode-project.sh" \
+              "$PROJECT_DIR" "$ROOT_PROJECT_DIR" "origin/$BRANCH_NAME" \
+              "OpenCode loop iteration $iteration"
             git push origin "$BRANCH_NAME"
             commit="$(git rev-parse HEAD)"
             gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/comments" \
@@ -961,6 +974,8 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/app-cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app-cloudflared.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/app.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
           tmux kill-session -t app-server 2>/dev/null || true
+          git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
+          git worktree prune 2>/dev/null || true
           [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
           sudo pkill -f 'sshd.*2222' 2>/dev/null || true
           rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"

@@ -26,11 +26,12 @@ uses OMO's native `goal` command and prepends `ulw` to the objective, matching
 the official OpenCode usage. The Codex Light `ulw-loop` component is not
 recreated or registered for OpenCode.
 
-At delivery, the workflow normalizes the generated `project/` snapshot against
-the base branch. If OpenCode has already pushed the run branch, final delivery
-fetches that ref and force-pushes the normalized snapshot with an explicit
-`--force-with-lease`; this avoids a non-fast-forward failure while protecting
-against a concurrent branch update.
+OpenCode runs in a sparse isolated Git worktree containing only the generated
+`project/` tree. The workflow checkout remains the delivery surface. Before
+delivery and each `/loop` push, `scripts/sync-opencode-project.sh` copies the
+worktree app into the checkout without deleting `project/`, validates that
+staged and committed paths stay under `project/`, and handles any worker-side
+branch update with `--force-with-lease`.
 
 ## What the job does
 
@@ -108,7 +109,8 @@ send a follow-up to the same attached session, use `opencode run --attach
 custom command, and later human messages steer the running goal instead of
 pausing it.
 
-Before starting OpenCode, the workflow checks out `agents-dev/skills` into
+Before starting OpenCode, the workflow checks out `agents-dev/skills` into a
+temporary root `.agents` checkout and copies it into the sparse worktree's
 `project/.agents`. OpenCode discovers project skills from
 `project/.agents/skills/**/SKILL.md`.
 The workflow excludes this nested skills checkout through `.git/info/exclude`
@@ -122,13 +124,15 @@ Model labels are refreshed from the live OpenCode catalog on each run and are
 limited to models with zero input, output, and cache-read cost. Default GitHub
 labels are removed, and the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
-Before delivery and each `/loop` push, `scripts/normalize-opencode-project.sh`
-rebuilds the generated branch from its base while preserving only `project/`.
+OpenCode runs in a sparse isolated worktree containing only `project/`.
+Before delivery and each `/loop` push, `scripts/sync-opencode-project.sh`
+copies that worktree's app into the workflow checkout without deleting its
+`project/` directory.
 Because OpenCode may push that branch before the delivery step, delivery uses
 `--force-with-lease` after fetching the worker branch.
-This prevents OpenCode changes to workflow files from causing GitHub token
-permission failures; `/loop` Git commands also use the workspace root because
-the normalizer replaces `project/` during each iteration.
+Staged and committed paths are checked for the `project/` boundary, preventing
+workflow-file changes from reaching the branch; every `/loop` Git command runs
+from the workspace root.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 `model/opencode/muse-spark-1.2-contributor-free` label; if that label is
 unavailable, the skill records that it used the workflow default instead.
