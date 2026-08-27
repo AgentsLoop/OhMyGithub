@@ -1,0 +1,71 @@
+[
+  {
+    "index": 0,
+    "uid": "e81fbf68b4c84f889f2b48df593daaa2",
+    "name": "Skull Knight",
+    "author": "iChill",
+    "authorUrl": "https://sketchfab.com/mwisson",
+    "license": "CC Attribution",
+    "licenseUrl": null,
+    "modelUrl": "https://sketchfab.com/3d-models/none-e81fbf68b4c84f889f2b48df593daaa2",
+    "thumbnailUrl": "https://media.sketchfab.com/models/e81fbf68b4c84f889f2b48df593daaa2/thumbnails/eab31533a02c48ec9181077dca9952fe/1024.jpeg",
+    "glbBytes": 711792,
+    "faceCount": 3838,
+    "vertexCount": 5540,
+    "textureCount": 1,
+    "textureMaxResolution": 1024,
+    "animationCount": 0,
+    "animations": [],
+    "thumbnailError": null
+  },
+  {
+    "index": 1,
+    "uid": "b1a2647210d14e88b86ba84e46da859b",
+    "name": "Low Poly Knight",
+    "author": "Davmid",
+    "authorUrl": "https://sketchfab.com/Dawid2K",
+    "license": "CC Attribution",
+    "licenseUrl": null,
+    "modelUrl": "https://sketchfab.com/3d-models/none-b1a2647210d14e88b86ba84e46da859b",
+    "thumbnailUrl": "https://media.sketchfab.com/models/b1a2647210d14e88b86ba84e46da859b/thumbnails/4a8f07035dee44a38c0014c4d071fc72/a52a1d889e894753873a1fbb3b89345b.jpeg",
+    "glbBytes": 477228,
+    "faceCount": 2924,
+    "vertexCount": 8639,
+    "textureCount": 1,
+    "textureMaxResolution": 8192,
+    "animationCount": 0,
+    "animations": [],
+    "thumbnailError": null
+  },
+  {
+    "index": 2,
+    "uid": "6d15613997ae4fe29ec3f4beb976b773",
+    "name": "Low Poly Knight (Rigged)",
+    "author": "Yanez Designs",
+    "authorUrl": "https://sketchfab.com/Yanez-Designs",
+    "license": "CC Attribution",
+    "licenseUrl": null,
+    "modelUrl": "https://sketchfab.com/3d-models/none-6d15613997ae4fe29ec3f4beb976b773",
+    "thumbnailUrl": "https://media.sketchfab.com/models/6d15613997ae4fe29ec3f4beb976b773/thumbnails/7968b7e87bd44d78a8918a2897710dc9/6106ed4de44043ff96629ae45a70c174.jpeg",
+    "glbBytes": 159112,
+    "faceCount": 1254,
+    "vertexCount": 1614,
+    "textureCount": 6,
+    "textureMaxResolution": 1024,
+    "animationCount": 1,
+    "animations": [
+      {
+        "uid": "21faae13dbab4640bc3ca4587e89ccbd",
+        "name": "Take 001",
+        "url": "https://media.sketchfab.com/models/6d15613997ae4fe29ec3f4beb976b773/25064c160bbb40e08f5be2182983cb16/animations/21faae13dbab4640bc3ca4587e89ccbd.bin.gz",
+        "size": 32360,
+        "duration": 3.333,
+        "isLoop": false,
+        "isEnabled": true,
+        "createdAt": "2018-10-19T02:04:28.492722",
+        "updatedAt": "2019-10-17T01:39:59.189241"
+      }
+    ],
+    "thumbnailError": null
+  }
+]
