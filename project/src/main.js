@@ -224,9 +224,9 @@ function makeFloorTextures(){
   const g=c.getContext('2d');
   g.fillStyle='#d2d8e2'; g.fillRect(0,0,N,N);
   // Iteration 11: Halo authored panel albedo variation — checker-like cool/warm per 3m tile (tiled albedo without external textures: alternating +/− hue like Halo trim sheet)
-  for(let ty=0; ty<N; ty+=256) for(let tx=0; tx<N; tx+=256){
+   for(let ty=0; ty<N; ty+=256) for(let tx=0; tx<N; tx+=256){
     const isCool = ((tx/256 + ty/256) & 1)===0;
-    g.fillStyle = isCool ? 'rgba(124,152,195,0.038)' : 'rgba(192,176,150,0.036)';
+    g.fillStyle = isCool ? 'rgba(124,152,195,0.055)' : 'rgba(192,176,150,0.045)';
     // inset 1px so grout AO stays clean; keeps panel read not wash
     g.fillRect(tx+1, ty+1, 254, 254);
     // faint inner panel edge lift for authored bevel read
@@ -1386,7 +1386,22 @@ function spawnEnemy(){
   const flashLight = new THREE.PointLight(0xff5a3b, 0, 3.2);
   flashLight.position.set(0,1.0,0);
   g.add(flashLight);
-  g.userData={ hp: 3 + Math.floor(wave*0.7), maxHp:3+Math.floor(wave*0.7), speed: 2.1 + wave*0.18 + Math.random()*0.6, mesh, ang, hitFlash:0, flashLight, shadow };
+  // Iteration 13: pronounced spawn-in — scale 0.1→1 with emissive pulse over 0.4s (Halo drop-pod read vs flat pop)
+  g.userData={ hp: 3 + Math.floor(wave*0.7), maxHp:3+Math.floor(wave*0.7), speed: 2.1 + wave*0.18 + Math.random()*0.6, mesh, ang, hitFlash:0, flashLight, shadow, spawnT:0, spawnDur:0.4 };
+  g.scale.setScalar(0.1);
+  // initial emissive burst — visors + hull briefly hot so spawn reads at distance even against bright floor
+  g.traverse(o=>{
+    if(!o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material)?o.material:[o.material];
+    mats.forEach(m=>{
+      if(!m.emissive) return;
+      const isVisor = /eye|visor|optic|lens/i.test((o.name+' '+(m.name||'')).toLowerCase());
+      const base = m.userData?.baseIntensity ?? (isVisor?1.6:0.08);
+      m.emissiveIntensity = base + (isVisor? 2.8 : 1.9);
+      if(!isVisor) m.emissive.setHex(0x7af2ff);
+    });
+  });
+  if(shadow) shadow.material.opacity = 0;
   scene.add(g);
   enemyList.push(g);
 }
@@ -1619,10 +1634,67 @@ function handleInput(dt){
 
 function updateEnemies(dt){
   for(const e of enemyList){
+    // Iteration 13: spawn-in scale + emissive fade (0.1→1 over 0.4s, Halo drop read) — blocks hitFlash until done
+    let isSpawning = false;
+    if(e.userData.spawnT !== undefined && e.userData.spawnT < e.userData.spawnDur){
+      e.userData.spawnT += dt;
+      const t = Math.min(1, e.userData.spawnT / e.userData.spawnDur);
+      const ease = 1 - Math.pow(1 - t, 3);
+      const sc = 0.1 + 0.9 * ease;
+      e.scale.setScalar(sc);
+      const pulse = 1 - t;
+      e.traverse(o=>{
+        if(!o.isMesh || !o.material) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(m=>{
+          if(!m.emissive) return;
+          const isVisor = /eye|visor|optic|lens/i.test((o.name+' '+(m.name||'')).toLowerCase());
+          const base = m.userData?.baseIntensity ?? (isVisor?1.6:0.08);
+          const baseCol = new THREE.Color(m.userData?.baseEmissive ?? 0x0e1a2a);
+          if(pulse > 0.01){
+            const hot = isVisor ? 2.8 : 1.9;
+            m.emissiveIntensity = base + pulse * hot;
+            if(!isVisor){
+              const spawnCol = new THREE.Color(0x7af2ff);
+              m.emissive.lerpColors(baseCol, spawnCol, pulse*0.95);
+            } else {
+              m.emissive.setHex(0x7af2ff);
+              m.emissiveIntensity = base + pulse*2.8 + Math.sin(time*12)*0.12*pulse;
+            }
+          } else {
+            m.emissive.setHex(m.userData?.baseEmissive ?? 0x0e1a2a);
+            m.emissiveIntensity = base;
+          }
+        });
+      });
+      // shadow fades in with scale so contact AO reads progressively
+      if(e.userData.shadow){
+        e.userData.shadow.material.opacity = 0.42 * t;
+        const s = sc * (1.0 - Math.min(0.12, Math.abs(Math.sin(time*2 + e.userData.ang))*0.06));
+        e.userData.shadow.scale.setScalar(s);
+      }
+      if(t >= 1){
+        e.scale.setScalar(1);
+        // normalize emissive back to base (let hitFlash/idle take over next frame)
+        e.traverse(o=>{
+          if(!o.isMesh || !o.material) return;
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach(m=>{
+            if(m.userData){
+              if(m.userData.baseIntensity!==undefined) m.emissiveIntensity = m.userData.baseIntensity;
+              if(m.userData.baseEmissive!==undefined) m.emissive.setHex(m.userData.baseEmissive);
+            }
+          });
+        });
+        if(e.userData.flashLight) e.userData.flashLight.intensity = 0;
+      } else {
+        isSpawning = true;
+      }
+    }
     const toPlayer = new THREE.Vector3().subVectors(camRig.position, e.position);
     toPlayer.y=0;
     const dist=toPlayer.length();
-    if(dist>0.1){ toPlayer.normalize().multiplyScalar(e.userData.speed*dt); }
+    if(dist>0.1){ toPlayer.normalize().multiplyScalar(e.userData.speed*dt); if(isSpawning) toPlayer.multiplyScalar(0.12); }
     // simple avoidance among enemies
     for(const o of enemyList) if(o!==e){
       const d=e.position.distanceTo(o.position);
@@ -1646,8 +1718,11 @@ function updateEnemies(dt){
     // face player
     e.lookAt(camRig.position.x, e.position.y, camRig.position.z);
     e.rotation.y+=Math.PI;
-    // hit flash — subtle warm emissive pulse + visor flare, decays fast so not flat clay
-    if(e.userData.hitFlash>0){
+    // hit flash — subtle warm emissive pulse + visor flare, decays fast so not flat clay (skipped while spawn pulse owns emissive)
+    if(isSpawning){
+      // spawn emissive already driven above; keep flash light synced to pulse
+      if(e.userData.flashLight) e.userData.flashLight.intensity = (1 - Math.min(1, e.userData.spawnT/0.4)) * 7.5;
+    } else if(e.userData.hitFlash>0){
       e.userData.hitFlash-=dt;
       const t = Math.max(0, e.userData.hitFlash/0.18);
       // point light flash fades
@@ -1696,14 +1771,14 @@ function updateEnemies(dt){
         });
       });
     }
-    // scale contact shadow with height (fake AO)
-    if(e.userData.shadow){
+    // scale contact shadow with height (fake AO) — not during spawn (spawn already drives it)
+    if(!isSpawning && e.userData.shadow){
       const s = 1.0 - Math.min(0.25, Math.abs(Math.sin(time*2 + e.userData.ang))*0.06);
       e.userData.shadow.scale.setScalar(s);
       e.userData.shadow.material.opacity = 0.42 * (0.9 + 0.1*Math.sin(time*2));
     }
-    // attack if close
-    if(dist<1.35 && dashTime<=0){
+    // attack if close (no damage during spawn-in)
+    if(!isSpawning && dist<1.35 && dashTime<=0){
       // damage with cooldown per enemy
       e.userData.cooldown = (e.userData.cooldown||0)-dt;
       if(e.userData.cooldown<=0){
