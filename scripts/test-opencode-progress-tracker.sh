@@ -10,6 +10,22 @@ done
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 tracker="$script_dir/opencode-progress-tracker.sh"
+
+assert_elapsed() {
+  local seconds="$1"
+  local expected="$2"
+  local actual
+  actual="$("$tracker" --format-elapsed "$seconds")"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "FAIL: elapsed $seconds formatted as '$actual', expected '$expected'" >&2
+    exit 1
+  fi
+  echo "PASS: elapsed $seconds -> $expected"
+}
+
+assert_elapsed 1266 "21m"
+assert_elapsed 3661 "1h 01m"
+
 test_dir="$(mktemp -d "${TMPDIR:-/tmp}/opencode-progress-test.XXXXXX")"
 port_file="$test_dir/port"
 output_file="$test_dir/progress.md"
@@ -33,10 +49,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 port_file = pathlib.Path(sys.argv[1])
 sessions = [
-    {"id": "ses_root"},
-    {"id": "ses_child", "parentID": "ses_root"},
-    {"id": "ses_nested", "parentID": "ses_child"},
-    {"id": "ses_done", "parentID": "ses_root"},
+    {"id": "ses_root", "tokens": {"input": 100, "output": 200, "reasoning": 30, "cache": {"read": 4, "write": 5}}},
+    {"id": "ses_child", "parentID": "ses_root", "tokens": {"input": 10, "output": 20, "reasoning": 3, "cache": {"read": 1, "write": 2}}},
+    {"id": "ses_nested", "parentID": "ses_child", "tokens": {"input": 40, "output": 50, "reasoning": 6, "cache": {"read": 7, "write": 8}}},
+    {"id": "ses_done", "parentID": "ses_root", "tokens": {"input": 1, "output": 2, "reasoning": 0, "cache": {"read": 0, "write": 0}}},
 ]
 statuses = {
     "ses_child": {"type": "busy"},
@@ -162,9 +178,22 @@ assert_line() {
   echo "PASS: $expected"
 }
 
-assert_line "- Active subagents: 2"
+assert_line "- Token count: 489"
 assert_line "- Total subagents executed: 3"
 assert_line "- Image-context model calls: 5"
+if ! grep -Eq -- '^- Elapsed: [0-9]+m$' "$output_file"; then
+  echo "FAIL: invalid elapsed format" >&2
+  sed -n '1,120p' "$output_file" >&2
+  exit 1
+fi
+echo "PASS: valid elapsed format"
+
+if ! grep -Eq -- '^- Speed score: [0-9]+(\.[0-9])? tokens/s$' "$output_file"; then
+  echo "FAIL: invalid speed score" >&2
+  sed -n '1,120p' "$output_file" >&2
+  exit 1
+fi
+echo "PASS: valid speed score"
 
 assert_absent() {
   local unexpected="$1"
@@ -179,5 +208,7 @@ assert_absent() {
 assert_absent "- Session messages:"
 assert_absent "- Assistant updates:"
 assert_absent "- Completed tool calls:"
+assert_absent "- Active tool calls:"
+assert_absent "- Active subagents:"
 
 echo "OpenCode progress tracker local test passed."

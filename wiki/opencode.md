@@ -6,14 +6,25 @@ The build and verification prompt templates are stored as Markdown files in
 
 ## Trigger
 
-`/oc <request>`, `/opencode <request>`, or `/goal <objective>` can appear in a
+`/oc <request>`, `/opencode <request>`, `/goal <objective>`, or `/loop <objective>` can appear in a
 newly created or edited issue/PR title or body, an issue comment, or a
 pull-request review comment. Bot-authored events are ignored, so status
 comments do not recurse. `/goal` selects the installed
 `opencode-goal-plugin`, configures `noInterruptOnUserMessage: true`, and starts
 the runner with `opencode run --command goal`; `/oc` and `/opencode` retain the
 standard `opencode run` path. A `/goal` trigger also automatically adds the
-`/Goal` GitHub issue label.
+`/Goal` GitHub issue label. `/loop` selects the same goal command, adds the
+`/Loop` label, and keeps the workflow running for five hours after the first
+published completion. Each iteration asks for distinct builder, critic, and
+verifier subagents, publishes to the existing branch/PR, and continues the
+original goal.
+
+OpenCode runs in a sparse isolated Git worktree containing only the generated
+`project/` tree. The workflow checkout remains the delivery surface. Before
+delivery and each `/loop` push, `scripts/sync-opencode-project.sh` copies the
+worktree app into the checkout without deleting `project/`, validates that
+staged and committed paths stay under `project/`, and handles any worker-side
+branch update with `--force-with-lease`.
 
 ## What the job does
 
@@ -63,8 +74,9 @@ temporary GitHub Actions filesystem.
 
 On macOS, run `./scripts/test-opencode-progress-tracker.sh`. It starts a local
 mock OpenCode HTTP server with nested, active, and completed child sessions,
-including user and tool image attachments, then asserts the three derived
-progress counters.
+including user and tool image attachments, then asserts tool calls, cumulative
+token usage (including nested child sessions), and the derived tokens-per-second
+speed score.
 
 The workflow uses the built-in OpenCode model path and does not require an
 `OPENCODE_API_KEY` secret. Branch creation, pushing, and pull-request creation
@@ -90,7 +102,8 @@ send a follow-up to the same attached session, use `opencode run --attach
 custom command, and later human messages steer the running goal instead of
 pausing it.
 
-Before starting OpenCode, the workflow checks out `agents-dev/skills` into
+Before starting OpenCode, the workflow checks out `agents-dev/skills` into a
+temporary root `.agents` checkout and copies it into the sparse worktree's
 `project/.agents`. OpenCode discovers project skills from
 `project/.agents/skills/**/SKILL.md`.
 The workflow excludes this nested skills checkout through `.git/info/exclude`
@@ -104,6 +117,18 @@ Model labels are refreshed from the live OpenCode catalog on each run and are
 limited to models with zero input, output, and cache-read cost. Default GitHub
 labels are removed, and the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
+OpenCode runs in a sparse isolated worktree containing only `project/`.
+Before delivery and each `/loop` push, `scripts/sync-opencode-project.sh`
+copies that worktree's app into the workflow checkout without deleting its
+`project/` directory.
+OpenCode is instructed to commit locally without pushing; the repository-root
+workflow is the sole publisher and uses `--force-with-lease` after fetching
+the worker branch.
+The shared skills and worker instructions are restored before verification and
+each continuation because OpenCode may clean untracked support files. Staged
+and committed paths are checked against the base branch for the `project/`
+boundary, preventing workflow-file changes from reaching the branch; every
+`/loop` Git command runs from the workspace root.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 `model/opencode/muse-spark-1.2-contributor-free` label; if that label is
 unavailable, the skill records that it used the workflow default instead.

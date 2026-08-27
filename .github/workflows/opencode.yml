@@ -14,12 +14,15 @@ jobs:
       (contains(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, '/opencode') ||
       contains(github.event.comment.body, '/goal') ||
+      contains(github.event.comment.body, '/loop') ||
       contains(github.event.issue.body, '/oc') ||
       contains(github.event.issue.body, '/opencode') ||
       contains(github.event.issue.body, '/goal') ||
+      contains(github.event.issue.body, '/loop') ||
       contains(github.event.issue.title, '/oc') ||
       contains(github.event.issue.title, '/opencode') ||
-      contains(github.event.issue.title, '/goal'))
+      contains(github.event.issue.title, '/goal') ||
+      contains(github.event.issue.title, '/loop'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -34,7 +37,10 @@ jobs:
       OPENCODE_WEB_PORT: 4096
       OPENCODE_PROXY_PORT: 4097
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
-      PROJECT_DIR: ${{ github.workspace }}/project
+      WORKTREE_DIR: /tmp/opencode-worktree-${{ github.run_id }}
+      PROJECT_DIR: /tmp/opencode-worktree-${{ github.run_id }}/project
+      ROOT_PROJECT_DIR: ${{ github.workspace }}/project
+      BASE_BRANCH: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       OPENCODE_EXPERIMENTAL: "true"
       OPENCODE_ENABLE_EXA: "true"
@@ -46,7 +52,8 @@ jobs:
       BRANCH_NAME: opencode/${{ github.run_id }}
       TRIGGER_ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
-      GOAL_REQUEST: ${{ contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') }}
+      GOAL_REQUEST: ${{ contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') || contains(github.event.comment.body, '/loop') || contains(github.event.issue.body, '/loop') || contains(github.event.issue.title, '/loop') }}
+      LOOP_REQUEST: ${{ contains(github.event.comment.body, '/loop') || contains(github.event.issue.body, '/loop') || contains(github.event.issue.title, '/loop') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -68,13 +75,30 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: agents-dev/skills
-          path: project/.agents
+          path: .agents
           fetch-depth: 1
           persist-credentials: false
 
       - name: Exclude shared skills from generated changes
         shell: bash
-        run: echo '/project/.agents/' >> .git/info/exclude
+        run: echo '/.agents/' >> .git/info/exclude
+
+      - name: Prepare isolated OpenCode worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          git fetch origin "$BASE_BRANCH"
+          git worktree add --detach "$WORKTREE_DIR" "origin/$BASE_BRANCH"
+          git -C "$WORKTREE_DIR" sparse-checkout init --no-cone
+          git -C "$WORKTREE_DIR" sparse-checkout set project
+          install -d "$PROJECT_DIR/.agents"
+          cp -a "$GITHUB_WORKSPACE/.agents/." "$PROJECT_DIR/.agents/"
+          cp "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
+          cmp --silent "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
+          touch "$PROJECT_DIR/.gitignore"
+          grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
+            printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
 
       - name: Install worker instructions
         shell: bash
@@ -119,6 +143,7 @@ jobs:
               { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
               { name: '/Goal', color: '8A2BE2', description: 'OpenCode goal workflow request' },
+              { name: '/Loop', color: 'D93F0B', description: 'OpenCode five-hour iterative workflow request' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',
@@ -178,6 +203,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          LOOP_REQUEST: ${{ env.LOOP_REQUEST }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
@@ -195,7 +221,11 @@ jobs:
             await github.rest.issues.addLabels({
               owner: context.repo.owner, repo: context.repo.repo,
               issue_number: number,
-              labels: ['in progress', ...(process.env.GOAL_REQUEST === 'true' ? ['/Goal'] : [])]
+              labels: [
+                'in progress',
+                ...(process.env.GOAL_REQUEST === 'true' ? ['/Goal'] : []),
+                ...(process.env.LOOP_REQUEST === 'true' ? ['/Loop'] : [])
+              ]
             });
 
       - name: Start AgentsWeb SSH session
@@ -397,6 +427,7 @@ jobs:
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
           OPENCODE_SKILLS: ${{ steps.opencode_labels.outputs.skills_json }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          LOOP_REQUEST: ${{ env.LOOP_REQUEST }}
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
@@ -409,13 +440,19 @@ jobs:
           if [[ "$GOAL_REQUEST" == 'true' ]]; then
             # The issue marker selects the custom command; do not include the
             # marker itself in the objective passed to the goal parser.
-            request_text="$(sed -E 's/^[[:space:]]*\/goal([[:space:]]*)?//' <<<"$request_text")"
+            request_text="$(sed -E 's/^[[:space:]]*\/(goal|loop)([[:space:]]*)?//' <<<"$request_text")"
           fi
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
           printf '%s\n' "$prompt" > "$PROMPT_FILE"
           echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
+          if [[ "$LOOP_REQUEST" == 'true' ]]; then
+            cat >> "$PROMPT_FILE" <<'EOF'
+
+            This is a /loop request. Preserve the original goal above as the source of truth. Before the first completion and before every later iteration, use the task tool to ask for distinct parallel builder, critic, and verifier subagents. The critic must inspect the current browser-visible game/app against a concrete reference and return the single biggest gap; apply that finding, re-verify the gameplay loop, and only then declare the iteration complete. After each completion, commit the project changes in the isolated worktree but do not push; the repository-root workflow will sync only project/ and perform the validated controlled push, then update the triggering issue. Immediately continue the same goal for the next improvement. Do not stop after publishing and do not create a second PR.
+          EOF
+          fi
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
           nohup bash -c '
@@ -475,11 +512,14 @@ jobs:
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          LOOP_REQUEST: ${{ env.LOOP_REQUEST }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const command = process.env.GOAL_REQUEST === 'true' ? '/goal' : '/oc';
+            const command = process.env.LOOP_REQUEST === 'true'
+              ? '/loop'
+              : process.env.GOAL_REQUEST === 'true' ? '/goal' : '/oc';
             const body = [
               '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
@@ -538,6 +578,15 @@ jobs:
             --model "${{ steps.opencode_labels.outputs.model }}" \
             "$(< "$GITHUB_WORKSPACE/.github/prompts/verify.md")" \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
+
+      - name: Restore isolated OpenCode support files
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d "$PROJECT_DIR/.agents"
+          rsync -a --delete "$GITHUB_WORKSPACE/.agents/" "$PROJECT_DIR/.agents/"
+          cp "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
+          cmp --silent "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
 
       - name: Expose verified app
         id: app_tunnel
@@ -625,7 +674,7 @@ jobs:
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
-            "The public game is verified at $APP_URL. Follow ./Agents.md now: capture and commit final playable-game screenshots under screenshots/ using final-* filenames, push the current branch, and post the final completion comment to issue #$TRIGGER_ISSUE_NUMBER. Include this public game URL, embedded screenshots, the final commit, deployment and test status, and known limitations. Do not create a pull request." \
+            "The public game is verified at $APP_URL. Follow ./Agents.md now: capture and commit final playable-game screenshots under screenshots/ using final-* filenames, but do not push because the repository-root workflow owns the controlled push. Post the final completion comment to issue #$TRIGGER_ISSUE_NUMBER. Include this public game URL, embedded screenshots, the final commit, deployment and test status, and known limitations. Do not create a pull request." \
             > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
           touch "$OPENCODE_WEB_DIR/response-comment.done"
 
@@ -636,7 +685,7 @@ jobs:
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          SCREENSHOT_PROMPT='The final screenshot evidence is still missing. Use the already verified public game and a real browser now, capture at least one meaningful playable-game screenshot, save it under screenshots/ with a filename beginning with final- (for example screenshots/final-gameplay.png), commit and push it on the current branch, and update the triggering issue with the immutable screenshot URL. Do not just explain or claim completion without creating the image. Keep all work inside project/ and do not create a pull request.'
+          SCREENSHOT_PROMPT='The final screenshot evidence is still missing. Use the already verified public game and a real browser now, capture at least one meaningful playable-game screenshot, save it under screenshots/ with a filename beginning with final- (for example screenshots/final-gameplay.png), commit it in the isolated worktree, and update the triggering issue with the immutable screenshot URL. Do not push; the repository-root workflow owns the controlled push. Do not just explain or claim completion without creating the image. Keep all work inside project/ and do not create a pull request.'
 
           for attempt in 1 2 3; do
             mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
@@ -673,19 +722,24 @@ jobs:
         run: |
           set -euo pipefail
           BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
-          # Dependencies are runtime-only and must never be included in the generated PR.
-          touch "$PROJECT_DIR/.gitignore"
-          grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
-            printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
-          git add -A -- project
-          if ! git diff --cached --quiet; then
-            git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH_NAME" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH_NAME"
           fi
+          bash "$GITHUB_WORKSPACE/scripts/sync-opencode-project.sh" \
+            "$PROJECT_DIR" "$ROOT_PROJECT_DIR" "origin/$BASE_BRANCH" \
+            "OpenCode: ${COMMENT_BODY%%$'\n'*}" "origin/$BASE_BRANCH"
           if git diff --quiet "origin/$BASE_BRANCH..HEAD" -- project; then
             echo 'OpenCode made no changes; no pull request will be created.'
             exit 0
           fi
-          git push --set-upstream origin "$BRANCH_NAME"
+          remote_branch_sha="$(git ls-remote origin "refs/heads/$BRANCH_NAME" | awk '{print $1}')"
+          if [[ -n "$remote_branch_sha" ]]; then
+            git fetch origin "$BRANCH_NAME"
+            git push --force-with-lease="refs/heads/$BRANCH_NAME:$remote_branch_sha" \
+              --set-upstream origin "$BRANCH_NAME"
+          else
+            git push --set-upstream origin "$BRANCH_NAME"
+          fi
           FINAL_COMMIT="$(git rev-parse HEAD)"
           TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
           TITLE="${TITLE:0:120}"
@@ -775,7 +829,7 @@ jobs:
             });
 
       - name: Mark issue complete
-        if: success()
+        if: success() && env.LOOP_REQUEST != 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -804,10 +858,67 @@ jobs:
               issue_number: number, labels: ['failed']
             });
 
+      - name: Continue /loop iterations for 5 hours
+        if: success() && env.LOOP_REQUEST == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
+          OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
+          PR_URL: ${{ steps.delivery.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          deadline=$(( $(date +%s) + 18000 ))
+          iteration=1
+          while (( $(date +%s) < deadline )); do
+            install -d "$PROJECT_DIR/.agents"
+            rsync -a --delete "$GITHUB_WORKSPACE/.agents/" "$PROJECT_DIR/.agents/"
+            cp "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
+            prompt="Continue the original goal for /loop iteration $iteration. Use distinct parallel builder, critic, and verifier task-tool subagents first; have the critic inspect the current browser-visible app against a concrete reference and report the biggest remaining gap. Apply the finding, run browser verification, and complete one meaningful improvement. Then commit the latest playable project in the isolated worktree, but do not push: the repository-root workflow will sync only project/, validate the diff, and perform the controlled force-with-lease push. Update the triggering issue with the public URL and commit, and continue the same goal. Do not create a second PR or stop after publishing."
+            echo "Starting /loop iteration $iteration; remaining seconds: $(( deadline - $(date +%s) ))."
+            set +e
+            "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
+              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+              --session "$SESSION_ID" \
+              --model "$OPENCODE_MODEL" \
+              "$prompt" > "$OPENCODE_WEB_DIR/loop-iteration-$iteration.log" 2>&1
+            code=$?
+            set -e
+            echo "OpenCode loop iteration $iteration exited with code $code."
+
+            git fetch origin "$BRANCH_NAME"
+            remote_branch_sha="$(git rev-parse "origin/$BRANCH_NAME")"
+            bash "$GITHUB_WORKSPACE/scripts/sync-opencode-project.sh" \
+              "$PROJECT_DIR" "$ROOT_PROJECT_DIR" "origin/$BRANCH_NAME" \
+              "OpenCode loop iteration $iteration" "origin/$BASE_BRANCH"
+            git push --force-with-lease="refs/heads/$BRANCH_NAME:$remote_branch_sha" \
+              origin "HEAD:refs/heads/$BRANCH_NAME"
+            commit="$(git rev-parse HEAD)"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/comments" \
+              -f body="🔁 **/loop iteration $iteration published.**\n\nPublic game: $APP_URL\nCommit: https://github.com/$GITHUB_REPOSITORY/commit/$commit\nPull request: ${PR_URL:-(existing PR)}\n\nContinuing the goal and waiting for the next critique cycle."
+            iteration=$((iteration + 1))
+          done
+
       - name: Keep temporary access available for 5 hours
-        if: success()
+        if: success() && env.LOOP_REQUEST != 'true'
         shell: bash
         run: sleep 18000
+
+      - name: Mark /loop issue complete
+        if: success() && env.LOOP_REQUEST == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.issue.number;
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, name: 'in progress'
+            }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, labels: ['complete']
+            });
 
       - name: Append SSH session closed
         if: always() && steps.access_comment.outputs.comment_id != ''
@@ -833,6 +944,8 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/app-cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app-cloudflared.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/app.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
           tmux kill-session -t app-server 2>/dev/null || true
+          git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
+          git worktree prune 2>/dev/null || true
           [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
           sudo pkill -f 'sshd.*2222' 2>/dev/null || true
           rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"
