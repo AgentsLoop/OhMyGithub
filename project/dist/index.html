@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COD: SHADOW OPS — AAA FPS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=JetBrains+Mono:wght@400;600&family=Share+Tech+Mono&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#05070a;font-family:'Orbitron',sans-serif;color:#e8eef2}
+  #canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+  /* Loading */
+  #loading{position:fixed;inset:0;z-index:100;background:radial-gradient(ellipse at 50% 40%, #0f1a2a 0%, #05070a 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s}
+  #loading h1{font-size:42px;letter-spacing:12px;font-weight:800;color:#fff;text-shadow:0 0 20px rgba(0,255,136,.6),0 2px 40px rgba(0,0,0,.8)}
+  #loading h1 span{color:#00ff88}
+  #loading p{margin-top:10px;font-family:'Share Tech Mono',monospace;letter-spacing:4px;color:#7a8a9a;font-size:13px}
+  #bar{width:320px;height:3px;background:rgba(255,255,255,.08);margin-top:28px;overflow:hidden;border-radius:2px}
+  #barFill{height:100%;width:0%;background:linear-gradient(90deg,#00ff88,#00d4ff);box-shadow:0 0 10px #00ff88;transition:width .2s}
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  #topBar{position:absolute;top:0;left:0;right:0;height:44px;background:linear-gradient(180deg, rgba(0,0,0,.75) 0%, rgba(0,0,0,0) 100%);display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px}
+  #scoreBox{display:flex;gap:18px;align-items:center}
+  #scoreVal{color:#00ff88;font-size:18px;font-weight:800}
+  #timeVal,#enemiesVal{color:#fff}
+  #center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+  #crosshair{width:28px;height:28px;position:relative}
+  #crosshair::before,#crosshair::after{content:'';position:absolute;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.9),0 0 8px rgba(0,255,136,.3)}
+  #crosshair::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-50%)}
+  #crosshair::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-50%)}
+  #crosshairDot{position:absolute;left:50%;top:50%;width:3px;height:3px;background:#00ff88;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 6px #00ff88}
+  #crosshair.hit{transform:scale(1.5)} #crosshair.hit::before,#crosshair.hit::after{background:#ff2a2a}
+  /* bottom HUD */
+  #bottom{position:absolute;bottom:0;left:0;right:0;padding:14px 18px;display:flex;align-items:end;justify-content:space-between;background:linear-gradient(0deg, rgba(0,0,0,.85) 0%, rgba(0,0,0,0) 100%)}
+  #leftHud{display:flex;gap:16px;align-items:end}
+  #healthBox,#ammoBox{background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);padding:10px 16px;min-width:120px}
+  #healthBox{border-left:3px solid #ff2a2a}
+  #ammoBox{border-left:3px solid #00ff88;min-width:160px}
+  .hudLabel{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:3px;color:#7a8a9a}
+  .hudValue{font-size:22px;font-weight:800;color:#fff;line-height:1;margin-top:4px}
+  .hudValue span{font-size:13px;color:#7a8a9a;font-weight:400}
+  #ammoVal{color:#00ff88}
+  #weaponName{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:3px;color:#c8d0d8;margin-top:6px}
+  #rightHud{display:flex;flex-direction:column;align-items:end;gap:8px}
+  #minimap{width:140px;height:140px;border:1px solid rgba(255,255,255,.15);background:radial-gradient(ellipse at center, rgba(0,255,136,.08), rgba(0,0,0,.85));backdrop-filter:blur(6px);position:relative;overflow:hidden}
+  #minimap canvas{width:100%;height:100%;display:block}
+  #controlsHint{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;color:rgba(255,255,255,.55);text-align:right;line-height:1.6}
+  /* hitmarker & damage */
+  #hitmarker{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24px;height:24px;opacity:0;transition:opacity .08s;pointer-events:none}
+  #hitmarker.show{opacity:1}
+  #hitmarker::before,#hitmarker::after{content:'';position:absolute;left:50%;top:50%;width:16px;height:2px;background:#fff;box-shadow:0 0 8px #fff}
+  #hitmarker::before{transform:translate(-50%,-50%) rotate(45deg)}
+  #hitmarker::after{transform:translate(-50%,-50%) rotate(-45deg)}
+  #damageVignette{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center, transparent 55%, rgba(255,30,30,.55) 100%);transition:opacity .15s;z-index:9}
+  #damageVignette.show{opacity:1}
+  /* center messages */
+  #centerMsg{position:absolute;left:50%;top:32%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+  #centerMsg h2{font-size:28px;letter-spacing:8px;color:#fff;text-shadow:0 2px 20px rgba(0,0,0,.8);opacity:0;transition:opacity .2s}
+  #centerMsg h2.show{opacity:1}
+  #killFeed{position:absolute;top:56px;right:16px;display:flex;flex-direction:column;gap:6px;align-items:end}
+  .killItem{background:rgba(0,0,0,.7);border-left:2px solid #00ff88;padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;color:#fff;animation:slideIn .2s}
+  @keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+  #pause{position:fixed;inset:0;background:rgba(3,7,12,.88);backdrop-filter:blur(12px);z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column}
+  #pause.show{display:flex}
+  #pause h2{font-size:32px;letter-spacing:10px}
+  #pause p{font-family:'Share Tech Mono',monospace;color:#8a9aaa;margin-top:8px;letter-spacing:2px}
+  #pause button{margin-top:24px;background:#00ff88;border:none;color:#000;font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:3px;padding:12px 28px;cursor:pointer;pointer-events:auto}
+  #pause button:hover{background:#fff}
+</style>
+  <script type="module" crossorigin src="/assets/index-AhbG8Ts9.js"></script>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="loading">
+  <h1>SHADOW <span>OPS</span></h1>
+  <p>ELITE TASK FORCE // CLASSIFIED</p>
+  <div id="bar"><div id="barFill"></div></div>
+  <p id="loadText" style="margin-top:12px;font-size:11px;letter-spacing:2px;color:#5a6a7a">INITIALIZING SYSTEMS...</p>
+</div>
+
+<div id="damageVignette"></div>
+
+<div id="hud">
+  <div id="topBar">
+    <div id="scoreBox">
+      <div>SCORE <span id="scoreVal">0</span></div>
+      <div>KILLS <span id="enemiesVal" style="color:#00ff88">0</span>/∞</div>
+      <div style="opacity:.5">|</div>
+      <div id="timeVal">03:00</div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center">
+      <span style="color:#ff3b3b;letter-spacing:3px">● LIVE FIRE EXERCISE</span>
+      <span style="opacity:.4">SHIPPING YARD — SECTOR 7</span>
+    </div>
+  </div>
+
+  <div id="center"><div id="crosshair"><div id="crosshairDot"></div></div></div>
+  <div id="hitmarker"></div>
+  <div id="centerMsg"><h2 id="centerText">HEADSHOT!</h2></div>
+  <div id="killFeed"></div>
+
+  <div id="bottom">
+    <div id="leftHud">
+      <div id="healthBox">
+        <div class="hudLabel">OPERATOR HEALTH</div>
+        <div class="hudValue" id="healthVal">100<span> / 100</span></div>
+        <div style="height:3px;background:rgba(255,255,255,.1);margin-top:8px;overflow:hidden;border-radius:2px"><div id="healthBar" style="height:100%;width:100%;background:linear-gradient(90deg,#ff2a2a,#ff7a00);transition:width .2s"></div></div>
+      </div>
+      <div id="ammoBox">
+        <div class="hudLabel">M4A1 — 5.56 NATO</div>
+        <div class="hudValue" id="ammoVal">30<span> / 90</span></div>
+        <div id="weaponName">SEMI / AUTO — TAP [R] RELOAD • [SHIFT] SPRINT • [C] CROUCH • [SPACE] JUMP</div>
+        <div style="height:3px;background:rgba(255,255,255,.1);margin-top:6px;overflow:hidden;border-radius:2px"><div id="ammoBar" style="height:100%;width:100%;background:linear-gradient(90deg,#00ff88,#00d4ff);transition:width .2s"></div></div>
+      </div>
+    </div>
+    <div id="rightHud">
+      <div id="minimap"><canvas id="mapCanvas" width="140" height="140"></canvas></div>
+      <div id="controlsHint">WASD MOVE • MOUSE AIM • CLICK FIRE<br>CLICK TO LOCK POINTER • ESC TO PAUSE</div>
+    </div>
+  </div>
+</div>
+
+<div id="pause">
+  <h2>PAUSED</h2>
+  <p>POINTER UNLOCKED — CLICK TO RESUME</p>
+  <button id="resumeBtn">RESUME OPERATION</button>
+  <p style="margin-top:18px;font-size:10px;opacity:.5">SHADOW OPS v1.0 • BUILT WITH THREE.JS • WEAPON: Custom Short Barrel AR (nebula075 — CC Attribution)</p>
+</div>
+
+</body>
+</html>
