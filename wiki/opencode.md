@@ -80,9 +80,8 @@ limited to models with zero input, output, and cache-read cost. Default GitHub
 labels are removed, and the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
-`model/opencode/x-preview-f-free` label, which is the catalog ID for Ox Alpha
-Free; if that label is unavailable, the skill records that it used the
-workflow default instead.
+`model/opencode/muse-spark-1.2-contributor-free` label; if that label is
+unavailable, the skill records that it used the workflow default instead.
 
 The workflow starts OpenCode Web from `$GITHUB_WORKSPACE/project` and uses the
 same directory for OpenCode runs, so both browser-created sessions and generated
