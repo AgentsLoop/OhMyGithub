@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>BLACKSITE // PROTOCOL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--cyan:#00f0ff;--mag:#ff0040;--bg:#050a12;--panel:#0a1524cc;--line:#00f0ff33}
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'JetBrains Mono',monospace}
+    #canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+    /* Top HUD bar */
+    .top-bar{position:fixed;top:0;left:0;right:0;height:56px;background:linear-gradient(180deg,#0a1a2e 0%,#06101f 100%);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:10;backdrop-filter:blur(8px)}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand h1{font-family:'Orbitron',sans-serif;font-size:18px;letter-spacing:0.18em;color:#fff;font-weight:800}
+    .brand h1 span{color:var(--cyan)}
+    .brand .sub{font-size:10px;letter-spacing:0.22em;color:#7fb3c8;margin-top:2px}
+    .top-stats{display:flex;gap:16px;align-items:center}
+    .stat{border:1px solid var(--line);background:#0c1e33;padding:6px 12px;min-width:78px;text-align:center}
+    .stat label{font-size:9px;letter-spacing:0.18em;color:#8ab4c8;display:block}
+    .stat b{font-size:16px;color:#fff;display:block;line-height:1}
+    .stat b.cyan{color:var(--cyan)}
+    .stat b.red{color:#ff3b5e}
+    /* Health bars */
+    .health-wrap{display:flex;align-items:center;gap:10px}
+    .hb{width:140px;height:8px;background:#112233;border:1px solid var(--line);position:relative;overflow:hidden}
+    .hb-fill{position:absolute;inset:0 0 0 0;width:100%;background:linear-gradient(90deg,var(--cyan),#0aff8a);transition:width 0.25s}
+    .hb-fill.low{background:linear-gradient(90deg,#ff0040,#ff8a00)}
+    /* Crosshair */
+    .cross{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:22px;height:22px;z-index:5;pointer-events:none}
+    .cross::before,.cross::after{content:"";position:absolute;background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+    .cross::before{left:10px;top:0;width:2px;height:22px;opacity:0.95}
+    .cross::after{left:0;top:10px;width:22px;height:2px;opacity:0.95}
+    .cross i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:6px;height:6px;border:1px solid #fff;opacity:0.7}
+    /* Bottom HUD */
+    .bottom{position:fixed;bottom:0;left:0;right:0;padding:10px 16px 12px;display:flex;justify-content:space-between;align-items:end;z-index:10;pointer-events:none}
+    .weapon-info{background:var(--panel);border:1px solid var(--line);padding:10px 14px;display:flex;gap:14px;align-items:center;backdrop-filter:blur(8px)}
+    .ammo-num{font-family:'Orbitron',sans-serif;font-size:28px;color:#fff;line-height:1}
+    .ammo-num small{font-size:13px;color:#7fb3c8}
+    .reloading{font-size:10px;letter-spacing:0.2em;color:var(--cyan);animation:blink 0.6s infinite}
+    @keyframes blink{50%{opacity:0}}
+    .controls-hint{background:var(--panel);border:1px solid var(--line);padding:8px 10px;font-size:10px;line-height:1.5;color:#8ab4c8;max-width:320px}
+    .controls-hint b{color:#fff}
+    /* Overlays */
+    .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;background:radial-gradient(ellipse at center,#0a1e38 0%,#02070d 72%);}
+    .overlay.hidden{display:none}
+    .card{width:min(560px,92vw);background:linear-gradient(180deg,#0d213f 0%,#071326 100%);border:1px solid #00f0ff44;box-shadow:0 20px 80px #0008,0 0 40px #00f0ff18;padding:28px;position:relative;overflow:hidden}
+    .card::before{content:"";position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+    .badge{font-size:10px;letter-spacing:0.28em;color:var(--cyan);border:1px solid #00f0ff44;padding:4px 8px;display:inline-block;margin-bottom:12px}
+    .card h2{font-family:'Orbitron',sans-serif;font-size:26px;letter-spacing:0.14em;color:#fff;line-height:1.1}
+    .card h2 span{color:var(--cyan)}
+    .card p{font-size:13px;line-height:1.6;color:#a8c4d8;margin:12px 0}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+    .kbd{border:1px solid #1e3a56;background:#0a1a2e;padding:8px 10px;font-size:11px;color:#cde6f5}
+    .kbd b{color:var(--cyan)}
+    .btn{width:100%;padding:14px 18px;background:var(--cyan);color:#02131a;font-family:'Orbitron',sans-serif;font-weight:800;letter-spacing:0.18em;font-size:14px;border:none;cursor:pointer;transition:filter 0.15s,transform 0.08s}
+    .btn:hover{filter:brightness(1.08)}
+    .btn:active{transform:scale(0.98)}
+    .btn.secondary{background:transparent;color:var(--cyan);border:1px solid var(--cyan)}
+    .row{display:flex;gap:10px}
+    /* Damage vignette */
+    .vignette{position:fixed;inset:0;pointer-events:none;z-index:9;opacity:0;transition:opacity 0.12s;background:radial-gradient(ellipse at center,transparent 55%,#ff004022 85%,#ff004055 100%)}
+    .vignette.on{opacity:1}
+    /* Attribution */
+    .attr{position:fixed;bottom:58px;left:16px;z-index:10;font-size:9px;color:#6a8a9e;max-width:420px;line-height:1.4;background:#020a14cc;border:1px solid #00f0ff1a;padding:6px 8px;backdrop-filter:blur(4px)}
+    .attr a{color:var(--cyan);text-decoration:none}
+    /* Mobile controls */
+    .mobile{display:none}
+    @media (max-width:760px){
+      .top-bar{height:48px;padding:0 10px}
+      .brand h1{font-size:13px}
+      .brand .sub{display:none}
+      .top-stats{gap:8px}
+      .stat{min-width:58px;padding:4px 6px}
+      .stat b{font-size:13px}
+      .hb{width:90px}
+      .controls-hint{display:none}
+      .mobile{position:fixed;inset:0;z-index:6;pointer-events:none;display:block}
+      .stick{position:absolute;bottom:90px;left:14px;width:110px;height:110px;border:1px solid #00f0ff33;border-radius:50%;background:#00f0ff0f;pointer-events:auto;touch-action:none}
+      .stick::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:#00f0ff33;border:1px solid #00f0ff66}
+      .m-actions{position:absolute;bottom:88px;right:14px;display:flex;flex-direction:column;gap:10px;pointer-events:auto}
+      .m-btn{width:62px;height:62px;border-radius:50%;border:1px solid var(--cyan);background:#00f0ff22;color:#fff;font-size:11px;letter-spacing:0.12em;font-weight:700;backdrop-filter:blur(6px)}
+      .m-btn:active{background:var(--cyan);color:#02131a}
+    }
+    #hitMarker{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Orbitron',sans-serif;font-size:18px;color:#fff;text-shadow:0 0 10px var(--cyan);z-index:11;pointer-events:none;opacity:0;transition:opacity 0.08s,transform 0.08s}
+    #hitMarker.show{opacity:1;transform:translate(-50%,-50%) scale(1.2)}
+  </style>
+  <script type="module" crossorigin src="/assets/index-P_uaUxyb.js"></script>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="cross"><i></i></div>
+  <div id="vignette" class="vignette"></div>
+  <div id="hitMarker">HIT</div>
+
+  <header class="top-bar">
+    <div class="brand">
+      <div>
+        <h1>BLACKSITE <span>// PROTOCOL</span></h1>
+        <div class="sub">SECTOR 07 — CONTAINMENT BREACH</div>
+      </div>
+    </div>
+    <div class="top-stats">
+      <div class="health-wrap">
+        <div style="text-align:right">
+          <div style="font-size:9px;letter-spacing:0.18em;color:#8ab4c8">INTEGRITY</div>
+          <div id="hpText" style="font-size:13px;color:#fff;font-weight:700">100%</div>
+        </div>
+        <div class="hb"><div id="hpFill" class="hb-fill" style="width:100%"></div></div>
+      </div>
+      <div class="stat"><label>SCORE</label><b id="scoreEl" class="cyan">0</b></div>
+      <div class="stat"><label>WAVE</label><b id="waveEl">1 / 3</b></div>
+      <div class="stat"><label>HOSTILES</label><b id="enemiesEl" class="red">0</b></div>
+    </div>
+  </header>
+
+  <div class="bottom">
+    <div class="weapon-info">
+      <div>
+        <div style="font-size:9px;letter-spacing:0.2em;color:#8ab4c8">M4A1 // 5.56</div>
+        <div class="ammo-num"><span id="ammoEl">30</span> <small>/ <span id="reserveEl">90</span></small></div>
+        <div id="reloadHint" class="reloading" style="display:none">RELOADING</div>
+      </div>
+      <div style="width:1px;height:42px;background:#00f0ff22"></div>
+      <div style="font-size:10px;color:#8ab4c8;line-height:1.4">
+        <div><b style="color:#fff" id="killsEl">0</b> NEUTRALIZED</div>
+        <div id="statusEl" style="color:var(--cyan)">CONTAINMENT ACTIVE</div>
+      </div>
+    </div>
+    <div class="controls-hint">
+      <b>WASD</b> Move · <b>Mouse</b> Aim · <b>Click</b> Fire · <b>R</b> Reload · <b>Shift</b> Sprint · <b>Space</b> Dash<br>
+      <span style="opacity:0.8">Eliminate 20 hostiles or survive 3 waves. Crates block movement and line of sight.</span>
+    </div>
+  </div>
+
+  <div class="attr" id="attr">
+    Weapon: <a href="https://sketchfab.com/3d-models/none-fb85c455cf374675a1db7988def2d926" target="_blank">Low-poly M4</a> by <a href="https://sketchfab.com/szaw" target="_blank">szaw</a> (CC Attribution) · Crate: <a href="https://sketchfab.com/3d-models/none-23af43363ba84509ae7ab7a1ff1580c4" target="_blank">Sci-fi Crate</a> by starkerg (CC Attribution) — GLB via Sketchfab, converted to metallic-roughness where needed.
+  </div>
+
+  <div class="mobile" id="mobile">
+    <div class="stick" id="stick"></div>
+    <div class="m-actions">
+      <button class="m-btn" id="mReload">R</button>
+      <button class="m-btn" id="mShoot" style="width:78px;height:78px;background:var(--cyan);color:#02131a">FIRE</button>
+    </div>
+  </div>
+
+  <!-- Start -->
+  <div id="startOverlay" class="overlay">
+    <div class="card">
+      <div class="badge">CLASSIFIED // EYES ONLY</div>
+      <h2>BLACKSITE <span>// PROTOCOL</span></h2>
+      <p>Containment failed in Sector 07. Hostile bioforms are converging on the reactor core. You are the last operator inside the perimeter. Hold the arena, use the crates for cover, and neutralize the threat.</p>
+      <div class="grid2">
+        <div class="kbd"><b>WASD</b> — Move<br><b>SHIFT</b> — Sprint · <b>SPACE</b> — Dash</div>
+        <div class="kbd"><b>Mouse</b> — Look<br><b>CLICK</b> — Fire · <b>R</b> — Reload</div>
+      </div>
+      <p style="font-size:11px;color:#7fb3c8;border-left:2px solid var(--cyan);padding-left:10px">Tip: Enemies flank slowly — keep moving. The M4 viewmodel and sci-fi crates are real GLB assets loaded with Three.js GLTFLoader (see attribution). Arena is 32 m, fully lit with PBR + shadows.</p>
+      <button id="playBtn" class="btn">▶ ENGAGE PROTOCOL</button>
+      <div style="margin-top:10px;font-size:10px;letter-spacing:0.14em;color:#8ab4c8;text-align:center">CLICK TO LOCK POINTER · ESC TO RELEASE</div>
+    </div>
+  </div>
+
+  <!-- Dead / Win -->
+  <div id="endOverlay" class="overlay hidden">
+    <div class="card">
+      <div id="endBadge" class="badge">PROTOCOL TERMINATED</div>
+      <h2 id="endTitle">CONTAINMENT <span>FAILED</span></h2>
+      <p id="endDesc">You held for 0:00. 0 hostiles neutralized.</p>
+      <div class="grid2">
+        <div class="kbd">Kills: <b id="endKills">0</b></div>
+        <div class="kbd">Wave: <b id="endWave">1</b></div>
+      </div>
+      <div class="row">
+        <button id="restartBtn" class="btn">↻ RE-ENGAGE</button>
+        <button id="menuBtn" class="btn secondary">MENU</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
