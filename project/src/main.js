@@ -262,20 +262,16 @@ loader.load('/models/car.glb', (gltf)=>{
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
          if (n.includes('carcamero')) {
-          // ITER9 PBR gloss restore: keep lime thumbnail lock (83,174,94) but restore Crossy facet spec.
-          // Was flat emissive 0.95 roughness 1.0 — correct hue but lost low-poly highlight vs thumbnail.
-          // Now PBR: base color lime + low emissive floor (0.38) guarantees rear readability (no charcoal 59)
-          // while roughness 0.46 / env 0.68 gives crisp sun facet gloss on top bevels via RoomEnv IBL.
-          // receiveShadow false prevents rear self-shadow darkening; fog false keeps saturated at 9m chase.
-          o.material.color.setHex(0x4CAF5A);
-          o.material.emissive.setHex(0x4CAF5A);
-          o.material.emissiveIntensity = 0.42;
-          o.material.roughness = 0.46;
-          o.material.metalness = 0.02;
-          o.material.envMap = envMap;
-          o.material.envMapIntensity = 0.68;
-          o.material.fog = false;
-          o.material.receiveShadow = false;
+           // CRITIC10 HARSH FIX: lime was bleached to 104,178,106 (+29R vs thumb 75,167,95) by env 0.68 + emissive 0.42 wash — B wins vs Sketchfab thumbnail, lost saturated voxel lime. Cut env 0.68→0.30 / emissive 0.42→0.16 and roughness 0.46→0.62 to kill white spec wash, keep matte saturated lime 0x4AAF5E (74,175,94) matching thumb greens, fog:false locked.
+           o.material.color.setHex(0x4AAF5E);
+           o.material.emissive.setHex(0x4AAF5E);
+           o.material.emissiveIntensity = 0.16;
+           o.material.roughness = 0.62;
+           o.material.metalness = 0.02;
+           o.material.envMap = envMap;
+           o.material.envMapIntensity = 0.30;
+           o.material.fog = false;
+           o.material.receiveShadow = false;
         } else if (n.includes('material.026')) {
           // windows / glass — keep DoubleSide transparent
           o.material.side = THREE.DoubleSide;
@@ -627,8 +623,8 @@ function update(dt){
       spawnBurst(c.position.clone());
       // hide shadow immediately for punch
       // keep burst visible
-      camKick = 0.85;
-      scorePunch = 0.28;
+      camKick = 1.02;
+      scorePunch = 0.32;
       contactShadow.scale.set(1.55,1,1.55);
       score+=100; collected++;
       scoreEl.textContent=String(score);
@@ -679,8 +675,8 @@ function update(dt){
     }
   });
   updateBursts(dt);
-  if(camKick>0){ camKick=Math.max(0, camKick - dt*3.4); }
-  if(scorePunch>0){ scorePunch=Math.max(0, scorePunch - dt*3.2); }
+  if(camKick>0){ camKick=Math.max(0, camKick - dt*5.8); }
+  if(scorePunch>0){ scorePunch=Math.max(0, scorePunch - dt*4.6); }
 }
 
 function win(){
@@ -695,14 +691,27 @@ function lose(){
 }
 
 function render(){
-  // chase cam + Crossy hard 4px punch — was sin*0.9 (~0.5u) soft wobble, now 2.6u crisp kick with fast decay for voxel snap
+  // chase cam — ITER10 final Crossy Road hard voxel snap (4-5px)
+  // BEFORE: lerp 0.11 soft spring + sin(camKick*32)*2.8 wobble — readable but floaty vs Crossy hop snap.
+  // AFTER: hard quantized voxel grid snap 0.10u (~4-5px at 9m chase, FOV 58°), lerp 0.26 for instant catch,
+  // single-impulse kick (no sine) decaying cubic for square punch, both camPos & look target snapped
+  // to same grid so image holds crisp without sub-pixel shimmer — matches Crossy Road camera voxel lock.
+  const VOXEL_SNAP = 0.10;
+  const snap = (v)=> Math.round(v/VOXEL_SNAP)*VOXEL_SNAP;
   const baseOffset = new THREE.Vector3(Math.sin(yaw)*-9, 5.5, Math.cos(yaw)*-9);
-  const kick = camKick>0 ? Math.sin(camKick*32)*camKick*2.8 : 0;
-  const camOffset = baseOffset.clone().add(new THREE.Vector3(kick, kick*0.85, 0));
-  const camPos = pos.clone().add(camOffset);
-  camPos.y = Math.max(camPos.y, 4.2);
-  camera.position.lerp(camPos, 0.11);
-  camTarget.lerp(new THREE.Vector3(pos.x, 1.0, pos.z), 0.11);
+  // hard square impulse: magnitude holds 1 frame then cubic decay — no oscillation wobble
+  const kickMag = camKick>0 ? camKick*camKick*2.6 : 0;
+  // kick perpendicular to forward so horizon snaps horizontally (Crossy punch) + small vertical
+  const kickDir = new THREE.Vector3(Math.cos(yaw), 0.85, -Math.sin(yaw));
+  const camOffset = baseOffset.clone().addScaledVector(kickDir, kickMag);
+  const rawPos = pos.clone().add(camOffset);
+  rawPos.y = Math.max(rawPos.y, 4.2);
+  camera.position.lerp(rawPos, 0.26);
+  // voxel quantize after lerp so smoothing doesn't reintroduce sub-pixel drift
+  camera.position.set(snap(camera.position.x), snap(camera.position.y), snap(camera.position.z));
+  const rawTarget = new THREE.Vector3(snap(pos.x), 1.0, snap(pos.z));
+  camTarget.lerp(rawTarget, 0.26);
+  camTarget.set(snap(camTarget.x), camTarget.y, snap(camTarget.z));
   camera.lookAt(camTarget);
 }
 
