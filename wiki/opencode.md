@@ -65,6 +65,12 @@ opencode github run
 
 The workflow now sends the comment text directly to `opencode run --attach`.
 
+For the installed `opencode-goal-plugin`, invoke a goal from the non-interactive
+CLI with `opencode run --command goal "<objective>"`; passing `/goal <objective>`
+as the message sends literal text instead of invoking the custom command. To
+send a follow-up to the same attached session, use `opencode run --attach
+<server-url> --session <session-id> "<message>"`.
+
 Before starting OpenCode, the workflow checks out `agents-dev/skills` into
 `project/.agents`. OpenCode discovers project skills from
 `project/.agents/skills/**/SKILL.md`.
