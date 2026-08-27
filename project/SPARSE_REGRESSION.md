@@ -234,6 +234,24 @@ curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
 Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
 ```
 
+## Iteration 11 — floor checker hue + outer ring AO + wall cap variation (gauntlet loop)
+
+**Builder `ses_fbc5d783cffeFHiMkcKp2N09wJ` (parallel):** `project/src/main.js:226-233` floor checker-like cool/warm hue shift per 3m panel even `rgba(124,152,195,0.038)` vs odd `rgba(192,176,150,0.036)` with inset + inner edge lift, `362-393` outer ring edge wear `RingGeometry(0.62R–0.99R)` with Canvas radial Multiply transparent center → `rgba(18,22,32,0.24–0.32)` outer annulus + 18 soft blotches, `558-564` wall cap alternates even `0xf1f5fa/0.42` vs odd `0xe8ecf2/0.50`. Breaks flat `0xd2d8e2`/`0xf0f4f8` toward Halo authored tiled albedo without external textures. Preserves `allowedHosts:true`, attribution, sparse `project/` only.
+
+**Critic `ses_fbc5ced30ffeAs7GxpAOWkvG54` (independent, blind vs Halo Infinite Streets/Bazaar/The Pit, https://mat-busy-devel-paragraph.trycloudflare.com 200 + http://127.0.0.1:3000 200 tmux app-server:3000): HALO WINS 9-0 — bright authored trim sheets vs flat pastel washed by fog that still collapses. Single biggest gap — no real geometry chamfer / baked AO — only painted tape: walls single `BoxGeometry(12,5.5,0.6)` per 60° face `591` with one `MeshStandardMaterial` reusing canvas `444-571` panel split `450-451` `rgba(255,255,255,0.040)`/`rgba(18,22,34,0.030)` + edge-wear streaks `507` `rgba(20,26,38,0.028)`, bevels thin tape strips `613` `0.038m` / `618` `0.016m` / `647` `0.05m` / `623` `0.055m` with no inset/extrusion, floor `363` `CircleGeometry(19)` `bumpScale:0.058` `365` + checker `229-234` + floorBump grooves `328-337` invisible past 8m, flattened by Fog `21` + Hemi `0.72` + Dir `2.85` + sky dome `0xc9d6ea` + heightHaze `alpha 0.22` + vignette `0.52` + canvas filter `contrast1.07` + floorReflect `0.055` float never darken concave junctions like Halo baked/HBAO — requires replacing tape-bevels with actual chamfered/panelized geometry per 1.2-2.4m module and baking AO/dirt at 0.15-0.25.
+
+**Verifier `ses_fbc5a5a5effeA6D5dLgHijFqwl` (parallel):** PASS — `vite v5.4.21 ✓ built in 1.70s` `dist/assets/index-DaBelnUv.js 658.45k gzip 171.79k` (+1.38k vs 657.07k `index-BL4Hlj0o.js` deleted), `dist/index.html 9.69k`, `curl http://127.0.0.1:3000 200` 9708 `tmux app-server: vite preview --host 0.0.0.0 --port 3000`, `curl https://mat-busy-devel-paragraph.trycloudflare.com 200` 9708 cf-ray `a31bcd...`, `curl -H Host 200` Vary Origin allowedHosts working, `/models/*.glb` 200 both `184368/183216/435108/1842656`, `vite.config:5,10` `allowedHosts:true` host 0.0.0.0 port 3000, `git sparse-checkout list → project` `73%` present, `src/main.js:1802` lines 13/13 mechanics (WASD pointerLock joystick sprint dash heat recoil tracer chase wave win lose pickups + requestAnimationFrame renderer.render resize clampToArena spawnEnemy updateWave) pass, Playwright both URLs `goto 200` title `NEXUS ARENA` canvas 1280×720 HUD hp100 GLB 200×3 WebGL true.
+
+**Remediation applied this iteration:** acknowledged floor per-panel checker hue + outer ring Multiply AO/dirt + wall cap alternation simulate authored tiled albedo without textures but still painted Canvas + tape bevels vs Halo tiled `albedo+normal+rough+AO` + bevel geometry; grout remains line not chamfer. Next iteration needs inset `BoxGeometry` chamfered/panelized geometry per module and baked AO/dirt at 0.15-0.25.
+
+**Re-verification after builder+remediation:**
+```
+npm run build ✓ 658.45k gzip 171.79k (9 modules, 1.70s) vs 657.07k prev (+1.38k)
+curl http://127.0.0.1:3000 200 9708
+curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
+Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
+```
+
 ## How to re-verify
 
 ```bash

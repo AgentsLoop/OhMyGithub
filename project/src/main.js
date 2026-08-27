@@ -223,6 +223,16 @@ function makeFloorTextures(){
   const c=document.createElement('canvas'); c.width=N; c.height=N;
   const g=c.getContext('2d');
   g.fillStyle='#d2d8e2'; g.fillRect(0,0,N,N);
+  // Iteration 11: Halo authored panel albedo variation — checker-like cool/warm per 3m tile (tiled albedo without external textures: alternating +/− hue like Halo trim sheet)
+  for(let ty=0; ty<N; ty+=256) for(let tx=0; tx<N; tx+=256){
+    const isCool = ((tx/256 + ty/256) & 1)===0;
+    g.fillStyle = isCool ? 'rgba(124,152,195,0.038)' : 'rgba(192,176,150,0.036)';
+    // inset 1px so grout AO stays clean; keeps panel read not wash
+    g.fillRect(tx+1, ty+1, 254, 254);
+    // faint inner panel edge lift for authored bevel read
+    g.strokeStyle = isCool ? 'rgba(255,255,255,0.028)' : 'rgba(255,255,255,0.022)';
+    g.lineWidth=1; g.strokeRect(tx+3.5, ty+3.5, 249, 249);
+  }
   // base variation — large soft mottling (concrete pour)
   for(let i=0;i<70;i++){
     const x=Math.random()*N, y=Math.random()*N, r=40+Math.random()*90;
@@ -367,6 +377,37 @@ floorReflect.position.y = 0.012;
 floorReflect.receiveShadow=false;
 floorReflect.renderOrder = 1;
 scene.add(floorReflect);
+// Iteration 11: subtle floor edge wear darkening along outer ring — world-space ring (outer ~28% annulus) simulates Halo trap-edge dirt/AO where arena meets wall kick, self-contained canvas radial
+{
+  const Rw = 256;
+  const rc2=document.createElement('canvas'); rc2.width=Rw; rc2.height=Rw;
+  const gc=rc2.getContext('2d');
+  gc.clearRect(0,0,Rw,Rw);
+  // radial: transparent center → soft outer darkening with subtle noise breaks (not flat vignette)
+  const outer = gc.createRadialGradient(Rw/2,Rw/2, Rw*0.28, Rw/2,Rw/2, Rw*0.50);
+  outer.addColorStop(0,'rgba(18,22,32,0)');
+  outer.addColorStop(0.42,'rgba(18,22,32,0)');
+  outer.addColorStop(0.72,'rgba(26,30,44,0.16)');
+  outer.addColorStop(0.86,'rgba(18,22,32,0.24)');
+  outer.addColorStop(1,'rgba(14,18,30,0.32)');
+  gc.fillStyle=outer; gc.beginPath(); gc.arc(Rw/2,Rw/2,Rw/2,0,Math.PI*2); gc.fill();
+  // break up perfect circle with a few soft blotches (foot traffic / edge pooling like authored AO)
+  for(let i=0;i<18;i++){
+    const a=Math.random()*Math.PI*2, r=Rw*0.36+Math.random()*Rw*0.10;
+    const x=Rw/2+Math.cos(a)*r, y=Rw/2+Math.sin(a)*r;
+    const rad=10+Math.random()*18, alpha=0.06+Math.random()*0.08;
+    gc.fillStyle=`rgba(22,24,32,${alpha})`;
+    gc.beginPath(); gc.ellipse(x,y,rad*1.4,rad,Math.random()*Math.PI,0,Math.PI*2); gc.fill();
+  }
+  const edgeTex=new THREE.CanvasTexture(rc2); edgeTex.colorSpace=THREE.SRGBColorSpace; edgeTex.anisotropy=4;
+  const ringMat2=new THREE.MeshBasicMaterial({ map:edgeTex, transparent:true, opacity:0.44, depthWrite:false, blending:THREE.MultiplyBlending, premultipliedAlpha:true });
+  ringMat2.polygonOffset=true; ringMat2.polygonOffsetFactor=-0.6;
+  const edgeRing=new THREE.Mesh(new THREE.RingGeometry(arenaRadius*0.62, arenaRadius*0.99, 64), ringMat2);
+  edgeRing.rotation.x=-Math.PI/2;
+  edgeRing.position.y=0.014;
+  edgeRing.renderOrder=2;
+  scene.add(edgeRing);
+}
 // contact AO — radial gradient plane (fake AO under crates/walls/pillars)
 function makeAOGradTexture(){
   const s=128, c=document.createElement('canvas'); c.width=s; c.height=s;
@@ -560,8 +601,11 @@ for(let i=0;i<6;i++){
   stripe.position.set(x, 1.1, z);
   stripe.lookAt(0, 1.1, 0);
   wallGroup.add(stripe);
-  // light cap trim
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(w, 0.22, 0.62), new THREE.MeshStandardMaterial({ color:0xf0f4f8, roughness:0.45, metalness:0.08 }));
+  // light cap trim — Iteration 11: Halo trim cap variation (alternating cooler/warmer whites like authored trim cap, not uniform 0xf0f4f8)
+  const capIsCool = (i & 1)===0;
+  const capCol = capIsCool ? 0xf1f5fa : 0xe8ecf2;
+  const capRough = capIsCool ? 0.42 : 0.50;
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(w, 0.22, 0.62), new THREE.MeshStandardMaterial({ color:capCol, roughness:capRough, metalness:0.09 }));
   cap.position.set(x, h-0.11, z);
   cap.lookAt(0, h-0.11, 0);
   wallGroup.add(cap);
