@@ -26,6 +26,8 @@ const waveAnnounceEl = document.getElementById('waveAnnounce');
 const breachWarnEl = document.getElementById('breachWarn');
 const hitFlashEl = document.getElementById('hitFlash');
 const vignetteEl = document.getElementById('vignette');
+const lowVignetteEl = document.getElementById('lowVignette');
+const chromaticEl = document.getElementById('chromatic');
 const mobileControlsEl = document.getElementById('mobileControls');
 const joystickEl = document.getElementById('joystick');
 const joyStickEl = document.getElementById('joyStick');
@@ -113,6 +115,8 @@ function doAbandonRun(){
   startCard.classList.remove('hidden');
   howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden'); pauseCard.classList.add('hidden'); historyCard.classList.add('hidden');
   bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
+  if(lowVignetteEl) lowVignetteEl.classList.remove('on');
+  if(chromaticEl) chromaticEl.classList.remove('on');
   // history runs increment if had progress
   if(hadProgress) runHistory.runs+=1;
   runHistory.bestLoop = Math.max(runHistory.bestLoop, 1);
@@ -215,9 +219,42 @@ scene.add(rim);
 const envScene = new THREE.Scene();
 scene.environment = null;
 
-// floor + arena bounds
+// floor + arena bounds — baked AO via CanvasTexture (soft shadow)
+function createFloorAOTexture(){
+  const c=document.createElement('canvas'); c.width=512; c.height=512;
+  const g=c.getContext('2d');
+  // base
+  g.fillStyle='#0e1a28'; g.fillRect(0,0,512,512);
+  // radial falloff to edges (vignette AO)
+  const rad=g.createRadialGradient(256,256,0,256,256,256);
+  rad.addColorStop(0,'rgba(0,0,0,0)');
+  rad.addColorStop(0.52,'rgba(0,0,0,0)');
+  rad.addColorStop(0.70,'rgba(0,0,0,0.16)');
+  rad.addColorStop(0.86,'rgba(0,0,0,0.30)');
+  rad.addColorStop(1,'rgba(0,0,0,0.55)');
+  g.fillStyle=rad; g.fillRect(0,0,512,512);
+  // 4 pillar contact shadows at radius 7.5 (world 18)
+  for(let i=0;i<4;i++){
+    const ang=i*Math.PI/2;
+    const x=256+Math.cos(ang)*(7.5/18*240);
+    const y=256+Math.sin(ang)*(7.5/18*240);
+    const pg=g.createRadialGradient(x,y,0,x,y,30);
+    pg.addColorStop(0,'rgba(0,0,0,0.48)'); pg.addColorStop(0.5,'rgba(0,0,0,0.22)'); pg.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=pg; g.beginPath(); g.arc(x,y,30,0,Math.PI*2); g.fill();
+  }
+  // core contact AO
+  const cg=g.createRadialGradient(256,256,0,256,256,24);
+  cg.addColorStop(0,'rgba(0,0,0,0.62)'); cg.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=cg; g.beginPath(); g.arc(256,256,24,0,Math.PI*2); g.fill();
+  const tex=new THREE.CanvasTexture(c);
+  tex.colorSpace=THREE.SRGBColorSpace; tex.needsUpdate=true;
+  return tex;
+}
 const floorGeo = new THREE.CircleGeometry(18, 64);
 const floorMat = new THREE.MeshStandardMaterial({ color:0x0e1a28, roughness:0.9, metalness:0.05 });
+const floorAOTexture = createFloorAOTexture();
+floorMat.map = floorAOTexture;
+floorMat.needsUpdate = true;
 const floor = new THREE.Mesh(floorGeo, floorMat);
 floor.rotation.x = -Math.PI/2;
 floor.receiveShadow=true;
@@ -331,9 +368,37 @@ function setupArenaDeco(){
     const g = arenaModel.scene.clone(true);
     centerAndScale({scene:g}, 12);
     g.position.set(0,-0.1,0);
-    g.traverse(o=>{ if(o.isMesh && o.material){ o.material.transparent=false; o.material.opacity=1; if(o.material.color) o.material.side=THREE.DoubleSide; }});
+    g.traverse(o=>{
+      if(o.isMesh && o.material){
+        const mat=o.material;
+        // Fix arena.glb Material.001 alpha 0.25 BLEND — render as transparent glass
+        const isGlass = (mat.name && mat.name.includes('Material.001')) || (mat.name && mat.name.includes('001')) || (mat.opacity < 1 && mat.opacity > 0);
+        // Also detect BLEND via userData or baseColor alpha
+        const alphaFromFactor = mat.opacity;
+        if(isGlass || alphaFromFactor===0.25){
+          mat.transparent = true;
+          mat.opacity = 0.25;
+          mat.depthWrite = false;
+          mat.side = THREE.DoubleSide;
+        } else {
+          // Preserve opaque materials but ensure DoubleSide verified
+          mat.transparent = false;
+          mat.opacity = 1;
+          mat.depthWrite = true;
+          mat.side = THREE.DoubleSide;
+        }
+        mat.needsUpdate = true;
+        // verify
+        if(isGlass){
+          // ensure glass stays correct even if GLTFLoader already set transparent
+          mat.transparent = true; mat.opacity = 0.25; mat.depthWrite = false; mat.side = THREE.DoubleSide;
+        }
+      }
+    });
     scene.add(g);
     arenaLoaded=true;
+    // expose for verification (glass verified)
+    window.__arenaGlassVerified = (()=>{ let ok=false; g.traverse(o=>{ if(o.isMesh && o.material && o.material.name && o.material.name.includes('001')){ const m=o.material; if(m.transparent===true && Math.abs(m.opacity-0.25)<0.01 && m.depthWrite===false && m.side===THREE.DoubleSide) ok=true; }}); return ok; })();
   }
 }
 function setupPlayer(){
@@ -718,8 +783,11 @@ function spawnEnemy(){
   const g = new THREE.Group();
   let mesh;
   const isElite = (waveKill + enemies.length) % 5 === 4 || Math.random()<0.15; // every ~5th is elite
-  // second archetype: ranged spitter (uses knight.glb) vs melee robot — 35% ranged
-  const isRanged = Math.random()<0.35;
+  // second archetype: ranged spitter — palette-aware: P0/1 35%, P2 50% +12% speed (critic 4)
+  const paletteForSpawn = loop % 3;
+  let rangedChance = 0.35;
+  if(paletteForSpawn===2) rangedChance = 0.50;
+  const isRanged = Math.random()<rangedChance;
   const archetype = isRanged ? 'ranged' : 'melee';
   if(archetype==='ranged' && knightModel && knightModel!==null){
     // use original knight.glb (non-rigged) for spitter — tint blueish
@@ -756,7 +824,8 @@ function spawnEnemy(){
   g.add(holder);
   g.position.copy(pos);
   const baseHp = archetype==='ranged' ? (isElite? 110+loop*10 : 55+loop*7) : (isElite? 140+loop*12 : 70+loop*8);
-  const baseSpeed = archetype==='ranged' ? (isElite? 2.0+loop*0.14 : 1.7+loop*0.12) : (isElite? 2.8+loop*0.2 : 2.2+loop*0.18+Math.random()*0.6);
+  let baseSpeed = archetype==='ranged' ? (isElite? 2.0+loop*0.14 : 1.7+loop*0.12) : (isElite? 2.8+loop*0.2 : 2.2+loop*0.18+Math.random()*0.6);
+  if(paletteForSpawn===2) baseSpeed *= 1.12;
   g.userData={ holder, hp: baseHp, speed: baseSpeed, maxHp: baseHp, elite:isElite, bob:Math.random()*Math.PI*2, archetype, shootCd: 1.2+Math.random()*0.8 };
   const barColor = archetype==='ranged' ? (isElite?0x7a5cff:0x5590ff) : (isElite?0xff1a3d:0xff3b6b);
   const bar = new THREE.Mesh(new THREE.PlaneGeometry(isElite?1.1:0.9, isElite?0.11:0.08), new THREE.MeshBasicMaterial({color:barColor, side:THREE.DoubleSide}));
@@ -855,16 +924,25 @@ function updateHUD(dt=0.016){
   ecountEl.textContent=enemies.length;
   isoEl.textContent= coreHp>60 ? 'STABLE' : coreHp>30 ? 'LEAKING' : 'BREACH';
   isoEl.style.color= coreHp>60 ? 'var(--ok)' : coreHp>30 ? 'var(--warn)' : 'var(--accent2)';
-  // breach warning toggle
+  // breach warning toggle — also low-HP vignette + subtle chromatic aberration (A)
   const shouldBreach = coreHp>0 && coreHp<30 && gameState==='playing';
   if(shouldBreach && !breachActive){
     breachActive=true;
     breachWarnEl.classList.remove('hidden');
     vignetteEl.classList.add('on');
+    if(lowVignetteEl) lowVignetteEl.classList.add('on');
+    if(chromaticEl) chromaticEl.classList.add('on');
   } else if(!shouldBreach && breachActive){
     breachActive=false;
     breachWarnEl.classList.add('hidden');
     vignetteEl.classList.remove('on');
+    if(lowVignetteEl) lowVignetteEl.classList.remove('on');
+    if(chromaticEl) chromaticEl.classList.remove('on');
+  }
+  // ensure low-HP visuals also sync when HUD called outside toggle (e.g. after damage without state change)
+  if(lowVignetteEl && chromaticEl){
+    if(shouldBreach){ lowVignetteEl.classList.add('on'); chromaticEl.classList.add('on'); }
+    else { lowVignetteEl.classList.remove('on'); chromaticEl.classList.remove('on'); }
   }
 }
 
@@ -922,26 +1000,31 @@ function applyChamberMutation(loopNum){
   dir.color.setHex(p.dir);
   rim.color.setHex(p.rim);
   coreRing.material.color.setHex(loopNum%3===1?0xff3b6b:0x35d0ff);
-  // hazard pillars — 4 at radius 7.5, pulse damage
+  // hazard pillars — mutate gameplay per loop%3 (critic 4): P0=0, P1=4 static, P2=4 rotating/pulsing
+  const paletteIdx = loopNum % 3;
+  if(paletteIdx===0){
+    log(`◈ Chamber mutated — palette ${paletteIdx} VOID + 0 hazards (clean)`);
+    return;
+  }
   hazardGroup = new THREE.Group();
-  for(let i=0;i<4;i++){
+  hazardGroup.userData = { paletteIdx, rotSpeed: paletteIdx===2 ? 0.35 : 0 };
+  const count = 4;
+  for(let i=0;i<count;i++){
     const ang=i*Math.PI/2 + (loopNum*0.3);
     const x=Math.cos(ang)*7.5, z=Math.sin(ang)*7.5;
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.65,2.4,12), new THREE.MeshStandardMaterial({ color:p.rim, emissive:p.rim, emissiveIntensity:0.55, transparent:true, opacity:0.92 }));
-    pillar.position.set(x,1.2,z);
+    pillar.position.set(0,1.2,0);
     pillar.castShadow=true; pillar.receiveShadow=true;
-    pillar.userData={ baseEmissive:0.55, pulsePhase: i*1.6 };
+    pillar.userData={ baseEmissive:0.55, pulsePhase: i*1.6, rotating: paletteIdx===2 };
     const ring=new THREE.Mesh(new THREE.RingGeometry(0.9,1.05,16), new THREE.MeshBasicMaterial({ color:p.rim, transparent:true, opacity:0.28, side:THREE.DoubleSide }));
     ring.rotation.x=-Math.PI/2; ring.position.y=0.06;
-    const g=new THREE.Group(); g.add(pillar); g.add(ring); g.position.set(0,0,0);
-    // keep pillars at world pos: use group wrapper
     const holder=new THREE.Group(); holder.position.set(x,0,z); holder.add(pillar); holder.add(ring);
-    // store hazard position for tick
-    holder.userData={ hazard:true, pillar, ring, damageTick:0 };
+    holder.userData={ hazard:true, pillar, ring, damageTick:0, rotating: paletteIdx===2 };
     hazardGroup.add(holder);
   }
   scene.add(hazardGroup);
-  log(`◈ Chamber mutated — palette ${loopNum%3} + 4 hazard pillars`);
+  const desc = paletteIdx===1 ? '4 static hazards' : '4 rotating pulsing hazards';
+  log(`◈ Chamber mutated — palette ${paletteIdx} ${paletteIdx===1?'CRIMSON':'TEAL'} + ${desc}`);
 }
 
 async function startLoop(){
@@ -972,6 +1055,8 @@ async function startLoop(){
   bossHudEl.classList.add('hidden');
   titanIncomingEl.classList.add('hidden');
   breachActive=false; breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
+  if(lowVignetteEl) lowVignetteEl.classList.remove('on');
+  if(chromaticEl) chromaticEl.classList.remove('on');
   // hide persistence overlays
   if(pauseCard) pauseCard.classList.add('hidden');
   if(historyCard) historyCard.classList.add('hidden');
@@ -1090,6 +1175,8 @@ function winLoop(){
   updateHUD();
   log(`✓ Loop ${loop} stable — choose a boon`);
   breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on'); breachActive=false;
+  if(lowVignetteEl) lowVignetteEl.classList.remove('on');
+  if(chromaticEl) chromaticEl.classList.remove('on');
   showWaveAnnouncer(`✓ LOOP ${loop} STABLE — CHOOSE BOON`,1800);
   // delay boon UI slightly for announcement
   setTimeout(()=> showBoonChoice(), 600);
@@ -1371,8 +1458,9 @@ function tick(dt){
         player.position.add(push);
       }
     }
-    // hazard pillars pulse + damage
+    // hazard pillars pulse + damage — palette 2 rotates (critic 4)
     if(hazardGroup){
+      if(hazardGroup.userData && hazardGroup.userData.paletteIdx===2) hazardGroup.rotation.y += dt*0.35;
       hazardGroup.children.forEach(h=>{
         const pillar=h.userData.pillar;
         const pulse = 0.55 + Math.sin(t*2.8 + pillar.userData.pulsePhase)*0.25;
@@ -1626,9 +1714,9 @@ updateSeedDisplay();
 renderHistoryCard();
 log('Worktree arena ready — awaiting loop start');
 
-// expose for verifier
+// expose for verifier — includes A-verification hooks
 window.__arena={
-  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3)}),
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on'))}),
   getBoons:()=>({...activeBoons}),
   getHistory:()=>{ try{ return JSON.parse(JSON.stringify(runHistory)); }catch(e){ return {...runHistory}; } },
   pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); },
@@ -1636,4 +1724,16 @@ window.__arena={
   abandonForTest:()=> doAbandonRun(),
   togglePauseForTest:()=> togglePause(),
   getSeed:()=> loop%3,
+  getGlassState:()=>{
+    // inspect scene for glass mesh material state
+    let found=null;
+    scene.traverse(o=>{
+      if(o.isMesh && o.material && o.material.name && o.material.name.includes('001')){
+        found={ name:o.material.name, transparent:o.material.transparent, opacity:o.material.opacity, depthWrite:o.material.depthWrite, side:o.material.side, doubleSide: o.material.side===THREE.DoubleSide };
+      }
+    });
+    return found;
+  },
+  getFloorAO:()=> ({ hasMap: !!(floorMat.map && floorMat.map.isCanvasTexture), hasCanvas: !!(floorMat.map && floorMat.map.image && floorMat.map.image.width===512) }),
+  getAttributionLinks:()=> Array.from(document.querySelectorAll('#attribution a')).map(a=>({ href:a.href, target:a.target, rel:a.rel })),
 };
