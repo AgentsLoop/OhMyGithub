@@ -293,9 +293,38 @@ function makeFloorTextures(){
   // grain
   for(let i=0;i<3400;i++){ const x=Math.random()*N, y=Math.random()*N; g.fillStyle=`rgba(0,0,0,${Math.random()*0.016})`; g.fillRect(x,y,1,1); }
   const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2.2,2.2); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=8;
-  // bump canvas — luminance variation for grout micro-catch (iteration 6: bumpScale 0.035)
+  // iteration 8: procedural height → bump approximation — grout grooves feel deeper, bevel catches specular like authored normalMap
   const bumpCanvas=document.createElement('canvas'); bumpCanvas.width=N; bumpCanvas.height=N;
-  bumpCanvas.getContext('2d').drawImage(c,0,0);
+  const bc=bumpCanvas.getContext('2d');
+  bc.fillStyle='#808080'; bc.fillRect(0,0,N,N);
+  // base concrete micro-height — mid-gray speckle jitter
+  for(let i=0;i<3200;i++){ const x=Math.random()*N, y=Math.random()*N; const v=Math.floor(128+(Math.random()-0.5)*22); bc.fillStyle=`rgb(${v},${v},${v})`; bc.fillRect(x,y,1,1); }
+  for(let i=0;i<70;i++){
+    const x=Math.random()*N, y=Math.random()*N, r=40+Math.random()*90;
+    const dark=Math.random()<0.5;
+    const delta= dark ? -16 : 14;
+    const v=128+delta;
+    const grd=bc.createRadialGradient(x,y,0,x,y,r);
+    grd.addColorStop(0,`rgba(${v},${v},${v},0.55)`); grd.addColorStop(1,'rgba(128,128,128,0)');
+    bc.fillStyle=grd; bc.beginPath(); bc.arc(x,y,r,0,Math.PI*2); bc.fill();
+  }
+  // grout grooves — darker = deeper, plus thin light bevel highlight on +side (fake normal chamfer)
+  for(let i=0;i<N;i+=256){
+    // deep groove
+    bc.strokeStyle='#3e434f'; bc.lineWidth=7; bc.beginPath(); bc.moveTo(i,0); bc.lineTo(i,N); bc.stroke();
+    bc.beginPath(); bc.moveTo(0,i); bc.lineTo(N,i); bc.stroke();
+    // soft wider trough (deeper shadow)
+    bc.strokeStyle='#52575f'; bc.lineWidth=12; bc.globalAlpha=0.42; bc.beginPath(); bc.moveTo(i,0); bc.lineTo(i,N); bc.stroke();
+    bc.beginPath(); bc.moveTo(0,i); bc.lineTo(N,i); bc.stroke(); bc.globalAlpha=1;
+    // bevel highlight — one pixel light edge simulating 45° chamfer catch
+    bc.strokeStyle='#aeb4c0'; bc.lineWidth=1.2; bc.globalAlpha=0.55;
+    bc.beginPath(); bc.moveTo(i+4,0); bc.lineTo(i+4,N); bc.stroke();
+    bc.beginPath(); bc.moveTo(0,i+4); bc.lineTo(N,i+4); bc.stroke(); bc.globalAlpha=1;
+  }
+  // faint secondary grid at 128
+  bc.strokeStyle='#6e727a'; bc.lineWidth=1; bc.globalAlpha=0.32;
+  for(let i=128;i<N;i+=256){ bc.beginPath(); bc.moveTo(i,0); bc.lineTo(i,N); bc.stroke(); bc.beginPath(); bc.moveTo(0,i); bc.lineTo(N,i); bc.stroke(); }
+  bc.globalAlpha=1;
   const floorBump=new THREE.CanvasTexture(bumpCanvas); floorBump.wrapS=floorBump.wrapT=THREE.RepeatWrapping; floorBump.repeat.set(2.2,2.2); floorBump.anisotropy=8;
   // roughness variation canvas — mid 0.84 with per-panel jitter + wear = less glossy
   const rc=document.createElement('canvas'); rc.width=512; rc.height=512;
@@ -318,11 +347,21 @@ function makeFloorTextures(){
 const floorTexs = makeFloorTextures();
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(arenaRadius, 64),
-  new THREE.MeshStandardMaterial({ map: floorTexs.color, roughnessMap: floorTexs.rough, bumpMap: floorTexs.bump, bumpScale:0.035, color:0xffffff, roughness:0.88, metalness:0.02 })
+  new THREE.MeshStandardMaterial({ map: floorTexs.color, roughnessMap: floorTexs.rough, bumpMap: floorTexs.bump, bumpScale:0.058, color:0xffffff, roughness:0.88, metalness:0.02 })
 );
 floor.rotation.x = -Math.PI/2;
 floor.receiveShadow=true;
 scene.add(floor);
+// iteration 8: subtle floor reflection — low-opacity metalized duplicate plane (fake planar reflection, catches sky/env like Halo 45° chamfer floors)
+const floorReflect = new THREE.Mesh(
+  new THREE.CircleGeometry(arenaRadius*0.985, 64),
+  new THREE.MeshStandardMaterial({ color:0xc9d6ea, roughness:0.28, metalness:0.42, transparent:true, opacity:0.055, envMapIntensity:1.0 })
+);
+floorReflect.rotation.x = -Math.PI/2;
+floorReflect.position.y = 0.012;
+floorReflect.receiveShadow=false;
+floorReflect.renderOrder = 1;
+scene.add(floorReflect);
 // contact AO — radial gradient plane (fake AO under crates/walls/pillars)
 function makeAOGradTexture(){
   const s=128, c=document.createElement('canvas'); c.width=s; c.height=s;
@@ -391,12 +430,14 @@ function makeWallTextures(){
   g.beginPath(); g.moveTo(0, N*0.48); g.lineTo(N, N*0.48); g.stroke();
   g.strokeStyle='rgba(255,255,255,0.22)'; g.lineWidth=1;
   g.beginPath(); g.moveTo(0, N*0.48+1.5); g.lineTo(N, N*0.48+1.5); g.stroke();
-  // cavity AO along top edge + bottom edge (darkens near trim)
-  const topGrad=g.createLinearGradient(0,0,0,38);
-  topGrad.addColorStop(0,'rgba(18,24,38,0.14)'); topGrad.addColorStop(1,'rgba(0,0,0,0)');
-  g.fillStyle=topGrad; g.fillRect(0,0,N,38);
+  // cavity AO along top edge + bottom edge — iteration 8: stronger top cavity (was 0.14 → 0.26) so wall-to-ceiling reads like authored AO
+  const topGrad=g.createLinearGradient(0,0,0,42);
+  topGrad.addColorStop(0,'rgba(14,18,30,0.26)'); topGrad.addColorStop(0.5,'rgba(18,24,38,0.11)'); topGrad.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=topGrad; g.fillRect(0,0,N,42);
+  // extra dark line right at chamfer (bevel shadow)
+  g.fillStyle='rgba(14,18,30,0.14)'; g.fillRect(0,36, N, 6);
   const botGrad=g.createLinearGradient(0,N-46,0,N);
-  botGrad.addColorStop(0,'rgba(18,24,38,0)'); botGrad.addColorStop(1,'rgba(18,24,38,0.18)');
+  botGrad.addColorStop(0,'rgba(18,24,38,0)'); botGrad.addColorStop(1,'rgba(18,24,38,0.20)');
   g.fillStyle=botGrad; g.fillRect(0,N-46,N,46);
   // iteration 5: fake edge-wear/dirt — broken dark streaks along vertical panel seams + drips near floor joint (Halo didactic wear)
   g.save();
@@ -488,7 +529,7 @@ for(let i=0;i<6;i++){
   const x = Math.cos(ang)*r, z=Math.sin(ang)*r;
   const w = 12, h=5.5;
   // body with trim-sheet textures
-  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.6), new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.035, color:0xffffff, roughness:0.79, metalness:0.06 }));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.6), new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.055, color:0xffffff, roughness:0.79, metalness:0.06 }));
   body.position.set(x, h/2, z);
   body.lookAt(0, h/2, 0);
   body.castShadow=true; body.receiveShadow=true;
@@ -516,6 +557,12 @@ for(let i=0;i<6;i++){
   bevelHi.position.set(x, h-0.212, z);
   bevelHi.lookAt(0, h-0.212, 0);
   wallGroup.add(bevelHi);
+  // iteration 8: cavity AO darkening strip right under top bevel (simulates chamfer shadow / aoMap where wall meets cap)
+  const wallCavityAO = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.055, 0.04), new THREE.MeshStandardMaterial({ color:0x182030, roughness:0.92, metalness:0.04 }));
+  wallCavityAO.position.set(x, h-0.275, z);
+  wallCavityAO.lookAt(0, h-0.275, 0);
+  wallCavityAO.translateZ(0.31);
+  wallGroup.add(wallCavityAO);
   // iteration 7: Halo neon wayfinding — thin emissive trim along top edge (reads at distance, not color spam)
   const neonTrim = new THREE.Mesh(new THREE.BoxGeometry(w*0.94, 0.028, 0.04), new THREE.MeshStandardMaterial({ color:0x7af2ff, emissive:0x7af2ff, emissiveIntensity:1.45 }));
   neonTrim.position.set(x, h-0.46, z);
@@ -680,7 +727,7 @@ function createElevatedPlatform(pos, yawRad=0, w=3.5, d=2.0, h=1.2){
   const g=new THREE.Group();
   g.position.copy(pos); g.position.y=0; g.rotation.y=yawRad;
   // main body — reuses wall trim-sheet material for hard-surface coherence
-  const bodyMat = new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.035, color:0xffffff, roughness:0.78, metalness:0.08 });
+  const bodyMat = new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.055, color:0xffffff, roughness:0.78, metalness:0.08 });
   // clone canvas repeat tweak so platform top not obviously same tiling as walls
   bodyMat.map = wallTexs.color.clone(); bodyMat.map.repeat.set(0.85,0.48); bodyMat.map.needsUpdate=true;
   bodyMat.roughnessMap = wallTexs.rough.clone(); bodyMat.roughnessMap.repeat.set(0.85,0.48); bodyMat.roughnessMap.needsUpdate=true;
