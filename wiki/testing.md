@@ -29,6 +29,12 @@ When a request contains `/goal`, verify that label synchronization creates the
 For `/loop`, also verify the `/Loop` label, goal invocation, continuation
 prompt, per-iteration push/comment, existing-PR behavior, and the `18000` second
 five-hour deadline.
+For the `omo` issue label, verify that an otherwise normal `/oc` request causes
+the OpenCode startup step to install `oh-my-openagent` with Bun before starting
+the web server; an unlabelled `/oc` request must not run that installer, and the
+`omo` label alone must not trigger a workflow.
+The `omo` prompt should also contain the `ulw-loop` continuation directive while
+the executable path remains the normal `/oc`/OpenCode goal invocation.
 
 The log-release step must copy and upload only non-empty `.log`/`.json` files;
 empty service logs such as `nginx.log` can make GitHub's upload API return
