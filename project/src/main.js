@@ -125,7 +125,7 @@ function doAbandonRun(){
   howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden'); if(doorCard) doorCard.classList.add('hidden'); pauseCard.classList.add('hidden'); historyCard.classList.add('hidden');
   bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
   if(lowVignetteEl) lowVignetteEl.classList.remove('on');
-  if(chromaticEl) chromaticEl.classList.remove('on');
+  if(chromaticEl){ chromaticEl.classList.remove('on'); chromaticEl.style.removeProperty('--chromaOpacity'); chromaticEl.style.removeProperty('--chroma'); }
   // ── (A) return pooled enemies on abandon
   enemies.forEach(e=>{ try{ returnEnemyToPool(e); }catch(_){} scene.remove(e); }); enemies.length=0;
   bossGroup=null; isBossLoop=false;
@@ -701,6 +701,39 @@ function triggerHitFlash(type){
   hitFlashEl.style.opacity='1';
   setTimeout(()=>{ hitFlashEl.style.opacity='0'; setTimeout(()=>hitFlashEl.classList.remove('coreHit','playerHit'),300); },140);
 }
+function triggerBoonFlash(){
+  const tot=activeBoons.pulse+activeBoons.cache+activeBoons.shard;
+  if(tot===0) return;
+  let best='pulse', max=activeBoons.pulse;
+  if(activeBoons.cache>max){ best='cache'; max=activeBoons.cache; }
+  if(activeBoons.shard>max){ best='shard'; max=activeBoons.shard; }
+  if(activeBoons.shard===max && max>0) best='shard';
+  else if(activeBoons.pulse===max && max>0) best='pulse';
+  const map={pulse:'pulseFlash',cache:'cacheFlash',shard:'shardFlash'};
+  const cls=map[best];
+  hitFlashEl.classList.remove('coreHit','playerHit','pulseFlash','cacheFlash','shardFlash');
+  void hitFlashEl.offsetWidth;
+  hitFlashEl.classList.add(cls);
+  hitFlashEl.style.opacity='1';
+  setTimeout(()=>{ hitFlashEl.style.opacity='0'; setTimeout(()=>hitFlashEl.classList.remove(cls),300); },120);
+}
+function spawnWinConfetti(){
+  const colors=[0xffd700,0x2ee5a0,0xffd700,0x2ee5a0,0xffe066,0xffd700,0x2ee5a0,0xffeb8a];
+  for(let i=0;i<40;i++){
+    const col=colors[i%colors.length];
+    const w=0.10+Math.random()*0.08, h=0.16+Math.random()*0.08;
+    const geo=new THREE.PlaneGeometry(w,h);
+    const mat=new THREE.MeshBasicMaterial({color:col, side:THREE.DoubleSide, transparent:true, opacity:0.96});
+    const m=new THREE.Mesh(geo, mat);
+    const ang=Math.random()*Math.PI*2, r=Math.random()*4;
+    m.position.set(Math.cos(ang)*r, 7+Math.random()*2.5, Math.sin(ang)*r);
+    m.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+    m.userData={ vel:new THREE.Vector3((Math.random()-0.5)*2.2, -1.8 -Math.random()*2.2, (Math.random()-0.5)*2.2), life:1.2, rotVel:new THREE.Vector3((Math.random()-0.5)*9,(Math.random()-0.5)*9,(Math.random()-0.5)*9), isConfetti:true };
+    scene.add(m); particles.push(m);
+  }
+  burst(core.position.clone().add(new THREE.Vector3(0,1.2,0)), 0xffd700, 16);
+  beep(880,0.08,0.12); setTimeout(()=>beep(1100,0.08,0.11),140);
+}
 function triggerHitStop(ms=60){
   hitStopTimer=Math.max(hitStopTimer, ms/1000);
   if(ms>=60) duckDrone(0.12, 0.35);
@@ -858,7 +891,7 @@ function spawnTitan(){
   const ang=Math.random()*Math.PI*2;
   const r=14.5;
   g.position.set(Math.cos(ang)*r,0,Math.sin(ang)*r);
-  g.userData={ holder, hp:bossHp, maxHp:bossHp, speed: 1.35+loop*0.08, isBoss:true, isElite:true, bob:Math.random()*Math.PI*2, archetype:'boss', shootCd:999, dashCd:2.6, shockCd:4.0 };
+  g.userData={ holder, hp:bossHp, maxHp:bossHp, speed: 1.35+loop*0.08, isBoss:true, isElite:true, bob:Math.random()*Math.PI*2, archetype:'boss', shootCd:999, dashCd:2.6, shockCd:4.0, kbVel: new THREE.Vector3() };
   const bar=new THREE.Mesh(new THREE.PlaneGeometry(1.8,0.14), new THREE.MeshBasicMaterial({color:0xff1a3d, side:THREE.DoubleSide}));
   bar.position.set(0,2.45,0); g.add(bar); g.userData.bar=bar;
   const aura=new THREE.Mesh(new THREE.RingGeometry(1.25,1.45,20), new THREE.MeshBasicMaterial({color:0xff3b6b, transparent:true, opacity:0.42, side:THREE.DoubleSide}));
@@ -923,7 +956,7 @@ function doBossShockwave(){
 
 function spawnSingleBullet(dirVec){
   const r = 0.14 * boonModifiers.radiusMult;
-  const dmg = Math.round(20 * boonModifiers.dmgMult);
+  const dmg = Math.round(14 * boonModifiers.dmgMult);
   const col = activeBoons.pulse>0 ? 0x7ae8ff : 0x35d0ff;
   const b = new THREE.Mesh(new THREE.SphereGeometry(r,10,10), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:col, emissiveIntensity: 1.9 + activeBoons.pulse*0.3 }));
   b.position.copy(player.position).add(new THREE.Vector3(0,0.6,0)).add(dirVec.clone().multiplyScalar(0.6));
@@ -936,7 +969,7 @@ function spawnSingleBullet(dirVec){
 }
 function shoot(){
   const now=performance.now();
-  const cd = activeBoons.pulse>0 ? 160 : 180;
+  const cd = 220;
   if(now-lastShot<cd) return;
   lastShot=now;
   const baseDir = aimDir.clone();
@@ -1051,10 +1084,10 @@ function spawnEnemy(){
   g.add(holder);
   g.position.copy(pos);
   const rawHp = archetype==='ranged' ? (isElite? 110+loop*10 : 55+loop*7) : (isElite? 140+loop*12 : 70+loop*8);
-  const baseHp = Math.round(rawHp * 1.6); // VS density fix — raise HP 1.6x so 40-60 can stack
+  const baseHp = Math.round(rawHp * 2.2); // VS density fix — raise HP 2.2x so 40-60 can stack
   let baseSpeed = archetype==='ranged' ? (isElite? 2.0+loop*0.14 : 1.7+loop*0.12) : (isElite? 2.8+loop*0.2 : 2.2+loop*0.18+Math.random()*0.6);
   if(paletteForSpawn===2) baseSpeed *= 1.12;
-  g.userData={ holder, hp: baseHp, speed: baseSpeed, maxHp: baseHp, elite:isElite, bob:Math.random()*Math.PI*2, archetype, shootCd: 1.2+Math.random()*0.8 };
+  g.userData={ holder, hp: baseHp, speed: baseSpeed, maxHp: baseHp, elite:isElite, bob:Math.random()*Math.PI*2, archetype, shootCd: 1.2+Math.random()*0.8, kbVel: new THREE.Vector3() };
   const barColor = archetype==='ranged' ? (isElite?0x7a5cff:0x5590ff) : (isElite?0xff1a3d:0xff3b6b);
   const bar = new THREE.Mesh(new THREE.PlaneGeometry(isElite?1.1:0.9, isElite?0.11:0.08), new THREE.MeshBasicMaterial({color:barColor, side:THREE.DoubleSide}));
   bar.position.set(0, isElite?1.65:1.45,0);
@@ -1153,25 +1186,42 @@ function updateHUD(dt=0.016){
   ecountEl.textContent=enemies.length;
   isoEl.textContent= coreHp>60 ? 'STABLE' : coreHp>30 ? 'LEAKING' : 'BREACH';
   isoEl.style.color= coreHp>60 ? 'var(--ok)' : coreHp>30 ? 'var(--warn)' : 'var(--accent2)';
-  // breach warning toggle — also low-HP vignette + subtle chromatic aberration (A)
+  // breach warning toggle — vignette on <30 (chromatic now handled separately <50)
   const shouldBreach = coreHp>0 && coreHp<30 && gameState==='playing';
   if(shouldBreach && !breachActive){
     breachActive=true;
     breachWarnEl.classList.remove('hidden');
     vignetteEl.classList.add('on');
     if(lowVignetteEl) lowVignetteEl.classList.add('on');
-    if(chromaticEl) chromaticEl.classList.add('on');
   } else if(!shouldBreach && breachActive){
     breachActive=false;
     breachWarnEl.classList.add('hidden');
     vignetteEl.classList.remove('on');
     if(lowVignetteEl) lowVignetteEl.classList.remove('on');
-    if(chromaticEl) chromaticEl.classList.remove('on');
   }
   // ensure low-HP visuals also sync when HUD called outside toggle (e.g. after damage without state change)
-  if(lowVignetteEl && chromaticEl){
-    if(shouldBreach){ lowVignetteEl.classList.add('on'); chromaticEl.classList.add('on'); }
-    else { lowVignetteEl.classList.remove('on'); chromaticEl.classList.remove('on'); }
+  if(lowVignetteEl){
+    if(shouldBreach) lowVignetteEl.classList.add('on');
+    else lowVignetteEl.classList.remove('on');
+  }
+  // ── (A) Iteration8: chromatic aberration intensity linked to coreHp<50 (subtle, grows as hp drops)
+  if(chromaticEl){
+    if(coreHp>0 && coreHp<50 && gameState==='playing'){
+      const intensity=(50-coreHp)/50; // 0..1
+      const op=(0.38+intensity*0.62).toFixed(2);
+      const chroma=(0.42+intensity*0.95).toFixed(2);
+      chromaticEl.style.setProperty('--chromaOpacity', op);
+      chromaticEl.style.setProperty('--chroma', chroma);
+      chromaticEl.classList.add('on');
+    } else if(coreHp>=50 || gameState!=='playing'){
+      // keep chromatic if breachActive (<30) but that case already covered by <50 block, so only remove when >=50 or not playing
+      if(coreHp>=50 || gameState!=='playing'){
+        chromaticEl.classList.remove('on');
+        chromaticEl.style.removeProperty('--chromaOpacity');
+        chromaticEl.style.removeProperty('--chroma');
+      }
+    }
+    // for 30<=hp<50, ensure vignette off but chromatic stays on via above
   }
 }
 
@@ -1294,7 +1344,7 @@ async function startLoop(){
   titanIncomingEl.classList.add('hidden');
   breachActive=false; breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
   if(lowVignetteEl) lowVignetteEl.classList.remove('on');
-  if(chromaticEl) chromaticEl.classList.remove('on');
+  if(chromaticEl){ chromaticEl.classList.remove('on'); chromaticEl.style.removeProperty('--chromaOpacity'); chromaticEl.style.removeProperty('--chroma'); }
   // hide persistence overlays
   if(pauseCard) pauseCard.classList.add('hidden');
   if(historyCard) historyCard.classList.add('hidden');
@@ -1503,7 +1553,8 @@ function winLoop(){
   log(`✓ Loop ${loop} stable — choose a boon`);
   breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on'); breachActive=false;
   if(lowVignetteEl) lowVignetteEl.classList.remove('on');
-  if(chromaticEl) chromaticEl.classList.remove('on');
+  if(chromaticEl){ chromaticEl.classList.remove('on'); chromaticEl.style.removeProperty('--chromaOpacity'); chromaticEl.style.removeProperty('--chroma'); }
+  spawnWinConfetti();
   showWaveAnnouncer(`✓ LOOP ${loop} STABLE — CHOOSE BOON`,1800);
   // delay boon UI slightly for announcement
   setTimeout(()=> showBoonChoice(), 600);
@@ -1769,6 +1820,23 @@ function tick(dt){
         if(target.lengthSq()>1e-4) e.userData.holder.rotation.y = Math.atan2(target.x, target.z);
       }
       e.userData.bar.lookAt(camera.position);
+      // kbVel decay — lerp knockback not instant teleport
+      if(e.userData.kbVel && e.userData.kbVel.lengthSq()>0.0001){
+        e.position.add(e.userData.kbVel.clone().multiplyScalar(dt));
+        e.userData.kbVel.multiplyScalar(Math.exp(-dt/0.18));
+        if(e.userData.kbVel.lengthSq()<0.001) e.userData.kbVel.set(0,0,0);
+      }
+      // repulsion — keep horde stacking to 40-60 (critic 8)
+      let rep = new THREE.Vector3();
+      for(let j=0;j<enemies.length;j++){
+        if(i===j) continue;
+        const o=enemies[j];
+        const d=e.position.distanceTo(o.position);
+        if(d<1.1 && d>0.001){
+          rep.add(e.position.clone().sub(o.position).normalize().multiplyScalar(0.08 * (1.1 - d)/1.1));
+        }
+      }
+      if(rep.lengthSq()>0) e.position.add(rep.multiplyScalar(dt*8));
       // bob for static + aura spin for elite
       if(e.userData.aura) e.userData.aura.rotation.z += dt*2.5;
       e.userData.holder.position.y = Math.sin(t*3.2 + e.userData.bob)*0.06 * (e.userData.elite?0.5:1);
@@ -1882,17 +1950,24 @@ function tick(dt){
         e.userData.bar.scale.x=pct;
         e.userData.bar.material.color.set(pct<0.3?0xff3b6b:0xffd23b);
         if(e.userData.isBoss) updateBossHud();
-        // white flash hit
+        // white flash hit — 120ms + scale punch 1.18 →1.0 80ms (critic 8)
         if(e.userData.holder){
-          e.userData.holder.traverse(o=>{ if(o.isMesh && o.material){ if(!o.userData.origEmissive){ o.userData.origEmissive=o.material.emissive.clone(); o.userData.origColor=o.material.color.clone(); } o.material.emissive.setHex(0xffffff); setTimeout(()=>{ if(o.material && o.userData.origEmissive){ o.material.emissive.copy(o.userData.origEmissive); if(o.userData.origColor) o.material.color.copy(o.userData.origColor); } }, 55); }});
+          e.userData.holder.traverse(o=>{ if(o.isMesh && o.material){ if(!o.userData.origEmissive){ o.userData.origEmissive=o.material.emissive.clone(); o.userData.origColor=o.material.color.clone(); } o.material.emissive.setHex(0xffffff); setTimeout(()=>{ if(o.material && o.userData.origEmissive){ o.material.emissive.copy(o.userData.origEmissive); if(o.userData.origColor) o.material.color.copy(o.userData.origColor); } }, 120); }});
+          e.userData.holder.scale.set(1.18,1.18,1.18);
+          setTimeout(()=>{ if(e.userData.holder) e.userData.holder.scale.set(1,1,1); }, 80);
         }
         spawnDamageNumber(e.position.clone().add(new THREE.Vector3(0,0.2,0)), String(b.userData.dmg), e.userData.elite?'#ffb020':'#ffffff');
         burst(e.position, 0xffffff, 4);
-        // knockback instead of insta-kill — VS horde stacks
-        e.position.add(b.userData.vel.clone().normalize().multiplyScalar(e.userData.isBoss?0.2:0.25));
-        // hitstop + directional shake + sound
-        triggerHitStop(62);
+        // knockback via kbVel decay (lerp not teleport) — VS stacks 40-60
+        if(e.userData.kbVel){
+          e.userData.kbVel.add(b.userData.vel.clone().normalize().multiplyScalar(e.userData.isBoss?1.2:3.2));
+        } else {
+          e.position.add(b.userData.vel.clone().normalize().multiplyScalar(e.userData.isBoss?0.2:0.25));
+        }
+        // hitstop + directional shake + sound + boon-colored flash (A iteration8)
+        triggerHitStop(90);
         triggerShake(0.85, b.userData.vel);
+        triggerBoonFlash();
         beep(e.userData.elite? 660: 880, 0.05, 0.09);
         scene.remove(b); bullets.splice(i,1);
         if(e.userData.hp<=0){
@@ -1964,6 +2039,18 @@ function tick(dt){
       p.material.opacity = Math.max(0, p.userData.life/0.22);
       p.userData.life-=dt;
       if(p.userData.life<=0){ scene.remove(p); particles.splice(i,1); }
+      continue;
+    }
+    if(p.userData.isConfetti){
+      p.position.add(p.userData.vel.clone().multiplyScalar(dt));
+      p.rotation.x += p.userData.rotVel.x * dt;
+      p.rotation.y += p.userData.rotVel.y * dt;
+      p.rotation.z += p.userData.rotVel.z * dt;
+      p.userData.vel.y -= 6*dt;
+      p.userData.vel.x *= 0.99; p.userData.vel.z *= 0.99;
+      p.userData.life-=dt;
+      if(p.material.opacity!==undefined) p.material.opacity=Math.max(0, p.userData.life/1.2);
+      if(p.userData.life<=0){ scene.remove(p); if(p.geometry) p.geometry.dispose(); particles.splice(i,1); }
       continue;
     }
     p.position.add(p.userData.vel.clone().multiplyScalar(dt));
@@ -2171,4 +2258,12 @@ window.__arena={
   toggleRebindForTest:(force)=> toggleRebindHint(force),
   getJoyDeadzone:()=> ({ width: joyDeadzoneEl ? joyDeadzoneEl.style.width : null, height: joyDeadzoneEl ? joyDeadzoneEl.style.height : null, exists: !!joyDeadzoneEl, deadzonePx: 18, dashThreshold: '18px logical' }),
   simulateQuestionKeyForTest:()=> { const ev=new KeyboardEvent('keydown',{key:'?'}); window.dispatchEvent(ev); document.dispatchEvent(ev); return !rebindHintEl.classList.contains('hidden'); },
+  // (A) iteration8 visual juice & feedback
+  spawnWinConfettiForTest:()=> spawnWinConfetti(),
+  getConfettiCount:()=> particles.filter(p=> p.userData && p.userData.isConfetti).length,
+  triggerBoonFlashForTest:()=> triggerBoonFlash(),
+  getHitFlashState:()=> ({ cls: hitFlashEl.className, bg: hitFlashEl.style.background, opacity: hitFlashEl.style.opacity }),
+  getChromaticState:()=> ({ on: !!(chromaticEl && chromaticEl.classList.contains('on')), opacity: chromaticEl ? chromaticEl.style.getPropertyValue('--chromaOpacity') : '', chroma: chromaticEl ? chromaticEl.style.getPropertyValue('--chroma') : '', hasVar: !!(chromaticEl && chromaticEl.style.getPropertyValue('--chroma')) }),
+  setCoreHpForTest:(v)=>{ coreHp=v; updateHUD(); return coreHp; },
+  getCoreHp:()=> coreHp,
 };
