@@ -73,11 +73,15 @@ dir.shadow.camera.updateProjectionMatrix();
 dir.shadow.bias = -0.0008;
 dir.shadow.normalBias = 0.012;
 scene.add(dir);
-// rim light — thumbnail facet highlight for lime Carcamero
-const rim = new THREE.DirectionalLight(0xFFF8E0, 1.1);
+// rim light — thumbnail facet highlight for lime Carcamero (boosted for rear-chase readability)
+const rim = new THREE.DirectionalLight(0xFFF8E0, 1.65);
 rim.position.set(-30, 18, -20);
 scene.add(rim);
-scene.add(new THREE.AmbientLight(0xFFF0C8, 0.15));
+// fill for rear-chase — defeats self-shadow charcoal at 9m without washing terraces
+const carFill = new THREE.DirectionalLight(0xFFF6D6, 0.85);
+carFill.position.set(0, 12, -22);
+scene.add(carFill);
+scene.add(new THREE.AmbientLight(0xFFF0C8, 0.18));
 
 // ground — HARD-QUANTIZED VOXEL TERRACES (Crossy Road readability fix)
 // Iter3: tightened AO 0.65-1.18 (was 0.78-1.06 too subtle at 9 m chase) + hard 1.05 m
@@ -114,7 +118,12 @@ const groundGeo = new THREE.PlaneGeometry(400,400, 84,84);
     const d4 = Math.sin(x*0.018 - y*0.022) * 0.45;
     const mask = THREE.MathUtils.clamp((dist - 28)/95, 0, 1);
     let raw = (d1+d2+d3+d4) * THREE.MathUtils.lerp(0.32, 1.0, mask);
-    if(dist < 22) raw *= 0.22; // keep spawn disc flat and legible (small lift then quantized to band 2)
+    if(dist < 22){
+      // Crossy spawn fix: raw*=0.22 flattened dist<22 to single band (variance 0 beige). Keep mostly flat for drivability but inject micro-terrace noise so 2-3 bands (2/3) survive for contrast.
+      const t = dist / 22;
+      const micro = Math.sin(x*0.62)*Math.cos(y*0.58)*0.62 + Math.sin(x*0.88 - y*0.72)*0.34;
+      raw = raw * THREE.MathUtils.lerp(0.22, 0.42, t) + micro * THREE.MathUtils.lerp(0.72, 0.28, t);
+    }
     // hard quantize to discrete voxel levels — no lerp, no 0.33 rounding
     let q = Math.floor(THREE.MathUtils.clamp((raw + 2.2)/VOXEL_STEP, 0, LEVELS - 0.001));
     // height centered so band 2 (~0) is near ground plane
@@ -182,7 +191,11 @@ function sampleGroundH(x,z){
   const d4=Math.sin(x*0.018-z*0.022)*0.45;
   const mask=THREE.MathUtils.clamp((dist-28)/95,0,1);
   let raw=(d1+d2+d3+d4)*THREE.MathUtils.lerp(0.32,1.0,mask);
-  if(dist<22) raw*=0.22;
+  if(dist<22){
+    const t=dist/22;
+    const micro=Math.sin(x*0.62)*Math.cos(z*0.58)*0.62 + Math.sin(x*0.88 - z*0.72)*0.34;
+    raw=raw*THREE.MathUtils.lerp(0.22,0.42,t)+micro*THREE.MathUtils.lerp(0.72,0.28,t);
+  }
   const VOXEL_STEP=1.05, LEVELS=5;
   let q=Math.floor(THREE.MathUtils.clamp((raw+2.2)/VOXEL_STEP,0,LEVELS-0.001));
   return q*VOXEL_STEP -2.2 +0.42;
@@ -241,26 +254,29 @@ loader.load('/models/car.glb', (gltf)=>{
       if(o.material){
         // ensure correct colour space and crisp non-metal response
         if(o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
-        o.material.side = THREE.DoubleSide;
+        // Crossy shadow fix: DoubleSide washed shadows (both sides lit). Use FrontSide for hard voxel occlusion; glass keeps DoubleSide transparent.
+        o.material.side = THREE.FrontSide;
         // — PMREM IBL tuning — neutral RoomEnvironment makes PBR pop without wash
         // scene.environment already set; per-material intensity keeps ground matte while car shines
         const n = (o.material.name || '').toLowerCase();
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
         if (n.includes('carcamero')) {
-          // lime body — thumbnail 80,156,99 vs GLB 24,163,12 + rear-view darkness fix
-          // Harsh A/B: chase-cam rear view hid lime (57,56,53 charcoal flat vs thumb 67,181,96)
-          // Force thumbnail sRGB, lift with emissive, lower roughness for facet gloss at 9m
-          o.material.color.setRGB(0.314, 0.612, 0.388); // exact thumb pick, not dark GLB
-          o.material.roughness = 0.28;
-          o.material.metalness = 0.05;
-          o.material.envMapIntensity = 1.35;
-          o.material.emissive = new THREE.Color(0x1e3a1e);
-          o.material.emissiveIntensity = 0.18;
+          // CRITIC 5: harsh A/B — rear chase still charcoal 57,56,53 vs thumb 68,164,83 (avg crop).
+          // Prior fix (0.314,0.612,0.388 @1.35/0.28) invisible at 9m — ground+shadow wash.
+          // Force exact thumbnail avg 68,164,83, crush roughness for facet gloss, lift env to 2.2,
+          // emissive boost to defeat rear-view shadowing; keep fog false + receiveShadow false.
+          o.material.color.setRGB(0.267, 0.643, 0.325); // measured thumb crop avg, not sRGB guess
+          o.material.roughness = 0.18;
+          o.material.metalness = 0.04;
+          o.material.envMapIntensity = 2.20;
+          o.material.emissive = new THREE.Color(0x1e4a22);
+          o.material.emissiveIntensity = 0.34;
           o.material.fog = false;
           o.material.receiveShadow = false;
         } else if (n.includes('material.026')) {
-          // windows / glass — white 0.8,0.8,0.8 needs gloss + reflection, no fog
+          // windows / glass — white 0.8,0.8,0.8 needs gloss + reflection, no fog — keep DoubleSide for transparency
+          o.material.side = THREE.DoubleSide;
           o.material.roughness = 0.06;
           o.material.metalness = 0.10;
           o.material.transparent = true;
@@ -582,8 +598,8 @@ function update(dt){
       spawnBurst(c.position.clone());
       // hide shadow immediately for punch
       // keep burst visible
-      camKick = 0.55;
-      scorePunch = 0.22;
+      camKick = 0.85;
+      scorePunch = 0.28;
       contactShadow.scale.set(1.55,1,1.55);
       score+=100; collected++;
       scoreEl.textContent=String(score);
@@ -634,8 +650,8 @@ function update(dt){
     }
   });
   updateBursts(dt);
-  if(camKick>0){ camKick=Math.max(0, camKick - dt*2.6); }
-  if(scorePunch>0){ scorePunch=Math.max(0, scorePunch - dt*3); }
+  if(camKick>0){ camKick=Math.max(0, camKick - dt*3.4); }
+  if(scorePunch>0){ scorePunch=Math.max(0, scorePunch - dt*3.2); }
 }
 
 function win(){
@@ -650,10 +666,10 @@ function lose(){
 }
 
 function render(){
-  // chase cam + Crossy kick
+  // chase cam + Crossy hard 4px punch — was sin*0.9 (~0.5u) soft wobble, now 2.6u crisp kick with fast decay for voxel snap
   const baseOffset = new THREE.Vector3(Math.sin(yaw)*-9, 5.5, Math.cos(yaw)*-9);
-  const kick = camKick>0 ? Math.sin(camKick*28)*camKick*0.9 : 0;
-  const camOffset = baseOffset.clone().add(new THREE.Vector3(kick, kick*0.6, 0));
+  const kick = camKick>0 ? Math.sin(camKick*32)*camKick*2.8 : 0;
+  const camOffset = baseOffset.clone().add(new THREE.Vector3(kick, kick*0.85, 0));
   const camPos = pos.clone().add(camOffset);
   camPos.y = Math.max(camPos.y, 4.2);
   camera.position.lerp(camPos, 0.11);
