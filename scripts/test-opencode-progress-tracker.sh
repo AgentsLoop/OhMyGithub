@@ -10,6 +10,22 @@ done
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 tracker="$script_dir/opencode-progress-tracker.sh"
+
+assert_elapsed() {
+  local seconds="$1"
+  local expected="$2"
+  local actual
+  actual="$("$tracker" --format-elapsed "$seconds")"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "FAIL: elapsed $seconds formatted as '$actual', expected '$expected'" >&2
+    exit 1
+  fi
+  echo "PASS: elapsed $seconds -> $expected"
+}
+
+assert_elapsed 1266 "21m"
+assert_elapsed 3661 "1h 01m"
+
 test_dir="$(mktemp -d "${TMPDIR:-/tmp}/opencode-progress-test.XXXXXX")"
 port_file="$test_dir/port"
 output_file="$test_dir/progress.md"
@@ -165,6 +181,12 @@ assert_line() {
 assert_line "- Token count: 489"
 assert_line "- Total subagents executed: 3"
 assert_line "- Image-context model calls: 5"
+if ! grep -Eq -- '^- Elapsed: [0-9]+m$' "$output_file"; then
+  echo "FAIL: invalid elapsed format" >&2
+  sed -n '1,120p' "$output_file" >&2
+  exit 1
+fi
+echo "PASS: valid elapsed format"
 
 if ! grep -Eq -- '^- Speed score: [0-9]+(\.[0-9])? tokens/s$' "$output_file"; then
   echo "FAIL: invalid speed score" >&2

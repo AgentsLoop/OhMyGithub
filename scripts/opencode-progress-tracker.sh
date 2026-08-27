@@ -3,6 +3,24 @@ set -euo pipefail
 
 started_at="$(date +%s)"
 
+format_elapsed() {
+  local elapsed_seconds="$1"
+  local elapsed_hours=$((elapsed_seconds / 3600))
+  local elapsed_minutes=$(((elapsed_seconds % 3600) / 60))
+
+  if (( elapsed_hours > 0 )); then
+    printf '%dh %02dm' "$elapsed_hours" "$elapsed_minutes"
+  else
+    printf '%dm' "$elapsed_minutes"
+  fi
+}
+
+if [[ "${1:-}" == "--format-elapsed" ]]; then
+  format_elapsed "${2:?elapsed seconds are required}"
+  printf '\n'
+  exit 0
+fi
+
 vision_calls() {
   jq -r '
     def has_image($message):
@@ -95,6 +113,7 @@ while :; do
     done <<<"$subagent_ids"
     changed_count="$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
     elapsed_seconds="$(( $(date +%s) - started_at ))"
+    elapsed="$(format_elapsed "$elapsed_seconds")"
     speed_score="$(awk -v tokens="$token_count" -v elapsed="$elapsed_seconds" \
       'BEGIN { if (elapsed > 0) printf "%.1f", tokens / elapsed; else print "0.0" }')"
     body="🟡 **OpenCode progress (live)**
@@ -103,7 +122,7 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
 🌐 **OpenCode Web UI:** $OPENCODE_WEB_URL
 
-- Elapsed: ${elapsed_seconds}s
+- Elapsed: ${elapsed}
 - Token count: ${token_count}
 - Speed score: ${speed_score} tokens/s
 - Tool calls: $tool_count
