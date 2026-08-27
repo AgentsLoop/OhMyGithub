@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NEXUS FIRING RANGE // SCI-FI TARGET RANGE</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@600;800&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div id="topbar">
+      <div class="hud-panel left">
+        <div class="label">SCORE</div>
+        <div id="score" class="value">00000</div>
+        <div id="combo" class="sub">COMBO x1</div>
+      </div>
+      <div class="hud-panel center">
+        <div class="label">TIME</div>
+        <div id="timer" class="value big">60.0</div>
+        <div class="sub">NEXUS RANGE ALPHA-7</div>
+      </div>
+      <div class="hud-panel right">
+        <div class="label">ACCURACY</div>
+        <div id="accuracy" class="value">--%</div>
+        <div id="hits" class="sub">0 HITS / 0 SHOTS</div>
+      </div>
+    </div>
+
+    <div id="crosshair">
+      <div class="ch-dot"></div>
+      <div class="ch-h"></div><div class="ch-h r"></div>
+      <div class="ch-v"></div><div class="ch-v b"></div>
+      <div id="hitmarker" class="hitmarker">
+        <span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div id="bottombar">
+      <div class="ammo-panel">
+        <div class="ammo-row"><span id="ammo">30</span><span class="sep">/</span><span id="reserve">90</span></div>
+        <div class="ammo-label">5.56 NEXUS &nbsp;|&nbsp; <span id="firemode">AUTO</span></div>
+        <div id="reloadbar"><div id="reloadfill"></div></div>
+      </div>
+      <div class="controls-hint">WASD MOVE &nbsp;•&nbsp; MOUSE LOOK &nbsp;•&nbsp; LMB FIRE &nbsp;•&nbsp; R RELOAD &nbsp;•&nbsp; SHIFT SPRINT</div>
+    </div>
+
+    <div id="hitfeed"></div>
+  </div>
+
+  <div id="overlay" class="overlay">
+    <div class="overlay-card">
+      <div class="kicker">TACTICAL SIMULATION</div>
+      <h1>NEXUS<br><span>FIRING RANGE</span></h1>
+      <p class="desc">Call-of-Duty inspired sci-fi range. Clear lane, hit reactive targets, build combo. <b>60 seconds.</b></p>
+      <div class="stats-grid">
+        <div><b>10 LANE</b><span>reactive dummies & holographic discs</span></div>
+        <div><b>COMBO</b><span>hit streak multiplier</span></div>
+        <div><b>+100</b><span>head / center hit</span></div>
+      </div>
+      <button id="playBtn" class="cta">▶ ENTER RANGE — CLICK TO LOCK</button>
+      <p class="small">Pointer lock required. ESC to release. Works on desktop Chrome/Edge/Firefox.</p>
+      <div class="attrib">Models: <a href="https://sketchfab.com/chanmagomed" target="_blank">chanmagomed Sci-Fi Gun</a> & <a href="https://sketchfab.com/crittaa" target="_blank">crittaa Sci-Fi Target</a> (CC Attribution)</div>
+    </div>
+  </div>
+
+  <div id="pauseOverlay" class="overlay hidden">
+    <div class="overlay-card small">
+      <h2>PAUSED</h2>
+      <button id="resumeBtn" class="cta secondary">RESUME</button>
+    </div>
+  </div>
+
+  <div id="resultOverlay" class="overlay hidden">
+    <div class="overlay-card">
+      <div class="kicker">SESSION COMPLETE</div>
+      <h1 id="finalScore">00000</h1>
+      <div class="result-grid">
+        <div><span>HITS</span><b id="finalHits">0/0</b></div>
+        <div><span>ACCURACY</span><b id="finalAcc">0%</b></div>
+        <div><span>BEST COMBO</span><b id="finalCombo">x0</b></div>
+        <div><span>RANK</span><b id="finalRank">RECRUIT</b></div>
+      </div>
+      <button id="restartBtn" class="cta">RESTART RANGE</button>
+    </div>
+  </div>
+
+  <div id="weaponHud" class="weapon-hud"></div>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
