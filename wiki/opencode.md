@@ -128,8 +128,9 @@ OpenCode runs in a sparse isolated worktree containing only `project/`.
 Before delivery and each `/loop` push, `scripts/sync-opencode-project.sh`
 copies that worktree's app into the workflow checkout without deleting its
 `project/` directory.
-Because OpenCode may push that branch before the delivery step, delivery uses
-`--force-with-lease` after fetching the worker branch.
+OpenCode is instructed to commit locally without pushing; the repository-root
+workflow is the sole publisher and uses `--force-with-lease` after fetching
+the worker branch.
 The shared skills and worker instructions are restored before verification and
 each continuation because OpenCode may clean untracked support files. Staged
 and committed paths are checked against the base branch for the `project/`

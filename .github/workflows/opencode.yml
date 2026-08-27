@@ -493,7 +493,7 @@ jobs:
           if [[ "$LOOP_REQUEST" == 'true' ]]; then
             cat >> "$PROMPT_FILE" <<'EOF'
 
-            This is a /loop request. Preserve the original goal above as the source of truth. Before the first completion and before every later iteration, use the task tool to ask for distinct parallel builder, critic, and verifier subagents. The critic must inspect the current browser-visible game/app against a concrete reference and return the single biggest gap; apply that finding, re-verify the gameplay loop, and only then declare the iteration complete. After each completion, publish the latest playable result by committing and pushing the project changes and updating the triggering issue, then immediately continue the same goal for the next improvement. Do not stop after publishing and do not create a second PR.
+            This is a /loop request. Preserve the original goal above as the source of truth. Before the first completion and before every later iteration, use the task tool to ask for distinct parallel builder, critic, and verifier subagents. The critic must inspect the current browser-visible game/app against a concrete reference and return the single biggest gap; apply that finding, re-verify the gameplay loop, and only then declare the iteration complete. After each completion, commit the project changes in the isolated worktree but do not push; the repository-root workflow will sync only project/ and perform the validated controlled push, then update the triggering issue. Immediately continue the same goal for the next improvement. Do not stop after publishing and do not create a second PR.
           EOF
           fi
           # The inner shell expands the positional parameters after nohup starts.
@@ -719,7 +719,7 @@ jobs:
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
-            "The public game is verified at $APP_URL. Follow ./Agents.md now: capture and commit final playable-game screenshots under screenshots/ using final-* filenames, push the current branch, and post the final completion comment to issue #$TRIGGER_ISSUE_NUMBER. Include this public game URL, embedded screenshots, the final commit, deployment and test status, and known limitations. Do not create a pull request." \
+            "The public game is verified at $APP_URL. Follow ./Agents.md now: capture and commit final playable-game screenshots under screenshots/ using final-* filenames, but do not push because the repository-root workflow owns the controlled push. Post the final completion comment to issue #$TRIGGER_ISSUE_NUMBER. Include this public game URL, embedded screenshots, the final commit, deployment and test status, and known limitations. Do not create a pull request." \
             > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
           touch "$OPENCODE_WEB_DIR/response-comment.done"
 
@@ -730,7 +730,7 @@ jobs:
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          SCREENSHOT_PROMPT='The final screenshot evidence is still missing. Use the already verified public game and a real browser now, capture at least one meaningful playable-game screenshot, save it under screenshots/ with a filename beginning with final- (for example screenshots/final-gameplay.png), commit and push it on the current branch, and update the triggering issue with the immutable screenshot URL. Do not just explain or claim completion without creating the image. Keep all work inside project/ and do not create a pull request.'
+          SCREENSHOT_PROMPT='The final screenshot evidence is still missing. Use the already verified public game and a real browser now, capture at least one meaningful playable-game screenshot, save it under screenshots/ with a filename beginning with final- (for example screenshots/final-gameplay.png), commit it in the isolated worktree, and update the triggering issue with the immutable screenshot URL. Do not push; the repository-root workflow owns the controlled push. Do not just explain or claim completion without creating the image. Keep all work inside project/ and do not create a pull request.'
 
           for attempt in 1 2 3; do
             mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
@@ -920,7 +920,7 @@ jobs:
             install -d "$PROJECT_DIR/.agents"
             rsync -a --delete "$GITHUB_WORKSPACE/.agents/" "$PROJECT_DIR/.agents/"
             cp "$GITHUB_WORKSPACE/agents.template.md" "$PROJECT_DIR/Agents.md"
-            prompt="Continue the original goal for /loop iteration $iteration. Use distinct parallel builder, critic, and verifier task-tool subagents first; have the critic inspect the current browser-visible app against a concrete reference and report the biggest remaining gap. Apply the finding, run browser verification, and complete one meaningful improvement. Then commit and push the latest playable project to the existing branch, update the triggering issue with the public URL and commit, and continue the same goal. Do not create a second PR or stop after publishing."
+            prompt="Continue the original goal for /loop iteration $iteration. Use distinct parallel builder, critic, and verifier task-tool subagents first; have the critic inspect the current browser-visible app against a concrete reference and report the biggest remaining gap. Apply the finding, run browser verification, and complete one meaningful improvement. Then commit the latest playable project in the isolated worktree, but do not push: the repository-root workflow will sync only project/, validate the diff, and perform the controlled force-with-lease push. Update the triggering issue with the public URL and commit, and continue the same goal. Do not create a second PR or stop after publishing."
             echo "Starting /loop iteration $iteration; remaining seconds: $(( deadline - $(date +%s) ))."
             set +e
             "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
@@ -933,10 +933,12 @@ jobs:
             echo "OpenCode loop iteration $iteration exited with code $code."
 
             git fetch origin "$BRANCH_NAME"
+            remote_branch_sha="$(git rev-parse "origin/$BRANCH_NAME")"
             bash "$GITHUB_WORKSPACE/scripts/sync-opencode-project.sh" \
               "$PROJECT_DIR" "$ROOT_PROJECT_DIR" "origin/$BRANCH_NAME" \
               "OpenCode loop iteration $iteration" "origin/$BASE_BRANCH"
-            git push origin "$BRANCH_NAME"
+            git push --force-with-lease="refs/heads/$BRANCH_NAME:$remote_branch_sha" \
+              origin "HEAD:refs/heads/$BRANCH_NAME"
             commit="$(git rev-parse HEAD)"
             gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/comments" \
               -f body="🔁 **/loop iteration $iteration published.**\n\nPublic game: $APP_URL\nCommit: https://github.com/$GITHUB_REPOSITORY/commit/$commit\nPull request: ${PR_URL:-(existing PR)}\n\nContinuing the goal and waiting for the next critique cycle."
