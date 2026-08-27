@@ -11,9 +11,10 @@ const overlay = document.getElementById('overlay');
 const playBtn = document.getElementById('playBtn');
 
 const scene = new THREE.Scene();
-// Crossy Road palette: saturated warm desert — immediate legibility, harmonious terracotta/cream
+// Crossy Road palette: saturated warm desert — hard voxel readability, no beige wash
 scene.background = new THREE.Color(0xF2C97D);
-scene.fog = new THREE.Fog(0xF2C97D, 95, 260);
+// Fog pushed far (was 95-260 washing mid-dunes + grain). Reduced to light depth cue 175-385 so terraces stay saturated.
+scene.fog = new THREE.Fog(0xF2C97D, 175, 385);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
@@ -50,70 +51,63 @@ dir.shadow.normalBias = 0.012;
 scene.add(dir);
 scene.add(new THREE.AmbientLight(0xFFF0C8, 0.15));
 
-// ground — procedural sand dunes (replaces flat plane + GridHelper) for Crossy Road voxel dunes
+// ground — HARD-QUANTIZED VOXEL TERRACES (Crossy Road readability fix)
+// Replaces soft 0.33m micro-terrace (Math.round(h*3)/3, D9A05A->FFECC1 wash, Fog 95-260 + grainTex)
+// with 5 discrete voxel bands, high-saturation crest/trough, baked AO per step, no grain wash.
 const groundGeo = new THREE.PlaneGeometry(400,400, 84,84);
 {
   const p = groundGeo.attributes.position;
   const cols = [];
-  const c = new THREE.Color();
+  // 5-band saturated voxel palette — trough deep terracotta, crest sunlit cream (not washed white)
+  const PALETTE = [
+    new THREE.Color(0xB85C1E), // 0 trough — deep burnt terracotta (AO darkest)
+    new THREE.Color(0xD9822B), // 1 low — saturated burnt sand
+    new THREE.Color(0xE9A845), // 2 mid — warm gold (high chroma)
+    new THREE.Color(0xF2C97D), // 3 high — background sand, saturated
+    new THREE.Color(0xFFEB9A), // 4 crest — sunlit cream, high sat (was FFECC1/white wash)
+  ];
+  // baked AO per voxel step: trough occluded, crest lifted (multiply in linear-ish sRGB)
+  const AO = [0.78, 0.88, 1.0, 1.02, 1.06];
+  const VOXEL_STEP = 1.05; // ~1m discrete jump (was 0.33) — Crossy Road legible bands
+  const LEVELS = 5;
   for(let i=0;i<p.count;i++){
     const x = p.getX(i);
     const y = p.getY(i);
     const dist = Math.hypot(x,y);
-    // Crossy Road dune field: large rolling dunes + medium ridges, flat oasis center
+    // same dune field as before for silhouette continuity
     const d1 = Math.sin(x*0.055) * Math.cos(y*0.055) * 1.65;
     const d2 = Math.sin(x*0.12 + y*0.08) * 0.55;
     const d3 = Math.cos(x*0.03 - y*0.04) * 0.95;
     const d4 = Math.sin(x*0.018 - y*0.022) * 0.45;
     const mask = THREE.MathUtils.clamp((dist - 28)/95, 0, 1);
-    let h = (d1+d2+d3+d4) * THREE.MathUtils.lerp(0.32, 1.0, mask);
-    if(dist < 22) h *= 0.18; // keep spawn/playable disc legible
-    // terrace slightly for voxel step feel
-    h = Math.round(h*3)/3;
+    let raw = (d1+d2+d3+d4) * THREE.MathUtils.lerp(0.32, 1.0, mask);
+    if(dist < 22) raw *= 0.22; // keep spawn disc flat and legible (small lift then quantized to band 2)
+    // hard quantize to discrete voxel levels — no lerp, no 0.33 rounding
+    let q = Math.floor(THREE.MathUtils.clamp((raw + 2.2)/VOXEL_STEP, 0, LEVELS - 0.001));
+    // height centered so band 2 (~0) is near ground plane
+    const h = q * VOXEL_STEP - 2.2 + 0.42; // +0.42 offsets so playable disc sits ~0.0-0.4
     p.setZ(i, h);
-    const hNorm = THREE.MathUtils.clamp((h+1.8)/3.6, 0, 1);
-    // sand gradient: shadowed trough -> sunlit crest
-    // trough #D9A05A, mid #E8BA7A, crest #F5D9A8 / #FFECC1
-    if(hNorm < 0.5){
-      c.lerpColors(new THREE.Color(0xD9A05A), new THREE.Color(0xE8BA7A), hNorm*2);
-    } else {
-      c.lerpColors(new THREE.Color(0xE8BA7A), new THREE.Color(0xFFECC1), (hNorm-0.5)*2);
-    }
-    // add subtle hue shift per dune for harmony
-    c.offsetHSL((Math.sin(x*0.02)+Math.cos(y*0.02))*0.015, 0, 0);
+    // vertex color = palette[q] * AO, minimal hue wobble to preserve band legibility (was ±0.015 HSL, now ±0.006)
+    const c = PALETTE[q].clone();
+    c.multiplyScalar(AO[q]);
+    c.offsetHSL((Math.sin(x*0.018)+Math.cos(y*0.018))*0.006, 0, 0);
+    // clamp after multiply (crest 1.06 may exceed 1)
+    c.r = Math.min(1, c.r); c.g = Math.min(1, c.g); c.b = Math.min(1, c.b);
     cols.push(c.r,c.g,c.b);
   }
   groundGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols,3));
   groundGeo.computeVertexNormals();
 }
-const groundMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.98, metalness:0.0 });
+const groundMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.92, metalness:0.0 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI/2;
 ground.receiveShadow = true;
 scene.add(ground);
+// NOTE: grainTex removed — canvas sand grain was invisible under vertexColors + Fog 95-260
+// and contributed to beige soup (washed multiply). Deleted to keep terraces crisp.
+// Fog pushed 95->175 / 260->385 above so bands stay saturated; AO now baked per step.
 
-// subtle sand grain overlay via canvas texture (repeated) to avoid flat plastic look
-const grainCanvas = document.createElement('canvas');
-grainCanvas.width = 256; grainCanvas.height = 256;
-{
-  const gtx = grainCanvas.getContext('2d');
-  gtx.fillStyle = '#ffffff';
-  gtx.fillRect(0,0,256,256);
-  for(let i=0;i<900;i++){
-    const x=Math.random()*256, y=Math.random()*256, r=Math.random()*1.1+0.3;
-    const a=Math.random()*0.07+0.02;
-    gtx.fillStyle=`rgba(110,70,20,${a})`;
-    gtx.beginPath(); gtx.arc(x,y,r,0,Math.PI*2); gtx.fill();
-  }
-}
-const grainTex = new THREE.CanvasTexture(grainCanvas);
-grainTex.wrapS = grainTex.wrapT = THREE.RepeatWrapping;
-grainTex.repeat.set(22,22);
-grainTex.colorSpace = THREE.SRGBColorSpace;
-groundMat.map = grainTex;
-groundMat.needsUpdate = true;
-
-// decorative dunes (low poly hills) — voxel crest accents, sampled to sit on procedural ground
+// decorative dunes — sampled voxel ground height (must match hard quantization above)
 function sampleGroundH(x,z){
   const dist=Math.hypot(x,z);
   const d1=Math.sin(x*0.055)*Math.cos(z*0.055)*1.65;
@@ -121,10 +115,11 @@ function sampleGroundH(x,z){
   const d3=Math.cos(x*0.03-z*0.04)*0.95;
   const d4=Math.sin(x*0.018-z*0.022)*0.45;
   const mask=THREE.MathUtils.clamp((dist-28)/95,0,1);
-  let h=(d1+d2+d3+d4)*THREE.MathUtils.lerp(0.32,1.0,mask);
-  if(dist<22) h*=0.18;
-  h=Math.round(h*3)/3;
-  return h;
+  let raw=(d1+d2+d3+d4)*THREE.MathUtils.lerp(0.32,1.0,mask);
+  if(dist<22) raw*=0.22;
+  const VOXEL_STEP=1.05, LEVELS=5;
+  let q=Math.floor(THREE.MathUtils.clamp((raw+2.2)/VOXEL_STEP,0,LEVELS-0.001));
+  return q*VOXEL_STEP -2.2 +0.42;
 }
 for(let i=0;i<18;i++){
   const h = 2+Math.random()*4;
