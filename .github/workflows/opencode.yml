@@ -325,6 +325,14 @@ jobs:
             .permission = ((.permission // {}) + {"*": "allow", "task": "allow"})
           ' "$HOME/.config/opencode/opencode.json" > "$config_tmp"
           mv "$config_tmp" "$HOME/.config/opencode/opencode.json"
+          if [[ "$OMO_REQUEST" == 'true' ]]; then
+            jq '.command["ulw-loop"] = {
+              "description": "Continue the OMO objective through verified implementation iterations.",
+              "template": "$ARGUMENTS\n\nKeep this objective active through verified implementation iterations. Continue until the requested work is complete; use parallel specialist agents, apply concrete critic findings, and verify each pass before continuing.",
+              "agent": "build"
+            }' "$HOME/.config/opencode/opencode.json" > "$config_tmp"
+            mv "$config_tmp" "$HOME/.config/opencode/opencode.json"
+          fi
           nohup "$OPENCODE_BIN" web --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
