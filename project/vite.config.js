@@ -1,0 +1,6 @@
+import { defineConfig } from 'vite';
+export default defineConfig({
+  server: { host: '0.0.0.0', port: 5173, allowedHosts: true, hmr: { host: 'localhost' } },
+  preview: { host: '0.0.0.0', port: 4173, allowedHosts: true },
+  test: { environment: 'jsdom', include: ['tests/**/*.test.js'] }
+});
