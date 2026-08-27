@@ -738,6 +738,8 @@ jobs:
         run: |
           set -euo pipefail
           BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          bash "$GITHUB_WORKSPACE/scripts/normalize-opencode-project.sh" \
+            "origin/$BASE_BRANCH" "OpenCode: ${COMMENT_BODY%%$'\n'*}"
           # Dependencies are runtime-only and must never be included in the generated PR.
           touch "$PROJECT_DIR/.gitignore"
           grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
@@ -896,10 +898,9 @@ jobs:
             set -e
             echo "OpenCode loop iteration $iteration exited with code $code."
 
-            git add -A -- project
-            if ! git diff --cached --quiet; then
-              git commit -m "OpenCode loop iteration $iteration"
-            fi
+            git fetch origin "$BRANCH_NAME"
+            bash "$GITHUB_WORKSPACE/scripts/normalize-opencode-project.sh" \
+              "origin/$BRANCH_NAME" "OpenCode loop iteration $iteration"
             git push origin "$BRANCH_NAME"
             commit="$(git rev-parse HEAD)"
             gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/comments" \

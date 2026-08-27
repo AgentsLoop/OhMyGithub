@@ -116,6 +116,11 @@ Model labels are refreshed from the live OpenCode catalog on each run and are
 limited to models with zero input, output, and cache-read cost. Default GitHub
 labels are removed, and the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
+Before delivery and each `/loop` push, `scripts/normalize-opencode-project.sh`
+rebuilds the generated branch from its base while preserving only `project/`.
+This prevents OpenCode changes to workflow files from causing GitHub token
+permission failures; `/loop` Git commands also use the workspace root because
+that step runs from `project/`.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 `model/opencode/muse-spark-1.2-contributor-free` label; if that label is
 unavailable, the skill records that it used the workflow default instead.
