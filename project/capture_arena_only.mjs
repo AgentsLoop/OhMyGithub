@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const c = await b.newContext({ viewport: { width: 1280, height: 720 } });
+const p = await c.newPage();
+await p.goto('http://127.0.0.1:3000/', { waitUntil: 'domcontentloaded' });
+await p.waitForTimeout(2500);
+await p.evaluate(()=>{ const el=document.getElementById('startOverlay'); if(el) el.style.display='none'; });
+await p.waitForTimeout(900);
+await p.screenshot({ path: '/home/runner/work/aiplay/aiplay/project/screenshots/final-arena.png' });
+console.log('arena ok', new Date().toISOString());
+await b.close();
