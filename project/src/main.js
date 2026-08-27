@@ -269,17 +269,28 @@ loader.load('/models/car.glb', (gltf)=>{
         const n = (o.material.name || '').toLowerCase();
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
-         if (n.includes('carcamero')) {
-            // CRITIC11 HARSH FIX: rendered lime 108,212,116 measured vs thumb avg 74,170,93 (+34R,+42G,+23B neon bleach) — dir 2.35+rim 1.85+env 0.30 washed facets white despite base 0x4AAF5E correct. B loses saturated sage. Cut emissive 0.16→0.06, env 0.30→0.12, roughness 0.62→0.84 to kill spec wash, enable receiveShadow for chassis AO, keep fog:false.
-            o.material.color.setHex(0x4A9A5D);
-            o.material.emissive.setHex(0x4A9A5D);
-            o.material.emissiveIntensity = 0.06;
-            o.material.roughness = 0.84;
-            o.material.metalness = 0.0;
-            o.material.envMap = envMap;
-            o.material.envMapIntensity = 0.12;
-            o.material.fog = false;
-            o.material.receiveShadow = true;
+          if (n.includes('carcamero')) {
+             // ITER12 FINAL GLOSS: iter11 cut bleach 108,212,116→74,154,93 (74,170,93 thumb target) via 0.84 rough/0.12 env but left car chalk-matte vs Crossy Road plastic pop — facets read flat at 9m, no specular cue. Crossy car is low-poly plastic: ~0.58 rough + neutral IBL sheen, not matte. Restore gloss without re-bleaching: roughness 0.84→0.58, env 0.12→0.42 (RoomEnvironment neutral, not wash), emissive 0.06→0.045, physical clearcoat 0.30/0.38 for thumbnail highlight, metal 0.02, receiveShadow+fog:false kept.
+             const oldMap = o.material.map || null;
+              const phys = new THREE.MeshPhysicalMaterial({
+                color: 0x49AD5C,
+                map: oldMap,
+                emissive: 0x49AD5C,
+                emissiveIntensity: 0.038,
+                roughness: 0.52,
+                metalness: 0.02,
+                clearcoat: 0.36,
+                clearcoatRoughness: 0.34,
+                envMap: envMap,
+                envMapIntensity: 0.48,
+                fog: false,
+              });
+             if (oldMap) phys.map.colorSpace = THREE.SRGBColorSpace;
+             phys.receiveShadow = true;
+             // preserve original side / shadow
+             phys.side = THREE.FrontSide;
+             o.material.dispose?.();
+             o.material = phys;
         } else if (n.includes('material.026')) {
           // windows / glass — keep DoubleSide transparent
           o.material.side = THREE.DoubleSide;
