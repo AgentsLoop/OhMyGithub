@@ -1,0 +1,84 @@
+{
+  "uid": "b2bea3f4e63f4347b76132e6ced21f20",
+  "name": "Animated pistol",
+  "author": "JUST",
+  "authorUrl": "https://sketchfab.com/teenjust500",
+  "license": "CC Attribution-NonCommercial",
+  "licenseUrl": null,
+  "modelUrl": "https://sketchfab.com/3d-models/none-b2bea3f4e63f4347b76132e6ced21f20",
+  "thumbnailUrl": "https://media.sketchfab.com/models/b2bea3f4e63f4347b76132e6ced21f20/thumbnails/0b491b5468a142f3b6b4484f0ed58a19/c6efbaf913384f68be3c0d1842d58186.jpeg",
+  "glbBytes": 13056948,
+  "faceCount": 52124,
+  "vertexCount": 36323,
+  "textureCount": 9,
+  "textureMaxResolution": 1024,
+  "animationCount": 6,
+  "animations": [
+    {
+      "uid": "da66a5af281a420aab819e61fa270bc3",
+      "name": "Rig_Joints|Watch",
+      "url": "https://media.sketchfab.com/models/b2bea3f4e63f4347b76132e6ced21f20/5d92166275864eaf94ee692056511768/animations/da66a5af281a420aab819e61fa270bc3.bin.gz",
+      "size": 430744,
+      "duration": 6.667,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-07-03T21:05:18.396245",
+      "updatedAt": "2023-07-03T21:05:18.396257"
+    },
+    {
+      "uid": "5bcb376f4eac4e4d8f41e44b44cb5afc",
+      "name": "Rig_Joints|Take",
+      "url": "https://media.sketchfab.com/models/b2bea3f4e63f4347b76132e6ced21f20/5d92166275864eaf94ee692056511768/animations/5bcb376f4eac4e4d8f41e44b44cb5afc.bin.gz",
+      "size": 70752,
+      "duration": 0.667,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-07-03T21:05:18.392775",
+      "updatedAt": "2023-07-03T21:05:18.392787"
+    },
+    {
+      "uid": "4e5ee20485444e118c82448fc83922fe",
+      "name": "Rig_Joints|Shoot",
+      "url": "https://media.sketchfab.com/models/b2bea3f4e63f4347b76132e6ced21f20/5d92166275864eaf94ee692056511768/animations/4e5ee20485444e118c82448fc83922fe.bin.gz",
+      "size": 30296,
+      "duration": 0.5,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-07-03T21:05:18.389395",
+      "updatedAt": "2023-07-03T21:05:18.389408"
+    },
+    {
+      "uid": "a61cc7ef45d84e76a76c66cf02bd387d",
+      "name": "Rig_Joints|Reload",
+      "url": "https://media.sketchfab.com/models/b2bea3f4e63f4347b76132e6ced21f20/5d92166275864eaf94ee692056511768/animations/a61cc7ef45d84e76a76c66cf02bd387d.bin.gz",
+      "size": 354048,
+      "duration": 3.933,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-07-03T21:05:18.386655",
+      "updatedAt": "2023-07-03T21:05:18.386667"
+    },
+    {
+      "uid": "c452acd5bacd42c28542953e1e635cf5",
+      "name": "Rig_Joints|Idle",
+      "url": "https://media.sketchfab.com/models/b2bea3f4e63f4347b76132e6ced21f20/5d92166275864eaf94ee692056511768/animations/c452acd5bacd42c28542953e1e635cf5.bin.gz",
+      "size": 1196,
+      "duration": 0.0,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-07-03T21:05:18.383221",
+      "updatedAt": "2023-07-03T21:05:18.383233"
+    },
+    {
+      "uid": "d89ca9c66338441099c3df6f0d9b1cbd",
+      "name": "Rig_Joints|Hide",
+      "url": "https://media.sketchfab.com/models/b2bea3f4e63f4347b76132e6ced21f20/5d92166275864eaf94ee692056511768/animations/d89ca9c66338441099c3df6f0d9b1cbd.bin.gz",
+      "size": 57948,
+      "duration": 0.5,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-07-03T21:05:18.378512",
+      "updatedAt": "2023-07-03T21:05:18.378526"
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<title>AIPlay Tactical FPS</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0b0e13;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+  #hud{position:fixed;inset:0;pointer-events:none;user-select:none}
+  #topbar{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:linear-gradient(180deg,rgba(0,0,0,.7),rgba(0,0,0,0));color:#e8eef7;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+  #topbar b{letter-spacing:.08em}
+  #stats{position:absolute;top:56px;left:16px;display:flex;gap:12px}
+  .pill{background:rgba(16,20,28,.82);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(8px);padding:8px 10px;border-radius:10px;color:#dbe6f7;font-size:12px;min-width:110px}
+  .pill span{color:#8ea0bf;font-size:10px;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:2px}
+  .pill strong{font-size:14px}
+  #cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:22px;height:22px}
+  #cross:before,#cross:after{content:"";position:absolute;background:rgba(255,255,255,.95);box-shadow:0 0 6px rgba(0,0,0,.7)}
+  #cross:before{left:10px;top:0;width:2px;height:22px} #cross:after{left:0;top:10px;width:22px;height:2px}
+  #cross.dot:after{box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+  #cross.hit{filter:drop-shadow(0 0 6px #ff3b30)}
+  #cross.hit:before,#cross.hit:after{background:#ff3b30}
+  #weaponHud{position:absolute;right:16px;bottom:16px;background:rgba(16,20,28,.82);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(10px);border-radius:14px;padding:12px 14px;min-width:210px;color:#e6efff}
+  #weaponHud h3{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8ea0bf;margin-bottom:6px}
+  #ammo{font-size:28px;font-weight:700;letter-spacing:.02em}
+  #ammo small{font-size:12px;color:#8ea0bf}
+  #reload{font-size:11px;color:#ffb02e;margin-top:4px;display:none}
+  #healthBar{position:absolute;left:16px;bottom:16px;display:flex;align-items:center;gap:10px;background:rgba(16,20,28,.82);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(10px);border-radius:14px;padding:10px 12px;min-width:230px;color:#e6efff}
+  #healthFillWrap{width:140px;height:8px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden}
+  #healthFill{height:100%;width:100%;background:linear-gradient(90deg,#21e6a0,#3b82f6);transition:width .2s}
+  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(800px 600px at 50% 30%,rgba(59,130,246,.25),rgba(0,0,0,.78) 65%),linear-gradient(180deg,rgba(10,14,20,.2),rgba(0,0,0,.85));color:#e8eef7;z-index:10}
+  #card{width:min(760px,92vw);background:rgba(16,20,28,.92);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.6);backdrop-filter:blur(10px)}
+  #card h1{font-size:28px;letter-spacing:.02em;margin-bottom:6px}
+  #card h1 i{font-style:normal;color:#60a5fa}
+  #card p{color:#b8c7e0;font-size:13px;line-height:1.5}
+  #card .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+  .k{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:10px}
+  .k b{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8ea0bf}
+  .k div{font-size:13px;margin-top:4px;color:#e6efff}
+  #playBtn{width:100%;margin-top:10px;padding:14px 16px;border-radius:12px;border:0;background:linear-gradient(90deg,#3b82f6,#06b6d4);color:white;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-size:14px;box-shadow:0 10px 30px rgba(59,130,246,.4)}
+  #playBtn:hover{filter:brightness(1.05)}
+  #hint{margin-top:10px;font-size:11px;color:#8ea0bf;text-align:center}
+  #damage{position:fixed;inset:0;pointer-events:none;border:0 solid rgba(255,59,48,0);transition:border-width .08s,background .08s;background:rgba(255,0,0,0)}
+  #killfeed{position:absolute;top:70px;right:16px;width:260px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .kf{background:rgba(16,20,28,.82);border-left:3px solid #22c55e;color:#dbe6f7;font-size:12px;padding:6px 8px;border-radius:8px;opacity:1;transition:opacity .4s}
+  #attribution{position:absolute;left:16px;top:96px;font-size:10px;color:rgba(255,255,255,.6);max-width:420px;line-height:1.4;background:rgba(0,0,0,.35);padding:6px 8px;border-radius:8px}
+  #attribution a{color:#93c5fd}
+  @media(max-width:640px){
+    #card .grid{grid-template-columns:1fr}
+    #topbar{font-size:11px; height:48px; padding:0 10px}
+    #stats{top:52px; left:10px; gap:8px; flex-wrap:wrap}
+    .pill{min-width:86px; padding:6px 8px}
+    #healthBar{min-width:150px; left:10px; bottom:10px; padding:8px 10px}
+    #healthFillWrap{width:90px}
+    #weaponHud{min-width:150px; right:10px; bottom:10px; padding:10px 12px}
+    #ammo{font-size:22px}
+    #attribution{left:10px; top:110px; max-width:92vw; font-size:9px}
+    #killfeed{top:62px; right:10px; width:180px}
+  }
+  @media(max-width:380px){
+    #stats .pill:nth-child(3){display:none}
+  }
+</style>
+  <script type="module" crossorigin src="/assets/index-Bpcdtqw7.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="damage"></div>
+<div id="hud">
+  <div id="topbar"><div><b>AIPlay Tactical</b> &nbsp;·&nbsp; Sector 07 — Secure the Facility</div><div id="timer">02:00</div></div>
+  <div id="stats">
+    <div class="pill"><span>Enemies</span><strong id="enemyCount">—</strong></div>
+    <div class="pill"><span>Score</span><strong id="scoreEl">0</strong></div>
+    <div class="pill"><span>Accuracy</span><strong id="accEl">—</strong></div>
+  </div>
+  <div id="killfeed"></div>
+  <div id="attribution" style="display:none"></div>
+  <div id="cross"></div>
+  <div id="healthBar"><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8ea0bf">Health</div><div id="healthFillWrap"><div id="healthFill"></div></div><div id="healthText" style="font-weight:700">100</div></div>
+  <div id="weaponHud"><h3 id="weaponName">M4A1 — 5.56mm</h3><div id="ammo">30 <small>/ 90</small></div><div id="reload">RELOADING…</div><div style="margin-top:6px;font-size:10px;color:#8ea0bf;letter-spacing:.06em">LMB Shoot · R Reload · WASD Move · Shift Sprint · Space Jump · Mouse Aim</div></div>
+</div>
+<div id="overlay">
+  <div id="card">
+    <h1>Secure the <i>Facility</i></h1>
+    <p>First-person tactical shooter. Clear all hostiles, manage ammo, and survive. Polished lighting, PBR materials, contact shadows, muzzle flash and hit feedback. Built in Three.js with a verified Sketchfab GLB workflow.</p>
+    <div class="grid">
+      <div class="k"><b>Movement</b><div>WASD + Mouse · Shift to sprint · Space to jump</div></div>
+      <div class="k"><b>Combat</b><div>Left-click fire · R to reload · Headshots deal 2×</div></div>
+      <div class="k"><b>Objective</b><div>Eliminate 10 hostiles before time or health expires</div></div>
+      <div class="k"><b>Tip</b><div>Click to lock pointer. Press ESC to pause.</div></div>
+    </div>
+    <button id="playBtn">Enter Facility — Click to Play</button>
+    <div id="hint">If pointer lock fails, click again. Audio resumes on first interaction.</div>
+    <p id="statusLine" style="margin-top:10px;font-size:11px;color:#8ea0bf"></p>
+  </div>
+</div>
+</body>
+</html>
