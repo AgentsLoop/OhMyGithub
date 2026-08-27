@@ -40,6 +40,10 @@ Yes, it creates the code. Yes, it runs the verification loop. Yes, it can expose
 3. Put `/oc` in the issue.
 4. Let GitHub Actions build, test, verify, and propose the result.
 
+Use `/loop` instead when the goal should iterate for five hours: each completed
+iteration publishes to the existing branch/PR, runs fresh builder, critic, and
+verifier subagents, and continues the original goal.
+
 ```text
 Your idea → GitHub issue → OpenCode → tests → verified app → pull request
 ```

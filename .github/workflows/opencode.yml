@@ -14,12 +14,15 @@ jobs:
       (contains(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, '/opencode') ||
       contains(github.event.comment.body, '/goal') ||
+      contains(github.event.comment.body, '/loop') ||
       contains(github.event.issue.body, '/oc') ||
       contains(github.event.issue.body, '/opencode') ||
       contains(github.event.issue.body, '/goal') ||
+      contains(github.event.issue.body, '/loop') ||
       contains(github.event.issue.title, '/oc') ||
       contains(github.event.issue.title, '/opencode') ||
-      contains(github.event.issue.title, '/goal'))
+      contains(github.event.issue.title, '/goal') ||
+      contains(github.event.issue.title, '/loop'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -46,7 +49,8 @@ jobs:
       BRANCH_NAME: opencode/${{ github.run_id }}
       TRIGGER_ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
-      GOAL_REQUEST: ${{ contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') }}
+      GOAL_REQUEST: ${{ contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') || contains(github.event.comment.body, '/loop') || contains(github.event.issue.body, '/loop') || contains(github.event.issue.title, '/loop') }}
+      LOOP_REQUEST: ${{ contains(github.event.comment.body, '/loop') || contains(github.event.issue.body, '/loop') || contains(github.event.issue.title, '/loop') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -119,6 +123,7 @@ jobs:
               { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
               { name: '/Goal', color: '8A2BE2', description: 'OpenCode goal workflow request' },
+              { name: '/Loop', color: 'D93F0B', description: 'OpenCode five-hour iterative workflow request' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',
@@ -178,6 +183,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          LOOP_REQUEST: ${{ env.LOOP_REQUEST }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
@@ -195,7 +201,11 @@ jobs:
             await github.rest.issues.addLabels({
               owner: context.repo.owner, repo: context.repo.repo,
               issue_number: number,
-              labels: ['in progress', ...(process.env.GOAL_REQUEST === 'true' ? ['/Goal'] : [])]
+              labels: [
+                'in progress',
+                ...(process.env.GOAL_REQUEST === 'true' ? ['/Goal'] : []),
+                ...(process.env.LOOP_REQUEST === 'true' ? ['/Loop'] : [])
+              ]
             });
 
       - name: Start AgentsWeb SSH session
@@ -397,6 +407,7 @@ jobs:
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
           OPENCODE_SKILLS: ${{ steps.opencode_labels.outputs.skills_json }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          LOOP_REQUEST: ${{ env.LOOP_REQUEST }}
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
@@ -409,13 +420,19 @@ jobs:
           if [[ "$GOAL_REQUEST" == 'true' ]]; then
             # The issue marker selects the custom command; do not include the
             # marker itself in the objective passed to the goal parser.
-            request_text="$(sed -E 's/^[[:space:]]*\/goal([[:space:]]*)?//' <<<"$request_text")"
+            request_text="$(sed -E 's/^[[:space:]]*\/(goal|loop)([[:space:]]*)?//' <<<"$request_text")"
           fi
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
           printf '%s\n' "$prompt" > "$PROMPT_FILE"
           echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
+          if [[ "$LOOP_REQUEST" == 'true' ]]; then
+            cat >> "$PROMPT_FILE" <<'EOF'
+
+            This is a /loop request. Preserve the original goal above as the source of truth. Before the first completion and before every later iteration, use the task tool to ask for distinct parallel builder, critic, and verifier subagents. The critic must inspect the current browser-visible game/app against a concrete reference and return the single biggest gap; apply that finding, re-verify the gameplay loop, and only then declare the iteration complete. After each completion, publish the latest playable result by committing and pushing the project changes and updating the triggering issue, then immediately continue the same goal for the next improvement. Do not stop after publishing and do not create a second PR.
+          EOF
+          fi
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
           nohup bash -c '
@@ -475,11 +492,14 @@ jobs:
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          LOOP_REQUEST: ${{ env.LOOP_REQUEST }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const command = process.env.GOAL_REQUEST === 'true' ? '/goal' : '/oc';
+            const command = process.env.LOOP_REQUEST === 'true'
+              ? '/loop'
+              : process.env.GOAL_REQUEST === 'true' ? '/goal' : '/oc';
             const body = [
               '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
@@ -775,7 +795,7 @@ jobs:
             });
 
       - name: Mark issue complete
-        if: success()
+        if: success() && env.LOOP_REQUEST != 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -804,10 +824,63 @@ jobs:
               issue_number: number, labels: ['failed']
             });
 
+      - name: Continue /loop iterations for 5 hours
+        if: success() && env.LOOP_REQUEST == 'true'
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
+          OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
+          PR_URL: ${{ steps.delivery.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          deadline=$(( $(date +%s) + 18000 ))
+          iteration=1
+          while (( $(date +%s) < deadline )); do
+            prompt="Continue the original goal for /loop iteration $iteration. Use distinct parallel builder, critic, and verifier task-tool subagents first; have the critic inspect the current browser-visible app against a concrete reference and report the biggest remaining gap. Apply the finding, run browser verification, and complete one meaningful improvement. Then commit and push the latest playable project to the existing branch, update the triggering issue with the public URL and commit, and continue the same goal. Do not create a second PR or stop after publishing."
+            echo "Starting /loop iteration $iteration; remaining seconds: $(( deadline - $(date +%s) ))."
+            set +e
+            "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
+              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+              --session "$SESSION_ID" \
+              --model "$OPENCODE_MODEL" \
+              "$prompt" > "$OPENCODE_WEB_DIR/loop-iteration-$iteration.log" 2>&1
+            code=$?
+            set -e
+            echo "OpenCode loop iteration $iteration exited with code $code."
+
+            git add -A -- project
+            if ! git diff --cached --quiet; then
+              git commit -m "OpenCode loop iteration $iteration"
+            fi
+            git push origin "$BRANCH_NAME"
+            commit="$(git rev-parse HEAD)"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/comments" \
+              -f body="🔁 **/loop iteration $iteration published.**\n\nPublic game: $APP_URL\nCommit: https://github.com/$GITHUB_REPOSITORY/commit/$commit\nPull request: ${PR_URL:-(existing PR)}\n\nContinuing the goal and waiting for the next critique cycle."
+            iteration=$((iteration + 1))
+          done
+
       - name: Keep temporary access available for 5 hours
-        if: success()
+        if: success() && env.LOOP_REQUEST != 'true'
         shell: bash
         run: sleep 18000
+
+      - name: Mark /loop issue complete
+        if: success() && env.LOOP_REQUEST == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.issue.number;
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, name: 'in progress'
+            }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: number, labels: ['complete']
+            });
 
       - name: Append SSH session closed
         if: always() && steps.access_comment.outputs.comment_id != ''

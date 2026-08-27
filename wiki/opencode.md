@@ -6,14 +6,18 @@ The build and verification prompt templates are stored as Markdown files in
 
 ## Trigger
 
-`/oc <request>`, `/opencode <request>`, or `/goal <objective>` can appear in a
+`/oc <request>`, `/opencode <request>`, `/goal <objective>`, or `/loop <objective>` can appear in a
 newly created or edited issue/PR title or body, an issue comment, or a
 pull-request review comment. Bot-authored events are ignored, so status
 comments do not recurse. `/goal` selects the installed
 `opencode-goal-plugin`, configures `noInterruptOnUserMessage: true`, and starts
 the runner with `opencode run --command goal`; `/oc` and `/opencode` retain the
 standard `opencode run` path. A `/goal` trigger also automatically adds the
-`/Goal` GitHub issue label.
+`/Goal` GitHub issue label. `/loop` selects the same goal command, adds the
+`/Loop` label, and keeps the workflow running for five hours after the first
+published completion. Each iteration asks for distinct builder, critic, and
+verifier subagents, publishes to the existing branch/PR, and continues the
+original goal.
 
 ## What the job does
 

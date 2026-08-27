@@ -26,6 +26,9 @@ OpenCode config.
 When a request contains `/goal`, verify that label synchronization creates the
 `/Goal` label and that `Mark issue in progress` applies it alongside
 `in progress`. Standard `/oc` and `/opencode` requests must not receive `/Goal`.
+For `/loop`, also verify the `/Loop` label, goal invocation, continuation
+prompt, per-iteration push/comment, existing-PR behavior, and the `18000` second
+five-hour deadline.
 
 The log-release step must copy and upload only non-empty `.log`/`.json` files;
 empty service logs such as `nginx.log` can make GitHub's upload API return
