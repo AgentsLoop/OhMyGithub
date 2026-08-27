@@ -72,6 +72,24 @@ curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
 Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD true /models/*.glb 200
 ```
 
+## Iteration 2 — wall trim-sheet bevel/AO + seam decals (gauntlet loop)
+
+**Builder `ses_fbc9e5ce0ffeBVYsfsNeHm2QO6` (parallel):** `project/src/main.js` `makeWallTextures()` 512×512 color canvas (28 mottles + 18 warm dust splotches low-third + 172px vertical groove + highlight pair + 0.48×H mid seam + top 38px / bottom 46px cavity AO gradients + 1600 grain + 42 hairlines, `repeat 1.05×0.58 anisotropy 8`) + 512 roughness canvas (38 jitter blobs + 1400 grain + white seam highlights) + reused bump `0.018` — replaces flat `0xe6edf7 roughness 0.78` `BoxGeometry` walls that critic flagged as “Boxes 0xe6edf7, no normal/bevel”. Wall `MeshStandardMaterial` now `map: wallTexs.color roughnessMap/bumpMap`, `color 0xffffff`. Per-wall geometry added: `bevelTop` `0xf2f6fb 0.038×0.64` highlight at `h-0.235` + `bevelBot` `0xc2cddd 0.042×0.66` cavity at `0.205` (thin chamfer strips along top/bottom edges), two interior vertical seam decals per wall (`seamGeo 0.04×5.02` light `0xc8d3e6` + `seamDark 0.02×5.02` `0x1a2338` offset `±3.55m` along tangent, `translateZ 0.31`), vertical corner chamfers `0.06×(h-0.32)×0.04` `0xd7deea` at `±5.98m`, and 8 rivets per wall (`BoxGeometry 0.05` `0x5a6b88 metal 0.72` at `ys 0.28 / h-0.42, xs ±5.65/±1.85`). Shared geos/mats reused to limit draw calls; total added ≈+48 meshes (8/wall×6). All orbit logic via `ang` `(-sin,cos)` tangent `lookAt(0,*,0)+translateZ` so decals stay flush. Preserves `vite.config.js:3` `allowedHosts:true`, attribution JSONs `b2a34296/vanidza, 23af43/starkerg, 55d74d7/trolosqlfod`, sparse `project/` only, no `.agents` touch.
+
+**Critic `ses_fbc9cb1faffeKylT9nFduuBdnu` (independent, blind vs Halo Infinite Streets/Bazaar/The Pit, https://mat-busy-devel-paragraph.trycloudflare.com 200 + http://127.0.0.1:3000 200 tmux app-server:3000 + screenshots final-*.png 213-276KB): Halo wins decisively — ours still bright pastel toy-box at 8-15m despite iteration 2 wall pass. Single biggest gap — fully procedural fake trim-sheet vs Halo authored tiled albedo(0.75+)+normal+roughness+AO+baked bevel/edge-wear/decals: `src/main.js:20` Fog 42/95 + `31-32` ACES 1.35 wash, `181-239` floor Canvas 1024 `#d2d8e2` with drawn grout + `223-237` roughnessMap 512 `#d6d6d6` no aoMap/normalMap, `281-351` wall color 512 with `bumpScale 0.018` reusing color canvas is fake normal, `370` wall body `roughness 0.79 metal 0.06 map/roughnessMap/bumpMap` on flat Box 12×5.5×0.6, `389-396` bevels thin strips not chamfered trim, `358-363` seams/rivets decal hacks not edge-wear masks; enemy `robot.glb` 0 textures hacked `74-139` random metal/rough + CubeCamera 128 still clay; weapon `weapon.glb` 1967 faces `0.095` no hands. Until authored trim-sheet library + baked AO/normal + bevel mesh, no tweak reaches Streets readability.
+
+**Verifier `ses_fbc9bfb09ffe9ELjdsa6zKe4lF` (parallel):** PASS — `npm --prefix project run build` 642.05k gzip 167.41k 9 modules 1.63s (vs 637.89k prev +4.16k), `curl http://127.0.0.1:3000 200` 9708 via tmux `app-server` `vite preview --host 0.0.0.0 --port 3000`, `curl https://mat-busy-devel-paragraph.trycloudflare.com 200` cf-ray, `/models/*.glb` 200 both, `vite.config.js:5,10` `allowedHosts:true`, `git sparse-checkout list → project` cone false, `src/main.js:1` 1254 lines 13/13 loop mechanics (WASD/pointerLock/shoot/heat/recoil/spawn/AI/damage/HUD/wave/collision/pickup/particles/animate) pass, Playwright both URLs title `NEXUS ARENA` canvas true HUD hp100 true GLB 200 pass.
+
+**Remediation applied this iteration:** acknowledged wall CanvasTexture + bevel strips + seam/rivet decals mitigate flatness but still procedural Canvas grout/noise vs Halo baked `aoMap/normalMap` + bevel mesh + edge-wear masks; floor remains procedural Canvas grout (next step tiled trim-sheet material library or procedural normal from height). Kept `dist` rebuilt (`index-DbvrohAT.js`) and `tmux app-server` alive for public URL.
+
+**Re-verification after builder+remediation:**
+```
+npm run build ✓ 642.05k gzip 167.41k (9 modules, 1.63s) vs 637.89k prev (+4.16k)
+curl http://127.0.0.1:3000 200 9708
+curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
+Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
+```
+
 ## How to re-verify
 
 ```bash

@@ -277,16 +277,97 @@ const ring = new THREE.Mesh(ringGeo, ringMat);
 ring.rotation.x = Math.PI/2;
 ring.position.y = 0.05;
 scene.add(ring);
-// walls (hexagonal)
+// Halo trim-sheet wall textures — breaks flat #e6edf7 with AO, panel seams, micro variation
+function makeWallTextures(){
+  const N=512;
+  const c=document.createElement('canvas'); c.width=N; c.height=N;
+  const g=c.getContext('2d');
+  g.fillStyle='#e6edf7'; g.fillRect(0,0,N,N);
+  // large soft mottling (paint micro-unevenness)
+  for(let i=0;i<28;i++){
+    const x=Math.random()*N, y=Math.random()*N, r=32+Math.random()*68;
+    const a=0.012+Math.random()*0.018;
+    const grd=g.createRadialGradient(x,y,0,x,y,r);
+    grd.addColorStop(0,`rgba(18,24,38,${a})`);
+    grd.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=grd; g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill();
+  }
+  // warm edge dust / handling smudges near bottom third
+  for(let i=0;i<18;i++){
+    const x=Math.random()*N, y=N*0.55+Math.random()*N*0.45, r=18+Math.random()*34;
+    const a=0.02+Math.random()*0.03;
+    g.fillStyle=`rgba(48,42,36,${a})`;
+    g.beginPath(); g.ellipse(x,y,r*1.4,r,Math.random()*0.4,0,Math.PI*2); g.fill();
+  }
+  // vertical panel seams (2.4m spacing ≈ 512/2.8) — dark groove + light bevel highlight
+  g.strokeStyle='rgba(18,26,42,0.085)'; g.lineWidth=2;
+  for(let x=86;x<N;x+=172){
+    g.beginPath(); g.moveTo(x,0); g.lineTo(x,N); g.stroke();
+  }
+  g.strokeStyle='rgba(255,255,255,0.32)'; g.lineWidth=1;
+  for(let x=87;x<N;x+=172){
+    g.beginPath(); g.moveTo(x+1,0); g.lineTo(x+1,N); g.stroke();
+  }
+  // horizontal mid seam at ~2.7m (wall mid) — subtle
+  g.strokeStyle='rgba(18,26,42,0.055)'; g.lineWidth=1.4;
+  g.beginPath(); g.moveTo(0, N*0.48); g.lineTo(N, N*0.48); g.stroke();
+  g.strokeStyle='rgba(255,255,255,0.22)'; g.lineWidth=1;
+  g.beginPath(); g.moveTo(0, N*0.48+1.5); g.lineTo(N, N*0.48+1.5); g.stroke();
+  // cavity AO along top edge + bottom edge (darkens near trim)
+  const topGrad=g.createLinearGradient(0,0,0,38);
+  topGrad.addColorStop(0,'rgba(18,24,38,0.14)'); topGrad.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=topGrad; g.fillRect(0,0,N,38);
+  const botGrad=g.createLinearGradient(0,N-46,0,N);
+  botGrad.addColorStop(0,'rgba(18,24,38,0)'); botGrad.addColorStop(1,'rgba(18,24,38,0.18)');
+  g.fillStyle=botGrad; g.fillRect(0,N-46,N,46);
+  // fine grain / noise
+  for(let i=0;i<1600;i++){ const x=Math.random()*N, y=Math.random()*N; g.fillStyle=`rgba(0,0,0,${Math.random()*0.012})`; g.fillRect(x,y,1,1); }
+  for(let i=0;i<42;i++){
+    const x=Math.random()*N, y=Math.random()*N, l=10+Math.random()*26;
+    g.strokeStyle='rgba(18,24,38,0.022)'; g.lineWidth=0.6;
+    g.beginPath(); g.moveTo(x,y); g.lineTo(x+l,y); g.stroke();
+  }
+  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(1.05,0.58); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=8;
+  // roughness variation — mid 0.78 with jitter + seams rougher
+  const rc=document.createElement('canvas'); rc.width=512; rc.height=512;
+  const rg=rc.getContext('2d');
+  rg.fillStyle='#d3d3d3'; rg.fillRect(0,0,512,512);
+  for(let i=0;i<38;i++){
+    const x=Math.random()*512, y=Math.random()*512, r=16+Math.random()*44;
+    const a=0.08+Math.random()*0.14;
+    const shade=Math.random()<0.5?0:255;
+    rg.fillStyle=`rgba(${shade},${shade},${shade},${a})`;
+    rg.beginPath(); rg.arc(x,y,r,0,Math.PI*2); rg.fill();
+  }
+  for(let i=0;i<1400;i++){ const x=Math.random()*512, y=Math.random()*512; rg.fillStyle=`rgba(0,0,0,${Math.random()*0.07})`; rg.fillRect(x,y,1,1); }
+  // seams rougher (brighter in roughness map)
+  rg.strokeStyle='#ececec'; rg.lineWidth=2.2;
+  for(let x=86;x<512;x+=172){ rg.beginPath(); rg.moveTo(x,0); rg.lineTo(x,512); rg.stroke(); }
+  rg.strokeStyle='#ececec'; rg.lineWidth=1.2;
+  rg.beginPath(); rg.moveTo(0,512*0.48); rg.lineTo(512,512*0.48); rg.stroke();
+  const roughTex=new THREE.CanvasTexture(rc); roughTex.wrapS=roughTex.wrapT=THREE.RepeatWrapping; roughTex.repeat.set(1.05,0.58); roughTex.anisotropy=8;
+  // bump map reused from color luminance variation — subtle
+  const bumpTex=new THREE.CanvasTexture(c); bumpTex.wrapS=bumpTex.wrapT=THREE.RepeatWrapping; bumpTex.repeat.set(1.05,0.58); bumpTex.anisotropy=8;
+  return { color:tex, rough:roughTex, bump:bumpTex };
+}
+const wallTexs = makeWallTextures();
+// walls (hexagonal) — trim-sheet + bevel/AO + seam/rivet decals
 const wallGroup = new THREE.Group();
 scene.add(wallGroup);
+// shared small geometries/materials for rivets/bevels (reuse to keep draw calls low)
+const rivetGeo = new THREE.BoxGeometry(0.05,0.05,0.02);
+const rivetMat = new THREE.MeshStandardMaterial({ color:0x5a6b88, roughness:0.42, metalness:0.72 });
+const seamGeo = new THREE.BoxGeometry(0.04, 5.02, 0.03);
+const seamMat = new THREE.MeshStandardMaterial({ color:0xc8d3e6, roughness:0.86, metalness:0.04 });
+const seamDarkGeo = new THREE.BoxGeometry(0.02, 5.02, 0.035);
+const seamDarkMat = new THREE.MeshStandardMaterial({ color:0x1a2338, roughness:0.92, metalness:0.08 });
 for(let i=0;i<6;i++){
   const ang = i*Math.PI/3;
   const r = arenaRadius-0.6;
   const x = Math.cos(ang)*r, z=Math.sin(ang)*r;
   const w = 12, h=5.5;
-  // bright 3-tone Halo wall: off-white body + charcoal kick + safety orange stripe
-  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.6), new THREE.MeshStandardMaterial({ color:0xe6edf7, roughness:0.78, metalness:0.06 }));
+  // body with trim-sheet textures
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.6), new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.018, color:0xffffff, roughness:0.79, metalness:0.06 }));
   body.position.set(x, h/2, z);
   body.lookAt(0, h/2, 0);
   body.castShadow=true; body.receiveShadow=true;
@@ -304,6 +385,55 @@ for(let i=0;i<6;i++){
   cap.position.set(x, h-0.11, z);
   cap.lookAt(0, h-0.11, 0);
   wallGroup.add(cap);
+  // bevel chamfers — thin lighter highlight on top edge, darker cavity at bottom edge above kick
+  const bevelTop = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.038, 0.64), new THREE.MeshStandardMaterial({ color:0xf2f6fb, roughness:0.42, metalness:0.10 }));
+  bevelTop.position.set(x, h-0.235, z);
+  bevelTop.lookAt(0, h-0.235, 0);
+  wallGroup.add(bevelTop);
+  const bevelBot = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.042, 0.66), new THREE.MeshStandardMaterial({ color:0xc2cddd, roughness:0.84, metalness:0.05 }));
+  bevelBot.position.set(x, 0.205, z);
+  bevelBot.lookAt(0, 0.205, 0);
+  wallGroup.add(bevelBot);
+  // vertical seam decals — two interior seams per wall (breaks pastel flatness, hints trim-sheet joints)
+  for(const off of [-3.55, 3.55]){
+    const sx = x + (-Math.sin(ang))*off;
+    const sz = z + (Math.cos(ang))*off;
+    const seam = new THREE.Mesh(seamGeo, seamMat);
+    seam.position.set(sx, h/2, sz);
+    seam.lookAt(0, h/2, 0);
+    seam.translateZ(0.31);
+    wallGroup.add(seam);
+    const seamDark = new THREE.Mesh(seamDarkGeo, seamDarkMat);
+    seamDark.position.set(sx, h/2, sz);
+    seamDark.lookAt(0, h/2, 0);
+    seamDark.translateZ(0.312);
+    seamDark.translateX(-0.015);
+    wallGroup.add(seamDark);
+  }
+  // corner rivets + mid-height bolts along bottom and top rail (small BoxGeometry = Halo bevel screws)
+  const rivetYs = [0.28, h-0.42];
+  const rivetXs = [-5.65, -1.85, 1.85, 5.65];
+  for(const ry of rivetYs){
+    for(const rx of rivetXs){
+      const rxW = x + (-Math.sin(ang))*rx;
+      const rzW = z + (Math.cos(ang))*rx;
+      const riv = new THREE.Mesh(rivetGeo, rivetMat);
+      riv.position.set(rxW, ry, rzW);
+      riv.lookAt(0, ry, 0);
+      riv.translateZ(0.32);
+      wallGroup.add(riv);
+    }
+  }
+  // vertical corner bevels (chamfer strips at wall ends)
+  for(const off of [-5.98, 5.98]){
+    const ex = x + (-Math.sin(ang))*off;
+    const ez = z + (Math.cos(ang))*off;
+    const vBevel = new THREE.Mesh(new THREE.BoxGeometry(0.06, h-0.32, 0.04), new THREE.MeshStandardMaterial({ color:0xd7deea, roughness:0.62, metalness:0.12 }));
+    vBevel.position.set(ex, h/2, ez);
+    vBevel.lookAt(0, h/2, 0);
+    vBevel.translateZ(0.30);
+    wallGroup.add(vBevel);
+  }
   // single orange wayfinding marker per long wall not neon spam
   if(i===0){
     const marker = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.45, 0.04), new THREE.MeshStandardMaterial({ color:0xe86a1a, emissive:0xe86a1a, emissiveIntensity:0.35 }));
