@@ -36,6 +36,9 @@ const boonCard = document.getElementById('boonCard');
 const boonChoicesEl = document.getElementById('boonChoices');
 const boonDescEl = document.getElementById('boonDesc');
 const boonHudEl = document.getElementById('boonHud');
+const doorCard = document.getElementById('doorCard');
+const doorChoicesEl = document.getElementById('doorChoices');
+const doorDescEl = document.getElementById('doorDesc');
 const bossHudEl = document.getElementById('bossHud');
 const bossBarEl = document.getElementById('bossBar');
 const bossHpTextEl = document.getElementById('bossHpText');
@@ -55,6 +58,8 @@ const histClearsEl = document.getElementById('histClears');
 const histScoreEl = document.getElementById('histScore');
 const histBoonsEl = document.getElementById('histBoons');
 const histRunsEl = document.getElementById('histRuns');
+const tutorialOverlayEl = document.getElementById('tutorialOverlay');
+const firstClearEl = document.getElementById('firstClear');
 
 // ── Persistence (localStorage run history) ──
 const HIST_KEY = 'isolated-arena-history-v1';
@@ -110,13 +115,15 @@ function doAbandonRun(){
   // preserve history, clear run
   activeBoons={pulse:0,cache:0,shard:0}; recomputeBoonModifiers(); updateBoonHud();
   loop=1; score=0; dispScore=0; coreHp=100; dispCore=100; playerHp=100; dispPlayer=100;
+  forcedNextPalette=null; doorOffer=[]; doorRewardWeight=null;
   gameState='menu';
   overlay.style.display='flex';
   startCard.classList.remove('hidden');
-  howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden'); pauseCard.classList.add('hidden'); historyCard.classList.add('hidden');
+  howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden'); if(doorCard) doorCard.classList.add('hidden'); pauseCard.classList.add('hidden'); historyCard.classList.add('hidden');
   bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
   if(lowVignetteEl) lowVignetteEl.classList.remove('on');
   if(chromaticEl) chromaticEl.classList.remove('on');
+  dismissTutorial(); if(firstClearEl){ firstClearEl.classList.add('hidden'); firstClearEl.classList.remove('show'); } firstClearShown=false;
   // history runs increment if had progress
   if(hadProgress) runHistory.runs+=1;
   runHistory.bestLoop = Math.max(runHistory.bestLoop, 1);
@@ -142,6 +149,50 @@ function togglePause(){
     ensureAudio(); if(droneStarted) updateDroneIntensity();
     log('▶ Resumed');
   }
+}
+
+// ── (A) Tutorial & first-kill juice helpers ──
+function showTutorial(){
+  if(tutorialOverlayEl && loop===1 && !firstClearShown){
+    tutorialOverlayEl.classList.remove('hidden');
+    tutorialActive=true;
+    // highlight HUD: pulse the stats that matter
+    const hlIds=['seedStat','loop'];
+    try{ document.getElementById('seedStat')?.classList.add('hudHighlight'); document.querySelector('.stat.loop')?.classList.add('hudHighlight'); }catch(e){}
+    // staged hint pulse is CSS-driven via animation-delay
+    if(tutorialTimer) clearTimeout(tutorialTimer);
+    tutorialTimer=setTimeout(()=> dismissTutorial(), 8000);
+    log('◆ Tutorial: WASD · MOUSE · CLICK/SPACE — dismiss on first kill or 8s');
+  }
+}
+function dismissTutorial(){
+  if(!tutorialActive) return;
+  tutorialActive=false;
+  if(tutorialTimer){ clearTimeout(tutorialTimer); tutorialTimer=null; }
+  if(tutorialOverlayEl) tutorialOverlayEl.classList.add('hidden');
+  try{ document.getElementById('seedStat')?.classList.remove('hudHighlight'); document.querySelector('.stat.loop')?.classList.remove('hudHighlight'); }catch(e){}
+}
+function showFirstClear(){
+  if(firstClearShown) return;
+  firstClearShown=true;
+  if(!firstClearEl) return;
+  firstClearEl.classList.remove('hidden');
+  requestAnimationFrame(()=> firstClearEl.classList.add('show'));
+  beep(960,0.10,0.12); setTimeout(()=>beep(1320,0.12,0.12),120);
+  triggerShake(0.9);
+  setTimeout(()=>{ firstClearEl.classList.remove('show'); setTimeout(()=>firstClearEl.classList.add('hidden'),300); }, 1600);
+  log('✦ FIRST CLEAR — first conflict resolved!');
+}
+function spawnCritDamageNumbers(pos){
+  // 2× gold numbers at scale 1.4 — elite killed juice
+  const base = pos.clone();
+  spawnDamageNumber(base.clone().add(new THREE.Vector3(0,0.2,0)), 'CRIT!', '#ffd700', 1.4);
+  // second number slightly offset, delayed
+  setTimeout(()=> spawnDamageNumber(base.clone().add(new THREE.Vector3(0.5,0.4,0.3)), 'CRIT!', '#ffcc40', 1.4), 90);
+  burst(base, 0xffd700, 16);
+  burst(base.clone().add(new THREE.Vector3(0,0.6,0)), 0xffffff, 10);
+  triggerShake(1.25);
+  beep(1320,0.08,0.13); setTimeout(()=>beep(880,0.09,0.11),90);
 }
 
 // ── Boon definitions (Hades-style, stackable, persist for run) ──
@@ -301,9 +352,14 @@ scene.add(coreRing);
 let coreFlashTimer=0;
 let breachActive=false;
 
+// (A) onboarding & first-kill juice state
+let tutorialActive=false, tutorialTimer=null, firstClearShown=false;
 // state
 let loop=1, score=0, coreHp=100, playerHp=100, waveKill=0, waveTotal=0, elapsed=0, waveActive=false, gameState='menu';
 let isBossLoop=false, bossGroup=null, bossShockTimer=4.0, bossDashTimer=2.6, bossPhase=1, pendingBoonPicks=1;
+let forcedNextPalette=null; // Hades door choice — overrides next loop's paletteIdx
+let doorOffer=[]; // 2 doors offered after boon
+let doorRewardWeight=null; // 'pulse' | 'cache' | 'shard' | null weighted for next boon roll
 let enemies=[], bullets=[], enemyBullets=[], particles=[], sparks=[], shockEffects=[];
 let keys={};
 let mouse = new THREE.Vector2(0,0);
@@ -444,13 +500,14 @@ function setupPlayer(){
   disc.rotation.x=-Math.PI/2; disc.position.y=0.02;
   player.add(disc);
 }
-function spawnDamageNumber(pos, text, color='#ffffff'){
-  // create canvas texture sprite
+function spawnDamageNumber(pos, text, color='#ffffff', scaleMult=1){
+  // create canvas texture sprite — scaleMult 1.4 for elite crit gold
   const canvas=document.createElement('canvas');
   const ctx=canvas.getContext('2d');
   canvas.width=256; canvas.height=128;
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.font='700 56px Space Grotesk, sans-serif';
+  const fontSize = scaleMult>1 ? Math.round(56*scaleMult) : 56;
+  ctx.font=`700 ${fontSize}px Space Grotesk, sans-serif`;
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillStyle=color;
   ctx.strokeStyle='rgba(0,0,0,0.7)';
@@ -462,7 +519,7 @@ function spawnDamageNumber(pos, text, color='#ffffff'){
   const mat=new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false });
   const spr=new THREE.Sprite(mat);
   spr.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5)*0.6,1.2, (Math.random()-0.5)*0.6));
-  spr.scale.set(1.6,0.8,1);
+  spr.scale.set(1.6*scaleMult,0.8*scaleMult,1);
   spr.userData={ life:0.65, vel:new THREE.Vector3(0,1.8,0) };
   scene.add(spr);
   damageSprites.push(spr);
@@ -504,6 +561,15 @@ joystickEl.addEventListener('touchmove',e=>{ e.preventDefault(); if(!touchActive
 joystickEl.addEventListener('touchend',e=>{ e.preventDefault(); touchActive=false; keys['w']=keys['a']=keys['s']=keys['d']=false; touchDir.set(0,0); joyStickEl.style.transform='translate(0,0)'; },{passive:false});
 actionBtnEl.addEventListener('touchstart',e=>{ e.preventDefault(); if(gameState==='playing') shoot(); },{passive:false});
 actionBtnEl.addEventListener('click',()=>{ if(gameState==='playing') shoot(); });
+// (A) tutorial dismiss — click overlay or any key
+if(tutorialOverlayEl){
+  tutorialOverlayEl.addEventListener('click', ()=> dismissTutorial());
+  tutorialOverlayEl.addEventListener('touchstart', ()=> dismissTutorial(), {passive:true});
+}
+addEventListener('keydown', e=>{
+  if(tutorialActive && e.key.length===1) dismissTutorial();
+  if(tutorialActive && (e.code==='Space' || e.key===' ')) dismissTutorial();
+});
 
 // screen shake — directional + DOM fallback
 let shakeTimer=0, shakeIntensity=0, shakeDir=new THREE.Vector3();
@@ -724,6 +790,10 @@ function doBossShockwave(){
   // minor knockback
   const dir=player.position.clone().sub(pos); dir.y=0; if(dir.lengthSq()>1e-6) player.position.add(dir.normalize().multiplyScalar(0.9));
   burst(player.position, 0xff3b6b, 8);
+  // (A) extra particle bursts on Titan shock — juicier phase 2
+  burst(pos.clone().add(new THREE.Vector3(0,0.4,0)), bossPhase===2?0xffb020:0xff3b6b, bossPhase===2? 20:14);
+  burst(pos.clone().add(new THREE.Vector3(0,0.9,0)), 0xffffff, 10);
+  if(bossPhase===2){ burst(pos, 0xff6b3b, 12); spawnDamageNumber(pos.clone().add(new THREE.Vector3(0,2.0,0)), 'ENRAGED!', '#ffb020', 1.25); }
   // log only occasionally
   if(Math.random()<0.5) log(`◈ Titan shockwave — ${dmgPlayer} dmg · core -${dmgCore}%`);
   spawnDamageNumber(pos.clone().add(new THREE.Vector3(0,1.8,0)), 'SHOCK!', bossPhase===2?'#ffb020':'#ff3b6b');
@@ -823,7 +893,8 @@ function spawnEnemy(){
   const holder=new THREE.Group(); holder.add(mesh);
   g.add(holder);
   g.position.copy(pos);
-  const baseHp = archetype==='ranged' ? (isElite? 110+loop*10 : 55+loop*7) : (isElite? 140+loop*12 : 70+loop*8);
+  const rawHp = archetype==='ranged' ? (isElite? 110+loop*10 : 55+loop*7) : (isElite? 140+loop*12 : 70+loop*8);
+  const baseHp = Math.round(rawHp * 1.6); // VS density fix — raise HP 1.6x so 40-60 can stack
   let baseSpeed = archetype==='ranged' ? (isElite? 2.0+loop*0.14 : 1.7+loop*0.12) : (isElite? 2.8+loop*0.2 : 2.2+loop*0.18+Math.random()*0.6);
   if(paletteForSpawn===2) baseSpeed *= 1.12;
   g.userData={ holder, hp: baseHp, speed: baseSpeed, maxHp: baseHp, elite:isElite, bob:Math.random()*Math.PI*2, archetype, shootCd: 1.2+Math.random()*0.8 };
@@ -992,16 +1063,20 @@ function applyChamberMutation(loopNum){
     { bg:0x0f0a12, fog:0x120a1a, hemi:0xffd0e8, dir:0xffb0d0, rim:0xff3b6b },
     { bg:0x0a0f14, fog:0x0a1e22, hemi:0xb0fff0, dir:0x80ffcc, rim:0x2ee5a0 },
   ];
-  const p = palettes[loopNum % palettes.length];
+  let paletteIdx = loopNum % palettes.length;
+  if(forcedNextPalette !== null){
+    paletteIdx = forcedNextPalette;
+    forcedNextPalette = null;
+  }
+  const p = palettes[paletteIdx];
   scene.background.setHex(p.bg);
   scene.fog = new THREE.Fog(p.fog, 35, 70);
   // update lights
   scene.children.forEach(o=>{ if(o.isHemisphereLight) o.color.setHex(p.hemi); });
   dir.color.setHex(p.dir);
   rim.color.setHex(p.rim);
-  coreRing.material.color.setHex(loopNum%3===1?0xff3b6b:0x35d0ff);
+  coreRing.material.color.setHex(paletteIdx===1?0xff3b6b:0x35d0ff);
   // hazard pillars — mutate gameplay per loop%3 (critic 4): P0=0, P1=4 static, P2=4 rotating/pulsing
-  const paletteIdx = loopNum % 3;
   if(paletteIdx===0){
     log(`◈ Chamber mutated — palette ${paletteIdx} VOID + 0 hazards (clean)`);
     return;
@@ -1052,6 +1127,7 @@ async function startLoop(){
   deadCard.classList.add('hidden');
   winCard.classList.add('hidden');
   boonCard.classList.add('hidden');
+  if(doorCard) doorCard.classList.add('hidden');
   bossHudEl.classList.add('hidden');
   titanIncomingEl.classList.add('hidden');
   breachActive=false; breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
@@ -1070,6 +1146,8 @@ async function startLoop(){
   if(gameState!=='countdown') return;
   gameState='playing';
   lastSpawn=performance.now();
+  // (A) onboarding — first-loop tutorial (only loop 1, staged hints)
+  if(loop===1){ firstClearShown=false; showTutorial(); } else { dismissTutorial(); if(firstClearEl){ firstClearEl.classList.add('hidden'); firstClearEl.classList.remove('show'); } firstClearShown=false; }
   if(isBossLoop){
     spawnTitan();
     showTitanIncoming();
@@ -1086,10 +1164,18 @@ async function startLoop(){
 function showBoonChoice(){
   gameState='boon';
   overlay.style.display='flex';
-  startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden');
+  startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); doorCard.classList.add('hidden');
   boonCard.classList.remove('hidden');
   if(pendingBoonPicks>1) bossHudEl.classList.remove('hidden');
-  const shuffled=[...BOONS].sort(()=>Math.random()-0.5);
+  let shuffled=[...BOONS].sort(()=>Math.random()-0.5);
+  // door reward weighting — ensure weighted boon appears in offer
+  if(doorRewardWeight){
+    const weighted = BOONS.find(b=>b.id===doorRewardWeight);
+    if(weighted && !shuffled.slice(0,3).some(b=>b.id===weighted.id)){
+      shuffled = [weighted, ...shuffled.filter(b=>b.id!==weighted.id)];
+    }
+    doorRewardWeight = null;
+  }
   pendingBoonOffer = shuffled.slice(0,3);
   const picksText = pendingBoonPicks>1 ? `Pick <b style="color:#ffb020">${pendingBoonPicks}</b> boons — TITAN REWARD (2×)` : `Pick one <b>Hades boon</b> to persist for the rest of the run.`;
   const bossNote = isBossLoop ? ' <span style="color:#ff3b6b">◈ TITAN DEFEATED</span>' : '';
@@ -1154,6 +1240,11 @@ function pickBoon(id){
   }
   setTimeout(()=>{
     boonCard.classList.add('hidden');
+    // after boons, show Hades doors for next chamber (critic 5 — agency)
+    if(loop >= 1){
+      showDoorChoice();
+      return;
+    }
     gameState='won';
     winCard.classList.remove('hidden');
     overlay.style.display='flex';
@@ -1165,6 +1256,79 @@ function pickBoon(id){
     const titanStr = isBossLoop ? ' ◈ Titan slain — bonus boon granted.' : '';
     document.getElementById('winText').textContent=`Worktree loop ${loop} regression passed. Integrity ${Math.round(coreHp)}%. ${modStr}${titanStr} Next checkout harder (+3 enemies, +8% speed).`;
   }, 380);
+}
+function showDoorChoice(){
+  gameState='doors';
+  overlay.style.display='flex';
+  boonCard.classList.add('hidden'); winCard.classList.add('hidden'); startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden');
+  doorCard.classList.remove('hidden');
+  // generate 2 Hades doors: each = paletteIdx + hazard count + reward preview (weighted boon)
+  const palettesInfo = [
+    { idx:0, name:'VOID', label:'VOID · CLEAN', hazards:'0 hazards', color:'#35d0ff', desc:'Clean arena — no pillars. Safe to kite, but no cover.', reward:'PULSE-weighted' },
+    { idx:1, name:'CRIMSON', label:'CRIMSON · STATIC', hazards:'4 static', color:'#ff3b6b', desc:'4 static damage pillars at radius 7.5. Hold positions.', reward:'CACHE-weighted' },
+    { idx:2, name:'TEAL · ROTATING', label:'TEAL · ROTATING', hazards:'4 rotating', color:'#2ee5a0', desc:'4 rotating pulsing pillars + 50% ranged, +12% speed. High risk.', reward:'SHARD-weighted' },
+  ];
+  // pick 2 distinct palettes not current loop%3? ensure variety
+  const cur = loop % 3;
+  let pool = palettesInfo.filter(p=> p.idx!==cur);
+  if(pool.length<2) pool = palettesInfo;
+  pool = pool.sort(()=>Math.random()-0.5).slice(0,2);
+  // ensure we have 2 options, fallback to include cur if needed
+  if(pool.length<2){
+    const remaining = palettesInfo.filter(p=> !pool.some(x=>x.idx===p.idx));
+    pool.push(remaining[0]);
+  }
+  doorOffer = pool.map(p=>({ paletteIdx:p.idx, info:p }));
+  // door reward weighting for next boon roll: store preferred boon id
+  doorOffer.forEach(d=>{
+    if(d.info.idx===0) d.rewardWeight='pulse';
+    else if(d.info.idx===1) d.rewardWeight='cache';
+    else d.rewardWeight='shard';
+  });
+  doorDescEl.innerHTML = `Loop <b style="color:var(--accent)">${loop}</b> cleared — Integrity ${Math.round(coreHp)}%. Choose the next <b>chamber</b> — defines hazards & boon odds.`;
+  doorChoicesEl.innerHTML='';
+  doorOffer.forEach((d, idx)=>{
+    const p=d.info;
+    const div=document.createElement('button');
+    div.className=`boonChoice ${p.idx===0?'pulseBoon':p.idx===1?'cacheBoon':'shardBoon'}`;
+    div.setAttribute('data-door', idx);
+    div.innerHTML=`
+      <span class="boonKey">${idx+1}</span>
+      <div class="boonIcon" style="background:${p.color}22;border-color:${p.color};color:${p.color}">${p.idx===0?'○':p.idx===1?'■':'◈'}</div>
+      <h3>${p.label}</h3>
+      <p>${p.desc}</p>
+      <div class="boonMeta">${p.hazards} · ${p.reward} · next seed P${p.idx}</div>
+    `;
+    div.onclick=()=> pickDoor(idx);
+    doorChoicesEl.appendChild(div);
+  });
+  log(`🚪 Choose chamber — ${doorOffer.map(d=>d.info.label).join('  vs  ')}`);
+}
+function pickDoor(idx){
+  const choice = doorOffer[idx];
+  if(!choice) return;
+  forcedNextPalette = choice.paletteIdx;
+  doorRewardWeight = choice.rewardWeight;
+  log(`🚪 Door chosen: ${choice.info.label} → next palette P${choice.paletteIdx} · ${choice.rewardWeight} weighted`);
+  beep({pulse:880, cache:660, shard:1040}[doorRewardWeight]||880,0.18,0.13);
+  triggerShake(0.6);
+  doorCard.querySelectorAll('.boonChoice').forEach(el=>{
+    if(Number(el.getAttribute('data-door'))===idx) el.classList.add('selected');
+    el.style.pointerEvents='none';
+  });
+  setTimeout(()=>{
+    doorCard.classList.add('hidden');
+    gameState='won';
+    winCard.classList.remove('hidden');
+    overlay.style.display='flex';
+    const mods = [];
+    if(activeBoons.pulse) mods.push(`Pulse ×${activeBoons.pulse}`);
+    if(activeBoons.cache) mods.push(`Cache ×${activeBoons.cache}`);
+    if(activeBoons.shard) mods.push(`Shard ×${activeBoons.shard}`);
+    const modStr = mods.length ? `Active: ${mods.join(' · ')}` : '';
+    const doorStr = ` Next: ${choice.info.label} (P${choice.paletteIdx})`;
+    document.getElementById('winText').textContent=`Worktree loop ${loop} regression passed. Integrity ${Math.round(coreHp)}%. ${modStr}.${doorStr}`;
+  }, 420);
 }
 function winLoop(){
   const gained = 200 + loop*50 + Math.round(coreHp);
@@ -1537,6 +1701,8 @@ function tick(dt){
         }
         spawnDamageNumber(e.position.clone().add(new THREE.Vector3(0,0.2,0)), String(b.userData.dmg), e.userData.elite?'#ffb020':'#ffffff');
         burst(e.position, 0xffffff, 4);
+        // knockback instead of insta-kill — VS horde stacks
+        e.position.add(b.userData.vel.clone().normalize().multiplyScalar(e.userData.isBoss?0.2:0.65));
         // hitstop + directional shake + sound
         triggerHitStop(62);
         triggerShake(0.85, b.userData.vel);
@@ -1567,17 +1733,23 @@ function tick(dt){
               const holder=new THREE.Group(); holder.add(mm); g.add(holder); g.position.copy(mPos); g.userData={ holder, hp: 70+loop*6, maxHp:70+loop*6, speed:2.4+loop*0.12, elite:true, bob:Math.random()*Math.PI*2, archetype:'melee' }; const bar=new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.08), new THREE.MeshBasicMaterial({color:0xff5533, side:THREE.DoubleSide})); bar.position.set(0,1.45,0); g.add(bar); g.userData.bar=bar; scene.add(g); enemies.push(g);
             }
             waveKill++; waveEl.textContent=`${waveKill} / ${waveTotal}`;
+            if(waveKill===1) showFirstClear();
+            if(tutorialActive) dismissTutorial();
             showWaveAnnouncer('◈ TITAN SLAIN',1800);
             winLoop();
           } else {
             burst(e.position, e.userData.elite?0xffcc40:0xff3b6b, e.userData.elite?18:12);
             spawnDamageNumber(e.position, e.userData.elite?'+85':' +35', '#2ee5a0');
+            // (A) crit juice: gold 2× scale 1.4 on elite kill + FIRST CLEAR + tutorial dismiss
+            if(e.userData.elite) spawnCritDamageNumbers(e.position);
             score+= e.userData.elite? 85 + loop*5 : 35 + loop*3;
             scoreEl.classList.add('bump');
             setTimeout(()=>scoreEl.classList.remove('bump'),180);
             beep(e.userData.elite? 1200: 620, 0.10, 0.11);
             waveKill++;
             waveEl.textContent=`${waveKill} / ${waveTotal}`;
+            if(waveKill===1){ showFirstClear(); }
+            if(tutorialActive) dismissTutorial();
             if(waveKill%Math.ceil(waveTotal/3)===0 && waveKill<waveTotal){
               showWaveAnnouncer(`WAVE ${loop} — ${waveKill}/${waveTotal}`,1400);
             }
@@ -1649,13 +1821,14 @@ document.getElementById('audioToggle').onclick=toggleDroneMute;
 document.getElementById('audioToggle').textContent = (localStorage.getItem('isolated-arena-muted')==='1') ? '🔇 MUTED' : '🔊 AUDIO';
 document.getElementById('howBtn').onclick=()=>{ startCard.classList.add('hidden'); howCard.classList.remove('hidden'); };
 document.getElementById('backBtn').onclick=()=>{ howCard.classList.add('hidden'); startCard.classList.remove('hidden'); };
-document.getElementById('retryBtn').onclick=()=>{ overlay.style.display='none'; boonCard.classList.add('hidden'); startLoop(); };
+document.getElementById('retryBtn').onclick=()=>{ overlay.style.display='none'; boonCard.classList.add('hidden'); if(doorCard) doorCard.classList.add('hidden'); startLoop(); };
 document.getElementById('menuBtn').onclick=()=>{
-  deadCard.classList.add('hidden'); boonCard.classList.add('hidden'); winCard.classList.add('hidden'); pauseCard.classList.add('hidden'); historyCard.classList.add('hidden');
+  deadCard.classList.add('hidden'); boonCard.classList.add('hidden'); if(doorCard) doorCard.classList.add('hidden'); winCard.classList.add('hidden'); pauseCard.classList.add('hidden'); historyCard.classList.add('hidden');
   startCard.classList.remove('hidden'); overlay.style.display='flex'; gameState='menu';
   coreHp=100; dispCore=100; loop=1; score=0; dispScore=0;
   activeBoons={pulse:0,cache:0,shard:0}; recomputeBoonModifiers(); updateBoonHud();
   bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); isBossLoop=false; bossGroup=null;
+  dismissTutorial(); if(firstClearEl){ firstClearEl.classList.add('hidden'); firstClearEl.classList.remove('show'); } firstClearShown=false;
   updateHUD(); updateSeedDisplay(); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
   log('Run reset — boons cleared');
   // increment runs history
@@ -1682,12 +1855,16 @@ addEventListener('keydown',e=>{
     if(e.key==='2') pendingBoonOffer[1] && pickBoon(pendingBoonOffer[1].id);
     if(e.key==='3') pendingBoonOffer[2] && pickBoon(pendingBoonOffer[2].id);
   }
+  if(gameState==='doors'){
+    if(e.key==='1') doorOffer[0] && pickDoor(0);
+    if(e.key==='2') doorOffer[1] && pickDoor(1);
+  }
 });
 
 // history & pause wiring
 if(historyBtn) historyBtn.onclick=()=>{
   renderHistoryCard();
-  startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden'); pauseCard.classList.add('hidden');
+  startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden'); if(doorCard) doorCard.classList.add('hidden'); pauseCard.classList.add('hidden');
   historyCard.classList.remove('hidden');
   overlay.style.display='flex';
   if(gameState==='menu' || gameState==='dead' || gameState==='won') {/* keep state */}
@@ -1714,9 +1891,9 @@ updateSeedDisplay();
 renderHistoryCard();
 log('Worktree arena ready — awaiting loop start');
 
-// expose for verifier — includes A-verification hooks
+// expose for verifier — includes A-verification hooks + (A) tutorial/first-clear + doors
 window.__arena={
-  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on'))}),
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight}),
   getBoons:()=>({...activeBoons}),
   getHistory:()=>{ try{ return JSON.parse(JSON.stringify(runHistory)); }catch(e){ return {...runHistory}; } },
   pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); },
@@ -1736,4 +1913,13 @@ window.__arena={
   },
   getFloorAO:()=> ({ hasMap: !!(floorMat.map && floorMat.map.isCanvasTexture), hasCanvas: !!(floorMat.map && floorMat.map.image && floorMat.map.image.width===512) }),
   getAttributionLinks:()=> Array.from(document.querySelectorAll('#attribution a')).map(a=>({ href:a.href, target:a.target, rel:a.rel })),
+  // (A) test hooks
+  showTutorialForTest:()=> showTutorial(),
+  dismissTutorialForTest:()=> dismissTutorial(),
+  showFirstClearForTest:()=> showFirstClear(),
+  spawnCritForTest:(x=0,z=0)=> spawnCritDamageNumbers(new THREE.Vector3(x,0,z)),
+  getTutorialState:()=> ({ active: tutorialActive, hidden: !!(tutorialOverlayEl && tutorialOverlayEl.classList.contains('hidden')), firstClearShown, firstClearHidden: !!(firstClearEl && firstClearEl.classList.contains('hidden')) }),
+  getDoorState:()=> ({ forcedNextPalette, doorCount: doorOffer.length, rewardWeight: doorRewardWeight, gameState, doorVisible: !!(doorCard && !doorCard.classList.contains('hidden')) }),
+  showDoorForTest:()=> { if(gameState==='won') showDoorChoice(); },
+  pickDoorForTest:(idx)=> pickDoor(idx),
 };
