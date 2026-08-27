@@ -6,6 +6,10 @@
 - [Temporary Mac SSH access](wiki/access.md)
 - [Testing and verification](wiki/testing.md)
 
+## Main project file
+
+The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
+
 ## Git delivery
 
 After every code change, commit and push the change. For small code changes, amend
