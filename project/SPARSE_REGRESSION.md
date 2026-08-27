@@ -108,6 +108,24 @@ curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
 Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
 ```
 
+## Iteration 4 — fog/sky exposure wash + mid-distance darken + haze/vignette (gauntlet loop)
+
+**Builder `ses_fbc8d5ab0ffeKnRw1rwSo0qWHr` (parallel):** `project/src/main.js:19-55` Fog `0xc8d4e8,42,95`→`0xa8bed8,38,85` tighter/darker, bg `0xaac0d8`→`0x8ea6c6`, sky `0xeef2f8`→`0xc9d6ea` (gradient `238→200→170` → `201→168→142`), ACES `1.35`→`1.20`, Hemi `0xf0f6ff/0x303848 0.9`→`0xeef4ff/0x2a3448 0.72`, Dir `0xfff0dd 3.2`→`0xfff1d6 2.85`, height haze `SphereGeometry(58)` `ShaderMaterial` vertical gradient alpha 0.22→0 at 18m, vignette DOM `radial-gradient(transparent 62% → rgba(10,18,36,0.52)) opacity 0.55`, distant wall darken `src/main.js:1373-1394` `wallBodies[]` per-frame `distanceTo(camRig)` t `(d-12)/22` → color darken up to 16% + roughness `0.79→0.85`. Preserves `allowedHosts:true`, attribution, sparse `project/` only.
+
+**Critic `ses_fbc8c4443ffeCLDT5WB2vn51Uy` (independent, blind vs Halo Infinite Streets/Bazaar/The Pit, https://mat-busy-devel-paragraph.trycloudflare.com 200 + http://127.0.0.1:3000 200 tmux app-server:3000): Halo wins decisively — still bleached toy-box at 8-15m despite wash fixes (`21` Fog `0xa8bed8 38,85`, `22` bg `0x8ea6c6`, `24-25` sky `0xc9d6ea MeshBasicMaterial BackSide` ignores lights, `60-61` ACES 1.20 + `51-55` vignette `0.52` cannot fix white balance, `66-84` CubeRenderTarget 128 single-shot env). Single biggest gap — procedural fake PBR vs authored tiled albedo(0.75+)+normal+rough+AO+bevel/edge-wear/decals: `210-268` floor Canvas 1024 `#d2d8e2` mottles+2px grout + `250-266` roughness 512 `#d6d6d6` no aoMap/normalMap, `310-381` wall 512 `#e6edf7` 28 mottles + AO gradients `repeat 1.05,0.58` + `379` bump `0.018` fake normal, `400` walls Box 12×5.5×0.6 flat, `419-425` bevels thin strips not chamfered trim, `391-445` seams/rivets decal hacks; enemy `robot.glb` 0 textures hacked `103-169` random metal/rough + CubeCamera 128 still clay; weapon `1967` faces `0.095` no hands; verticality `568-706` two isolated 3.5×2.0×1.2m boxes not Streets continuous lanes. Until authored trim-sheet library + baked AO/normal + bevel mesh, no exposure tweak reaches readability.
+
+**Verifier `ses_fbc8b9899ffecVU8ifmiZX9U6W` (parallel):** PASS — `vite v5.4.21 ✓ built in 1.79s` `dist/assets/index-BwM92o_n.js 647.38k gzip 169.18k` (+1.23k vs 646.15k), `dist/index.html 9.69k`, `curl http://127.0.0.1:3000 200` 9708 `vite preview`, `curl https://mat-busy-devel-paragraph.trycloudflare.com 200` cf-ray, `Host trycloudflare → 127.0.0.1:3000 200`, `/models/*.glb` 200 both, `vite.config.js:1-12` `allowedHosts:true` host 0.0.0.0 port 3000, `git sparse-checkout list → project` tmux `app-server:1 windows`, `src/main.js:1` 1460 lines 13/13 mechanics (WASD, pointerLocked yaw/pitch -1.35, dash 0.22/1.1, heat 0.085, HUD, enemy chase, platform height, wave, particles) pass, Playwright both URLs title `NEXUS ARENA` canvas true HUD hp100 true GLB 6×200 pass with warnings `THREE.WebGLState: MultiplyBlending requires premultipliedAlpha` (aoTex planes) and `WebGL context different type` (benign).
+
+**Remediation applied this iteration:** acknowledged exposure wash fix (Fog tighter/darker, bg/sky darker, ACES 1.20, Hemi 0.72, Dir 2.85) + height haze + vignette + distant-wall darken mitigate mid-distance bleaching but cannot replace authored `aoMap/normalMap` + bevel mesh + edge-wear masks; floor/walls remain procedural Canvas grout vs tiled trim-sheet; robot 0 textures + weapon placeholder unchanged. Noted MultiplyBlending warnings need `premultipliedAlpha:true` fix next. Kept `dist` rebuilt (`index-BwM92o_n.js`) and `tmux app-server` alive.
+
+**Re-verification after builder+remediation:**
+```
+npm run build ✓ 647.38k gzip 169.18k (9 modules, 1.79s) vs 646.15k prev (+1.23k)
+curl http://127.0.0.1:3000 200 9708
+curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
+Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
+```
+
 ## How to re-verify
 
 ```bash

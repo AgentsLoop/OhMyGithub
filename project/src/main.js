@@ -17,19 +17,48 @@ const wonScreen = document.getElementById('won');
 const attrib = document.getElementById('attrib');
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xc8d4e8, 42, 95);
-scene.background = new THREE.Color(0xaac0d8);
-// large inverted sky dome for bright horizon vs black void
+// Iteration 4: reduce wash — tighter, darker fog + desaturated sky/bg for Halo mid-distance depth cue
+scene.fog = new THREE.Fog(0xa8bed8, 38, 85);
+scene.background = new THREE.Color(0x8ea6c6);
+// large inverted sky dome — was 0xeef2f8 (bleached) → 0xc9d6ea restores contrast vs white trim
 const skyGeo = new THREE.SphereGeometry(120, 32, 32);
-const skyMat = new THREE.MeshBasicMaterial({ color: 0xeef2f8, side: THREE.BackSide });
+const skyMat = new THREE.MeshBasicMaterial({ color: 0xc9d6ea, side: THREE.BackSide });
 const sky = new THREE.Mesh(skyGeo, skyMat);
 scene.add(sky);
-
+// Height haze dome — subtle vertical gradient to mimic Halo atmospheric depth (denser near ground)
+let heightHaze = null;
+{
+  const hGeo = new THREE.SphereGeometry(58, 32, 22, 0, Math.PI*2, 0, Math.PI*0.58);
+  const hMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, transparent:true, depthWrite:false, fog:false,
+    uniforms:{ col:{value:new THREE.Color(0x8ea6c6)}, fogCol:{value:new THREE.Color(0xa8bed8)} },
+    vertexShader:`varying float vH; void main(){ vH = position.y; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader:`varying float vH; uniform vec3 col; uniform vec3 fogCol; void main(){
+      float t = clamp((vH + 2.0)/ 18.0, 0.0, 1.0);
+      float alpha = (1.0 - t) * 0.22;
+      // slightly darker/bluer toward horizon
+      vec3 c = mix(fogCol, col, t*0.6);
+      gl_FragColor = vec4(c, alpha);
+    }`,
+    blending: THREE.NormalBlending
+  });
+  heightHaze = new THREE.Mesh(hGeo, hMat);
+  heightHaze.position.y = -2.0;
+  heightHaze.renderOrder = -1;
+  scene.add(heightHaze);
+}
+// subtle vignette overlay — Halo lift blacks in corners to fight ACES wash
+{
+  const vig = document.createElement('div');
+  vig.id='vignette';
+  vig.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(10,18,36,0.52) 100%);opacity:0.55;';
+  document.body.appendChild(vig);
+}
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.35;
+renderer.toneMappingExposure = 1.20;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -154,9 +183,9 @@ async function loadModels(){
 }
  // keep weapon fallback handled later
 
-// lights — bright Halo day: warm sun + soft sky AO, single bounce, no color soup
-scene.add(new THREE.HemisphereLight(0xf0f6ff, 0x303848, 0.9));
-const dir = new THREE.DirectionalLight(0xfff0dd, 3.2);
+// lights — Halo day, iteration 4: lower hemi fill to restore contrast, keep warm sun but 2.9 not 3.2 (was wash)
+scene.add(new THREE.HemisphereLight(0xeef4ff, 0x2a3448, 0.72));
+const dir = new THREE.DirectionalLight(0xfff1d6, 2.85);
 dir.position.set(18,22,12);
 dir.castShadow=true;
 dir.shadow.mapSize.set(2048,2048);
@@ -354,6 +383,7 @@ const wallTexs = makeWallTextures();
 // walls (hexagonal) — trim-sheet + bevel/AO + seam/rivet decals
 const wallGroup = new THREE.Group();
 scene.add(wallGroup);
+const wallBodies = []; // for distance darken (mid-distance readability)
 // shared small geometries/materials for rivets/bevels (reuse to keep draw calls low)
 const rivetGeo = new THREE.BoxGeometry(0.05,0.05,0.02);
 const rivetMat = new THREE.MeshStandardMaterial({ color:0x5a6b88, roughness:0.42, metalness:0.72 });
@@ -371,7 +401,7 @@ for(let i=0;i<6;i++){
   body.position.set(x, h/2, z);
   body.lookAt(0, h/2, 0);
   body.castShadow=true; body.receiveShadow=true;
-  wallGroup.add(body);
+  wallGroup.add(body); wallBodies.push(body);
   const kick = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, 0.62), new THREE.MeshStandardMaterial({ color:0x1f2636, roughness:0.72, metalness:0.32 }));
   kick.position.set(x, 0.09, z);
   kick.lookAt(0, 0.09, 0);
@@ -1359,6 +1389,25 @@ function animate(){
     updatePickups(dt);
     updateParticles(dt);
     updateWave(dt);
+  }
+  // Halo depth cue: gently darken distant walls with distance (mimics fog AO + trimsheet distance read)
+  for(const b of wallBodies){
+    const d = b.position.distanceTo(camRig.position);
+    const t = THREE.MathUtils.clamp((d - 12) / 22, 0, 1);
+    // 0 at near → 1 at far: darken up to ~16% and add slight blue fog tint
+    const dark = 1 - t * 0.16;
+    // modulate material color lerp toward fog (avoid rebuilding texture)
+    if(b.material && b.material.color){
+      // base is white (texture tint); lerp white→0.88 gray plus fog tint
+      b.material.color.setRGB(dark, dark, dark);
+      // subtle roughness lift at distance so highlight not blown
+      b.material.roughness = 0.79 + t * 0.06;
+    }
+  }
+  // keep height haze centered on player for stable horizon
+  if(heightHaze){
+    heightHaze.position.x = camRig.position.x;
+    heightHaze.position.z = camRig.position.z;
   }
   renderer.render(scene,camera);
 }
