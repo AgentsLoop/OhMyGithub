@@ -1,0 +1,40 @@
+{
+  "uid": "24456f3cf17f4a12b05fbe9d95c3687d",
+  "name": "Military Drone Low-Poly",
+  "author": "ToporEnterprise",
+  "authorUrl": "https://sketchfab.com/lebedeventerprise",
+  "license": "CC Attribution",
+  "licenseUrl": null,
+  "modelUrl": "https://sketchfab.com/3d-models/none-24456f3cf17f4a12b05fbe9d95c3687d",
+  "thumbnailUrl": "https://media.sketchfab.com/models/24456f3cf17f4a12b05fbe9d95c3687d/thumbnails/fe85b2ed0528459b86984234bf6dbc84/34ba3ca17c9d476f9ddeb034e9050f12.jpeg",
+  "glbBytes": 402632,
+  "faceCount": 344,
+  "vertexCount": 302,
+  "textureCount": 2,
+  "textureMaxResolution": 512,
+  "animationCount": 2,
+  "animations": [
+    {
+      "uid": "c22e1a3f17bf45e7bc3ea216c7d981ca",
+      "name": "Drone1_Armature|Drone1_Walk",
+      "url": "https://media.sketchfab.com/models/24456f3cf17f4a12b05fbe9d95c3687d/5067be76c69040789eaeaceaba0dbc6d/animations/c22e1a3f17bf45e7bc3ea216c7d981ca.bin.gz",
+      "size": 4688,
+      "duration": 0.667,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2021-08-15T15:12:57.391908",
+      "updatedAt": "2021-08-15T15:12:57.391918"
+    },
+    {
+      "uid": "92dd694071cc4330967dcf1be5714b03",
+      "name": "Drone1_Armature|Drone1_Idle",
+      "url": "https://media.sketchfab.com/models/24456f3cf17f4a12b05fbe9d95c3687d/5067be76c69040789eaeaceaba0dbc6d/animations/92dd694071cc4330967dcf1be5714b03.bin.gz",
+      "size": 25764,
+      "duration": 4.0,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2021-08-15T15:12:57.388131",
+      "updatedAt": "2021-08-15T15:12:57.388143"
+    }
+  ]
+}
