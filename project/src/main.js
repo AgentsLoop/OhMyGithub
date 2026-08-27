@@ -169,7 +169,7 @@ const halo2 = halo.clone(); halo2.position.y=1.9; halo2.scale.set(1.15,1.15,1);
 reactor.add(halo2);
 scene.add(reactor);
 
-// crates as cover
+// crates as cover — Halo verticality: flat crates → 2-high stacks + mid Walls for head-glitch cover
 const crates = [];
 function addCrate(pos, scale=1){
   let mesh;
@@ -194,6 +194,45 @@ function addCrate(pos, scale=1){
     scene.add(l);
   }
 }
+function addStack(basePos, levels=2, scale=1){
+  const lift = 1.02*scale; // crate height ≈1.1*scale, slight overlap for contact
+  for(let i=0;i<levels;i++){
+    let mesh;
+    if(crateTemplate){
+      mesh = crateTemplate.clone(true);
+      mesh.scale.setScalar(0.015*scale*1.2);
+      mesh.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; }});
+    } else {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(1.2*scale,1.1*scale,1.2*scale), new THREE.MeshStandardMaterial({ color:0x2a3a5a, emissive:0x00c8ff, emissiveIntensity:0.15, roughness:0.7, metalness:0.4 }));
+    }
+    mesh.position.copy(basePos);
+    mesh.position.y = 0.55*scale + i*lift;
+    mesh.rotation.y = (Math.random()-0.5)*0.35;
+    mesh.userData.radius = 0.9*scale;
+    // subtle color temp variation per level for Halo kit-bash read
+    mesh.traverse?.(o=>{ if(o.isMesh && o.material && o.material.color){ o.material = o.material.clone(); o.material.color.offsetHSL(0,0, i===1 ? 0.06 : 0); }});
+    scene.add(mesh);
+    crates.push(mesh);
+  }
+  // stack collision proxy (taller)
+  crates[crates.length-1].userData.stackHeight = levels*lift;
+}
+function addCoverWall(pos, yawRad=0, len=3.0, h=1.45){
+  // Halo-style mid cover wall: high-albedo hard-surface + metal trim + neon top strip
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(len, h, 0.52), new THREE.MeshStandardMaterial({ color:0xdbe6ff, roughness:0.55, metalness:0.18 }));
+  body.position.y=h/2; body.castShadow=true; body.receiveShadow=true;
+  g.add(body);
+  const trim=new THREE.Mesh(new THREE.BoxGeometry(len+0.06, 0.12, 0.56), new THREE.MeshStandardMaterial({ color:0x182a44, roughness:0.45, metalness:0.45 }));
+  trim.position.y=0.14; g.add(trim);
+  const neon=new THREE.Mesh(new THREE.BoxGeometry(len*0.88, 0.04, 0.06), new THREE.MeshStandardMaterial({ color:0x7af2ff, emissive:0x7af2ff, emissiveIntensity:1.6 }));
+  neon.position.set(0, h-0.08, 0.27); g.add(neon);
+  g.position.copy(pos); g.position.y=0;
+  g.rotation.y=yawRad;
+  // collision radius approx
+  g.userData.radius = Math.max(len,0.9)/2;
+  scene.add(g); crates.push(g);
+}
 const cratePositions = [
   new THREE.Vector3(6,0,5), new THREE.Vector3(-5,0,7), new THREE.Vector3(8,0,-4),
   new THREE.Vector3(-7,0,-5), new THREE.Vector3(0,0,9), new THREE.Vector3(0,0,-9),
@@ -203,6 +242,14 @@ const cratePositions = [
 cratePositions.forEach(p=>addCrate(p, 0.9+Math.random()*0.4));
 addCrate(new THREE.Vector3(3,0,0),1.6);
 addCrate(new THREE.Vector3(-3,0,-2),1.4);
+// Halo vertical loop — 2-high stacks visible from spawn (0,1.7,8) looking inward
+addStack(new THREE.Vector3(5.2,0,-2.4), 2, 1.05);
+addStack(new THREE.Vector3(-5.0,0,2.8), 2, 1.05);
+addStack(new THREE.Vector3(1.2,0,-6.2), 2, 1.08);
+addStack(new THREE.Vector3(-1.8,0,5.8), 2, 0.98);
+// 2 mid walls for head-glitch lanes (Streets/The Pit style)
+addCoverWall(new THREE.Vector3(2.2,0,3.2), 0.55, 3.2, 1.45);
+addCoverWall(new THREE.Vector3(-2.6,0,-3.6), -0.55, 3.2, 1.45);
 
 // weapon viewmodel — Halo Infinite ref: low, center-right, strong silhouette, readable against bright arena
 const viewWeapon = new THREE.Group();
