@@ -1,0 +1,17 @@
+{
+  "name": "warehouse-ops-fps",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000 --host",
+    "test": "vitest run",
+    "serve": "python3 -m http.server 3000"
+  },
+  "devDependencies": {
+    "playwright": "1.47",
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
