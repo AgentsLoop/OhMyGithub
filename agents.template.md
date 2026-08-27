@@ -13,12 +13,14 @@ blocked. Each update must include:
 
 - a short summary of completed work;
 - the current status and known blockers (write `None` when there are none);
-- links to relevant pushed commits and any available public preview;
+- links to the current commit and any available public preview. The
+  repository-root workflow publishes the isolated worktree with its
+  validated controlled push;
 - one screenshot showing the latest newly completed UI or gameplay milestone.
 
 Save milestone screenshots under `screenshots/`. Before embedding one in an
-issue comment, commit it, push the current branch, and use an immutable URL in
-this form:
+issue comment, commit it in the isolated worktree and use an immutable URL
+after the repository-root workflow publishes it in this form:
 
 ```text
 https://raw.githubusercontent.com/$GITHUB_REPOSITORY/<commit-sha>/project/screenshots/<file-name>
@@ -44,7 +46,8 @@ Before declaring the game complete:
 1. Run the relevant tests and verify the playable game in a real browser.
 2. Capture final screenshots of the playable game and save them under
    `screenshots/` using names beginning with `final-`.
-3. Commit and push all final code and screenshots.
+3. Commit all final code and screenshots in the isolated worktree. Do not push;
+   the repository-root workflow owns the validated controlled push.
 4. Post a final issue comment containing:
    - a concise summary of the completed game;
    - the public game link;
