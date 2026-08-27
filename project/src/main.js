@@ -63,6 +63,20 @@ const firstClearEl = document.getElementById('firstClear');
 const rebindHintEl = document.getElementById('rebindHint');
 const rebindCloseBtn = document.getElementById('rebindCloseBtn');
 const joyDeadzoneEl = document.getElementById('joyDeadzone');
+// ── (A) Iteration9: Run analytics overlay refs
+const analyticsOverlayEl = document.getElementById('analyticsOverlay');
+const analyticsCloseBtn = document.getElementById('analyticsCloseBtn');
+const analyticsResetBtn = document.getElementById('analyticsResetBtn');
+const anBestEl = document.getElementById('anBest');
+const anCurrentEl = document.getElementById('anCurrent');
+const anKillsEl = document.getElementById('anKills');
+const anDmgEl = document.getElementById('anDmg');
+const anHazEl = document.getElementById('anHaz');
+const anBoonsEl = document.getElementById('anBoons');
+const anFpsEl = document.getElementById('anFps');
+const anThrottleEl = document.getElementById('anThrottle');
+const anSeedEl = document.getElementById('anSeed');
+const anSeedSubEl = document.getElementById('anSeedSub');
 
 // ── Persistence (localStorage run history) ──
 const HIST_KEY = 'isolated-arena-history-v1';
@@ -136,6 +150,64 @@ function doAbandonRun(){
   saveHistory(); renderHistoryCard(); updateSeedDisplay(); updateHUD();
   log('⌫ Run abandoned — boons/loop cleared · history preserved');
 }
+// ── (A) Iteration9: Run analytics — live stats + best loop via localStorage + FPS-adaptive throttling
+const ANALYTICS_KEY = 'isolated-arena-analytics-v1';
+let analytics = { totalKills:0, damageDealt:0, hazardsAvoided:0, boonsAcquired:0 };
+let lastFps = 60;
+let analyticsVisible = false;
+try{
+  const ar = localStorage.getItem(ANALYTICS_KEY);
+  if(ar){ const p=JSON.parse(ar); analytics={...analytics, ...p}; }
+}catch(e){}
+function saveAnalytics(){ try{ localStorage.setItem(ANALYTICS_KEY, JSON.stringify(analytics)); }catch(e){} }
+function updateAnalyticsOverlay(){
+  if(anBestEl) anBestEl.textContent = String(runHistory.bestLoop);
+  if(anCurrentEl) anCurrentEl.textContent = String(loop);
+  if(anKillsEl) anKillsEl.textContent = String(analytics.totalKills);
+  if(anDmgEl) anDmgEl.textContent = String(Math.round(analytics.damageDealt));
+  if(anHazEl) anHazEl.textContent = String(analytics.hazardsAvoided);
+  if(anBoonsEl) anBoonsEl.textContent = String(analytics.boonsAcquired);
+  if(anFpsEl) anFpsEl.textContent = String(Math.round(lastFps));
+  if(anThrottleEl) anThrottleEl.textContent = lastFps<55 ? 'burst 2-3 (throttled)' : 'burst 4-6';
+  if(anFpsEl) anFpsEl.style.color = lastFps<55 ? 'var(--accent2)' : lastFps<58 ? 'var(--warn)' : 'var(--accent)';
+  if(anSeedEl) anSeedEl.textContent = `P${loop%3} · ${seedName(loop%3)}`;
+  if(anSeedSubEl) anSeedSubEl.textContent = `palette ${loop%3} · loop ${loop}`;
+}
+function toggleAnalytics(force){
+  const show = typeof force==='boolean' ? force : !analyticsVisible;
+  analyticsVisible = show;
+  if(analyticsVisible){
+    updateAnalyticsOverlay();
+    analyticsOverlayEl.classList.remove('hidden');
+    log('📊 Analytics — Tab to close');
+  } else {
+    analyticsOverlayEl.classList.add('hidden');
+  }
+}
+function resetAnalytics(){
+  analytics={ totalKills:0, damageDealt:0, hazardsAvoided:0, boonsAcquired:0 };
+  saveAnalytics(); updateAnalyticsOverlay();
+  log('📊 Analytics reset');
+}
+let lastHazardAvoidTick=0;
+// called each tick when hazardGroup exists — counts near-miss as avoided
+function trackHazardsAvoided(dt){
+  if(!hazardGroup || gameState!=='playing') return;
+  const now=performance.now();
+  if(now - lastHazardAvoidTick < 220) return; // throttle to ~4-5Hz
+  let nearMiss=false, inDanger=false;
+  for(const h of hazardGroup.children){
+    const d = player.position.distanceTo(h.position);
+    if(d < 1.15) inDanger=true;
+    else if(d < 2.2) nearMiss=true;
+  }
+  if(nearMiss && !inDanger){
+    analytics.hazardsAvoided += 1;
+    lastHazardAvoidTick = now;
+    if(analyticsOverlayEl && !analyticsOverlayEl.classList.contains('hidden')) updateAnalyticsOverlay();
+  }
+}
+
 let pausedPrevState=null;
 function togglePause(){
   if(gameState==='playing'){
@@ -1420,6 +1492,8 @@ function pickBoon(id){
   if(!b) return;
   activeBoons[id] = (activeBoons[id]||0)+1;
   recordBoon(id);
+  // ── (A) Iteration9 analytics: boons acquired
+  analytics.boonsAcquired += 1; saveAnalytics(); if(analyticsVisible) updateAnalyticsOverlay();
   recomputeBoonModifiers();
   updateBoonHud();
   beep({pulse:880, cache:660, shard:1040}[id]||880,0.16,0.13);
@@ -1714,13 +1788,15 @@ function tick(dt){
           lastSpawn=performance.now();
         }
       }
-      // burst jitter every 2.0s: 4-6 at once staggered 40ms — keeps 40-60 stacked
+      // burst jitter every 2.0s: 4-6 at once staggered 40ms — keeps 40-60 stacked — FPS-adaptive 2-3 if <55fps (Iteration9 A)
       if(performance.now() - lastBurst > 2000 && enemies.length < waveTotal - waveKill - 4 && elapsed>1.0){
-        const burstN = 4 + Math.floor(Math.random()*3);
+        const throttled = lastFps < 55;
+        const burstN = throttled ? 2 + Math.floor(Math.random()*2) : 4 + Math.floor(Math.random()*3);
         lastBurst = performance.now();
         for(let b=0;b<burstN;b++){
           setTimeout(()=>{ if(gameState==='playing' && !isBossLoop && enemies.length < waveTotal - waveKill) spawnEnemy(); }, b*40);
         }
+        if(throttled && burstN<=3) { /* FPS-adaptive throttling active — reduces spawn jitter 4-6→2-3 */ }
       }
     }
 
@@ -1896,7 +1972,11 @@ function tick(dt){
           else h.userData.damageTick=0.08;
         }
       });
+      // ── (A) Iteration9 analytics: hazards avoided live tracking
+      trackHazardsAvoided(dt);
     }
+    // ── (A) live analytics overlay update ~5Hz while visible and playing
+    if(analyticsVisible && gameState==='playing' && (performance.now() % 200 < 16)) updateAnalyticsOverlay();
     // enemy projectiles
     for(let i=enemyBullets.length-1;i>=0;i--){
       const b=enemyBullets[i];
@@ -1956,6 +2036,8 @@ function tick(dt){
           e.userData.holder.scale.set(1.18,1.18,1.18);
           setTimeout(()=>{ if(e.userData.holder) e.userData.holder.scale.set(1,1,1); }, 80);
         }
+        // ── (A) Iteration9 analytics: track damage dealt (live updating)
+        analytics.damageDealt += b.userData.dmg; saveAnalytics(); if(analyticsVisible) updateAnalyticsOverlay();
         spawnDamageNumber(e.position.clone().add(new THREE.Vector3(0,0.2,0)), String(b.userData.dmg), e.userData.elite?'#ffb020':'#ffffff');
         burst(e.position, 0xffffff, 4);
         // knockback via kbVel decay (lerp not teleport) — VS stacks 40-60
@@ -1971,12 +2053,14 @@ function tick(dt){
         beep(e.userData.elite? 660: 880, 0.05, 0.09);
         scene.remove(b); bullets.splice(i,1);
         if(e.userData.hp<=0){
+           // ── (A) Iteration9 analytics: total kills (live)
+           analytics.totalKills += 1; saveAnalytics(); if(analyticsVisible) updateAnalyticsOverlay();
            const wasBoss=!!e.userData.isBoss;
-           // ── (A) pooling: return GLB clone to pool via visible reset instead of dispose
-           try{ returnEnemyToPool(e); }catch(_){ }
-           scene.remove(e);
-           enemies.splice(hitIdx,1);
-          if(wasBoss){
+            // ── (A) pooling: return GLB clone to pool via visible reset instead of dispose
+            try{ returnEnemyToPool(e); }catch(_){ }
+            scene.remove(e);
+            enemies.splice(hitIdx,1);
+           if(wasBoss){
             bossGroup=null; bossHudEl.classList.add('hidden');
             burst(e.position, 0xff1a3d, 24);
             spawnDamageNumber(e.position, '+250', '#ffb020');
@@ -2085,12 +2169,13 @@ function animate(){
   fpsAcc+=dt;
   if(fpsAcc>0.5){
     const fps=Math.round(frames/fpsAcc);
+    lastFps=fps;
     fpsEl.textContent=fps+' fps';
     // ── (A) FPS HUD color warning <55fps — keeps 60fps during burst12 flood
     if(fps<55){
       fpsEl.style.color='var(--accent2)';
       fpsEl.style.textShadow='0 0 8px rgba(255,59,107,0.8)';
-      fpsEl.title='FPS low — pooling active';
+      fpsEl.title='FPS low — burst throttled to 2-3';
     } else if(fps<58){
       fpsEl.style.color='var(--warn)';
       fpsEl.style.textShadow='0 0 6px rgba(255,176,32,0.6)';
@@ -2100,6 +2185,8 @@ function animate(){
       fpsEl.style.textShadow='';
       fpsEl.title='';
     }
+    // ── (A) Iteration9 analytics live update throttle suffix
+    if(analyticsVisible) updateAnalyticsOverlay();
     frames=0; fpsAcc=0;
   }
 }
@@ -2134,6 +2221,14 @@ document.getElementById('menuBtn').onclick=()=>{
 document.getElementById('nextBtn').onclick=()=>{ winCard.classList.add('hidden'); loop++; coreHp=Math.min(100, coreHp+12); startLoop(); };
 
 addEventListener('keydown',e=>{
+  // ── (A) Iteration9: Tab analytics overlay — best loop, current loop, total kills, damage dealt, hazards avoided, boons acquired (live)
+  if(e.key==='Tab'){
+    e.preventDefault();
+    // if any other overlay visible, close it first except analytics itself
+    if(rebindHintEl && !rebindHintEl.classList.contains('hidden')) toggleRebindHint(false);
+    toggleAnalytics();
+    return;
+  }
   // ── (A) ? rebind hint overlay — shows R retry, Esc pause, 1/2/3 boon, 1/2 doors
   if(e.key==='?' || (e.shiftKey && e.key==='/') || e.key==='¿'){
     e.preventDefault();
@@ -2141,12 +2236,17 @@ addEventListener('keydown',e=>{
     if(rebindHintEl && !rebindHintEl.classList.contains('hidden')){
       toggleRebindHint(false);
     } else {
+      if(analyticsVisible) toggleAnalytics(false);
       toggleRebindHint(true);
       log('⌨ Hints (?): R retry · Esc pause · 1/2/3 boon · 1/2 doors');
     }
     return;
   }
   if(e.key==='Escape'){
+    if(analyticsVisible){
+      toggleAnalytics(false);
+      return;
+    }
     if(rebindHintEl && !rebindHintEl.classList.contains('hidden')){
       toggleRebindHint(false);
       return;
@@ -2205,16 +2305,21 @@ if(joyDeadzoneEl){
   joyDeadzoneEl.style.width='36px';
   joyDeadzoneEl.style.height='36px';
 }
+// ── (A) Iteration9 analytics wiring — Tab-triggered, live updating, best loop persists
+if(analyticsCloseBtn) analyticsCloseBtn.onclick=()=> toggleAnalytics(false);
+if(analyticsResetBtn) analyticsResetBtn.onclick=()=> resetAnalytics();
+if(analyticsOverlayEl) analyticsOverlayEl.addEventListener('click',e=>{ if(e.target===analyticsOverlayEl) toggleAnalytics(false); });
 
 updateHUD();
 updateBoonHud();
 updateSeedDisplay();
 renderHistoryCard();
-log('Worktree arena ready — awaiting loop start');
+updateAnalyticsOverlay();
+log('Worktree arena ready — awaiting loop start — Tab for analytics');
 
-// expose for verifier — includes pooling + fps warning + tutorial/first-clear + doors + iteration7 haptics/rebind/deadzone
+// expose for verifier — includes pooling + fps warning + tutorial/first-clear + doors + iteration7 haptics/rebind/deadzone + iteration9 analytics
 window.__arena={
-  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight, pools: { robotTotal: robotPoolAll.length, knightTotal: knightPoolAll.length, robotAvail: robotPoolAvailable.length, knightAvail: knightPoolAvailable.length, initialized: poolsInitialized }, fps: fpsEl.textContent, fpsColor: fpsEl.style.color, rebindHidden: !!(rebindHintEl && rebindHintEl.classList.contains('hidden')), joyDeadzoneSize: joyDeadzoneEl ? joyDeadzoneEl.style.width : null, hasVibrate: ('vibrate' in navigator) }),
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight, pools: { robotTotal: robotPoolAll.length, knightTotal: knightPoolAll.length, robotAvail: robotPoolAvailable.length, knightAvail: knightPoolAvailable.length, initialized: poolsInitialized }, fps: fpsEl.textContent, fpsColor: fpsEl.style.color, rebindHidden: !!(rebindHintEl && rebindHintEl.classList.contains('hidden')), joyDeadzoneSize: joyDeadzoneEl ? joyDeadzoneEl.style.width : null, hasVibrate: ('vibrate' in navigator), analytics:{...analytics}, lastFps, analyticsVisible: !!(analyticsOverlayEl && !analyticsOverlayEl.classList.contains('hidden')), throttle: lastFps<55?'2-3':'4-6' }),
   getBoons:()=>({...activeBoons}),
   getHistory:()=>{ try{ return JSON.parse(JSON.stringify(runHistory)); }catch(e){ return {...runHistory}; } },
   pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); },
@@ -2266,4 +2371,15 @@ window.__arena={
   getChromaticState:()=> ({ on: !!(chromaticEl && chromaticEl.classList.contains('on')), opacity: chromaticEl ? chromaticEl.style.getPropertyValue('--chromaOpacity') : '', chroma: chromaticEl ? chromaticEl.style.getPropertyValue('--chroma') : '', hasVar: !!(chromaticEl && chromaticEl.style.getPropertyValue('--chroma')) }),
   setCoreHpForTest:(v)=>{ coreHp=v; updateHUD(); return coreHp; },
   getCoreHp:()=> coreHp,
+  // (A) Iteration9 analytics & FPS-adaptive throttling
+  getAnalytics:()=> ({...analytics, bestLoop: runHistory.bestLoop, currentLoop: loop, lastFps, throttled: lastFps<55}),
+  getAnalyticsOverlayState:()=> ({ visible: !!(analyticsOverlayEl && !analyticsOverlayEl.classList.contains('hidden')), elExists: !!analyticsOverlayEl }),
+  toggleAnalyticsForTest:(force)=> toggleAnalytics(force),
+  simulateTabForTest:()=> { const ev=new KeyboardEvent('keydown',{key:'Tab'}); window.dispatchEvent(ev); document.dispatchEvent(ev); return !analyticsOverlayEl.classList.contains('hidden'); },
+  addDamageForTest:(n=10)=>{ analytics.damageDealt+=n; saveAnalytics(); if(analyticsVisible) updateAnalyticsOverlay(); return analytics.damageDealt; },
+  addKillForTest:()=>{ analytics.totalKills+=1; saveAnalytics(); if(analyticsVisible) updateAnalyticsOverlay(); return analytics.totalKills; },
+  addHazardAvoidForTest:()=>{ analytics.hazardsAvoided+=1; saveAnalytics(); if(analyticsVisible) updateAnalyticsOverlay(); return analytics.hazardsAvoided; },
+  setFpsForTest:(fps)=>{ lastFps=fps; if(analyticsVisible) updateAnalyticsOverlay(); return lastFps; },
+  getThrottleState:()=> ({ lastFps, burst: lastFps<55?'2-3':'4-6', throttled: lastFps<55 }),
+  resetAnalyticsForTest:()=> resetAnalytics(),
 };

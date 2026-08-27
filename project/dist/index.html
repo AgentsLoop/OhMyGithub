@@ -184,8 +184,23 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
 .rebindItem b{font-size:12px;letter-spacing:0.06em}
 .rebindItem small{font-size:10px;opacity:0.62;line-height:1.4}
 .rebindItem .kbdRow{margin-top:2px}
-</style>
-  <script type="module" crossorigin src="/assets/index-DA7AvNUD.js"></script>
+ /* ── (A) Iteration9: Run analytics overlay — Tab-triggered, live updating ── */
+ #analyticsOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,14,0.72);backdrop-filter:blur(6px);z-index:38;pointer-events:auto}
+ #analyticsOverlay.hidden{display:none !important}
+ .analyticsCard{width:min(640px,94vw);background:rgba(17,22,30,0.98);border:1px solid rgba(53,208,255,0.35);border-radius:16px;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+ .analyticsCard h2{font-family:'Space Grotesk',sans-serif;font-size:18px;letter-spacing:-0.02em;margin-bottom:10px}
+ .analyticsCard h2 span{color:var(--accent)}
+ .analyticsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+ @media(max-width:720px){.analyticsGrid{grid-template-columns:repeat(2,1fr)}}
+ .analyticsGrid div{background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:center}
+ .analyticsGrid b{display:block;font-size:20px;color:var(--accent)}
+ .analyticsGrid label{font-size:9px;letter-spacing:0.12em;opacity:0.6}
+  .analyticsGrid div.warn b{color:var(--warn)}
+  .analyticsGrid div.ok b{color:var(--ok)}
+  #filmGrain{position:fixed;inset:0;pointer-events:none;z-index:29;opacity:0.07;mix-blend-mode:multiply;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.4'/></svg>"),linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);background-size:256px 256px, 100% 2px;background-repeat:repeat,repeat;animation:grain 0.18s steps(4) infinite}
+  @keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-1%,1%)}50%{transform:translate(-0.5%,-1%)}75%{transform:translate(1%,0.5%)}100%{transform:translate(0,0)}}
+ </style>
+  <script type="module" crossorigin src="/assets/index-Bt5Nj8KZ.js"></script>
 </head>
 <body>
 <canvas id="canvas"></canvas>
@@ -287,7 +302,7 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
     </div>
   </div>
   <div class="foot">
-    <div class="hint">Built for /loop isolated-worktree regression · Three r160 · Vite · GLTFLoader · CC Attribution preserved · <span class="kbd">Esc</span> pause</div>
+    <div class="hint">Built for /loop isolated-worktree regression · Three r160 · Vite · GLTFLoader · CC Attribution preserved · <span class="kbd">Esc</span> pause · <span class="kbd">Tab</span> analytics</div>
     <div class="controls"><button id="audioToggle" class="btn" style="font-size:11px;padding:4px 10px;pointer-events:auto">🔊 AUDIO</button><span id="fps">60 fps</span> · <span>Isolation: <b id="iso">STABLE</b></span></div>
   </div>
 </div>
@@ -314,19 +329,40 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
   <div id="actionBtn">PULSE</div>
 </div>
 <div id="rebindHint" class="hidden">
-  <div class="rebindCard">
-    <h2><span>KEYBOARD</span> HINTS — press <span style="opacity:0.6">?</span> or <span style="opacity:0.6">Esc</span> to close</h2>
-    <div class="rebindGrid">
-      <div class="rebindItem"><b>R — RETRY</b><small>Retry same loop when breached (dead screen)</small><div class="kbdRow"><span class="kbd">R</span></div></div>
-      <div class="rebindItem"><b>Esc — PAUSE</b><small>Toggle pause during play; also closes overlays</small><div class="kbdRow"><span class="kbd">Esc</span></div></div>
-      <div class="rebindItem"><b>1 / 2 / 3 — BOON</b><small>Pick boon during boon choice (Hades stackable)</small><div class="kbdRow"><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span></div></div>
-      <div class="rebindItem"><b>1 / 2 — DOORS</b><small>Pick next chamber door (palette + hazard + reward)</small><div class="kbdRow"><span class="kbd">1</span><span class="kbd">2</span></div></div>
+   <div class="rebindCard">
+     <h2><span>KEYBOARD</span> HINTS — press <span style="opacity:0.6">?</span> or <span style="opacity:0.6">Esc</span> to close</h2>
+     <div class="rebindGrid">
+       <div class="rebindItem"><b>R — RETRY</b><small>Retry same loop when breached (dead screen)</small><div class="kbdRow"><span class="kbd">R</span></div></div>
+       <div class="rebindItem"><b>Esc — PAUSE</b><small>Toggle pause during play; also closes overlays</small><div class="kbdRow"><span class="kbd">Esc</span></div></div>
+       <div class="rebindItem"><b>1 / 2 / 3 — BOON</b><small>Pick boon during boon choice (Hades stackable)</small><div class="kbdRow"><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span></div></div>
+       <div class="rebindItem"><b>1 / 2 — DOORS</b><small>Pick next chamber door (palette + hazard + reward)</small><div class="kbdRow"><span class="kbd">1</span><span class="kbd">2</span></div></div>
+     </div>
+     <div style="font-size:11px;opacity:0.6">Also: <span class="kbd">WASD</span> move · <span class="kbd">MOUSE</span> aim · <span class="kbd">CLICK / SPACE</span> pulse · <span class="kbd">SHIFT</span> dash · <span class="kbd">?</span> this hint · Haptics via <code>navigator.vibrate</code> on pulse/hit/Titan</div>
+     <div class="row" style="margin-top:14px;justify-content:center"><button class="btn primary" id="rebindCloseBtn">Got it</button></div>
+   </div>
+ </div>
+<div id="analyticsOverlay" class="hidden">
+  <div class="analyticsCard">
+    <h2><span>RUN</span> ANALYTICS — <span style="opacity:0.6;font-weight:400;letter-spacing:0.08em">Tab to toggle</span></h2>
+    <p style="font-size:11px;opacity:0.62;margin-bottom:8px">Live updating during play · <code>localStorage</code> persists best loop · FPS-adaptive burst 2–3 when &lt;55fps</p>
+    <div class="analyticsGrid" id="analyticsGrid">
+      <div><label>BEST LOOP</label><b id="anBest">1</b></div>
+      <div><label>CURRENT LOOP</label><b id="anCurrent">1</b></div>
+      <div class="ok"><label>TOTAL KILLS</label><b id="anKills">0</b></div>
+      <div class="warn"><label>DAMAGE DEALT</label><b id="anDmg">0</b></div>
+      <div><label>HAZARDS AVOIDED</label><b id="anHaz">0</b></div>
+      <div><label>BOONS ACQUIRED</label><b id="anBoons">0</b></div>
     </div>
-    <div style="font-size:11px;opacity:0.6">Also: <span class="kbd">WASD</span> move · <span class="kbd">MOUSE</span> aim · <span class="kbd">CLICK / SPACE</span> pulse · <span class="kbd">SHIFT</span> dash · <span class="kbd">?</span> this hint · Haptics via <code>navigator.vibrate</code> on pulse/hit/Titan</div>
-    <div class="row" style="margin-top:14px;justify-content:center"><button class="btn primary" id="rebindCloseBtn">Got it</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+      <div style="background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center"><label style="font-size:9px;letter-spacing:0.12em;opacity:0.6">FPS</label><b id="anFps" style="font-size:14px;color:var(--accent)">60</b><div style="font-size:9px;opacity:0.5" id="anThrottle">burst 4-6</div></div>
+      <div style="background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center"><label style="font-size:9px;letter-spacing:0.12em;opacity:0.6">SEED / PALETTE</label><b id="anSeed" style="font-size:14px">P0 · VOID</b><div style="font-size:9px;opacity:0.5" id="anSeedSub">palette 0</div></div>
+    </div>
+    <div class="row" style="margin-top:14px;justify-content:center"><button class="btn primary" id="analyticsCloseBtn">Resume</button><button class="btn ghost" id="analyticsResetBtn" style="font-size:11px">Reset Analytics</button></div>
+    <div class="hint" style="margin-top:10px;text-align:center">Tab toggles overlay · live updates while playing · best loop stored in <code>isolated-arena-history-v1</code></div>
   </div>
 </div>
 <div class="log" id="log"></div>
+<div id="filmGrain"></div>
 <div id="attribution">Models: <a href="https://sketchfab.com/3d-models/none-25821d86141d48659e8ba8275f6c9c08" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Arena</a> by Seyyid Fatih KOÇ, <a href="https://sketchfab.com/3d-models/low-poly-robot-19ccf1fa9c5f47ba8e7a1703a7c0d7ae" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Robot</a> by Daniel Darko, <a href="https://sketchfab.com/3d-models/low-poly-knight-rigged-6d15613997ae4fe29ec3f4beb976b773" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Knight (Rigged)</a> by Anthony Yanez — CC Attribution</div>
 </body>
 </html>
