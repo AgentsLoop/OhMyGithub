@@ -128,7 +128,7 @@ Because OpenCode may push that branch before the delivery step, delivery uses
 `--force-with-lease` after fetching the worker branch.
 This prevents OpenCode changes to workflow files from causing GitHub token
 permission failures; `/loop` Git commands also use the workspace root because
-that step runs from `project/`.
+the normalizer replaces `project/` during each iteration.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 `model/opencode/muse-spark-1.2-contributor-free` label; if that label is
 unavailable, the skill records that it used the workflow default instead.

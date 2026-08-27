@@ -884,7 +884,6 @@ jobs:
       - name: Continue /loop iterations for 5 hours
         if: success() && env.LOOP_REQUEST == 'true'
         shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
