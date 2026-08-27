@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+const page = await ctx.newPage();
+await page.goto('http://127.0.0.1:3000/', { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(2500);
+await page.screenshot({ path: '/tmp/blacksite-screenshot.png', fullPage: false });
+console.log('screenshot captured at /tmp/blacksite-screenshot.png');
+const abPage = await ctx.newPage();
+await abPage.goto('http://127.0.0.1:8765/?only=three', { waitUntil: 'domcontentloaded' });
+await abPage.waitForTimeout(3000);
+await abPage.screenshot({ path: '/tmp/crate-ab-three.png', fullPage: false });
+console.log('AB screenshot at /tmp/crate-ab-three.png');
+await browser.close();
