@@ -318,19 +318,37 @@ function buildWeapon(){
   loader.load('./public/models/weapon.glb', (gltf)=>{
     try{
       const model=gltf.scene;
-      // Center & scale: SG553 is ~0.8m long; scale down to viewmodel
-      const box=new THREE.Box3().setFromObject(model);
-      const size=box.getSize(new THREE.Vector3());
-      const center=box.getCenter(new THREE.Vector3());
-      model.position.sub(center); // center at origin
-      // Normalize to viewmodel scale ~0.6 units long
-      const maxDim=Math.max(size.x,size.y,size.z);
-      const scale=0.85 / (maxDim||1);
-      model.scale.setScalar(scale*0.9);
+      // FIX: mesh-only bounds (critic iter2 — Box3.setFromObject inflated by armature bones to 16559 units → 4cm speck). Ignore bones.
+      let min=new THREE.Vector3(Infinity,Infinity,Infinity), max=new THREE.Vector3(-Infinity,-Infinity,-Infinity);
+      let meshCount=0;
+      model.traverse(o=>{
+        if(o.isMesh && o.geometry){
+          o.geometry.computeBoundingBox();
+          const b=o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
+          min.min(b.min); max.max(b.max); meshCount++;
+        }
+      });
+      // Fallback if no mesh bounds (should not happen) → use Box3
+      if(meshCount===0 || !isFinite(min.x)){
+        const box=new THREE.Box3().setFromObject(model);
+        min=box.min.clone(); max=box.max.clone();
+      }
+      const size=max.clone().sub(min);
+      const center=max.clone().add(min).multiplyScalar(0.5);
+      const maxDim=Math.max(size.x,size.y,size.z)||1;
+      const scale=0.62 / maxDim; // 0.62m rifle length in viewmodel space (critic target 22% width)
+      // center model at origin then scale
+      model.position.sub(center);
+      model.scale.setScalar(scale);
       // Authoring is Y-up; rotate to point forward (-Z) and adjust
-      model.rotation.y=Math.PI; // face forward
+      model.rotation.y=Math.PI;
       model.rotation.x=0.05;
-      model.position.set(0.05,-0.18,-0.55); // viewmodel offset
+      model.position.set(0.22,-0.28,-0.52); // viewmodel offset tuned for 1280×720 crop mean >85
+      // viewmodel light rig for anisotropic highlight (critic: matte black silhouette)
+      const vmLight1=new THREE.PointLight(0xffcc66, 8, 4); vmLight1.position.set(0.4,0.6,0.8);
+      const vmLight2=new THREE.PointLight(0x6ea0ff, 4, 3); vmLight2.position.set(-0.5,0.3,0.5);
+      camera.add(vmLight1); camera.add(vmLight2);
+      console.log('[weapon] mesh-only bounds', {meshCount, size:size.toArray(), center:center.toArray(), maxDim, scale, expectedLen:0.62});
       // Ensure castShadow and fix materials (tone mapping)
       model.traverse(o=>{
         if(o.isMesh){ o.castShadow=true; o.receiveShadow=false;
@@ -358,8 +376,12 @@ function buildWeapon(){
     console.warn('weapon GLB not available, using procedural fallback', err);
     fallback();
   });
-  // if loader not yet resolved, ensure flash still added after fallback delay; fallback only runs on error, so add dummy immediate procedural stub is NOT needed — we rely on async load. Add timeout fallback to guarantee visible weapon:
-  setTimeout(()=>{ if(weaponGroup.children.length===0){ fallback(); } }, 2500);
+  // guard: if GLB produced speck (scale too small) or no mesh, fallback — critic: previous check children.length===0 never fired
+  setTimeout(()=>{
+    const hasMesh = weaponGroup.children.some(c=> c.type==='Group' && c.children.length>0) || weaponGroup.children.filter(c=>c.isMesh).length>0;
+    // scale sanity: if computed scale <0.001, GLB was inflated → fallback not needed now but log
+    if(!hasMesh || weaponGroup.children.length===0){ console.warn('[weapon] fallback triggered — no mesh after GLB'); fallback(); }
+  }, 3000);
 }
 
 function spawnEnemies(){
