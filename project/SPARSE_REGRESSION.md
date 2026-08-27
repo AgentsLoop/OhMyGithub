@@ -126,6 +126,24 @@ curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
 Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
 ```
 
+## Iteration 5 — premultipliedAlpha fix + procedural edge-wear/dirt (gauntlet loop)
+
+**Builder `ses_fbc88b012ffeDHbPyWW6C34Mpy` (parallel):** `project/src/main.js:57,331,686,704` renderer `premultipliedAlpha:true` (`alpha:false`) + `addContactAO` mat `premultipliedAlpha:true` + `edgeAOmat` + `innerMat` for `MultiplyBlending` — eliminates `THREE.WebGLState: MultiplyBlending requires premultipliedAlpha` warnings (no white fringe). Floor `makeFloorTextures()` `239-275` broken dark streaks `rgba(22,24,34,0.022-0.05)` paired light bevel highlight along every 256px grout (segLen 18-52 gap 12-38 wobble ±3.5), corner dirt pooling radial gradients at intersections, 22 oil/dirt ellipses near panel edges — simulates cavity AO + handling dirt as authored wear mask. Wall `makeWallTextures()` `391-430` broken dark strokes along vertical seams `[86,258,430]` + light chip edge, broken horizontal mid-seam, 14 vertical drips near floor joint, intersection dark blobs, 30 rust speckles near seams — simulates Halo edge-wear / foot-traffic pooling without bump `0.018` increase. Preserves `allowedHosts:true`, attribution, sparse `project/` only.
+
+**Critic `ses_fbc8736b2ffeIrBtLNPREUYNew` (independent, blind vs Halo Infinite Streets/Bazaar/The Pit, https://mat-busy-devel-paragraph.trycloudflare.com 200 + http://127.0.0.1:3000 200 tmux app-server:3000, screenshots final-*.png 447-462KB): Halo wins decisively — still bright pastel toy-box at 8-15m despite iteration 5 wear pass. Single biggest gap — fully procedural fake trim-sheet/PBR/AO/bevel vs Halo authored tiled albedo 0.75+ + normal + roughness + baked AO + chamfered trim + edge-wear mask/decals: `21` Fog `0xa8bed8,38,85` + `22` bg `0x8ea6c6` + `25` sky `0xc9d6ea` + `31-48` heightHaze alpha 0.22 + `54` vignette `0.52` + `60-61` ACES `1.20` still washes mids, `210-307` floor Canvas 1024 `#d2d8e2` repeat `2.2` with mottles + grout lines + `242-279` broken dark streaks `rgba(22,24,34,0.022-0.028) 3-5px` + highlight + corner radial + oil leaks reads as painted strokes not cavity shadow/bevel, `305` roughness `0.88 metal 0.02` no aoMap/normalMap, `349-462` wall 512 `#e6edf7` repeat `1.05×0.58` with cavity gradients + `392-431` wear strokes wobble + `460` bump `0.018` fake normal, `481` walls Box 12×5.5×0.6 flat `0xffffff roughness 0.79 metal 0.06`, bevels thin strips not chamfered trim, seams/rivets decal boxes not authored; enemy `robot.glb` 0 textures `103-169` random metal/rough + CubeCamera 128 still clay; weapon `weapon.glb` 1967 faces `0.095` no hands. Until authored tiled albedo+normal+rough+AO + bevel mesh + mask, no stroke tweak reaches Halo high-albedo readability/verticality.
+
+**Verifier `ses_fbc86a051ffe1PhAYWNLYUgKCu` (parallel):** PASS — `vite v5.4.21 building 9 modules ✓ built in 1.82s` `dist/assets/index-BJ4ilavZ.js 650.59k gzip 169.91k` (+3.2k vs 647.38k), `dist/index.html 9.69k`, `curl http://127.0.0.1:3000 200` 9708 via `tmux app-server: vite preview --host 0.0.0.0 --port 3000`, `curl https://mat-busy-devel-paragraph.trycloudflare.com 200` 9708 cf-ray, `curl -H Host 200` Vary Origin, `/models/*.glb` 200 both, `vite.config.js:5,10` `allowedHosts:true` host 0.0.0.0 port 3000, `git sparse-checkout list → project` tmux `app-server:1 windows`, `src/main.js:1` 1541 lines 13/13 mechanics (WASD `984,1188`, pointerLocked `96,883`, joystick `906`, sprint `852,873`, dash `854,982`, heat `849,1077`, recoil `796,1080`, tracer `1094`, chase `1270`, wave `856,1422`, win `1438`, lose `1367`, pickups `855,1071`) pass, Playwright both URLs title `NEXUS ARENA` canvas 1280×720 HUD hp100 GLB 200×4 pass with only benign `PCFSoftShadowMap deprecated` warning.
+
+**Remediation applied this iteration:** acknowledged MultiplyBlending premultipliedAlpha fix eliminates warnings + edge-wear streaks simulate cavity AO/handling dirt but still painted Canvas strokes vs Halo baked `aoMap/normalMap` + bevel mesh + edge-wear mask; floor grout remains line not chamfer. Next iteration needs authored tiled albedo+normal+roughness+AO library + bevel mesh + edge-wear mask to close gap.
+
+**Re-verification after builder+remediation:**
+```
+npm run build ✓ 650.59k gzip 169.91k (9 modules, 1.82s) vs 647.38k prev (+3.2k)
+curl http://127.0.0.1:3000 200 9708
+curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
+Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
+```
+
 ## How to re-verify
 
 ```bash

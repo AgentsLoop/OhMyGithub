@@ -54,7 +54,7 @@ let heightHaze = null;
   vig.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(10,18,36,0.52) 100%);opacity:0.55;';
   document.body.appendChild(vig);
 }
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance', alpha:false, premultipliedAlpha:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -239,6 +239,45 @@ function makeFloorTextures(){
   }
   g.strokeStyle='rgba(0,0,0,0.035)'; g.lineWidth=1;
   for(let i=128;i<N;i+=256){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,N); g.stroke(); }
+  // iteration 5: fake cavity edge-wear / dirt — dark broken streaks along panel grout (authored trim-sheet wear without external textures)
+  g.save();
+  for(let i=256;i<N;i+=256){
+    for(let y=0;y<N;){
+      const segLen=18+Math.random()*52, gap=12+Math.random()*38;
+      const wob=(Math.random()-0.5)*3.5, a=0.022+Math.random()*0.028;
+      g.strokeStyle=`rgba(22,24,34,${a})`; g.lineWidth=3+Math.random()*2.2; g.lineCap='round';
+      g.beginPath(); g.moveTo(i+wob+1, y+2); g.lineTo(i+wob-1, y+segLen); g.stroke();
+      g.strokeStyle=`rgba(255,255,255,${a*0.5})`; g.lineWidth=0.9;
+      g.beginPath(); g.moveTo(i+wob+3, y+4); g.lineTo(i+wob+2, y+segLen-3); g.stroke();
+      y+=segLen+gap;
+    }
+    for(let x=0;x<N;){
+      const segLen=18+Math.random()*52, gap=12+Math.random()*38;
+      const wob=(Math.random()-0.5)*3.5, a=0.022+Math.random()*0.028;
+      g.strokeStyle=`rgba(22,24,34,${a})`; g.lineWidth=3+Math.random()*2.2; g.lineCap='round';
+      g.beginPath(); g.moveTo(x+2, i+wob+1); g.lineTo(x+segLen, i+wob-1); g.stroke();
+      g.strokeStyle=`rgba(255,255,255,${a*0.5})`; g.lineWidth=0.9;
+      g.beginPath(); g.moveTo(x+4, i+wob+3); g.lineTo(x+segLen-3, i+wob+2); g.stroke();
+      x+=segLen+gap;
+    }
+  }
+  for(let y=0;y<N;y+=256) for(let x=0;x<N;x+=256){
+    if(Math.random()<0.72){
+      const rad=9+Math.random()*14, a=0.035+Math.random()*0.04;
+      const grd=g.createRadialGradient(x,y,0,x,y,rad);
+      grd.addColorStop(0,`rgba(18,20,32,${a})`); grd.addColorStop(1,'rgba(0,0,0,0)');
+      g.fillStyle=grd; g.beginPath(); g.arc(x,y,rad,0,Math.PI*2); g.fill();
+      g.fillStyle=`rgba(255,255,255,${a*0.32})`; g.beginPath(); g.arc(x+2,y+2,rad*0.5,0,Math.PI*2); g.fill();
+    }
+  }
+  // scattered oil/dirt leaks near random panel edges
+  for(let k=0;k<22;k++){
+    const gx=(Math.floor(Math.random()*4)*256), gy=(Math.floor(Math.random()*4)*256);
+    const rx=gx+(Math.random()-0.5)*18, ry=gy+(Math.random()-0.5)*18;
+    const r=6+Math.random()*13, a=0.03+Math.random()*0.04;
+    g.fillStyle=`rgba(36,28,22,${a})`; g.beginPath(); g.ellipse(rx,ry,r*1.3,r,Math.random()*Math.PI,0,Math.PI*2); g.fill();
+  }
+  g.restore();
   // fine scratches / hairlines
   g.strokeStyle='rgba(0,0,0,0.018)'; g.lineWidth=0.7;
   for(let i=0;i<90;i++){
@@ -289,7 +328,7 @@ function makeAOGradTexture(){
 const aoTex = makeAOGradTexture();
 function addContactAO(pos, sx, sz, opacity=0.38){
   const geo=new THREE.PlaneGeometry(sx, sz);
-  const mat=new THREE.MeshBasicMaterial({ map: aoTex, transparent:true, opacity, depthWrite:false, blending:THREE.MultiplyBlending });
+  const mat=new THREE.MeshBasicMaterial({ map: aoTex, transparent:true, opacity, depthWrite:false, blending:THREE.MultiplyBlending, premultipliedAlpha:true });
   mat.polygonOffset=true; mat.polygonOffsetFactor=-1;
   const m=new THREE.Mesh(geo, mat);
   m.rotation.x=-Math.PI/2;
@@ -349,6 +388,48 @@ function makeWallTextures(){
   const botGrad=g.createLinearGradient(0,N-46,0,N);
   botGrad.addColorStop(0,'rgba(18,24,38,0)'); botGrad.addColorStop(1,'rgba(18,24,38,0.18)');
   g.fillStyle=botGrad; g.fillRect(0,N-46,N,46);
+  // iteration 5: fake edge-wear/dirt — broken dark streaks along vertical panel seams + drips near floor joint (Halo didactic wear)
+  g.save();
+  for(const sx of [86,258,430]){
+    for(let y=0;y<N;){
+      const len=22+Math.random()*48, gap=18+Math.random()*46;
+      const wob=(Math.random()-0.5)*2.8, a=0.028+Math.random()*0.032;
+      g.strokeStyle=`rgba(20,26,38,${a})`; g.lineWidth=4+Math.random()*2.8; g.lineCap='round';
+      g.beginPath(); g.moveTo(sx+wob+1, y); g.lineTo(sx+wob-0.5, y+len); g.stroke();
+      g.strokeStyle=`rgba(255,255,255,${a*0.48})`; g.lineWidth=1;
+      g.beginPath(); g.moveTo(sx+wob+3, y+3); g.lineTo(sx+wob+2.2, y+len-4); g.stroke();
+      y+=len+gap;
+    }
+  }
+  for(let x=0;x<N;){
+    const len=26+Math.random()*44, gap=14+Math.random()*36;
+    const wob=(Math.random()-0.5)*2.2, a=0.02+Math.random()*0.025;
+    g.strokeStyle=`rgba(20,26,38,${a})`; g.lineWidth=3+Math.random()*1.6; g.lineCap='round';
+    g.beginPath(); g.moveTo(x, N*0.48+wob); g.lineTo(x+len, N*0.48+wob+0.6); g.stroke();
+    x+=len+gap;
+  }
+  for(let i=0;i<14;i++){
+    const x=Math.random()*N, y0=N-46+Math.random()*18;
+    const len=8+Math.random()*22, a=0.03+Math.random()*0.045;
+    g.strokeStyle=`rgba(28,24,18,${a})`; g.lineWidth=2.2+Math.random()*2.5; g.lineCap='round';
+    g.beginPath(); g.moveTo(x,y0); g.lineTo(x+(Math.random()-0.5)*4, y0+len); g.stroke();
+  }
+  for(const sx of [86,258,430]){
+    const sy=N*0.48;
+    if(Math.random()<0.9){
+      const rad=7+Math.random()*9, a=0.04+Math.random()*0.05;
+      const grd=g.createRadialGradient(sx,sy,0,sx,sy,rad);
+      grd.addColorStop(0,`rgba(18,20,32,${a})`); grd.addColorStop(1,'rgba(0,0,0,0)');
+      g.fillStyle=grd; g.beginPath(); g.arc(sx,sy,rad,0,Math.PI*2); g.fill();
+    }
+  }
+  // subtle rust/dirt speckles near seams (warm leak)
+  for(let i=0;i<30;i++){
+    const sx=[86,258,430][Math.floor(Math.random()*3)] + (Math.random()-0.5)*14;
+    const y=Math.random()*N, r=2.5+Math.random()*5.5, a=0.04+Math.random()*0.06;
+    g.fillStyle=`rgba(58,38,24,${a})`; g.beginPath(); g.arc(sx,y,r,0,Math.PI*2); g.fill();
+  }
+  g.restore();
   // fine grain / noise
   for(let i=0;i<1600;i++){ const x=Math.random()*N, y=Math.random()*N; g.fillStyle=`rgba(0,0,0,${Math.random()*0.012})`; g.fillRect(x,y,1,1); }
   for(let i=0;i<42;i++){
@@ -645,7 +726,7 @@ function createElevatedPlatform(pos, yawRad=0, w=3.5, d=2.0, h=1.2){
   platforms.push({pos:pos.clone(), yaw:yawRad, w, d, h, group:g});
   // floor AO: broad contact under platform + thin cavity planes along 4 edges (fake cavity AO)
   addContactAO(pos, w*1.08, d*1.08, 0.36);
-  const edgeAOmat = new THREE.MeshBasicMaterial({ color:0x182030, transparent:true, opacity:0.14, depthWrite:false, blending:THREE.MultiplyBlending });
+  const edgeAOmat = new THREE.MeshBasicMaterial({ color:0x182030, transparent:true, opacity:0.14, depthWrite:false, blending:THREE.MultiplyBlending, premultipliedAlpha:true });
   edgeAOmat.polygonOffset=true; edgeAOmat.polygonOffsetFactor=-0.8;
   const thickness=0.28;
   // we need world positions for AO planes; use group transform by creating child planes inside g but at y=0.018 (just above floor local)
@@ -668,7 +749,7 @@ function createElevatedPlatform(pos, yawRad=0, w=3.5, d=2.0, h=1.2){
   addEdgeAO(-w/2 - 0.18, 0, thickness, d);
   addEdgeAO(w/2 + 0.18, 0, thickness, d);
   // extra darkening strip right under the kick (inner cavity line)
-  const innerMat=new THREE.MeshBasicMaterial({ color:0x0f1420, transparent:true, opacity:0.18, depthWrite:false, blending:THREE.MultiplyBlending });
+  const innerMat=new THREE.MeshBasicMaterial({ color:0x0f1420, transparent:true, opacity:0.18, depthWrite:false, blending:THREE.MultiplyBlending, premultipliedAlpha:true });
   innerMat.polygonOffset=true; innerMat.polygonOffsetFactor=-0.9;
   function addInnerStrip(lx,lz,sx,sz){
     const geo=new THREE.PlaneGeometry(sx, sz);
