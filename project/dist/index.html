@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXUS ARENA — Compact Sci-Fi Shooter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;overflow:hidden;background:#05060a;font-family:'JetBrains Mono',monospace;color:#e6faff}
+    #canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+    #hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:14px 18px}
+    .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+    .brand{font-family:'Orbitron',sans-serif;letter-spacing:.12em;font-weight:900;font-size:18px;color:#7af7ff;text-shadow:0 0 14px rgba(122,247,255,.9),0 0 28px rgba(122,247,255,.4)}
+    .brand span{color:#fff}
+    .stats{display:flex;gap:10px;flex-wrap:wrap}
+    .chip{background:rgba(12,22,34,.78);border:1px solid rgba(122,247,255,.35);backdrop-filter:blur(8px);padding:8px 12px;border-radius:10px;min-width:110px;box-shadow:0 8px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08)}
+    .chip b{display:block;font-size:11px;letter-spacing:.14em;color:#7af7ff;opacity:.9}
+    .chip em{display:block;font-style:normal;font-size:20px;font-weight:700;line-height:1;color:#fff;text-shadow:0 0 10px rgba(122,247,255,.6)}
+    .chip i{font-style:normal;font-size:11px;color:#9fb8c8}
+    .center-hud{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center}
+    .crosshair{width:26px;height:26px;position:relative;margin:0 auto}
+    .crosshair:before,.crosshair:after{content:"";position:absolute;background:#7af7ff;box-shadow:0 0 8px rgba(122,247,255,1)}
+    .crosshair:before{left:12px;top:0;width:2px;height:26px}
+    .crosshair:after{left:0;top:12px;width:26px;height:2px}
+    .crosshair span{position:absolute;inset:8px;border:1px solid rgba(122,247,255,.9);border-radius:50%;box-shadow:0 0 8px rgba(122,247,255,.6)}
+    .hit{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) scale(.8);opacity:0;font-family:'Orbitron',sans-serif;font-weight:900;letter-spacing:.18em;font-size:22px;color:#ff3b6b;text-shadow:0 0 14px rgba(255,59,107,.9);transition:.18s}
+    .hit.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    .bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+    .weapon{pointer-events:auto;display:flex;align-items:center;gap:12px;background:rgba(10,18,28,.88);border:1px solid rgba(122,247,255,.3);padding:10px 14px;border-radius:12px;backdrop-filter:blur(10px)}
+    .weapon b{color:#7af7ff;font-size:11px;letter-spacing:.14em}
+    .bar{width:140px;height:8px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}
+    .bar>div{height:100%;background:linear-gradient(90deg,#7af7ff,#6a5cff);box-shadow:0 0 10px rgba(122,247,255,.9);width:100%}
+    .bar.hp>div{background:linear-gradient(90deg,#ff3b6b,#ff8a3d)}
+    .bar.ammo>div{background:linear-gradient(90deg,#7af7ff,#2af598)}
+    .controls{font-size:11px;line-height:1.5;color:#b8d2e0;max-width:360px;text-align:right}
+    .controls kbd{background:rgba(122,247,255,.14);border:1px solid rgba(122,247,255,.35);border-bottom-width:2px;padding:1px 6px;border-radius:6px;color:#e6faff;font-family:inherit}
+    #overlay{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(800px 600px at 50% 30%, rgba(122,247,255,.18), transparent 70%), linear-gradient(180deg, rgba(6,10,18,.92), rgba(3,6,12,.96));backdrop-filter:blur(6px)}
+    #overlay.hidden{display:none}
+    .card{width:min(640px,92vw);background:linear-gradient(180deg, rgba(18,28,42,.98), rgba(10,16,26,.98));border:1px solid rgba(122,247,255,.28);border-radius:18px;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 40px rgba(122,247,255,.12), inset 0 1px 0 rgba(255,255,255,.08);text-align:left}
+    .card h1{font-family:'Orbitron',sans-serif;font-weight:900;letter-spacing:.14em;font-size:28px;color:#fff;margin-bottom:6px}
+    .card h1 i{color:#7af7ff;font-style:normal}
+    .card p{color:#b9d1e0;font-size:13px;line-height:1.6}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+    .feat{background:rgba(122,247,255,.07);border:1px solid rgba(122,247,255,.18);border-radius:12px;padding:10px 12px}
+    .feat b{color:#7af7ff;font-size:11px;letter-spacing:.12em}
+    .feat span{display:block;color:#e6faff;font-size:12px;margin-top:4px;line-height:1.4}
+    .cta{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+    .btn{pointer-events:auto;appearance:none;border:1px solid rgba(122,247,255,.45);background:linear-gradient(180deg,#7af7ff,#6a7bff);color:#041019;font-weight:800;letter-spacing:.12em;font-size:13px;padding:12px 18px;border-radius:999px;cursor:pointer;box-shadow:0 8px 24px rgba(122,247,255,.35), inset 0 1px 0 rgba(255,255,255,.7);transition:.15s}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 12px 32px rgba(122,247,255,.45)}
+    .btn:active{transform:translateY(0)}
+    .btn.ghost{background:rgba(255,255,255,.06);color:#e6faff;border-color:rgba(255,255,255,.18);box-shadow:none}
+    .badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.14em;color:#7af7ff;background:rgba(122,247,255,.1);border:1px solid rgba(122,247,255,.22);padding:6px 10px;border-radius:999px}
+    .attrib{margin-top:10px;font-size:11px;color:#8aa8bb;line-height:1.5}
+    .attrib a{color:#7af7ff}
+    .toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:rgba(10,18,28,.9);border:1px solid rgba(122,247,255,.3);padding:8px 12px;border-radius:999px;font-size:12px;letter-spacing:.08em;color:#e6faff;opacity:0;pointer-events:none;transition:.2s;backdrop-filter:blur(8px)}
+    .toast.show{opacity:1;top:22px}
+    /* Halo Infinite-inspired damage vignette + hitmarker */
+    #damageVignette{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;transition:opacity .14s ease;background:radial-gradient(ellipse at center, transparent 58%, rgba(255,44,80,.0) 68%, rgba(255,44,80,.55) 100%);box-shadow:inset 0 0 110px rgba(255,44,80,.65), inset 0 0 46px rgba(255,44,80,.45), inset 0 0 0 1px rgba(255,70,100,.18)}
+    #damageVignette.flash{opacity:1;transition:opacity .06s ease}
+    #damageVignette.low{opacity:.38;transition:opacity .5s ease}
+    #damageVignette.low.flash{opacity:.92}
+    #hitmarker{position:absolute;left:50%;top:50%;width:20px;height:20px;transform:translate(-50%,-50%) scale(.62);opacity:0;pointer-events:none;transition:opacity .08s ease, transform .11s cubic-bezier(.18,1.6,.4,1)}
+    #hitmarker.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    #hitmarker.kill{filter:drop-shadow(0 0 6px rgba(255,60,90,.9))}
+    #hitmarker i{position:absolute;inset:0}
+    #hitmarker i::before,#hitmarker i::after{content:"";position:absolute;left:50%;top:50%;width:2.6px;height:16px;margin:-8px 0 0 -1.3px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.72), 0 0 8px rgba(122,247,255,.9);border-radius:1px}
+    #hitmarker i::before{transform:rotate(45deg)}
+    #hitmarker i::after{transform:rotate(-45deg)}
+    #hitmarker.kill i::before,#hitmarker.kill i::after{background:#ff3b61;box-shadow:0 0 0 1px rgba(0,0,0,.75), 0 0 10px rgba(255,59,97,.95)}
+    #hitmarker b{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;background:#fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.7)}
+    #hitmarker.kill b{background:#ff3b61}
+    .crosshair.pulse{transform:scale(1.18);filter:brightness(1.4)}
+    @media(max-width:720px){.stats .chip{min-width:86px;padding:7px 9px}.controls{display:none}.brand{font-size:15px}.card h1{font-size:22px}.grid2{grid-template-columns:1fr}}
+  </style>
+  <script type="module" crossorigin src="/assets/index-CDj9QaEl.js"></script>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="hud">
+    <div class="top">
+      <div class="brand">NEXUS<span> ARENA</span> <span style="font-size:10px;letter-spacing:.2em;display:block;color:#9fb8c8;margin-top:2px">COMPACT SCI-FI SHOOTER • ITERATION 2</span></div>
+      <div class="stats">
+        <div class="chip"><b>SCORE</b><em id="score">0</em><i id="wave">Wave 1</i></div>
+        <div class="chip"><b>ENEMIES</b><em id="enemies">6</em><i id="timer">02:00</i></div>
+        <div class="chip"><b>FPS</b><em id="fps">—</em><i>60 target</i></div>
+      </div>
+    </div>
+    <div class="center-hud"><div class="crosshair" id="crosshair"><span></span></div><div id="hitmarker"><i></i><b></b></div><div id="hit" class="hit">HIT</div></div>
+  <div id="damageVignette" aria-hidden="true"></div>
+    <div class="bottom">
+      <div class="weapon">
+        <div>
+          <b>VX-9 PULSE RIFLE</b>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <div class="bar ammo"><div id="ammoBar" style="width:100%"></div></div><span id="ammo" style="font-weight:700;color:#fff">30/90</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <div class="bar hp"><div id="hpBar" style="width:100%"></div></div><span id="hp" style="font-weight:700;color:#fff">100 HP</span>
+          </div>
+        </div>
+      </div>
+      <div class="controls">
+        <div><kbd>WASD</kbd> Move • <kbd>Mouse</kbd> Look • <kbd>Click</kbd> Fire • <kbd>Shift</kbd> Sprint • <kbd>R</kbd> Reload</div>
+        <div style="opacity:.8;margin-top:4px">Mobile: drag to look, stick to move, tap FIRE</div>
+      </div>
+    </div>
+  </div>
+  <div id="overlay">
+    <div class="card">
+      <div class="badge">● LIVE • THREE.JS • 60 FPS TARGET • PBR + BLOOM</div>
+      <h1>NEXUS <i>ARENA</i></h1>
+      <p>Compact sci-fi arena inspired by <b>Halo Infinite</b> Arena &amp; <b>Destiny 2 Crucible</b>. Clean PBR, emissive neon, tight gunplay. Survive 3 waves inside a 44m hex-arena with physical crate cover and agile drone adversaries.</p>
+      <div class="grid2">
+        <div class="feat"><b>▲ MOVEMENT</b><span>WASD + mouse, sprint, arena collision & slide</span></div>
+        <div class="feat"><b>◎ COMBAT</b><span>Hitscan pulse rifle, reload, headshot bonus, drone AI strafe</span></div>
+        <div class="feat"><b>⬢ ARENA</b><span>Hex walls, neon floor grid, 5 PBR crate covers from Sketchfab</span></div>
+        <div class="feat"><b>◐ VISUAL BAR</b><span>Tone-mapped ACES, soft bloom, vignette vs Halo Infinite</span></div>
+      </div>
+      <div class="cta">
+        <button id="play" class="btn">▶ ENTER ARENA</button>
+        <button id="how" class="btn ghost">HOW TO PLAY</button>
+      </div>
+      <div class="attrib">
+        Models: <b>Sci-fi Crate</b> by starkerg (CC Attribution) — <a href="https://sketchfab.com/3d-models/none-23af43363ba84509ae7ab7a1ff1580c4" target="_blank" rel="noopener">Sketchfab</a> (normalized from KHR_materials_pbrSpecularGlossiness) • <b>Sci-Fi Drone</b> by azzajess (CC Attribution-NonCommercial) — <a href="https://sketchfab.com/3d-models/sci-fi-drone-74a5a6bcc9cf4a9f877364ab700623ba" target="_blank" rel="noopener">Sketchfab</a> • Bar: Halo Infinite Arena (343 Industries) screenshots at 1920×1080 for blind A/B comparison.
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="toast">RELOADING…</div>
+  <div id="mobile" style="position:fixed;inset:0;pointer-events:none;display:none"></div>
+</body>
+</html>
