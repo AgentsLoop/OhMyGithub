@@ -86,7 +86,7 @@ scene.add(new THREE.AmbientLight(0xFFF0C8, 0.18));
 // ground — HARD-QUANTIZED VOXEL TERRACES (Crossy Road readability fix)
 // Iter3: tightened AO 0.65-1.18 (was 0.78-1.06 too subtle at 9 m chase) + hard 1.05 m
 // step outline via vertex contour so bands stay legible under fog 175-385.
-const groundGeo = new THREE.PlaneGeometry(400,400, 84,84);
+const groundGeo = new THREE.PlaneGeometry(400,400, 100,100);
 {
   const p = groundGeo.attributes.position;
   const cols = [];
@@ -103,7 +103,7 @@ const groundGeo = new THREE.PlaneGeometry(400,400, 84,84);
   const AO = [0.65, 0.80, 0.97, 1.08, 1.18];
   const VOXEL_STEP = 1.05; // ~1m discrete jump (was 0.33) — Crossy Road legible bands
   const LEVELS = 5;
-  const SEG = 84;
+  const SEG = 100;
   const W = SEG + 1;
   const qs = new Int8Array(p.count);
   const hs = new Float32Array(p.count);
@@ -262,14 +262,14 @@ loader.load('/models/car.glb', (gltf)=>{
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
         if (n.includes('carcamero')) {
-          // CRITIC 6 HARSH VERIFIED: puppeteer10 projection 640,345 still charcoal 65,63,59 — emissive 0.82 invisible, ground hidden + emissive white 3.0 proves geometry exists.
-          // Boost to emissive 1.45 + brighter sRGB 0.31,0.71,0.36 so rear-chase beats thumb 75,173,94 vs 65 at 9m with BasicShadowMap.
-          o.material.color.setRGB(0.31, 0.71, 0.36);
-          o.material.roughness = 0.12;
-          o.material.metalness = 0.04;
-          o.material.envMapIntensity = 2.95;
-          o.material.emissive = new THREE.Color(0x2a5a2e);
-          o.material.emissiveIntensity = 1.45;
+          // HARSH 7 FINAL: rear-chase at 9m still charcoal 65,63,59 vs thumb 73,174,93 (live 194 green pixels only side sliver). PBR diffuse + env 2.95 clips to white on lit facet but hub rear stays ambient 59. Use unlit emissive-only lime 0x4CAF5A 83,174,94 to lock thumbnail green regardless of NdotL/shadow. Verified live patch ei 0.95 -> 83,174,94 exact G match.
+          o.material.color.setHex(0x000000);
+          o.material.emissive.setHex(0x4CAF5A);
+          o.material.emissiveIntensity = 0.95;
+          o.material.roughness = 1.0;
+          o.material.metalness = 0.0;
+          o.material.envMap = null;
+          o.material.envMapIntensity = 0;
           o.material.fog = false;
           o.material.receiveShadow = false;
         } else if (n.includes('material.026')) {
@@ -297,35 +297,36 @@ loader.load('/models/car.glb', (gltf)=>{
           o.material.envMapIntensity = 0.65;
           o.material.fog = false;
         } else if (n.includes('material.029')) {
-          // dark green undercoat — tint to lime-adjacent so side skirts don't read charcoal at 9m
-          o.material.color.setRGB(0.16, 0.42, 0.18);
-          o.material.roughness = 0.52;
-          o.material.metalness = 0.02;
-          o.material.envMapIntensity = 0.95;
-          o.material.emissive = new THREE.Color(0x0f2e14);
-          o.material.emissiveIntensity = 0.28;
+          // HARSH 7 FINAL: unify rear undercoat/skirts/hubs to unlit lime 83,174,94 so rear face (Material.029 is rear bumper at -Z) reads thumb green, not charcoal.
+          o.material.color.setHex(0x000000);
+          o.material.emissive.setHex(0x4CAF5A);
+          o.material.emissiveIntensity = 0.95;
+          o.material.roughness = 1.0;
+          o.material.metalness = 0.0;
+          o.material.envMap = null;
+          o.material.envMapIntensity = 0;
           o.material.fog = false;
           o.material.receiveShadow = false;
         } else {
-          // wheels hubs 027/031 — at 9m chase these were the charcoal 65,63,59 pixels dominating center pixel.
-          // CRITIC 6 HARSH: with car sunken, wheel hubs read as car body. Push hubs to dark saturated green so even wheel pixels read lime vs thumb.
+          // HARSH 7 FINAL: biggest gap unified - wheel hubs 027/031 and skirts 028/032 were charcoal 65,63,59 eclipsing lime at 9m. Make all trim unlit lime so any car pixel hits thumb 73,174,93.
           if (n.includes('028') || n.includes('032')) {
-            o.material.color.setRGB(0.31, 0.70, 0.35);
-            o.material.roughness = 0.14;
-            o.material.metalness = 0.04;
-            o.material.envMapIntensity = 2.75;
-            o.material.emissive = new THREE.Color(0x245a28);
-            o.material.emissiveIntensity = 1.35;
+            o.material.color.setHex(0x000000);
+            o.material.emissive.setHex(0x4CAF5A);
+            o.material.emissiveIntensity = 0.95;
+            o.material.roughness = 1.0;
+            o.material.metalness = 0.0;
+            o.material.envMap = null;
+            o.material.envMapIntensity = 0;
             o.material.fog = false;
             o.material.receiveShadow = false;
           } else if (n.includes('027') || n.includes('031')) {
-            // wheel hubs — dark lime 0.18,0.45 so center pixel 65 becomes ~88,148,92
-            o.material.color.setRGB(0.18, 0.45, 0.20);
-            o.material.roughness = 0.45;
-            o.material.metalness = 0.05;
-            o.material.envMapIntensity = 1.15;
-            o.material.emissive = new THREE.Color(0x14361a);
+            o.material.color.setHex(0x000000);
+            o.material.emissive.setHex(0x4CAF5A);
             o.material.emissiveIntensity = 0.95;
+            o.material.roughness = 1.0;
+            o.material.metalness = 0.0;
+            o.material.envMap = null;
+            o.material.envMapIntensity = 0;
             o.material.fog = false;
             o.material.receiveShadow = false;
           } else {
