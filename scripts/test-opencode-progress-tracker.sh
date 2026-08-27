@@ -37,11 +37,13 @@ sessions = [
     {"id": "ses_child", "parentID": "ses_root"},
     {"id": "ses_nested", "parentID": "ses_child"},
     {"id": "ses_done", "parentID": "ses_root"},
+    {"id": "ses_failed", "parentID": "ses_root"},
 ]
 statuses = {
     "ses_child": {"type": "busy"},
     "ses_nested": {"type": "retry"},
     "ses_done": {"type": "idle"},
+    "ses_failed": {"type": "error"},
 }
 messages = {
     "ses_root": [
@@ -163,7 +165,8 @@ assert_line() {
 }
 
 assert_line "- Active subagents: 2"
-assert_line "- Total subagents executed: 3"
+assert_line "- Total subagents executed: 4"
+assert_line "- Total failed subagents: 1"
 assert_line "- Image-context model calls: 5"
 
 assert_absent() {

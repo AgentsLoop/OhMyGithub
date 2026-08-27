@@ -56,14 +56,18 @@ while :; do
       ($sessions | descendants($sessions; $root)) as $subagents
       | {
           total: ($subagents | length),
+          failed: ([$statuses | to_entries[]
+            | select((.key as $id | ($subagents | index($id))) != null)
+            | select(.value.type == "error" or .value.type == "failed")
+          ] | length),
           active: ([$statuses | to_entries[]
             | select((.key as $id | ($subagents | index($id))) != null)
-            | select(.value.type != "idle")
+            | select(.value.type != "idle" and .value.type != "error" and .value.type != "failed")
           ] | length)
         }
-      | [.active, .total] | @tsv
+      | [.active, .total, .failed] | @tsv
     ')"
-    IFS=$'\t' read -r active_subagents total_subagents <<<"$subagent_stats"
+    IFS=$'\t' read -r active_subagents total_subagents failed_subagents <<<"$subagent_stats"
     subagent_ids="$(jq -nr \
       --arg root "$SESSION_ID" \
       --argjson sessions "$sessions_payload" '
@@ -99,6 +103,7 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 - Active tool calls: $active_count
 - Active subagents: $active_subagents
 - Total subagents executed: $total_subagents
+- Total failed subagents: $failed_subagents
 - Image-context model calls: $vision_count
 - Changed workspace files: $changed_count
 
