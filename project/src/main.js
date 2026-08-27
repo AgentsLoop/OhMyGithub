@@ -14,8 +14,8 @@ const playBtn = document.getElementById('playBtn');
 const scene = new THREE.Scene();
 // Crossy Road palette: saturated warm desert — hard voxel readability, no beige wash
 scene.background = new THREE.Color(0xF2C97D);
-// Fog pushed far (was 95-260 washing mid-dunes + grain). Reduced to light depth cue 175-385 so terraces stay saturated.
-scene.fog = new THREE.Fog(0xF2C97D, 175, 385);
+// Fog pushed extra-far 220-480 (was 175-385): iter11 far-band collapse fix — at 9m chase, mid-dunes 30-55m were desaturated 18% by fog lerp, far terraces >80m collapsed to beige. 220 pushes saturation to dune line, 480 preserves horizon band separation while keeping depth cue.
+scene.fog = new THREE.Fog(0xF2C97D, 220, 480);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
@@ -73,12 +73,12 @@ dir.shadow.camera.updateProjectionMatrix();
 dir.shadow.bias = -0.0008;
 dir.shadow.normalBias = 0.012;
 scene.add(dir);
-// rim light — thumbnail facet highlight for lime Carcamero (iter9 +0.2 for PBR gloss on rear bevel)
-const rim = new THREE.DirectionalLight(0xFFF8E0, 1.85);
+// rim light — thumbnail facet highlight for lime Carcamero (iter11 -0.60/ -0.30 cuts bleach measured 108,212,116 vs thumb 74,170,93)
+const rim = new THREE.DirectionalLight(0xFFF8E0, 1.25);
 rim.position.set(-30, 18, -20);
 scene.add(rim);
-// fill for rear-chase — defeats self-shadow charcoal at 9m without washing terraces (iter9 +0.10 supports PBR)
-const carFill = new THREE.DirectionalLight(0xFFF6D6, 0.95);
+// fill for rear-chase — defeats self-shadow charcoal at 9m without washing terraces (cut 0.95→0.65 for PBR desat)
+const carFill = new THREE.DirectionalLight(0xFFF6D6, 0.65);
 carFill.position.set(0, 12, -22);
 scene.add(carFill);
 scene.add(new THREE.AmbientLight(0xFFF0C8, 0.18));
@@ -125,9 +125,11 @@ const groundGeo = new THREE.PlaneGeometry(400,400, 100,100);
       raw = raw * THREE.MathUtils.lerp(0.22, 0.42, t) + micro * THREE.MathUtils.lerp(0.72, 0.28, t);
     }
     // hard quantize to discrete voxel levels — no lerp, no 0.33 rounding
+    // far-band height exaggeration: at grazing chase angle (5.5m eye, -9m offset) a 1.05m step at 80-120m compresses to ~1.2px and bands merge. Scale step height +38% at far (mask 0→1 => 1.05→1.45m) so far terraces keep 1.7-2.2px separation at horizon without changing band count or spawn flatness.
     let q = Math.floor(THREE.MathUtils.clamp((raw + 2.2)/VOXEL_STEP, 0, LEVELS - 0.001));
-    // height centered so band 2 (~0) is near ground plane
-    const h = q * VOXEL_STEP - 2.2 + 0.42; // +0.42 offsets so playable disc sits ~0.0-0.4
+    const effStep = VOXEL_STEP * (1 + mask * 0.38);
+    // height centered so band 2 (~0) is near ground plane — use effStep for z so far bands physically taller
+    const h = q * effStep - 2.2 + 0.42; // +0.42 offsets so playable disc sits ~0.0-0.4
     p.setZ(i, h);
     qs[i] = q;
     hs[i] = h;
@@ -142,10 +144,9 @@ const groundGeo = new THREE.PlaneGeometry(400,400, 100,100);
   // — hard step outline / vertex contour —
   // At 9 m chase cam, 1.05 m bands collapse without an explicit seam. Darken
   // any vertex adjacent (4-neighbour + diagonal) to a different quantized level
-  // toward deep umber 0x3D1F0A. Vertex-based (no extra geometry) so it survives
-  // fog 175-385 and keeps ground matte (env 0.12 unchanged). Mix 42% → ~1 px seam.
-  const OUTLINE = new THREE.Color(0x3D1F0A);
-  const EDGE_MIX = 0.42;
+  // toward deep umber 0x2E1506. Iter11: boost 42%→52% base and add far mask +0.14 (→66% at horizon) + flatten correction 0.88 for troughs so far seam survives fog 220-480 at grazing angle. Vertex-based (no extra geometry) keeps ground matte (env 0.12).
+  const OUTLINE = new THREE.Color(0x2E1506);
+  const EDGE_MIX_BASE = 0.52;
   for(let i=0;i<p.count;i++){
     const r = Math.floor(i / W);
     const cc = i % W;
@@ -164,8 +165,14 @@ const groundGeo = new THREE.PlaneGeometry(400,400, 100,100);
     if(isEdge){
       const idx = i*3;
       const cur = new THREE.Color(cols[idx], cols[idx+1], cols[idx+2]);
-      cur.lerp(OUTLINE, EDGE_MIX);
-      if(q <= 1) cur.multiplyScalar(0.94);
+      // distance-aware lerp: far horizon needs stronger seam to survive perspective compression + fog
+      const x = groundGeo.attributes.position.getX(i);
+      const y = groundGeo.attributes.position.getY(i);
+      const d = Math.hypot(x,y);
+      const farMask = THREE.MathUtils.clamp((d - 55)/90, 0, 1);
+      const mix = THREE.MathUtils.clamp(EDGE_MIX_BASE + farMask*0.14, 0, 0.72);
+      cur.lerp(OUTLINE, mix);
+      if(q <= 1) cur.multiplyScalar(0.88);
       cols[idx]=cur.r; cols[idx+1]=cur.g; cols[idx+2]=cur.b;
     }
   }
@@ -182,7 +189,7 @@ scene.add(ground);
 // and contributed to beige soup (washed multiply). Deleted to keep terraces crisp.
 // Fog pushed 95->175 / 260->385 above so bands stay saturated; AO now baked per step.
 
-// decorative dunes — sampled voxel ground height (must match hard quantization above)
+// decorative dunes — sampled voxel ground height (must match hard quantization above + iter11 far exaggeration)
 function sampleGroundH(x,z){
   const dist=Math.hypot(x,z);
   const d1=Math.sin(x*0.055)*Math.cos(z*0.055)*1.65;
@@ -198,7 +205,8 @@ function sampleGroundH(x,z){
   }
   const VOXEL_STEP=1.05, LEVELS=5;
   let q=Math.floor(THREE.MathUtils.clamp((raw+2.2)/VOXEL_STEP,0,LEVELS-0.001));
-  return q*VOXEL_STEP -2.2 +0.42;
+  const effStep = VOXEL_STEP * (1 + mask * 0.38);
+  return q*effStep -2.2 +0.42;
 }
 for(let i=0;i<18;i++){
   const h = 2+Math.random()*4;
@@ -262,16 +270,16 @@ loader.load('/models/car.glb', (gltf)=>{
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
          if (n.includes('carcamero')) {
-           // CRITIC10 HARSH FIX: lime was bleached to 104,178,106 (+29R vs thumb 75,167,95) by env 0.68 + emissive 0.42 wash — B wins vs Sketchfab thumbnail, lost saturated voxel lime. Cut env 0.68→0.30 / emissive 0.42→0.16 and roughness 0.46→0.62 to kill white spec wash, keep matte saturated lime 0x4AAF5E (74,175,94) matching thumb greens, fog:false locked.
-           o.material.color.setHex(0x4AAF5E);
-           o.material.emissive.setHex(0x4AAF5E);
-           o.material.emissiveIntensity = 0.16;
-           o.material.roughness = 0.62;
-           o.material.metalness = 0.02;
-           o.material.envMap = envMap;
-           o.material.envMapIntensity = 0.30;
-           o.material.fog = false;
-           o.material.receiveShadow = false;
+            // CRITIC11 HARSH FIX: rendered lime 108,212,116 measured vs thumb avg 74,170,93 (+34R,+42G,+23B neon bleach) — dir 2.35+rim 1.85+env 0.30 washed facets white despite base 0x4AAF5E correct. B loses saturated sage. Cut emissive 0.16→0.06, env 0.30→0.12, roughness 0.62→0.84 to kill spec wash, enable receiveShadow for chassis AO, keep fog:false.
+            o.material.color.setHex(0x4A9A5D);
+            o.material.emissive.setHex(0x4A9A5D);
+            o.material.emissiveIntensity = 0.06;
+            o.material.roughness = 0.84;
+            o.material.metalness = 0.0;
+            o.material.envMap = envMap;
+            o.material.envMapIntensity = 0.12;
+            o.material.fog = false;
+            o.material.receiveShadow = true;
         } else if (n.includes('material.026')) {
           // windows / glass — keep DoubleSide transparent
           o.material.side = THREE.DoubleSide;
