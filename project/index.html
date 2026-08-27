@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS COMMAND — StarCraft RTS</title>
+<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="app">
+  <!-- Top Bar -->
+  <header id="topbar">
+    <div id="logo">NEXUS <span>COMMAND</span> <em>v1.0</em></div>
+    <div id="resources">
+      <div class="res"><span class="icon mineral"></span><span id="mineralCount">0</span></div>
+      <div class="res"><span class="icon gas"></span><span id="gasCount">0</span></div>
+      <div class="res"><span class="icon supply"></span><span id="supplyCount">0/0</span></div>
+      <div class="res time"><span id="timeCount">00:00</span></div>
+    </div>
+    <div id="topBtns">
+      <button id="btnPause">⏸</button>
+      <button id="btnRestart">↺ Restart</button>
+      <button id="btnHelp">?</button>
+    </div>
+  </header>
+
+  <div id="main">
+    <div id="canvasWrap">
+      <canvas id="gameCanvas" width="1200" height="720"></canvas>
+      <div id="overlayMsg" class="hidden"></div>
+      <div id="buildCursor" class="hidden"></div>
+      <div id="fpsCounter">60 FPS</div>
+    </div>
+
+    <aside id="sidebar">
+      <!-- Minimap -->
+      <div class="panel">
+        <div class="panelTitle">TACTICAL MAP</div>
+        <canvas id="minimap" width="200" height="200"></canvas>
+        <div id="minimapLabels"><span>TERRAN BASE</span><span>ZERG HIVE</span></div>
+      </div>
+
+      <!-- Selection -->
+      <div class="panel" id="selectionPanel">
+        <div class="panelTitle">SELECTION</div>
+        <div id="selContent"><span class="hint">No selection — drag to select units, right-click to move</span></div>
+        <div id="selHP" class="hidden"><div id="selHPBar"><div id="selHPFill"></div></div><span id="selHPText"></span></div>
+        <div id="selQueue"></div>
+      </div>
+
+      <!-- Build / Action -->
+      <div class="panel" id="actionPanel">
+        <div class="panelTitle" id="actionTitle">COMMAND</div>
+        <div id="buildGrid"></div>
+        <div id="hotkeyHelp">
+          <span><b>A</b> Attack</span><span><b>S</b> Stop</span><span><b>H</b> Hold</span><span><b>B</b> Build</span>
+        </div>
+      </div>
+
+      <!-- Control Groups -->
+      <div class="panel" id="cgPanel">
+        <div class="panelTitle">CONTROL GROUPS <span style="font-size:8px;color:#5a8ab5">Ctrl+0..9 assign — 0..9 recall</span></div>
+        <div id="controlGroups"></div>
+      </div>
+
+      <!-- Status -->
+      <div id="statusLog"></div>
+    </aside>
+  </div>
+
+  <footer id="bottombar">
+    <div id="controlsHint">
+      <span><b>Left Drag</b> Select</span>
+      <span><b>Right Click</b> Move / Attack</span>
+      <span><b>A + Click</b> Attack Move</span>
+      <span><b>Shift</b> Queue</span>
+      <span><b>WASD / Arrows</b> Pan</span>
+      <span><b>Mouse Wheel</b> Zoom*</span>
+      <span><b>Ctrl+1..0</b> Assign Group</span>
+      <span><b>1..0</b> Recall Group</span>
+    </div>
+    <div id="objective">Objective: Destroy the Zerg Hive Cluster in the north-east.</div>
+  </footer>
+
+  <!-- Start Screen -->
+  <div id="startScreen">
+    <div class="startBox">
+      <h1>NEXUS COMMAND</h1>
+      <p class="subtitle">Terran Dominion vs Zerg Swarm — Mini StarCraft</p>
+      <div class="briefing">
+        <h3>BRIEFING</h3>
+        <p>Commander, the Zerg have infested Sector 7. Establish your Command Center, harvest minerals and vespene gas, build Supply Depots and Barracks, and raise an army of Marines and Siege Tanks. The enemy Hive will keep producing Zerglings — strike before you're overwhelmed.</p>
+        <ul>
+          <li><b>SCV</b> (50 min) — Worker, builds & gathers</li>
+          <li><b>Marine</b> (50 min) — Reliable infantry, 6 dmg</li>
+          <li><b>Tank</b> (150 min / 50 gas) — Heavy hitter, 22 dmg, slow</li>
+          <li>Buildings need SCV + resources. Supply Depots raise cap by 8.</li>
+        </ul>
+      </div>
+      <button id="btnStart">▶ LAUNCH MISSION</button>
+      <p class="small">Tip: Select SCV → click Build → place building. Right-click minerals to harvest.</p>
+    </div>
+  </div>
+
+  <!-- Victory / Defeat -->
+  <div id="endScreen" class="hidden">
+    <div class="startBox">
+      <h1 id="endTitle">VICTORY</h1>
+      <p id="endDesc"></p>
+      <button onclick="location.reload()">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- Build Menu Modal -->
+  <div id="buildMenu" class="hidden">
+    <div class="panelTitle">BUILD — Select SCV first</div>
+    <div id="buildMenuGrid"></div>
+    <button id="buildMenuClose">✕</button>
+  </div>
+
+  <div id="helpOverlay" class="hidden">
+    <div class="helpBox">
+      <h2>HOW TO PLAY</h2>
+      <ul>
+        <li><b>Select:</b> Left-click / drag box. Ctrl+click adds, Shift queues/extends selection.</li>
+        <li><b>Move/Attack:</b> Right-click ground = move, right-click enemy = attack.</li>
+        <li><b>A + Click:</b> Attack-move (engage anything on the way).</li>
+        <li><b>S:</b> Stop, <b>H:</b> Hold position. <b>Ctrl+1..0:</b> Assign control group. <b>1..0:</b> Recall. Double-tap centers camera. <b>Ctrl+Shift+Num:</b> Add to group.</li>
+        <li><b>SCV:</b> Select SCV → Build buttons → click valid (green) location.</li>
+        <li><b>Gather:</b> Right-click blue Mineral Field or green Vespene Geyser. SCV auto-returns to Command Center.</li>
+        <li><b>Supply:</b> Build Supply Depots or you'll be blocked.</li>
+        <li><b>Minimap:</b> Click/drag to jump camera. Groups also clickable below minimap.</li>
+      </ul>
+      <button id="helpClose">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
