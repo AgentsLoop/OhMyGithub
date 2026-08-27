@@ -1,0 +1,40 @@
+[
+  {
+    "index": 0,
+    "uid": "ce73836afac346ae82f820a81a33145b",
+    "name": "Sci-fi sword: 'Burning Blast'",
+    "author": "Ardocast",
+    "authorUrl": "https://sketchfab.com/Ardocast",
+    "license": "CC Attribution",
+    "licenseUrl": null,
+    "modelUrl": "https://sketchfab.com/3d-models/none-ce73836afac346ae82f820a81a33145b",
+    "thumbnailUrl": "https://media.sketchfab.com/models/ce73836afac346ae82f820a81a33145b/thumbnails/566caecb5fb543a2bd4e7c6c3df0cb14/014b00f380ac498f90733981c1534174.jpeg",
+    "glbBytes": 1911352,
+    "faceCount": 5566,
+    "vertexCount": 4656,
+    "textureCount": 4,
+    "textureMaxResolution": 2048,
+    "animationCount": 0,
+    "animations": [],
+    "thumbnailError": null
+  },
+  {
+    "index": 1,
+    "uid": "55d74d7d4f6a4071af856d2ffc2c429a",
+    "name": "Rifle Laser Sight",
+    "author": "trolosqlfod",
+    "authorUrl": "https://sketchfab.com/trolosqlfod",
+    "license": "CC Attribution",
+    "licenseUrl": null,
+    "modelUrl": "https://sketchfab.com/3d-models/none-55d74d7d4f6a4071af856d2ffc2c429a",
+    "thumbnailUrl": "https://media.sketchfab.com/models/55d74d7d4f6a4071af856d2ffc2c429a/thumbnails/8e401548dc654d1ba5761cacddd48ef4/29c673b9789b4448975110640235f292.jpeg",
+    "glbBytes": 1842656,
+    "faceCount": 1967,
+    "vertexCount": 2010,
+    "textureCount": 2,
+    "textureMaxResolution": 1024,
+    "animationCount": 0,
+    "animations": [],
+    "thumbnailError": null
+  }
+]

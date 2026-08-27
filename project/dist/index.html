@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS ARENA — Compact Sci-Fi Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Rajdhani:wght@500;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#05070f;font-family:'Rajdhani',system-ui,sans-serif;color:#e6f0ff}
+  #c{width:100%;height:100%;display:block}
+  #ui{position:fixed;inset:0;pointer-events:none}
+  .topbar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:linear-gradient(180deg,rgba(0,0,0,.7),transparent);backdrop-filter:blur(6px)}
+  .brand{font-family:'Orbitron',monospace;font-weight:800;letter-spacing:.12em;font-size:18px;color:#7af2ff;text-shadow:0 0 12px rgba(122,242,255,.8)}
+  .brand span{color:#ff3b82}
+  .hud{display:flex;gap:14px;align-items:center}
+  .pill{background:rgba(20,30,60,.9);border:1px solid rgba(122,242,255,.35);padding:7px 12px;border-radius:999px;font-weight:700;font-size:13px;letter-spacing:.06em;display:flex;gap:8px;align-items:center;box-shadow:0 0 18px rgba(80,180,255,.25), inset 0 0 10px rgba(80,180,255,.15)}
+  .pill b{color:#7af2ff}
+  .pill.hp{border-color:rgba(255,59,130,.45)}
+  .pill.hp b{color:#ff5a8f}
+  .bar{width:92px;height:6px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#ff3b82,#ff8a3b);width:100%;transition:width .2s}
+  .bar.shield>i{background:linear-gradient(90deg,#7af2ff,#7a7aff)}
+  .center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .card{background:rgba(10,16,32,.92);border:1px solid rgba(122,242,255,.3);border-radius:16px;padding:22px 20px;max-width:560px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 30px rgba(122,242,255,.2);pointer-events:auto}
+  .card h1{font-family:'Orbitron',monospace;font-size:28px;letter-spacing:.1em;color:#7af2ff;margin-bottom:6px}
+  .card h1 i{color:#ff3b82;font-style:normal}
+  .card p{opacity:.85;line-height:1.5;font-size:14px;margin:8px 0}
+  .kpi{display:flex;gap:10px;justify-content:center;margin:14px 0}
+  .kpi div{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;min-width:110px}
+  .kpi b{font-family:'Orbitron',monospace;font-size:18px;display:block}
+  .kpi span{font-size:11px;letter-spacing:.1em;opacity:.7}
+  .btn{pointer-events:auto;background:linear-gradient(90deg,#7af2ff,#7a7aff);color:#05070f;border:0;padding:12px 18px;border-radius:999px;font-family:'Orbitron',monospace;font-weight:800;letter-spacing:.08em;font-size:13px;cursor:pointer;box-shadow:0 8px 24px rgba(122,122,255,.4);transition:transform .12s,filter .12s}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .btn:active{transform:translateY(0)}
+  .btn.secondary{background:rgba(255,255,255,.08);color:#e6f0ff;border:1px solid rgba(255,255,255,.18);box-shadow:none}
+  .controls{position:absolute;bottom:12px;left:12px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;font-size:11px;line-height:1.6;letter-spacing:.04em;max-width:360px;backdrop-filter:blur(8px)}
+  .controls b{color:#7af2ff}
+  .crosshair{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);pointer-events:none}
+  .crosshair:before,.crosshair:after{content:"";position:absolute;background:#7af2ff;box-shadow:0 0 8px rgba(122,242,255,.9)}
+  .crosshair:before{left:50%;top:0;width:2px;height:22px;transform:translateX(-50%)}
+  .crosshair:after{top:50%;left:0;height:2px;width:22px;transform:translateY(-50%)}
+  .crosshair i{position:absolute;left:50%;top:50%;width:8px;height:8px;border:2px solid #ff3b82;transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 0 8px rgba(255,59,130,.8)}
+  .hit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Orbitron',monospace;font-weight:800;font-size:22px;color:#ff3b82;text-shadow:0 0 12px rgba(255,59,130,.9);opacity:0;pointer-events:none}
+  .hit.show{animation:hit .45s ease}
+  @keyframes hit{0%{opacity:0;transform:translate(-50%,-40%) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-70%) scale(1.1)}}
+  #attrib{position:absolute;bottom:12px;right:12px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 10px;font-size:10px;max-width:320px;line-height:1.5;opacity:.9}
+  #attrib a{color:#7af2ff;text-decoration:none}
+  .wave{position:absolute;top:58px;left:50%;transform:translateX(-50%);background:rgba(122,242,255,.12);border:1px solid rgba(122,242,255,.35);padding:6px 14px;border-radius:999px;font-family:'Orbitron',monospace;font-size:11px;letter-spacing:.12em;color:#7af2ff;backdrop-filter:blur(6px)}
+  @media(max-width:700px){.topbar{flex-direction:column;gap:8px;align-items:flex-start}.controls{display:none}.brand{font-size:15px}}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.184.0",
+    "three/addons/": "https://esm.sh/three@0.184.0/examples/jsm/"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-DVRWR8Xk.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="topbar">
+    <div class="brand">NEXUS <span>ARENA</span> <small style="opacity:.6;font-size:10px;letter-spacing:.15em;margin-left:6px">COMPACT SCI-FI</small></div>
+    <div class="hud">
+      <div class="pill hp">HP <div class="bar" style="width:110px"><i id="hpbar"></i></div> <b id="hp">100</b></div>
+      <div class="pill">SHIELD <div class="bar shield" style="width:80px"><i id="shieldbar"></i></div> <b id="shield">50</b></div>
+      <div class="pill">SCORE <b id="score">0</b></div>
+      <div class="pill">WAVE <b id="wave">1</b></div>
+      <div class="pill"><span id="enemies">0</span> HOSTILES</div>
+    </div>
+  </div>
+  <div class="wave" id="waveBanner">WAVE 1 — BREACH DETECTED</div>
+  <div class="crosshair"><i></i></div>
+  <div class="hit" id="hit">HIT</div>
+  <div class="controls">
+    <b>WASD</b> move · <b>Mouse</b> look · <b>Click</b> fire · <b>Shift</b> sprint · <b>Space</b> dash · <b>R</b> restart<br>
+    <b>Desktop:</b> click to lock pointer · <b>Mobile:</b> drag to look, joystick + fire button
+  </div>
+  <div id="attrib"></div>
+
+  <div class="center" id="overlay">
+    <div class="card" id="startCard">
+      <h1>NEXUS <i>ARENA</i></h1>
+      <p>Compact sci-fi arena shooter. Hold the hexagonal reactor against waves of hunter drones. Use crates for cover, keep moving, and chain headshots.</p>
+      <div class="kpi">
+        <div><b>60s</b><span>PER WAVE</span></div>
+        <div><b>3</b><span>WEAPONS MODES</span></div>
+        <div><b>∞</b><span>WAVES</span></div>
+      </div>
+      <p style="font-size:12px;opacity:.7">Built with Three.js + Sketchfab GLBs. Bar: <b>Halo Infinite Arena</b> — neon hard-surface, readable arena, crunchy weapon feel.</p>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+        <button class="btn" id="playBtn">ENTER ARENA →</button>
+        <button class="btn secondary" id="howBtn">HOW TO PLAY</button>
+      </div>
+      <p id="how" style="display:none;margin-top:10px;text-align:left;background:rgba(255,255,255,.06);padding:10px;border-radius:10px;font-size:12px">Drones flank and rush. Your pulse rifle overheats after 12 shots — burst fire. Pick up shield cores (blue) and health orbs (pink) dropped on kills. Dash through enemies for i-frames. Survive 3 waves to win. Arena is 38m across — learn the cover loop.</p>
+    </div>
+  </div>
+
+  <div class="center" id="dead" style="display:none">
+    <div class="card">
+      <h1 style="color:#ff3b82">NEURAL LINK LOST</h1>
+      <p id="deadStats"></p>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+        <button class="btn" onclick="location.reload()">REBOOT</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="center" id="won" style="display:none">
+    <div class="card" style="border-color:rgba(122,242,255,.6)">
+      <h1 style="color:#7af2ff">ARENA SECURED</h1>
+      <p id="wonStats"></p>
+      <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- mobile -->
+  <div id="mobile" style="position:fixed;inset:auto 0 0 0;display:none;pointer-events:none;padding:10px;justify-content:space-between;align-items:end">
+    <div id="joy" style="width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(122,242,255,.25);position:relative;pointer-events:auto;touch-action:none">
+      <div id="stick" style="position:absolute;left:50%;top:50%;width:48px;height:48px;background:rgba(122,242,255,.9);border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 12px rgba(122,242,255,.7)"></div>
+    </div>
+    <div style="display:flex;gap:10px;pointer-events:auto">
+      <button id="mFire" style="width:92px;height:92px;border-radius:50%;background:radial-gradient(circle at 30% 30%, #ff5a8f, #c41a4a);border:2px solid rgba(255,255,255,.6);color:white;font-family:'Orbitron',monospace;font-weight:800;box-shadow:0 8px 24px rgba(255,59,130,.5)">FIRE</button>
+      <button id="mDash" style="width:72px;height:72px;border-radius:50%;background:rgba(122,242,255,.9);border:2px solid white;color:#05070f;font-family:'Orbitron',monospace;font-weight:800">DASH</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
