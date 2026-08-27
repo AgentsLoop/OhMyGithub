@@ -67,8 +67,9 @@ temporary GitHub Actions filesystem.
 
 On macOS, run `./scripts/test-opencode-progress-tracker.sh`. It starts a local
 mock OpenCode HTTP server with nested, active, and completed child sessions,
-including user and tool image attachments, then asserts the three derived
-progress counters.
+including user and tool image attachments, then asserts tool calls, cumulative
+token usage (including nested child sessions), and the derived tokens-per-second
+speed score.
 
 The workflow uses the built-in OpenCode model path and does not require an
 `OPENCODE_API_KEY` secret. Branch creation, pushing, and pull-request creation

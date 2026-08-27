@@ -28,25 +28,18 @@ while :; do
   sessions_payload="$(curl --fail --silent --show-error \
     -H "x-opencode-directory: $PROJECT_DIR" \
     "http://127.0.0.1:$OPENCODE_WEB_PORT/session" 2>/dev/null || true)"
-  status_payload="$(curl --fail --silent --show-error \
-    -H "x-opencode-directory: $PROJECT_DIR" \
-    "http://127.0.0.1:$OPENCODE_WEB_PORT/session/status" 2>/dev/null || true)"
   if jq -e 'type == "array"' >/dev/null 2>&1 <<<"$payload" && \
-    jq -e 'type == "array"' >/dev/null 2>&1 <<<"$sessions_payload" && \
-    jq -e 'type == "object"' >/dev/null 2>&1 <<<"$status_payload"; then
+    jq -e 'type == "array"' >/dev/null 2>&1 <<<"$sessions_payload"; then
     stats="$(jq -r '
       def parts: [.[].parts[]?];
       def tools: [parts[] | select(.type == "tool")];
-      [
-        (tools | length),
-        ([tools[] | select(.state.status == "running" or .state.status == "pending")] | length)
-      ] | @tsv
+      (tools | length)
     ' <<<"$payload")"
-    IFS=$'\t' read -r tool_count active_count <<<"$stats"
+    tool_count="$stats"
     subagent_stats="$(jq -nr \
       --arg root "$SESSION_ID" \
       --argjson sessions "$sessions_payload" \
-      --argjson statuses "$status_payload" '
+      '
       def descendants($all; $parent):
         [$all[] | select(.parentID == $parent)] as $children
         | ($children | map(.id)) as $ids
@@ -54,16 +47,30 @@ while :; do
           else $ids + ([$ids[] | descendants($all; .)] | add)
           end;
       ($sessions | descendants($sessions; $root)) as $subagents
-      | {
-          total: ($subagents | length),
-          active: ([$statuses | to_entries[]
-            | select((.key as $id | ($subagents | index($id))) != null)
-            | select(.value.type != "idle")
-          ] | length)
-        }
-      | [.active, .total] | @tsv
+      | ($subagents | length)
     ')"
-    IFS=$'\t' read -r active_subagents total_subagents <<<"$subagent_stats"
+    total_subagents="$subagent_stats"
+    token_count="$(jq -nr \
+      --arg root "$SESSION_ID" \
+      --argjson sessions "$sessions_payload" '
+      def descendants($all; $parent):
+        [$all[] | select(.parentID == $parent)] as $children
+        | ($children | map(.id)) as $ids
+        | if ($ids | length) == 0 then $ids
+          else $ids + ([$ids[] | descendants($all; .)] | add)
+          end;
+      ([$root] + ($sessions | descendants($sessions; $root))) as $tracked
+      | reduce $sessions[] as $session (0;
+          if ($tracked | index($session.id)) == null then .
+          else .
+            + ($session.tokens.input // 0)
+            + ($session.tokens.output // 0)
+            + ($session.tokens.reasoning // 0)
+            + ($session.tokens.cache.read // 0)
+            + ($session.tokens.cache.write // 0)
+          end
+        )
+    ')"
     subagent_ids="$(jq -nr \
       --arg root "$SESSION_ID" \
       --argjson sessions "$sessions_payload" '
@@ -88,6 +95,8 @@ while :; do
     done <<<"$subagent_ids"
     changed_count="$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
     elapsed_seconds="$(( $(date +%s) - started_at ))"
+    speed_score="$(awk -v tokens="$token_count" -v elapsed="$elapsed_seconds" \
+      'BEGIN { if (elapsed > 0) printf "%.1f", tokens / elapsed; else print "0.0" }')"
     body="🟡 **OpenCode progress (live)**
 
 Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
@@ -95,9 +104,9 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 🌐 **OpenCode Web UI:** $OPENCODE_WEB_URL
 
 - Elapsed: ${elapsed_seconds}s
+- Token count: ${token_count}
+- Speed score: ${speed_score} tokens/s
 - Tool calls: $tool_count
-- Active tool calls: $active_count
-- Active subagents: $active_subagents
 - Total subagents executed: $total_subagents
 - Image-context model calls: $vision_count
 - Changed workspace files: $changed_count
