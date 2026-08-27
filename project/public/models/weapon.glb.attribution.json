@@ -1,0 +1,73 @@
+{
+  "uid": "908f41fb8c5b4628ab5547e3519a6083",
+  "name": "FPS Silicone gun animations (LP)",
+  "author": "Cransh",
+  "authorUrl": "https://sketchfab.com/ccransh",
+  "license": "CC Attribution",
+  "licenseUrl": null,
+  "modelUrl": "https://sketchfab.com/3d-models/none-908f41fb8c5b4628ab5547e3519a6083",
+  "thumbnailUrl": "https://media.sketchfab.com/models/908f41fb8c5b4628ab5547e3519a6083/thumbnails/f2aef3eff40f4c6a9d6f369ef4a2a821/1e69538ae4a4430ba0e2b77c90eb5a46.jpeg",
+  "glbBytes": 2757092,
+  "faceCount": 7281,
+  "vertexCount": 9113,
+  "textureCount": 0,
+  "textureMaxResolution": 0,
+  "animationCount": 5,
+  "animations": [
+    {
+      "uid": "1146728b997d44ec90eed172dc1fb718",
+      "name": "Rig|siligun_walk",
+      "url": "https://media.sketchfab.com/models/908f41fb8c5b4628ab5547e3519a6083/1f1ed25528364358b1610b01d82541f7/animations/1146728b997d44ec90eed172dc1fb718.bin.gz",
+      "size": 340512,
+      "duration": 1.317,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-10-04T01:34:07.499339",
+      "updatedAt": "2023-10-04T01:41:18.431651"
+    },
+    {
+      "uid": "aa08f61d9da149d79f6bd380388a957b",
+      "name": "Rig|siligun_run",
+      "url": "https://media.sketchfab.com/models/908f41fb8c5b4628ab5547e3519a6083/1f1ed25528364358b1610b01d82541f7/animations/aa08f61d9da149d79f6bd380388a957b.bin.gz",
+      "size": 209996,
+      "duration": 0.817,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-10-04T01:34:07.496487",
+      "updatedAt": "2023-10-04T01:41:18.349597"
+    },
+    {
+      "uid": "c061ef0bcb92401a94666e112fa04809",
+      "name": "Rig|siligun_reload",
+      "url": "https://media.sketchfab.com/models/908f41fb8c5b4628ab5547e3519a6083/1f1ed25528364358b1610b01d82541f7/animations/c061ef0bcb92401a94666e112fa04809.bin.gz",
+      "size": 1289704,
+      "duration": 4.983,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-10-04T01:34:07.493273",
+      "updatedAt": "2023-10-04T01:41:18.433677"
+    },
+    {
+      "uid": "c511882f503740b7af643404efa13034",
+      "name": "Rig|siligun_idle",
+      "url": "https://media.sketchfab.com/models/908f41fb8c5b4628ab5547e3519a6083/1f1ed25528364358b1610b01d82541f7/animations/c511882f503740b7af643404efa13034.bin.gz",
+      "size": 514376,
+      "duration": 1.983,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-10-04T01:34:07.490430",
+      "updatedAt": "2023-10-04T01:41:18.428242"
+    },
+    {
+      "uid": "e8462613a82a49c1b3a3d2f4f2728f0c",
+      "name": "Rig|siligun_fire",
+      "url": "https://media.sketchfab.com/models/908f41fb8c5b4628ab5547e3519a6083/1f1ed25528364358b1610b01d82541f7/animations/e8462613a82a49c1b3a3d2f4f2728f0c.bin.gz",
+      "size": 114756,
+      "duration": 0.483,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2023-10-04T01:34:07.486991",
+      "updatedAt": "2023-10-04T01:41:18.428903"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEON VECTOR — FPS Vertical Slice</title>
+    <meta name="description" content="AAA Three.js FPS vertical slice — pointer-lock, raycast shooting, GLB viewmodel" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud">
+      <div id="hud-top">
+        <div class="hud-stat"><span class="label">HEALTH</span><div class="bar"><div id="health-bar" class="bar-fill"></div></div><span id="health-text">100</span></div>
+        <div class="hud-stat center"><span id="score-text">0 / 15 ELIMINATED</span><span id="timer-text" class="sub">00:00</span></div>
+        <div class="hud-stat right"><span class="label">AMMO</span><span id="ammo-text" class="mono-lg">30 / 90</span><span id="reload-hint" class="hint">[R] RELOAD</span></div>
+      </div>
+      <div id="crosshair"><div class="h"></div><div class="v"></div><div class="dot"></div></div>
+      <div id="hud-bottom">
+        <div class="controls-hint">WASD Move · SHIFT Sprint · SPACE Jump · MOUSE Aim · CLICK Shoot · R Reload · ESC Unlock</div>
+        <div class="weapon-name" id="weapon-name">SILICON-X7 // CRANSH</div>
+      </div>
+    </div>
+    <div id="overlay" class="overlay">
+      <div class="overlay-card">
+        <p class="eyebrow">THREE.JS · POINTER LOCK · GLB VIEWMODEL</p>
+        <h1>NEON VECTOR</h1>
+        <p class="subtitle">AAA FPS Vertical Slice — Eliminate 15 targets before your health hits zero</p>
+        <button id="play-btn" class="cta">▶ ENTER ARENA</button>
+        <div class="meta-grid">
+          <div><strong>Movement</strong><span>WASD + Mouse · Shift Sprint · Space Jump</span></div>
+          <div><strong>Combat</strong><span>Click to Fire · R Reload · Headshots = 2×</span></div>
+          <div><strong>Goal</strong><span>15 Kills to Win · Avoid drone contact</span></div>
+        </div>
+        <p class="attribution" id="attribution"></p>
+      </div>
+    </div>
+    <div id="overlay-win" class="overlay hidden">
+      <div class="overlay-card win">
+        <p class="eyebrow">MISSION ACCOMPLISHED</p><h1>VICTORY</h1>
+        <p class="subtitle" id="win-stats"></p>
+        <button class="cta" onclick="location.reload()">↻ PLAY AGAIN</button>
+        <p class="hint">Press <b>R</b> to restart instantly</p>
+      </div>
+    </div>
+    <div id="overlay-lose" class="overlay hidden">
+      <div class="overlay-card lose">
+        <p class="eyebrow">FLATLINED</p><h1>ELIMINATED</h1>
+        <p class="subtitle" id="lose-stats"></p>
+        <button class="cta cta-lose" onclick="location.reload()">↻ TRY AGAIN</button>
+        <p class="hint">Press <b>R</b> to restart instantly</p>
+      </div>
+    </div>
+    <div id="hit-marker" class="hit-marker">╳ HIT</div>
+    <div id="damage-vignette"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
