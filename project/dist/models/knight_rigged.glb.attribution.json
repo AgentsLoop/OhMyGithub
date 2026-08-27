@@ -1,0 +1,29 @@
+{
+  "uid": "6d15613997ae4fe29ec3f4beb976b773",
+  "name": "Low Poly Knight (Rigged)",
+  "author": "Yanez Designs",
+  "authorUrl": "https://sketchfab.com/Yanez-Designs",
+  "license": "CC Attribution",
+  "licenseUrl": null,
+  "modelUrl": "https://sketchfab.com/3d-models/none-6d15613997ae4fe29ec3f4beb976b773",
+  "thumbnailUrl": "https://media.sketchfab.com/models/6d15613997ae4fe29ec3f4beb976b773/thumbnails/7968b7e87bd44d78a8918a2897710dc9/6106ed4de44043ff96629ae45a70c174.jpeg",
+  "glbBytes": 159112,
+  "faceCount": 1254,
+  "vertexCount": 1614,
+  "textureCount": 6,
+  "textureMaxResolution": 1024,
+  "animationCount": 1,
+  "animations": [
+    {
+      "uid": "21faae13dbab4640bc3ca4587e89ccbd",
+      "name": "Take 001",
+      "url": "https://media.sketchfab.com/models/6d15613997ae4fe29ec3f4beb976b773/25064c160bbb40e08f5be2182983cb16/animations/21faae13dbab4640bc3ca4587e89ccbd.bin.gz",
+      "size": 32360,
+      "duration": 3.333,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2018-10-19T02:04:28.492722",
+      "updatedAt": "2019-10-17T01:39:59.189241"
+    }
+  ]
+}

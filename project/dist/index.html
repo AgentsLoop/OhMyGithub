@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Isolated Worktree Arena — Loop Regression</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0d12;--panel:#11161e;--line:#1e2a3a;--accent:#35d0ff;--accent2:#ff3b6b;--ok:#2ee5a0;--warn:#ffb020}
+body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;overflow:hidden}
+#canvas{display:block;width:100vw;height:100vh}
+#hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:linear-gradient(180deg,rgba(10,13,18,0.95),rgba(10,13,18,0));pointer-events:auto}
+.brand{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:-0.02em;font-size:16px}
+.brand span{color:var(--accent)}
+.badge{font-size:11px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;background:rgba(53,208,255,0.08);color:var(--accent)}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:110px}
+.stat label{font-size:9px;letter-spacing:0.12em;opacity:0.6;display:block}
+.stat strong{font-size:16px}
+.stat.loop{border-color:rgba(53,208,255,0.3)}
+.stat.loop strong{color:var(--accent)}
+.healthbar{height:6px;background:#0f1a26;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:6px}
+.healthbar i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),var(--accent));width:100%;transition:width 0.2s}
+.center{flex:1;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+.card{width:min(560px,92vw);background:rgba(17,22,30,0.96);border:1px solid var(--line);border-radius:16px;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,0.6);backdrop-filter:blur(10px)}
+.card h1{font-family:'Space Grotesk',sans-serif;font-size:28px;line-height:1;letter-spacing:-0.03em}
+.card h1 em{color:var(--accent);font-style:normal}
+.card p{opacity:0.75;font-size:13px;line-height:1.6;margin:10px 0 14px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:#e6edf3;padding:10px 16px;border-radius:999px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;pointer-events:auto;transition:transform 0.15s,border-color 0.15s,background 0.15s}
+.btn:hover{transform:translateY(-1px);border-color:rgba(53,208,255,0.5)}
+.btn.primary{background:var(--accent);color:#02141c;border-color:transparent}
+.btn.primary:hover{background:#4ee0ff}
+.btn.ghost{background:transparent}
+.kbd{font-size:11px;padding:2px 6px;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;background:#0f141c;margin-right:6px}
+.foot{padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;pointer-events:auto}
+.hint{font-size:11px;opacity:0.6}
+.controls{display:flex;gap:8px;align-items:center;font-size:11px}
+.controls span{opacity:0.7}
+.log{position:fixed;left:14px;bottom:14px;max-width:380px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.log div{font-size:11px;background:rgba(17,22,30,0.92);border:1px solid var(--line);padding:8px 10px;border-radius:10px;opacity:0.95}
+.hidden{display:none !important}
+#attribution{position:fixed;right:10px;bottom:10px;font-size:9px;opacity:0.5;background:rgba(0,0,0,0.5);padding:4px 6px;border-radius:6px;pointer-events:auto}
+/* ── Hades-like loop polish ── */
+#countdown{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;z-index:30}
+#countdownNum{font-family:'Space Grotesk',sans-serif;font-size:clamp(80px,22vw,180px);font-weight:700;line-height:1;color:#fff;text-shadow:0 0 40px rgba(53,208,255,0.9),0 0 80px rgba(53,208,255,0.5),0 4px 20px rgba(0,0,0,0.8);letter-spacing:-0.05em;transform:scale(0.6);opacity:0}
+#countdownNum.anim{animation:countPop 0.85s cubic-bezier(0.34,1.56,0.64,1) forwards}
+#countdownLabel{font-family:'Space Grotesk',sans-serif;font-size:14px;letter-spacing:0.35em;color:var(--accent);opacity:0.9;margin-top:6px;text-shadow:0 0 12px rgba(53,208,255,0.8)}
+#countdownSub{font-size:12px;letter-spacing:0.18em;opacity:0.6;margin-top:4px}
+@keyframes countPop{0%{transform:scale(0.45);opacity:0}35%{transform:scale(1.08);opacity:1}65%{transform:scale(1);opacity:1}100%{transform:scale(0.92);opacity:0}}
+#waveAnnounce{position:fixed;top:78px;left:50%;transform:translateX(-50%) translateY(-10px);background:linear-gradient(180deg,rgba(17,22,30,0.98),rgba(17,22,30,0.88));border:1px solid rgba(53,208,255,0.35);color:#e6edf3;padding:10px 28px;border-radius:999px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.14em;pointer-events:none;z-index:20;opacity:0;transition:opacity 0.25s,transform 0.35s;box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 20px rgba(53,208,255,0.15);white-space:nowrap}
+#waveAnnounce.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#waveAnnounce b{color:var(--accent)}
+#breachWarn{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(90deg,#ff3b6b,#ff6b3b);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.18em;padding:8px 22px;border-radius:999px;pointer-events:none;z-index:25;box-shadow:0 0 30px rgba(255,59,107,0.6),0 8px 24px rgba(0,0,0,0.5);animation:breachPulse 0.9s ease-in-out infinite alternate}
+@keyframes breachPulse{0%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 18px rgba(255,59,107,0.5)}100%{transform:translate(-50%,-50%) scale(1.04);box-shadow:0 0 36px rgba(255,59,107,0.9)}}
+#hitFlash{position:fixed;inset:0;pointer-events:none;z-index:22;opacity:0;background:radial-gradient(ellipse at center,rgba(255,59,107,0.22),transparent 68%);transition:opacity 0.12s}
+#hitFlash.coreHit{opacity:1;background:radial-gradient(ellipse at center,rgba(255,59,107,0.32),rgba(255,120,40,0.12) 55%,transparent 72%)}
+#hitFlash.playerHit{opacity:1;background:radial-gradient(ellipse at center,rgba(53,208,255,0.28),transparent 70%)}
+#screenShake{position:fixed;inset:0;pointer-events:none}
+.shake{animation:shake 0.32s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes shake{10%,90%{transform:translate3d(-1px,1px,0)}20%,80%{transform:translate3d(2px,-1px,0)}30%,50%,70%{transform:translate3d(-3px,0,0)}40%,60%{transform:translate3d(3px,1px,0)}}
+.shakeStrong{animation:shakeStrong 0.42s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes shakeStrong{10%,90%{transform:translate3d(-2px,2px,0)}20%,80%{transform:translate3d(4px,-2px,0)}30%,50%,70%{transform:translate3d(-5px,1px,0)}40%,60%{transform:translate3d(5px,-1px,0)}}
+.stat strong{display:inline-block;transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),color 0.2s}
+.stat strong.bump{transform:scale(1.18)}
+.stat strong.hpDanger{color:var(--accent2) !important}
+#hpbar{transition:width 0.35s cubic-bezier(0.25,1,0.5,1),background 0.3s}
+/* mobile controls */
+#mobileControls{position:fixed;inset:0;pointer-events:none;z-index:15}
+#joystick{position:absolute;left:18px;bottom:18px;width:118px;height:118px;border-radius:50%;background:rgba(17,22,30,0.55);border:1px solid rgba(53,208,255,0.25);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none}
+#joystick::before{content:'';position:absolute;inset:10px;border-radius:50%;border:1px dashed rgba(53,208,255,0.18)}
+#joyStick{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#4ee0ff,#1590b8);box-shadow:0 4px 16px rgba(53,208,255,0.5),inset 0 1px 1px rgba(255,255,255,0.6);transform:translate(0,0);transition:transform 0.08s}
+#joyLabel{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:8px;letter-spacing:0.16em;opacity:0.5;white-space:nowrap}
+#actionBtn{position:absolute;right:22px;bottom:22px;width:82px;height:82px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#ff6b8a,#c81e3a);border:2px solid rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.08em;color:#fff;pointer-events:auto;box-shadow:0 6px 24px rgba(255,59,107,0.5),0 0 0 0 rgba(255,59,107,0.6);cursor:pointer;user-select:none;animation:pulseBtn 1.6s ease-in-out infinite}
+#actionBtn:active{transform:scale(0.93)}
+@keyframes pulseBtn{0%,100%{box-shadow:0 6px 24px rgba(255,59,107,0.5),0 0 0 0 rgba(255,59,107,0.5)}50%{box-shadow:0 6px 24px rgba(255,59,107,0.6),0 0 0 12px rgba(255,59,107,0)}}
+#mobileControls.hidden{display:none !important}
+@media(pointer:coarse){ #mobileControls.autoShow{display:block !important} }
+.vignetteBreach{position:fixed;inset:0;pointer-events:none;z-index:21;opacity:0;transition:opacity 0.35s;box-shadow:inset 0 0 80px rgba(255,59,107,0.0),inset 0 0 140px rgba(255,59,107,0.0)}
+.vignetteBreach.on{opacity:1;box-shadow:inset 0 0 80px rgba(255,59,107,0.22),inset 0 0 140px rgba(255,59,107,0.12)}
+</style>
+  <script type="module" crossorigin src="/assets/index-BtZtloDM.js"></script>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="hud">
+  <div class="topbar">
+    <div>
+      <div class="brand"><span>ISOLATED</span> WORKTREE <span>ARENA</span> <span style="opacity:0.5;font-weight:400">— loop regression</span></div>
+      <div class="hint">Each loop is an isolated checkout. Defend the core. Survive the regression.</div>
+    </div>
+    <div class="badge">worktree /tmp/opencode-worktree · branch opencode/loop · BAR: Hades + Vampire Survivors</div>
+  </div>
+  <div style="display:flex;justify-content:space-between;padding:0 18px;gap:12px;flex-wrap:wrap;pointer-events:none">
+    <div class="stats">
+      <div class="stat loop"><label>LOOP</label><strong id="loop">1</strong><div style="font-size:10px;opacity:0.6">ISOLATED CHECKOUT</div></div>
+      <div class="stat"><label>SCORE</label><strong id="score">0</strong></div>
+      <div class="stat"><label>WAVE</label><strong id="wave">0 / 0</strong></div>
+      <div class="stat" style="min-width:160px"><label>CORE INTEGRITY</label><strong id="hp">100%</strong><div class="healthbar"><i id="hpbar"></i></div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><label>PLAYER HP</label><strong id="php">100</strong></div>
+      <div class="stat"><label>ENEMIES</label><strong id="ecount">0</strong></div>
+    </div>
+  </div>
+  <div class="center" id="overlay">
+    <div class="card" id="startCard">
+      <h1><em>LOOP</em> REGRESSION ARENA</h1>
+      <p>Every <b style="color:var(--accent)">Loop</b> spawns an <b>isolated worktree</b> — a fresh checkout that must survive on its own. Enemies are <b style="color:var(--accent2)">merge conflicts</b> rushing the core. If isolation breaks, the loop regresses.</p>
+      <p style="font-size:12px;border-left:3px solid var(--accent);padding-left:10px;background:rgba(53,208,255,0.06);border-radius:0 8px 8px 0">Inspired by <b>Hades</b> chambers + <b>Vampire Survivors</b> waves. This build uses <b>Three.js + Sketchfab GLBs</b> with verified A/B rendering.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px">
+        <span class="kbd">WASD</span> move &nbsp;<span class="kbd">MOUSE</span> aim &nbsp;<span class="kbd">CLICK / SPACE</span> pulse &nbsp;<span class="kbd">SHIFT</span> dash
+      </div>
+      <div class="row">
+        <button class="btn primary" id="playBtn">► ENTER LOOP 1</button>
+        <button class="btn" id="howBtn">How isolation works</button>
+      </div>
+      <div class="hint" style="margin-top:10px">3 GLB models loaded: Arena Low Poly, Low-poly Robot, Low Poly Knight — all CC Attribution, attribution preserved.</div>
+    </div>
+    <div class="card hidden" id="howCard">
+      <h1>HOW ISOLATION WORKS</h1>
+      <p>• <b>Arena = worktree</b> at <code>/tmp/opencode-worktree-&lt;run&gt;/project</code> with <code>sparse-checkout: project</code>.<br>
+      • Each <b>Loop</b> increments difficulty: +3 enemies, +8% speed, −1s spawn interval.<br>
+      • <b>Regression check</b>: survive 22s or clear wave to advance. Core at 0% = loop failed → retry same loop.<br>
+      • Visual proof: arena GLB centered & framed, robot/knight use matching GLTFLoader, ACES tonemap.</p>
+      <div class="row"><button class="btn primary" id="backBtn">Back</button></div>
+    </div>
+    <div class="card hidden" id="deadCard">
+      <h1 style="color:var(--accent2)">LOOP BREACH</h1>
+      <p id="deadText">Isolation failed. The worktree leaked.</p>
+      <div class="row"><button class="btn primary" id="retryBtn">↻ RETRY SAME LOOP</button><button class="btn ghost" id="menuBtn">Menu</button></div>
+    </div>
+    <div class="card hidden" id="winCard">
+      <h1 style="color:var(--ok)">LOOP STABLE ✓</h1>
+      <p id="winText">Worktree isolated. Regression passed. Advancing…</p>
+      <div class="row"><button class="btn primary" id="nextBtn">► NEXT LOOP</button></div>
+    </div>
+  </div>
+  <div class="foot">
+    <div class="hint">Built for /loop isolated-worktree regression · Three r160 · Vite · GLTFLoader · CC Attribution preserved</div>
+    <div class="controls"><span id="fps">60 fps</span> · <span>Isolation: <b id="iso">STABLE</b></span></div>
+  </div>
+</div>
+<div id="countdown" class="hidden"><div id="countdownNum"></div><div id="countdownLabel"></div><div id="countdownSub"></div></div>
+<div id="waveAnnounce" class="hidden"></div>
+<div id="breachWarn" class="hidden">⚠ CORE BREACH IMMINENT ⚠</div>
+<div id="hitFlash"></div>
+<div id="vignette" class="vignetteBreach"></div>
+<div id="mobileControls" class="hidden">
+  <div id="joystick"><div id="joyStick"></div><div id="joyLabel">MOVE</div></div>
+  <div id="actionBtn">PULSE</div>
+</div>
+<div class="log" id="log"></div>
+<div id="attribution">Models: <a href="https://sketchfab.com/3d-models/none-25821d86141d48659e8ba8275f6c9c08" style="color:var(--accent)">Arena</a> by Seyyid Fatih KOÇ, <a href="https://sketchfab.com/3d-models/low-poly-robot-19ccf1fa9c5f47ba8e7a1703a7c0d7ae" style="color:var(--accent)">Robot</a> by Daniel Darko, <a href="https://sketchfab.com/3d-models/low-poly-knight-b1a2647210d14e88b86ba84e46da859b" style="color:var(--accent)">Knight</a> — CC Attribution</div>
+</body>
+</html>
