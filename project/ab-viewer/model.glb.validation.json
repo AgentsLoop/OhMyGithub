@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "path": "/home/runner/work/aiplay/aiplay/project/public/models/rifle.glb",
+    "bytes": 2629352,
+    "sha256": "93c0ccd9bea165d47d61d12d023d9cbed7dc8acea79d1f8783e97514b7b6c4d7"
+  },
+  "validator": {
+    "name": "Khronos glTF Validator",
+    "version": "2.0.0-dev.3.10",
+    "summary": {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 2,
+      "hints": 0
+    }
+  },
+  "valid": true,
+  "extensions": {
+    "used": [
+      "KHR_materials_specular"
+    ],
+    "required": [],
+    "unsupported": [],
+    "archived": []
+  },
+  "animations": [],
+  "textures": {
+    "maxDimension": 2048,
+    "images": [
+      {
+        "index": 0,
+        "name": "image-0",
+        "mimeType": "image/png",
+        "bytes": 227339,
+        "width": 512,
+        "height": 512,
+        "channels": 3,
+        "hasAlpha": false,
+        "powerOfTwo": true,
+        "oversized": false,
+        "error": null
+      },
+      {
+        "index": 1,
+        "name": "image-1",
+        "mimeType": "image/png",
+        "bytes": 1248165,
+        "width": 1024,
+        "height": 1024,
+        "channels": 3,
+        "hasAlpha": false,
+        "powerOfTwo": true,
+        "oversized": false,
+        "error": null
+      },
+      {
+        "index": 2,
+        "name": "image-2",
+        "mimeType": "image/png",
+        "bytes": 336613,
+        "width": 1024,
+        "height": 1024,
+        "channels": 2,
+        "hasAlpha": true,
+        "powerOfTwo": true,
+        "oversized": false,
+        "error": null
+      }
+    ],
+    "oversized": [],
+    "nonPowerOfTwo": [],
+    "broken": []
+  },
+  "issues": [
+    {
+      "code": "UNUSED_OBJECT",
+      "message": "This object may be unused.",
+      "severity": 2,
+      "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+    },
+    {
+      "code": "UNUSED_OBJECT",
+      "message": "This object may be unused.",
+      "severity": 2,
+      "pointer": "/meshes/4/primitives/0/attributes/TEXCOORD_0"
+    }
+  ],
+  "validatorReport": {
+    "uri": "/home/runner/work/aiplay/aiplay/project/public/models/rifle.glb",
+    "mimeType": "model/gltf-binary",
+    "validatorVersion": "2.0.0-dev.3.10",
+    "issues": {
+      "numErrors": 0,
+      "numWarnings": 0,
+      "numInfos": 2,
+      "numHints": 0,
+      "messages": [
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/4/primitives/0/attributes/TEXCOORD_0"
+        }
+      ],
+      "truncated": false
+    },
+    "info": {
+      "version": "2.0",
+      "generator": "Sketchfab-15.27.0",
+      "extensionsUsed": [
+        "KHR_materials_specular"
+      ],
+      "resources": [
+        {
+          "pointer": "/buffers/0",
+          "mimeType": "application/gltf-buffer",
+          "storage": "glb",
+          "byteLength": 2622612
+        },
+        {
+          "pointer": "/images/0",
+          "mimeType": "image/png",
+          "storage": "buffer-view",
+          "image": {
+            "width": 512,
+            "height": 512,
+            "format": "rgb",
+            "primaries": "srgb",
+            "transfer": "srgb",
+            "bits": 8
+          }
+        },
+        {
+          "pointer": "/images/1",
+          "mimeType": "image/png",
+          "storage": "buffer-view",
+          "image": {
+            "width": 1024,
+            "height": 1024,
+            "format": "rgb",
+            "primaries": "srgb",
+            "transfer": "srgb",
+            "bits": 8
+          }
+        },
+        {
+          "pointer": "/images/2",
+          "mimeType": "image/png",
+          "storage": "buffer-view",
+          "image": {
+            "width": 1024,
+            "height": 1024,
+            "format": "luminance-alpha",
+            "primaries": "srgb",
+            "transfer": "srgb",
+            "bits": 8
+          }
+        }
+      ],
+      "animationCount": 0,
+      "materialCount": 5,
+      "hasMorphTargets": false,
+      "hasSkins": false,
+      "hasTextures": true,
+      "hasDefaultScene": true,
+      "drawCallCount": 5,
+      "totalVertexCount": 19074,
+      "totalTriangleCount": 16677,
+      "maxUVs": 1,
+      "maxInfluences": 0,
+      "maxAttributes": 3
+    }
+  }
+}
