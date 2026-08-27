@@ -582,6 +582,49 @@ const seamGeo = new THREE.BoxGeometry(0.04, 5.02, 0.03);
 const seamMat = new THREE.MeshStandardMaterial({ color:0xc8d3e6, roughness:0.86, metalness:0.04 });
 const seamDarkGeo = new THREE.BoxGeometry(0.02, 5.02, 0.035);
 const seamDarkMat = new THREE.MeshStandardMaterial({ color:0x1a2338, roughness:0.92, metalness:0.08 });
+// Iteration 12: inset chamfered trim-sheet tiles — real geometry chamfer per 1.2-2.4m module (two stacked panels per wall, recessed, with AO dirt at seams) + baked floor-wall junction AO
+const insetPanelW = 11.66, insetPanelH = 2.38, insetThick = 0.05;
+const insetTopMat = new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.040, color:0xf6f9ff, roughness:0.72, metalness:0.07 });
+insetTopMat.map = wallTexs.color.clone(); insetTopMat.map.repeat.set(1.05,0.58); insetTopMat.map.needsUpdate=true;
+insetTopMat.roughnessMap = wallTexs.rough.clone(); insetTopMat.roughnessMap.repeat.set(1.05,0.58); insetTopMat.roughnessMap.needsUpdate=true;
+insetTopMat.bumpMap = wallTexs.bump.clone(); insetTopMat.bumpMap.repeat.set(1.05,0.58); insetTopMat.bumpMap.needsUpdate=true;
+const insetBotMat = new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.040, color:0xd9deeb, roughness:0.81, metalness:0.05 });
+insetBotMat.map = wallTexs.color.clone(); insetBotMat.map.repeat.set(1.05,0.58); insetBotMat.map.needsUpdate=true;
+insetBotMat.roughnessMap = wallTexs.rough.clone(); insetBotMat.roughnessMap.repeat.set(1.05,0.58); insetBotMat.roughnessMap.needsUpdate=true;
+insetBotMat.bumpMap = wallTexs.bump.clone(); insetBotMat.bumpMap.repeat.set(1.05,0.58); insetBotMat.bumpMap.needsUpdate=true;
+// vertical panel dividers inside inset (chamfered trim columns ~2.4m module) — shared thin box
+const insetVDivGeo = new THREE.BoxGeometry(0.045, insetPanelH, 0.02);
+const insetVDivMat = new THREE.MeshStandardMaterial({ color:0xd1d9ea, roughness:0.62, metalness:0.10 });
+const insetVDivDarkGeo = new THREE.BoxGeometry(0.022, insetPanelH, 0.025);
+const insetVDivDarkMat = new THREE.MeshStandardMaterial({ color:0x182030, roughness:0.92, metalness:0.04 });
+// floor-wall baked AO texture — shared 256x64 gradient: dark at wall edge (0.25) fading to transparent over 0.9m
+let wallFloorAOTex = null;
+{
+  const W=256, H=64;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const g=c.getContext('2d');
+  g.clearRect(0,0,W,H);
+  // vertical gradient along H (0 = at wall, H = toward center) — Multiply dark
+  const grd=g.createLinearGradient(0,0,0,H);
+  grd.addColorStop(0,'rgba(14,18,30,0.86)');
+  grd.addColorStop(0.18,'rgba(14,18,30,0.52)');
+  grd.addColorStop(0.42,'rgba(18,22,36,0.24)');
+  grd.addColorStop(0.70,'rgba(18,22,36,0.08)');
+  grd.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=grd; g.fillRect(0,0,W,H);
+  // break perfect strip with soft dirt blobs along wall edge (baked AO variation)
+  for(let i=0;i<28;i++){
+    const x=Math.random()*W, y=Math.random()*H*0.45;
+    const rx=10+Math.random()*26, ry=4+Math.random()*9;
+    const a=0.035+Math.random()*0.06;
+    g.fillStyle=`rgba(10,14,24,${a})`;
+    g.beginPath(); g.ellipse(x,y,rx,ry, (Math.random()-0.5)*0.5, 0, Math.PI*2); g.fill();
+  }
+  // faint highlight edge at wall face (bevel catch) — 2px inner line
+  g.fillStyle='rgba(205,212,230,0.18)'; g.fillRect(0,0,W,2);
+  g.fillStyle='rgba(14,18,30,0.55)'; g.fillRect(0,1,W,1.5);
+  wallFloorAOTex=new THREE.CanvasTexture(c); wallFloorAOTex.colorSpace=THREE.SRGBColorSpace; wallFloorAOTex.anisotropy=4;
+}
 for(let i=0;i<6;i++){
   const ang = i*Math.PI/3;
   const r = arenaRadius-0.6;
@@ -593,6 +636,44 @@ for(let i=0;i<6;i++){
   body.lookAt(0, h/2, 0);
   body.castShadow=true; body.receiveShadow=true;
   wallGroup.add(body); wallBodies.push(body);
+  // Iteration 12: inset chamfered trim-sheet tiles — two recessed panels per wall (real geometry chamfer, not tape), ~2.4m module
+  for(const [py, mat] of [[3.99, insetTopMat], [1.52, insetBotMat]]){
+    const inset = new THREE.Mesh(new THREE.BoxGeometry(insetPanelW, insetPanelH, insetThick), mat);
+    inset.position.set(x, py, z);
+    inset.lookAt(0, py, 0);
+    inset.translateZ(0.262);
+    inset.castShadow=true; inset.receiveShadow=true;
+    wallGroup.add(inset);
+    // vertical mullions per 2.9m module (4 columns across 11.66m) — thin highlight + dark cavity pair for 45° chamfer read
+    for(const off of [-2.915, 0, 2.915]){
+      const vx = x + (-Math.sin(ang))*off;
+      const vz = z + (Math.cos(ang))*off;
+      const div = new THREE.Mesh(insetVDivGeo, insetVDivMat);
+      div.position.set(vx, py, vz);
+      div.lookAt(0, py, 0);
+      div.translateZ(0.283);
+      div.translateX(0.012);
+      wallGroup.add(div);
+      const divDark = new THREE.Mesh(insetVDivDarkGeo, insetVDivDarkMat);
+      divDark.position.set(vx, py, vz);
+      divDark.lookAt(0, py, 0);
+      divDark.translateZ(0.285);
+      divDark.translateX(-0.014);
+      wallGroup.add(divDark);
+    }
+    // subtle chamfer edge highlight along inset top/bottom perimeter (catches directional sun)
+    const hEdgeMat = new THREE.MeshStandardMaterial({ color:0xeef4ff, roughness:0.42, metalness:0.09 });
+    const topEdge = new THREE.Mesh(new THREE.BoxGeometry(insetPanelW+0.02, 0.016, 0.025), hEdgeMat);
+    topEdge.position.set(x, py + insetPanelH/2 - 0.008, z);
+    topEdge.lookAt(0, py + insetPanelH/2 - 0.008, 0);
+    topEdge.translateZ(0.285);
+    wallGroup.add(topEdge);
+    const botEdgeDark = new THREE.Mesh(new THREE.BoxGeometry(insetPanelW+0.02, 0.018, 0.025), new THREE.MeshStandardMaterial({ color:0x182030, roughness:0.92, metalness:0.04 }));
+    botEdgeDark.position.set(x, py - insetPanelH/2 + 0.009, z);
+    botEdgeDark.lookAt(0, py - insetPanelH/2 + 0.009, 0);
+    botEdgeDark.translateZ(0.286);
+    wallGroup.add(botEdgeDark);
+  }
   const kick = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, 0.62), new THREE.MeshStandardMaterial({ color:0x1f2636, roughness:0.72, metalness:0.32 }));
   kick.position.set(x, 0.09, z);
   kick.lookAt(0, 0.09, 0);
@@ -716,6 +797,38 @@ for(let i=0;i<6;i++){
     marker.lookAt(0, 2.2, 0);
     marker.translateZ(0.32);
     scene.add(marker);
+  }
+  // Iteration 12: baked AO shadow plane at floor-wall junction — concave junction darken (Halo baked/HBAO) over 0.9m sweep, 0.15-0.25 effective multiply
+  {
+    const aoMat = new THREE.MeshBasicMaterial({ map: wallFloorAOTex, transparent:true, opacity:0.38, depthWrite:false, blending:THREE.MultiplyBlending, premultipliedAlpha:true });
+    aoMat.polygonOffset=true; aoMat.polygonOffsetFactor=-1.2;
+    const aoW = w + 0.8, aoD = 0.92;
+    // plane center ~0.46m inward from wall face (face at r-0.30)
+    const faceR = r - 0.30;
+    const centerR = faceR - aoD/2;
+    const cx = Math.cos(ang)*centerR, cz = Math.sin(ang)*centerR;
+    const aoGroup2 = new THREE.Group();
+    aoGroup2.position.set(cx, 0.018, cz);
+    aoGroup2.lookAt(0, 0.018, 0);
+    const aoPlane = new THREE.Mesh(new THREE.PlaneGeometry(aoW, aoD), aoMat);
+    aoPlane.rotation.x = -Math.PI/2;
+    aoPlane.renderOrder = 3;
+    aoGroup2.add(aoPlane);
+    scene.add(aoGroup2);
+    // extra narrow core-contact dark line right at foot (crispy cavity like Halo trim skirting, 0.18m band)
+    const coreMat = new THREE.MeshBasicMaterial({ color:0x0f1420, transparent:true, opacity:0.22, depthWrite:false, blending:THREE.MultiplyBlending });
+    coreMat.polygonOffset=true; coreMat.polygonOffsetFactor=-1.3;
+    const coreW = w + 0.62, coreD = 0.18;
+    const coreR = faceR - coreD/2 + 0.02;
+    const ccx = Math.cos(ang)*coreR, ccz = Math.sin(ang)*coreR;
+    const coreGroup = new THREE.Group();
+    coreGroup.position.set(ccx, 0.019, ccz);
+    coreGroup.lookAt(0, 0.019, 0);
+    const corePlane = new THREE.Mesh(new THREE.PlaneGeometry(coreW, coreD), coreMat);
+    corePlane.rotation.x = -Math.PI/2;
+    corePlane.renderOrder = 4;
+    coreGroup.add(corePlane);
+    scene.add(coreGroup);
   }
   // pillar with AO base
   const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.48,0.48, h, 12), new THREE.MeshStandardMaterial({ color:0xe0e8f2, roughness:0.58, metalness:0.14 }));
