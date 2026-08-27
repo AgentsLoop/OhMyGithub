@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>NEXUS Range — Sci-Fi Training Facility // MK-IV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cyan:#00e5ff; --mag:#ff006a; --amber:#ffb800; --bg:#060a14; --panel:rgba(10,18,36,0.82);
+  --border:rgba(0,229,255,0.22); --text:#e6f1ff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#050914;color:var(--text);font-family:'JetBrains Mono',monospace;overflow:hidden}
+#canvas-wrap{position:fixed;inset:0}
+canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;gap:12px;
+  background:linear-gradient(180deg, rgba(7,14,32,0.88), rgba(7,14,32,0.34));
+  border-bottom:1px solid var(--border); backdrop-filter:blur(10px);
+}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{width:34px;height:34px;border:1px solid var(--cyan);background:radial-gradient(circle at 30% 30%, rgba(0,229,255,0.35), transparent 60%), linear-gradient(135deg, #0a1a33, #071023);display:grid;place-items:center;font-weight:700;color:var(--cyan);letter-spacing:0.08em;font-size:11px}
+.brand h1{margin:0;font-family:'Space Grotesk',sans-serif;font-size:16px;letter-spacing:0.12em;font-weight:700}
+.brand h1 span{color:var(--cyan)}
+.brand p{margin:0;font-size:10px;letter-spacing:0.18em;opacity:0.7}
+.top-metrics{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.chip{background:var(--panel);border:1px solid var(--border);padding:8px 12px;min-width:98px;border-radius:10px}
+.chip label{display:block;font-size:9px;letter-spacing:0.18em;opacity:0.65}
+.chip strong{font-size:18px;font-weight:700;letter-spacing:0.04em}
+.chip small{font-size:10px;opacity:0.7}
+.chip.accent{border-color:rgba(255,184,0,0.35);background:linear-gradient(180deg, rgba(255,184,0,0.16), rgba(10,18,36,0.82))}
+.center-hud{flex:1;display:grid;place-items:center;position:relative}
+.crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34px;height:34px;pointer-events:none}
+.crosshair i{position:absolute;background:var(--cyan);box-shadow:0 0 8px rgba(0,229,255,0.9)}
+.crosshair .h{height:2px;width:14px;top:50%;margin-top:-1px}
+.crosshair .v{width:2px;height:14px;left:50%;margin-left:-1px}
+.crosshair .h.l{left:0} .crosshair .h.r{right:0}
+.crosshair .v.t{top:0} .crosshair .v.b{bottom:0}
+.crosshair .dot{width:4px;height:4px;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:#fff;box-shadow:0 0 10px rgba(255,255,255,0.9)}
+.crosshair.fire{transform:translate(-50%,-50%) scale(1.18);filter:brightness(1.4)}
+.hitmarker{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%) rotate(45deg);opacity:0;pointer-events:none}
+.hitmarker span{position:absolute;background:#fff;width:2px;height:10px;box-shadow:0 0 6px #fff}
+.hitmarker span:nth-child(1){left:0;top:0} span:nth-child(2){right:0;top:0} span:nth-child(3){left:0;bottom:0} span:nth-child(4){right:0;bottom:0}
+.hitmarker.show{opacity:1;animation:hitPop 220ms ease}
+@keyframes hitPop{0%{transform:translate(-50%,-50%) rotate(45deg) scale(0.6)}100%{transform:translate(-50%,-50%) rotate(45deg) scale(1)}}
+.bottombar{
+  display:flex;gap:12px;padding:12px 16px;align-items:stretch;
+  background:linear-gradient(0deg, rgba(7,14,32,0.92), rgba(7,14,32,0.2));
+  border-top:1px solid var(--border); backdrop-filter:blur(10px);
+}
+.weapon-panel{flex:1;display:flex;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+.ammo{font-size:28px;font-weight:700;letter-spacing:0.04em;line-height:1}
+.ammo small{font-size:12px;opacity:0.6;letter-spacing:0.12em}
+.bar{height:6px;flex:1;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;position:relative}
+.bar i{position:absolute;inset:0 0 0 0;background:linear-gradient(90deg, var(--cyan), #7af0ff);width:50%}
+.actions{display:flex;gap:8px;align-items:center}
+.btn{pointer-events:auto;border:1px solid var(--border);background:rgba(0,229,255,0.12);color:var(--text);padding:10px 14px;border-radius:10px;font-weight:700;letter-spacing:0.08em;font-size:11px;cursor:pointer;backdrop-filter:blur(6px)}
+.btn:hover{background:rgba(0,229,255,0.2)}
+.btn.secondary{background:rgba(255,255,255,0.06)}
+.btn:active{transform:translateY(1px)}
+.foot{padding:6px 14px;font-size:10px;letter-spacing:0.08em;opacity:0.72;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:rgba(5,9,20,0.7);border-top:1px solid rgba(255,255,255,0.06)}
+.foot a{color:var(--cyan);text-decoration:none;border-bottom:1px dotted rgba(0,229,255,0.45)}
+#overlay{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(800px 600px at 50% 30%, rgba(0,229,255,0.18), transparent 70%), linear-gradient(180deg, rgba(6,10,20,0.72), rgba(6,10,20,0.88));backdrop-filter:blur(8px);z-index:5}
+.card{width:min(640px,92vw);background:linear-gradient(180deg, rgba(14,24,48,0.96), rgba(8,14,30,0.96));border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,229,255,0.08) inset}
+.card h2{margin:0 0 6px;font-family:'Space Grotesk',sans-serif;font-size:26px;letter-spacing:0.06em}
+.card h2 em{color:var(--cyan);font-style:normal}
+.card p{margin:0 0 12px;line-height:1.6;font-size:13px;opacity:0.88}
+.kbd{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kbd span{border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.06);padding:4px 8px;border-radius:7px;font-size:11px;letter-spacing:0.08em}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.stat{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:10px}
+.stat label{font-size:9px;letter-spacing:0.14em;opacity:0.6}
+.stat strong{font-size:18px}
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.pill{font-size:10px;letter-spacing:0.12em;border:1px solid var(--border);padding:6px 10px;border-radius:999px;background:rgba(0,229,255,0.08)}
+#toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:rgba(0,229,255,0.12);border:1px solid var(--border);padding:10px 14px;border-radius:999px;font-weight:700;letter-spacing:0.12em;font-size:11px;opacity:0;pointer-events:none;transition:opacity 180ms}
+#toast.show{opacity:1}
+.reload{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(255,184,0,0.14);border:1px solid rgba(255,184,0,0.35);padding:8px 14px;border-radius:999px;font-weight:700;letter-spacing:0.12em;font-size:11px;opacity:0;transition:opacity 150ms}
+.reload.show{opacity:1}
+@media (max-width:760px){ .topbar{flex-direction:column;align-items:stretch} .top-metrics{gap:8px} .chip{min-width:0;flex:1} .bottombar{flex-direction:column} }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="canvas-wrap"></div>
+<div id="hud">
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark">NX<br>RNG</div>
+      <div>
+        <h1><span>NEXUS</span> RANGE MK-IV</h1>
+        <p>ORBITAL TRAINING FACILITY • SECTOR 7 • LIVE FIRE</p>
+      </div>
+    </div>
+    <div class="top-metrics">
+      <div class="chip"><label>SCORE</label><strong id="ui-score">0</strong><small id="ui-combo">x1.0 combo</small></div>
+      <div class="chip"><label>TIME</label><strong id="ui-time">90.0</strong><small id="ui-wave">WAVE 1 • 6 TARGETS</small></div>
+      <div class="chip accent"><label>ACCURACY</label><strong id="ui-acc">—</strong><small id="ui-hits">0 HIT / 0 SHOT</small></div>
+    </div>
+  </div>
+  <div class="center-hud">
+    <div class="crosshair" id="crosshair"><i class="h l"></i><i class="h r"></i><i class="v t"></i><i class="v b"></i><i class="dot"></i></div>
+    <div class="hitmarker" id="hitmarker"><span></span><span></span><span></span><span></span></div>
+    <div id="toast">WAVE COMPLETE</div>
+    <div id="reload" class="reload">RELOADING…</div>
+  </div>
+  <div class="bottombar">
+    <div class="weapon-panel">
+      <div class="ammo"><div id="ui-ammo">28 / 120</div><small>PULSE RIFLE • MK-IV • BURST</small></div>
+      <div class="bar"><i id="ui-ammo-bar" style="width:100%"></i></div>
+      <div style="min-width:140px;text-align:right"><small style="letter-spacing:0.14em;opacity:0.7">FIRE RATE</small><div style="font-weight:700;letter-spacing:0.08em">860 RPM • <span id="ui-fps">—</span> FPS</div></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btn-restart">RESTART [R]</button>
+      <button class="btn secondary" id="btn-pause">PAUSE</button>
+    </div>
+  </div>
+  <div class="foot">
+    <div><strong style="letter-spacing:0.1em">CONTROLS</strong> WASD move • MOUSE look • CLICK fire • R reload • SHIFT sprint • ESC pause • SPACE jump</div>
+    <div id="attribution">Loading assets…</div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="card">
+    <h2><em>NEXUS</em> TRAINING RANGE</h2>
+    <p>Valorant Range × Call of Duty Firing Range — rebuilt as a first-person sci-fi qualification course. Strafe, acquire, and neutralize hovering security drones. Chain hits to build combo. Survive timed waves. Built for mouse + keyboard with pointer-lock aim.</p>
+    <div class="stats-grid">
+      <div class="stat"><label>BEST SCORE</label><strong id="overlay-best">0</strong></div>
+      <div class="stat"><label>SESSION</label><strong>90 SEC</strong></div>
+      <div class="stat"><label>TARGETS</label><strong>HOVER DRONES</strong></div>
+    </div>
+    <div class="kbd">
+      <span>W A S D</span><span>MOUSE</span><span>CLICK</span><span>R</span><span>SHIFT</span>
+    </div>
+    <p style="margin-top:12px;font-size:11px;letter-spacing:0.08em;opacity:0.72">Click <strong>ENTER RANGE</strong> to lock pointer and begin. Your browser will enter FPS look mode. Press ESC to release.</p>
+    <div class="pills"><span class="pill">THREE.JS 0.160</span><span class="pill">60 FPS TARGET</span><span class="pill">PBR NEON</span></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn" id="btn-enter" style="flex:1;pointer-events:auto;padding:14px">ENTER RANGE →</button>
+      <button class="btn secondary" id="btn-how" style="pointer-events:auto">HOW TO PLAY</button>
+    </div>
+    <p id="load-status" style="margin-top:10px;font-size:11px;opacity:0.7;letter-spacing:0.06em">Initializing engines…</p>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

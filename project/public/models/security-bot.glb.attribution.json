@@ -1,0 +1,29 @@
+{
+  "uid": "ee0a6da142b94d2bbf1d65526bec3d3e",
+  "name": "P.U.C. security bot #7",
+  "author": "Gouhadouken",
+  "authorUrl": "https://sketchfab.com/goukagouken",
+  "license": "CC Attribution",
+  "licenseUrl": null,
+  "modelUrl": "https://sketchfab.com/3d-models/none-ee0a6da142b94d2bbf1d65526bec3d3e",
+  "thumbnailUrl": "https://media.sketchfab.com/models/ee0a6da142b94d2bbf1d65526bec3d3e/thumbnails/0df969b51ae54b6e9e53d0a3731041a3/728aa65cb89c41d883372c48643cc57f.jpeg",
+  "glbBytes": 578560,
+  "faceCount": 6422,
+  "vertexCount": 5539,
+  "textureCount": 1,
+  "textureMaxResolution": 1024,
+  "animationCount": 1,
+  "animations": [
+    {
+      "uid": "06a3572e47d247339fc42645f120a4a9",
+      "name": "Take 01",
+      "url": "https://media.sketchfab.com/models/ee0a6da142b94d2bbf1d65526bec3d3e/34009540daad44efb9198a67b516afff/animations/06a3572e47d247339fc42645f120a4a9.bin.gz",
+      "size": 3372,
+      "duration": 3.958,
+      "isLoop": true,
+      "isEnabled": true,
+      "createdAt": "2020-06-12T15:12:47.963660",
+      "updatedAt": "2020-06-19T09:15:49.466288"
+    }
+  ]
+}
