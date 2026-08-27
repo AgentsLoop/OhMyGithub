@@ -21,6 +21,9 @@ commit on the branch.
 Before running any workflow, verify that the working tree is clean and everything
 is committed.
 
+## Git Commits
+- Write evidence-rich commit messages, not short subject-only messages. Use a specific subject and a body that records the motivating symptom or context, root cause, decision rationale and alternatives considered, material changes, verification performed, discovered Throughput bottlenecks or Hung commands, relevant Pitfalls and Gotchas, and known caveats or follow-up. Preserve the durable reasoning summary needed for diagnosis, rollback, and future extension.
+
 ## Links in handoffs
 
 When a relevant URL or stable identifier exists, include a clickable Markdown
@@ -75,3 +78,4 @@ ssh -i ~/.ssh/aiplay-agentsweb -p <port> runner@<run-name>.agentsweb.space
 ```
 
 The command works only while the corresponding Actions job is running.
+
