@@ -20,6 +20,9 @@ const scene = new THREE.Scene();
 // Iteration 4: reduce wash — tighter, darker fog + desaturated sky/bg for Halo mid-distance depth cue
 scene.fog = new THREE.Fog(0xa8bed8, 38, 85);
 scene.background = new THREE.Color(0x8ea6c6);
+// Iteration 10: subtle warm/cool grading via fog lerp — nudge 2-3% toward warm paper to counter cool ACES blue, keeps Halo mid-distance depth without washing
+scene.fog.color.lerp(new THREE.Color(0xc9b8a6), 0.03);
+scene.background.lerp(new THREE.Color(0xd2c4b2), 0.02);
 // large inverted sky dome — was 0xeef2f8 (bleached) → 0xc9d6ea restores contrast vs white trim
 const skyGeo = new THREE.SphereGeometry(120, 32, 32);
 const skyMat = new THREE.MeshBasicMaterial({ color: 0xc9d6ea, side: THREE.BackSide });
@@ -58,7 +61,9 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreferen
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.20;
+renderer.toneMappingExposure = 1.13;
+// Iteration 10: Halo color grading — fine-tuned exposure restores highlight headroom + subtle contrast/saturation lift via CSS filter (warm/cool balanced, not washed)
+canvas.style.filter = 'contrast(1.07) saturate(1.08) brightness(1.015) sepia(0.03) hue-rotate(-1deg)';
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -400,6 +405,12 @@ function makeWallTextures(){
   const c=document.createElement('canvas'); c.width=N; c.height=N;
   const g=c.getContext('2d');
   g.fillStyle='#e6edf7'; g.fillRect(0,0,N,N);
+  // Iteration 10: Halo trim-sheet panel variation — top panel (above mid seam) ~4% brighter albedo than bottom, simulates authored albedo variation without external textures
+  g.fillStyle='rgba(255,255,255,0.040)'; g.fillRect(0,0,N,N*0.48);
+  g.fillStyle='rgba(18,22,34,0.030)'; g.fillRect(0,N*0.52,N,N*0.48);
+  // subtle warm-cool shift — top slightly cooler (sky light catch), bottom slightly warmer (bounce/dust) for Halo didactic read
+  g.fillStyle='rgba(122,160,210,0.018)'; g.fillRect(0,0,N,N*0.48);
+  g.fillStyle='rgba(210,180,150,0.015)'; g.fillRect(0,N*0.52,N,N*0.48);
   // large soft mottling (paint micro-unevenness)
   for(let i=0;i<28;i++){
     const x=Math.random()*N, y=Math.random()*N, r=32+Math.random()*68;
@@ -570,6 +581,17 @@ for(let i=0;i<6;i++){
   wallCavityAO.lookAt(0, h-0.275, 0);
   wallCavityAO.translateZ(0.31);
   wallGroup.add(wallCavityAO);
+  // Iteration 10: extra wall panel highlight variation — subtle brighter top panel vs bottom (Halo trim-sheet didactic albedo: top ~0.86 vs bottom ~0.80, no external textures)
+  const topPanelVar = new THREE.Mesh(new THREE.BoxGeometry(w*0.97, h*0.44, 0.015), new THREE.MeshStandardMaterial({ color:0xeef4ff, roughness:0.66, metalness:0.08, transparent:true, opacity:0.18 }));
+  topPanelVar.position.set(x, h*0.735, z);
+  topPanelVar.lookAt(0, h*0.735, 0);
+  topPanelVar.translateZ(0.306);
+  wallGroup.add(topPanelVar);
+  const botPanelWash = new THREE.Mesh(new THREE.BoxGeometry(w*0.97, h*0.44, 0.015), new THREE.MeshStandardMaterial({ color:0xd9e2f3, roughness:0.78, metalness:0.05, transparent:true, opacity:0.09 }));
+  botPanelWash.position.set(x, h*0.24, z);
+  botPanelWash.lookAt(0, h*0.24, 0);
+  botPanelWash.translateZ(0.305);
+  wallGroup.add(botPanelWash);
   // iteration 7: Halo neon wayfinding — thin emissive trim along top edge (reads at distance, not color spam)
   const neonTrim = new THREE.Mesh(new THREE.BoxGeometry(w*0.94, 0.028, 0.04), new THREE.MeshStandardMaterial({ color:0x7af2ff, emissive:0x7af2ff, emissiveIntensity:1.45 }));
   neonTrim.position.set(x, h-0.46, z);
