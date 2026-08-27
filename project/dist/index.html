@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIPlay Tactical FPS — Call of Duty Inspired</title>
+  <script type="module" crossorigin src="/assets/index-BOR1GE-_.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BbFC6b9B.css">
+</head>
+<body>
+  <div id="hud">
+    <div id="hud-top">
+      <div id="score">SCORE <span>0</span></div>
+      <div id="timer">02:00</div>
+      <div id="health">HP <span>100</span></div>
+    </div>
+    <div id="hud-bottom">
+      <div id="ammo"><span id="ammo-current">30</span> / <span id="ammo-reserve">90</span></div>
+      <div id="weapon-name">M4A1 TACTICAL</div>
+    </div>
+    <div id="crosshair"><div class="h"></div><div class="v"></div><div class="dot"></div></div>
+    <div id="hitmarker">+</div>
+    <div id="damage-vignette"></div>
+  </div>
+
+  <div id="overlay">
+    <div id="overlay-card">
+      <h1>TACTICAL FPS</h1>
+      <p class="sub">Inspired by Call of Duty: Modern Warfare III — Three.js • 60fps • Tactical Arena</p>
+      <div class="stats">
+        <span>5.1 km² ARENA</span><span>•</span><span>PBR WEAPON</span><span>•</span><span>TACTICAL BOT TARGETS</span>
+      </div>
+      <button id="play">▶ ENGAGE — CLICK TO LOCK</button>
+      <p class="hint">WASD Move • Mouse Look • Shift Sprint • Space Jump • Ctrl Crouch • LMB Fire • R Reload • Click to Play</p>
+      <p class="credit" id="credit">Weapon model: procedural fallback — Sketchfab GLB loads if present</p>
+    </div>
+  </div>
+  <div id="paused" class="hidden">PAUSED — ESC to resume</div>
+
+  <canvas id="c"></canvas>
+</body>
+</html>

@@ -1,0 +1,71 @@
+[
+  {
+    "index": 0,
+    "uid": "jEosSrePMDJR9GXwpALOOaRkT3E",
+    "name": "KSR 29 Sniper",
+    "author": "3DHaupt",
+    "authorUrl": "https://sketchfab.com/dennish2010",
+    "license": "CC Attribution-NonCommercial",
+    "licenseUrl": null,
+    "modelUrl": "https://sketchfab.com/3d-models/none-jEosSrePMDJR9GXwpALOOaRkT3E",
+    "thumbnailUrl": "https://media.sketchfab.com/models/jEosSrePMDJR9GXwpALOOaRkT3E/thumbnails/9713b9a5337943659c6f4d32594a855f/617768036cfa41079f02e2c0d67f3c25.jpeg",
+    "glbBytes": 7371964,
+    "faceCount": 65280,
+    "vertexCount": 38762,
+    "textureCount": 2,
+    "textureMaxResolution": 2048,
+    "animationCount": 0,
+    "animations": [],
+    "thumbnailError": null
+  },
+  {
+    "index": 1,
+    "uid": "92a2efa3086b4eec8ee93b910ce77aa1",
+    "name": "SG553 Assault Rifle",
+    "author": "wburton",
+    "authorUrl": "https://sketchfab.com/wburton95",
+    "license": "CC Attribution",
+    "licenseUrl": null,
+    "modelUrl": "https://sketchfab.com/3d-models/none-92a2efa3086b4eec8ee93b910ce77aa1",
+    "thumbnailUrl": "https://media.sketchfab.com/models/92a2efa3086b4eec8ee93b910ce77aa1/thumbnails/f0de7b13992846009b6b46ed1ebb546b/aa8a1df11fa2443e8c95bb79d51ca8fa.jpeg",
+    "glbBytes": 8449492,
+    "faceCount": 8877,
+    "vertexCount": 8551,
+    "textureCount": 4,
+    "textureMaxResolution": 2048,
+    "animationCount": 1,
+    "animations": [
+      {
+        "uid": "c6027c5a3f5e417980dc6dd6385e6338",
+        "name": "Armature|ArmatureAction",
+        "url": "https://media.sketchfab.com/models/92a2efa3086b4eec8ee93b910ce77aa1/57dd2a3cbf6d45069e4f0613949bcab1/animations/c6027c5a3f5e417980dc6dd6385e6338.bin.gz",
+        "size": 54476,
+        "duration": 12.083,
+        "isLoop": false,
+        "isEnabled": true,
+        "createdAt": "2018-05-10T06:48:56.628513",
+        "updatedAt": "2019-10-15T16:30:18.068501"
+      }
+    ],
+    "thumbnailError": null
+  },
+  {
+    "index": 2,
+    "uid": "997840668e1e4c1384c7220563323085",
+    "name": "HK G28 Sniper Rifle",
+    "author": "trolosqlfod",
+    "authorUrl": "https://sketchfab.com/trolosqlfod",
+    "license": "CC Attribution",
+    "licenseUrl": null,
+    "modelUrl": "https://sketchfab.com/3d-models/none-997840668e1e4c1384c7220563323085",
+    "thumbnailUrl": "https://media.sketchfab.com/models/997840668e1e4c1384c7220563323085/thumbnails/564a7ca6aa7d4ad9a2a54b0694e1fb45/20794227c73248cf976b81a961c58d64.jpeg",
+    "glbBytes": 6963616,
+    "faceCount": 27287,
+    "vertexCount": 66000,
+    "textureCount": 5,
+    "textureMaxResolution": 2048,
+    "animationCount": 0,
+    "animations": [],
+    "thumbnailError": null
+  }
+]
