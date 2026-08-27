@@ -130,9 +130,11 @@ copies that worktree's app into the workflow checkout without deleting its
 `project/` directory.
 Because OpenCode may push that branch before the delivery step, delivery uses
 `--force-with-lease` after fetching the worker branch.
-Staged and committed paths are checked for the `project/` boundary, preventing
-workflow-file changes from reaching the branch; every `/loop` Git command runs
-from the workspace root.
+The shared skills and worker instructions are restored before verification and
+each continuation because OpenCode may clean untracked support files. Staged
+and committed paths are checked against the base branch for the `project/`
+boundary, preventing workflow-file changes from reaching the branch; every
+`/loop` Git command runs from the workspace root.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 `model/opencode/muse-spark-1.2-contributor-free` label; if that label is
 unavailable, the skill records that it used the workflow default instead.

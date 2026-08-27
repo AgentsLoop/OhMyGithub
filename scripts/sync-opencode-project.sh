@@ -5,6 +5,7 @@ source_project_dir="${1:?source project directory is required}"
 root_project_dir="${2:?root project directory is required}"
 target_ref="${3:?target ref is required}"
 commit_message="${4:?commit message is required}"
+validation_ref="${5:-$target_ref}"
 workspace_dir="${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}"
 
 cd "$workspace_dir"
@@ -30,7 +31,7 @@ if ! git diff --cached --quiet; then
   git commit -m "$commit_message"
 fi
 
-committed_out_of_scope="$(git diff --name-only "$target_ref"...HEAD | grep -v '^project/' || true)"
+committed_out_of_scope="$(git diff --name-only "$validation_ref"...HEAD | grep -v '^project/' || true)"
 if [[ -n "$committed_out_of_scope" ]]; then
   printf 'Out-of-scope committed files changed:\n%s\n' "$committed_out_of_scope" >&2
   exit 1
