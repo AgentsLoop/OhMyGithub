@@ -721,7 +721,7 @@ function animate(){
             if(player.health<=0){ player.health=0; gameState='dead'; document.getElementById('deadStats').textContent=`You were neutralized. Wave ${wave} — ${kills} kills, ${Math.round(hits/Math.max(1,shots)*100)}% accuracy.`; dead.classList.remove('hide'); document.exitPointerLock?.(); updateHUD(); }
           }
           // tracer from enemy
-          spawnBulletTrail(origin, player.pos.clone().add(new THREE.Vector3((Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5));
+          spawnBulletTrail(origin, player.pos.clone().add(new THREE.Vector3((Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5)));
           // flash on enemy gun
           const f = new THREE.PointLight(0xffe8a0, 12, 4); f.position.copy(origin).add(dirToP.clone().multiplyScalar(0.5)); scene.add(f); setTimeout(()=>scene.remove(f),40);
         }
