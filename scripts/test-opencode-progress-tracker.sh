@@ -166,4 +166,18 @@ assert_line "- Active subagents: 2"
 assert_line "- Total subagents executed: 3"
 assert_line "- Image-context model calls: 5"
 
+assert_absent() {
+  local unexpected="$1"
+  if grep -Fq -- "$unexpected" "$output_file"; then
+    echo "FAIL: unexpected '$unexpected'" >&2
+    sed -n '1,120p' "$output_file" >&2
+    exit 1
+  fi
+  echo "PASS: absent: $unexpected"
+}
+
+assert_absent "- Session messages:"
+assert_absent "- Assistant updates:"
+assert_absent "- Completed tool calls:"
+
 echo "OpenCode progress tracker local test passed."

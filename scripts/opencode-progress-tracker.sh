@@ -38,14 +38,11 @@ while :; do
       def parts: [.[].parts[]?];
       def tools: [parts[] | select(.type == "tool")];
       [
-        length,
-        ([.[] | select(.info.role == "assistant")] | length),
         (tools | length),
-        ([tools[] | select(.state.status == "completed")] | length),
         ([tools[] | select(.state.status == "running" or .state.status == "pending")] | length)
       ] | @tsv
     ' <<<"$payload")"
-    IFS=$'\t' read -r message_count assistant_count tool_count completed_count active_count <<<"$stats"
+    IFS=$'\t' read -r tool_count active_count <<<"$stats"
     subagent_stats="$(jq -nr \
       --arg root "$SESSION_ID" \
       --argjson sessions "$sessions_payload" \
@@ -98,10 +95,7 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 🌐 **OpenCode Web UI:** $OPENCODE_WEB_URL
 
 - Elapsed: ${elapsed_seconds}s
-- Session messages: $message_count
-- Assistant updates: $assistant_count
 - Tool calls: $tool_count
-- Completed tool calls: $completed_count
 - Active tool calls: $active_count
 - Active subagents: $active_subagents
 - Total subagents executed: $total_subagents
