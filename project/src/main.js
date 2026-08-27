@@ -73,12 +73,12 @@ dir.shadow.camera.updateProjectionMatrix();
 dir.shadow.bias = -0.0008;
 dir.shadow.normalBias = 0.012;
 scene.add(dir);
-// rim light — thumbnail facet highlight for lime Carcamero (boosted for rear-chase readability)
-const rim = new THREE.DirectionalLight(0xFFF8E0, 1.65);
+// rim light — thumbnail facet highlight for lime Carcamero (iter9 +0.2 for PBR gloss on rear bevel)
+const rim = new THREE.DirectionalLight(0xFFF8E0, 1.85);
 rim.position.set(-30, 18, -20);
 scene.add(rim);
-// fill for rear-chase — defeats self-shadow charcoal at 9m without washing terraces
-const carFill = new THREE.DirectionalLight(0xFFF6D6, 0.85);
+// fill for rear-chase — defeats self-shadow charcoal at 9m without washing terraces (iter9 +0.10 supports PBR)
+const carFill = new THREE.DirectionalLight(0xFFF6D6, 0.95);
 carFill.position.set(0, 12, -22);
 scene.add(carFill);
 scene.add(new THREE.AmbientLight(0xFFF0C8, 0.18));
@@ -261,15 +261,19 @@ loader.load('/models/car.glb', (gltf)=>{
         const n = (o.material.name || '').toLowerCase();
         // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
         if (envMap) o.material.envMap = envMap;
-        if (n.includes('carcamero')) {
-          // HARSH 7 FINAL: rear-chase at 9m still charcoal 65,63,59 vs thumb 73,174,93 (live 194 green pixels only side sliver). PBR diffuse + env 2.95 clips to white on lit facet but hub rear stays ambient 59. Use unlit emissive-only lime 0x4CAF5A 83,174,94 to lock thumbnail green regardless of NdotL/shadow. Verified live patch ei 0.95 -> 83,174,94 exact G match.
-          o.material.color.setHex(0x000000);
+         if (n.includes('carcamero')) {
+          // ITER9 PBR gloss restore: keep lime thumbnail lock (83,174,94) but restore Crossy facet spec.
+          // Was flat emissive 0.95 roughness 1.0 — correct hue but lost low-poly highlight vs thumbnail.
+          // Now PBR: base color lime + low emissive floor (0.38) guarantees rear readability (no charcoal 59)
+          // while roughness 0.46 / env 0.68 gives crisp sun facet gloss on top bevels via RoomEnv IBL.
+          // receiveShadow false prevents rear self-shadow darkening; fog false keeps saturated at 9m chase.
+          o.material.color.setHex(0x4CAF5A);
           o.material.emissive.setHex(0x4CAF5A);
-          o.material.emissiveIntensity = 0.95;
-          o.material.roughness = 1.0;
-          o.material.metalness = 0.0;
-          o.material.envMap = null;
-          o.material.envMapIntensity = 0;
+          o.material.emissiveIntensity = 0.42;
+          o.material.roughness = 0.46;
+          o.material.metalness = 0.02;
+          o.material.envMap = envMap;
+          o.material.envMapIntensity = 0.68;
           o.material.fog = false;
           o.material.receiveShadow = false;
         } else if (n.includes('material.026')) {
@@ -296,39 +300,40 @@ loader.load('/models/car.glb', (gltf)=>{
           o.material.metalness = 0.06;
           o.material.envMapIntensity = 0.65;
           o.material.fog = false;
-        } else if (n.includes('material.029')) {
-          // HARSH 7 FINAL: unify rear undercoat/skirts/hubs to unlit lime 83,174,94 so rear face (Material.029 is rear bumper at -Z) reads thumb green, not charcoal.
-          o.material.color.setHex(0x000000);
-          o.material.emissive.setHex(0x4CAF5A);
-          o.material.emissiveIntensity = 0.95;
-          o.material.roughness = 1.0;
-          o.material.metalness = 0.0;
-          o.material.envMap = null;
-          o.material.envMapIntensity = 0;
+         } else if (n.includes('material.029')) {
+          // HARSH9 fix: restore dark undercarriage contrast vs lime body — thumbnail has dark green/black rear, not lime bloom. PBR dark preserves Crossy chassis read at 9m.
+          o.material.color.setHex(0x143A1E);
+          o.material.emissive.setHex(0x000000);
+          o.material.emissiveIntensity = 0;
+          o.material.roughness = 0.78;
+          o.material.metalness = 0.03;
+          o.material.envMap = envMap;
+          o.material.envMapIntensity = 0.28;
           o.material.fog = false;
-          o.material.receiveShadow = false;
+          o.material.receiveShadow = true;
         } else {
-          // HARSH 7 FINAL: biggest gap unified - wheel hubs 027/031 and skirts 028/032 were charcoal 65,63,59 eclipsing lime at 9m. Make all trim unlit lime so any car pixel hits thumb 73,174,93.
+          // HARSH9 fix: restore dark trim/tyre separation — thumbnail lime body over dark skirts/hubs, not uniform bleach. Dark grey keeps voxel silhouette vs sand.
           if (n.includes('028') || n.includes('032')) {
-            o.material.color.setHex(0x000000);
-            o.material.emissive.setHex(0x4CAF5A);
-            o.material.emissiveIntensity = 0.95;
-            o.material.roughness = 1.0;
-            o.material.metalness = 0.0;
-            o.material.envMap = null;
-            o.material.envMapIntensity = 0;
+            o.material.color.setHex(n.includes('028') ? 0x2E2E2E : 0x5C5C5C);
+            o.material.emissive.setHex(0x000000);
+            o.material.emissiveIntensity = 0;
+            o.material.roughness = 0.68;
+            o.material.metalness = 0.04;
+            o.material.envMap = envMap;
+            o.material.envMapIntensity = 0.32;
             o.material.fog = false;
-            o.material.receiveShadow = false;
+            o.material.receiveShadow = true;
           } else if (n.includes('027') || n.includes('031')) {
-            o.material.color.setHex(0x000000);
-            o.material.emissive.setHex(0x4CAF5A);
-            o.material.emissiveIntensity = 0.95;
-            o.material.roughness = 1.0;
-            o.material.metalness = 0.0;
-            o.material.envMap = null;
-            o.material.envMapIntensity = 0;
+            // wheel tyre vs rim — keep dark for readability, rim slightly lighter
+            o.material.color.setHex(n.includes('027') ? 0x1E1E1E : 0x4A4A4A);
+            o.material.emissive.setHex(0x000000);
+            o.material.emissiveIntensity = 0;
+            o.material.roughness = n.includes('027') ? 0.92 : 0.55;
+            o.material.metalness = n.includes('027') ? 0.01 : 0.12;
+            o.material.envMap = envMap;
+            o.material.envMapIntensity = n.includes('027') ? 0.18 : 0.42;
             o.material.fog = false;
-            o.material.receiveShadow = false;
+            o.material.receiveShadow = true;
           } else {
             o.material.roughness = Math.min(0.78, Math.max(0.55, o.material.roughness || 0.6));
             o.material.metalness = 0.02;
