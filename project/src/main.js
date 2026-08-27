@@ -123,6 +123,9 @@ function doAbandonRun(){
   bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
   if(lowVignetteEl) lowVignetteEl.classList.remove('on');
   if(chromaticEl) chromaticEl.classList.remove('on');
+  // ── (A) return pooled enemies on abandon
+  enemies.forEach(e=>{ try{ returnEnemyToPool(e); }catch(_){} scene.remove(e); }); enemies.length=0;
+  bossGroup=null; isBossLoop=false;
   dismissTutorial(); if(firstClearEl){ firstClearEl.classList.add('hidden'); firstClearEl.classList.remove('show'); } firstClearShown=false;
   // history runs increment if had progress
   if(hadProgress) runHistory.runs+=1;
@@ -373,6 +376,96 @@ let mixer=null, clock=new THREE.Clock();
 let hitStopTimer=0;
 let damageSprites=[];
 
+// ── (A) Performance pooling — 30 robot + 15 knight pre-pooled clones, materials cloned once at startup
+let robotPoolAvailable=[], knightPoolAvailable=[], robotPoolAll=[], knightPoolAll=[];
+let robotBaseMax=1, knightBaseMax=1;
+let poolsInitialized=false;
+function computeBaseMax(gltf){
+  try{
+    const box=new THREE.Box3().setFromObject(gltf.scene);
+    const sz=new THREE.Vector3(); box.getSize(sz);
+    return Math.max(sz.x,sz.y,sz.z)||1;
+  }catch(e){ return 1; }
+}
+function initEnemyPools(){
+  if(poolsInitialized) return;
+  poolsInitialized=true;
+  if(robotModel){
+    robotBaseMax=computeBaseMax(robotModel);
+    for(let i=0;i<30;i++){
+      const clone=robotModel.scene.clone(true);
+      // center once
+      try{
+        const box=new THREE.Box3().setFromObject(clone);
+        const c=new THREE.Vector3(); box.getCenter(c);
+        clone.position.sub(c);
+      }catch(e){}
+      clone.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; if(o.material) o.material=o.material.clone(); }});
+      clone.visible=false;
+      clone.userData.pooled=true; clone.userData.poolType='robot';
+      robotPoolAvailable.push(clone);
+      robotPoolAll.push(clone);
+    }
+    log(`◈ Pool — 30 robot clones pre-pooled · baseMax ${robotBaseMax.toFixed(2)} · mats cloned once`);
+  }
+  if(knightModel){
+    knightBaseMax=computeBaseMax(knightModel);
+    for(let i=0;i<15;i++){
+      const clone=knightModel.scene.clone(true);
+      try{
+        const box=new THREE.Box3().setFromObject(clone);
+        const c=new THREE.Vector3(); box.getCenter(c);
+        clone.position.sub(c);
+      }catch(e){}
+      clone.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; if(o.material) o.material=o.material.clone(); }});
+      clone.visible=false;
+      clone.userData.pooled=true; clone.userData.poolType='knight';
+      knightPoolAvailable.push(clone);
+      knightPoolAll.push(clone);
+    }
+    log(`◈ Pool — 15 knight clones pre-pooled · baseMax ${knightBaseMax.toFixed(2)}`);
+  }
+}
+function acquirePooledModel(type){
+  if(type==='knight' && knightPoolAvailable.length) return knightPoolAvailable.pop();
+  if(type==='robot' && robotPoolAvailable.length) return robotPoolAvailable.pop();
+  // fallback cross-type if requested missing but other available (rare)
+  if(type==='knight' && robotPoolAvailable.length) return robotPoolAvailable.pop();
+  if(type==='robot' && knightPoolAvailable.length) return knightPoolAvailable.pop();
+  return null;
+}
+function releasePooledModel(clone){
+  if(!clone) return;
+  // reset transform & visibility
+  clone.visible=false;
+  clone.position.set(0,0,0);
+  clone.rotation.set(0,0,0);
+  clone.scale.set(1,1,1);
+  // detach from parent if any (holder was removed already, but ensure not in scene)
+  if(clone.parent) clone.parent.remove(clone);
+  const t=clone.userData.poolType;
+  if(t==='knight') knightPoolAvailable.push(clone);
+  else robotPoolAvailable.push(clone);
+}
+function returnEnemyToPool(enemy){
+  // enemy is the Group g with holder containing pooled model
+  if(!enemy || !enemy.userData) return;
+  const holder=enemy.userData.holder;
+  if(holder){
+    // find pooled model inside holder
+    const pooled=holder.children.find(c=> c.userData && c.userData.pooled);
+    if(pooled){
+      holder.remove(pooled);
+      releasePooledModel(pooled);
+    }
+  }
+  // dispose bar/aura/ring geometries that were created per spawn
+  if(enemy.userData.bar){ if(enemy.userData.bar.geometry) enemy.userData.bar.geometry.dispose(); }
+  if(enemy.userData.aura){ if(enemy.userData.aura.geometry) enemy.userData.aura.geometry.dispose(); }
+  if(enemy.userData.rangeRing){ if(enemy.userData.rangeRing.geometry) enemy.userData.rangeRing.geometry.dispose(); }
+  if(enemy.userData.bossRing){ if(enemy.userData.bossRing.geometry) enemy.userData.bossRing.geometry.dispose(); }
+}
+
 // HUD lerp state
 let dispScore=0, dispCore=100, dispPlayer=100;
 
@@ -407,6 +500,7 @@ async function loadModels(){
   await Promise.allSettled(loads);
   setupPlayer();
   setupArenaDeco();
+  initEnemyPools();
 }
 function centerAndScale(gltf, targetSize=6){
   const box = new THREE.Box3().setFromObject(gltf.scene);
@@ -801,7 +895,7 @@ function doBossShockwave(){
 
 function spawnSingleBullet(dirVec){
   const r = 0.14 * boonModifiers.radiusMult;
-  const dmg = Math.round(26 * boonModifiers.dmgMult);
+  const dmg = Math.round(20 * boonModifiers.dmgMult);
   const col = activeBoons.pulse>0 ? 0x7ae8ff : 0x35d0ff;
   const b = new THREE.Mesh(new THREE.SphereGeometry(r,10,10), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:col, emissiveIntensity: 1.9 + activeBoons.pulse*0.3 }));
   b.position.copy(player.position).add(new THREE.Vector3(0,0.6,0)).add(dirVec.clone().multiplyScalar(0.6));
@@ -859,36 +953,70 @@ function spawnEnemy(){
   if(paletteForSpawn===2) rangedChance = 0.50;
   const isRanged = Math.random()<rangedChance;
   const archetype = isRanged ? 'ranged' : 'melee';
-  if(archetype==='ranged' && knightModel && knightModel!==null){
-    // use original knight.glb (non-rigged) for spitter — tint blueish
-    mesh = knightModel.scene.clone(true);
-    const box=new THREE.Box3().setFromObject(mesh); const size=new THREE.Vector3(); box.getSize(size);
-    const c=new THREE.Vector3(); box.getCenter(c); mesh.position.sub(c);
-    const s= (isElite?1.25:0.95) / Math.max(size.x,size.y,size.z);
-    mesh.scale.setScalar(s);
-    mesh.rotation.y=Math.PI;
-    mesh.traverse(o=>{ if(o.isMesh){
-      o.castShadow=true;
-      o.material = o.material.clone();
-      if(isElite){ o.material.emissive=new THREE.Color(0x5500ff); o.material.emissiveIntensity=0.85; o.material.color=new THREE.Color(0xa0a0ff); }
-      else { o.material.emissive=new THREE.Color(0x2244aa); o.material.emissiveIntensity=0.45; o.material.color=new THREE.Color(0x8aa0ff); }
-    }});
-  } else if(robotModel){
-    mesh = robotModel.scene.clone(true);
-    const box=new THREE.Box3().setFromObject(mesh); const size=new THREE.Vector3(); box.getSize(size);
-    const c=new THREE.Vector3(); box.getCenter(c); mesh.position.sub(c);
-    const s= (isElite?1.35:1.05) / Math.max(size.x,size.y,size.z);
-    mesh.scale.setScalar(s);
-    mesh.rotation.y=Math.PI;
-    mesh.traverse(o=>{ if(o.isMesh){
-      o.castShadow=true;
-      if(isElite){ o.material = o.material.clone(); o.material.emissive=new THREE.Color(0xff1133); o.material.emissiveIntensity=0.9; o.material.color=new THREE.Color(0xff9aa0); }
-    }});
-  } else {
-    const col = archetype==='ranged'? 0x5590ff : 0xff3b6b;
-    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(isElite?0.42:0.32,isElite?0.9:0.7,4,10), new THREE.MeshStandardMaterial({color:isElite?0xff1a3d:col, emissive:isElite?0x880010: (archetype==='ranged'?0x1a3a80:0x550010), emissiveIntensity:isElite?0.9:0.6}));
-    mesh.position.y=0.6;
-    mesh.castShadow=true;
+  // ── (A) pooling hot path — reuse pre-pooled GLB clones with materials cloned once at startup
+  // avoids clone(true)+material.clone() per spawn; reset via visible+position
+  if(archetype==='ranged' && knightModel && knightPoolAvailable.length){
+    const pooled=acquirePooledModel('knight');
+    if(pooled){
+      mesh=pooled;
+      mesh.visible=true;
+      mesh.position.set(0,0,0);
+      mesh.rotation.set(0,Math.PI,0);
+      const s= (isElite?1.25:0.95) / (knightBaseMax||1);
+      mesh.scale.setScalar(s);
+      // tint without cloning — materials already cloned once per pooled instance
+      mesh.traverse(o=>{ if(o.isMesh){
+        o.castShadow=true;
+        if(isElite){ o.material.emissive=new THREE.Color(0x5500ff); o.material.emissiveIntensity=0.85; o.material.color=new THREE.Color(0xa0a0ff); }
+        else { o.material.emissive=new THREE.Color(0x2244aa); o.material.emissiveIntensity=0.45; o.material.color=new THREE.Color(0x8aa0ff); }
+      }});
+    }
+  }
+  if(!mesh && robotModel && robotPoolAvailable.length){
+    // melee fallback uses robot pool; if pooled knight was used above mesh already set, skip
+    if(archetype!=='ranged' || !knightModel){
+      const pooled=acquirePooledModel('robot');
+      if(pooled){
+        mesh=pooled;
+        mesh.visible=true;
+        mesh.position.set(0,0,0);
+        mesh.rotation.set(0,Math.PI,0);
+        const s= (isElite?1.35:1.05) / (robotBaseMax||1);
+        mesh.scale.setScalar(s);
+        mesh.traverse(o=>{ if(o.isMesh){
+          o.castShadow=true;
+          if(isElite){ o.material.emissive=new THREE.Color(0xff1133); o.material.emissiveIntensity=0.9; o.material.color=new THREE.Color(0xff9aa0); }
+          else { o.material.emissive=new THREE.Color(0x222222); o.material.emissiveIntensity=0.12; o.material.color=new THREE.Color(0xffffff); }
+        }});
+      }
+    }
+  }
+  // fallback — pools exhausted or model missing: clone fresh (cold path, rare)
+  if(!mesh){
+    if(archetype==='ranged' && knightModel){
+      mesh = knightModel.scene.clone(true);
+      const box=new THREE.Box3().setFromObject(mesh); const size=new THREE.Vector3(); box.getSize(size);
+      const c=new THREE.Vector3(); box.getCenter(c); mesh.position.sub(c);
+      const s= (isElite?1.25:0.95) / Math.max(size.x,size.y,size.z);
+      mesh.scale.setScalar(s);
+      mesh.rotation.y=Math.PI;
+      mesh.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.material = o.material.clone(); if(isElite){ o.material.emissive=new THREE.Color(0x5500ff); o.material.emissiveIntensity=0.85; o.material.color=new THREE.Color(0xa0a0ff); } else { o.material.emissive=new THREE.Color(0x2244aa); o.material.emissiveIntensity=0.45; o.material.color=new THREE.Color(0x8aa0ff); } }});
+      mesh.userData.fallback=true;
+    } else if(robotModel){
+      mesh = robotModel.scene.clone(true);
+      const box=new THREE.Box3().setFromObject(mesh); const size=new THREE.Vector3(); box.getSize(size);
+      const c=new THREE.Vector3(); box.getCenter(c); mesh.position.sub(c);
+      const s= (isElite?1.35:1.05) / Math.max(size.x,size.y,size.z);
+      mesh.scale.setScalar(s);
+      mesh.rotation.y=Math.PI;
+      mesh.traverse(o=>{ if(o.isMesh){ o.castShadow=true; if(isElite){ o.material = o.material.clone(); o.material.emissive=new THREE.Color(0xff1133); o.material.emissiveIntensity=0.9; o.material.color=new THREE.Color(0xff9aa0); } }});
+      mesh.userData.fallback=true;
+    } else {
+      const col = archetype==='ranged'? 0x5590ff : 0xff3b6b;
+      mesh = new THREE.Mesh(new THREE.CapsuleGeometry(isElite?0.42:0.32,isElite?0.9:0.7,4,10), new THREE.MeshStandardMaterial({color:isElite?0xff1a3d:col, emissive:isElite?0x880010: (archetype==='ranged'?0x1a3a80:0x550010), emissiveIntensity:isElite?0.9:0.6}));
+      mesh.position.y=0.6;
+      mesh.castShadow=true;
+    }
   }
   const holder=new THREE.Group(); holder.add(mesh);
   g.add(holder);
@@ -1110,7 +1238,7 @@ async function startLoop(){
   waveTotal = isBossLoop ? 1 : 90;
   elapsed=0;
   waveActive=true;
-  enemies.forEach(e=>scene.remove(e)); enemies.length=0;
+  enemies.forEach(e=>{ try{ returnEnemyToPool(e); }catch(_){} scene.remove(e); }); enemies.length=0;
   bossGroup=null; bossPhase=1; bossShockTimer=4.0; bossDashTimer=2.8;
   shockEffects.length=0;
   bullets.forEach(b=>scene.remove(b)); bullets.length=0;
@@ -1146,6 +1274,7 @@ async function startLoop(){
   if(gameState!=='countdown') return;
   gameState='playing';
   lastSpawn=performance.now();
+  lastBurst=performance.now()+700;
   // (A) onboarding — first-loop tutorial (only loop 1, staged hints)
   if(loop===1){ firstClearShown=false; showTutorial(); } else { dismissTutorial(); if(firstClearEl){ firstClearEl.classList.add('hidden'); firstClearEl.classList.remove('show'); } firstClearShown=false; }
   if(isBossLoop){
@@ -1356,6 +1485,7 @@ function failLoop(){
 }
 
 let lastSpawn=0;
+let lastBurst=0;
 let spawnInterval=1.25;
 
 function tick(dt){
@@ -1497,6 +1627,14 @@ function tick(dt){
         if(performance.now()-lastSpawn > spawnInterval*1000){
           spawnEnemy();
           lastSpawn=performance.now();
+        }
+      }
+      // burst jitter every 2.0s: 4-6 at once staggered 40ms — keeps 40-60 stacked
+      if(performance.now() - lastBurst > 2000 && enemies.length < waveTotal - waveKill - 4 && elapsed>1.0){
+        const burstN = 4 + Math.floor(Math.random()*3);
+        lastBurst = performance.now();
+        for(let b=0;b<burstN;b++){
+          setTimeout(()=>{ if(gameState==='playing' && !isBossLoop && enemies.length < waveTotal - waveKill) spawnEnemy(); }, b*40);
         }
       }
     }
@@ -1702,16 +1840,18 @@ function tick(dt){
         spawnDamageNumber(e.position.clone().add(new THREE.Vector3(0,0.2,0)), String(b.userData.dmg), e.userData.elite?'#ffb020':'#ffffff');
         burst(e.position, 0xffffff, 4);
         // knockback instead of insta-kill — VS horde stacks
-        e.position.add(b.userData.vel.clone().normalize().multiplyScalar(e.userData.isBoss?0.2:0.65));
+        e.position.add(b.userData.vel.clone().normalize().multiplyScalar(e.userData.isBoss?0.2:0.25));
         // hitstop + directional shake + sound
         triggerHitStop(62);
         triggerShake(0.85, b.userData.vel);
         beep(e.userData.elite? 660: 880, 0.05, 0.09);
         scene.remove(b); bullets.splice(i,1);
         if(e.userData.hp<=0){
-          const wasBoss=!!e.userData.isBoss;
-          scene.remove(e);
-          enemies.splice(hitIdx,1);
+           const wasBoss=!!e.userData.isBoss;
+           // ── (A) pooling: return GLB clone to pool via visible reset instead of dispose
+           try{ returnEnemyToPool(e); }catch(_){ }
+           scene.remove(e);
+           enemies.splice(hitIdx,1);
           if(wasBoss){
             bossGroup=null; bossHudEl.classList.add('hidden');
             burst(e.position, 0xff1a3d, 24);
@@ -1729,7 +1869,9 @@ function tick(dt){
               const backup=spawnEnemy; // reuse logic but place manually
               // create quick elite minion
               const g=new THREE.Group(); let mm;
-              if(robotModel){ mm=robotModel.scene.clone(true); const box=new THREE.Box3().setFromObject(mm); const sz=new THREE.Vector3(); box.getSize(sz); const c=new THREE.Vector3(); box.getCenter(c); mm.position.sub(c); mm.scale.setScalar(1.2/Math.max(sz.x,sz.y,sz.z)); mm.rotation.y=Math.PI; mm.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.material=o.material.clone(); o.material.emissive=new THREE.Color(0xff5533); o.material.emissiveIntensity=0.7; }}); } else { mm=new THREE.Mesh(new THREE.CapsuleGeometry(0.32,0.7,4,10), new THREE.MeshStandardMaterial({color:0xff5533})); mm.position.y=0.6; }
+               // ── (A) pooling for titan minions — try pooled robot first
+               if(robotPoolAvailable.length){ const pooled=acquirePooledModel('robot'); if(pooled){ mm=pooled; mm.visible=true; mm.position.set(0,0,0); mm.rotation.set(0,Math.PI,0); mm.scale.setScalar(1.2/(robotBaseMax||1)); mm.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.material.emissive=new THREE.Color(0xff5533); o.material.emissiveIntensity=0.7; }}); } }
+               if(!mm && robotModel){ mm=robotModel.scene.clone(true); const box=new THREE.Box3().setFromObject(mm); const sz=new THREE.Vector3(); box.getSize(sz); const c=new THREE.Vector3(); box.getCenter(c); mm.position.sub(c); mm.scale.setScalar(1.2/Math.max(sz.x,sz.y,sz.z)); mm.rotation.y=Math.PI; mm.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.material=o.material.clone(); o.material.emissive=new THREE.Color(0xff5533); o.material.emissiveIntensity=0.7; }}); mm.userData.fallback=true; } else if(!mm){ mm=new THREE.Mesh(new THREE.CapsuleGeometry(0.32,0.7,4,10), new THREE.MeshStandardMaterial({color:0xff5533})); mm.position.y=0.6; }
               const holder=new THREE.Group(); holder.add(mm); g.add(holder); g.position.copy(mPos); g.userData={ holder, hp: 70+loop*6, maxHp:70+loop*6, speed:2.4+loop*0.12, elite:true, bob:Math.random()*Math.PI*2, archetype:'melee' }; const bar=new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.08), new THREE.MeshBasicMaterial({color:0xff5533, side:THREE.DoubleSide})); bar.position.set(0,1.45,0); g.add(bar); g.userData.bar=bar; scene.add(g); enemies.push(g);
             }
             waveKill++; waveEl.textContent=`${waveKill} / ${waveTotal}`;
@@ -1805,7 +1947,25 @@ function animate(){
   tick(dt);
   frames++;
   fpsAcc+=dt;
-  if(fpsAcc>0.5){ fpsEl.textContent=Math.round(frames/fpsAcc)+' fps'; frames=0; fpsAcc=0; }
+  if(fpsAcc>0.5){
+    const fps=Math.round(frames/fpsAcc);
+    fpsEl.textContent=fps+' fps';
+    // ── (A) FPS HUD color warning <55fps — keeps 60fps during burst12 flood
+    if(fps<55){
+      fpsEl.style.color='var(--accent2)';
+      fpsEl.style.textShadow='0 0 8px rgba(255,59,107,0.8)';
+      fpsEl.title='FPS low — pooling active';
+    } else if(fps<58){
+      fpsEl.style.color='var(--warn)';
+      fpsEl.style.textShadow='0 0 6px rgba(255,176,32,0.6)';
+      fpsEl.title='';
+    } else {
+      fpsEl.style.color='';
+      fpsEl.style.textShadow='';
+      fpsEl.title='';
+    }
+    frames=0; fpsAcc=0;
+  }
 }
 animate();
 
@@ -1827,6 +1987,7 @@ document.getElementById('menuBtn').onclick=()=>{
   startCard.classList.remove('hidden'); overlay.style.display='flex'; gameState='menu';
   coreHp=100; dispCore=100; loop=1; score=0; dispScore=0;
   activeBoons={pulse:0,cache:0,shard:0}; recomputeBoonModifiers(); updateBoonHud();
+  enemies.forEach(e=>{ try{ returnEnemyToPool(e);}catch(_){} scene.remove(e); }); enemies.length=0;
   bossHudEl.classList.add('hidden'); titanIncomingEl.classList.add('hidden'); isBossLoop=false; bossGroup=null;
   dismissTutorial(); if(firstClearEl){ firstClearEl.classList.add('hidden'); firstClearEl.classList.remove('show'); } firstClearShown=false;
   updateHUD(); updateSeedDisplay(); breachWarnEl.classList.add('hidden'); vignetteEl.classList.remove('on');
@@ -1891,9 +2052,9 @@ updateSeedDisplay();
 renderHistoryCard();
 log('Worktree arena ready — awaiting loop start');
 
-// expose for verifier — includes A-verification hooks + (A) tutorial/first-clear + doors
+// expose for verifier — includes pooling + fps warning + tutorial/first-clear + doors
 window.__arena={
-  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight}),
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight, pools: { robotTotal: robotPoolAll.length, knightTotal: knightPoolAll.length, robotAvail: robotPoolAvailable.length, knightAvail: knightPoolAvailable.length, initialized: poolsInitialized }, fps: fpsEl.textContent, fpsColor: fpsEl.style.color }),
   getBoons:()=>({...activeBoons}),
   getHistory:()=>{ try{ return JSON.parse(JSON.stringify(runHistory)); }catch(e){ return {...runHistory}; } },
   pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); },
@@ -1922,4 +2083,9 @@ window.__arena={
   getDoorState:()=> ({ forcedNextPalette, doorCount: doorOffer.length, rewardWeight: doorRewardWeight, gameState, doorVisible: !!(doorCard && !doorCard.classList.contains('hidden')) }),
   showDoorForTest:()=> { if(gameState==='won') showDoorChoice(); },
   pickDoorForTest:(idx)=> pickDoor(idx),
+  // (A) pooling hooks
+  getPools:()=> ({ robotTotal: robotPoolAll.length, knightTotal: knightPoolAll.length, robotAvail: robotPoolAvailable.length, knightAvail: knightPoolAvailable.length, initialized: poolsInitialized, robotBaseMax, knightBaseMax }),
+  spawnEnemyForTest:()=> { spawnEnemy(); return enemies.length; },
+  getFpsState:()=> ({ text: fpsEl.textContent, color: fpsEl.style.color, warning: fpsEl.style.color==='var(--accent2)' }),
+  forceLowFpsForTest:()=> { fpsEl.textContent='52 fps'; fpsEl.style.color='var(--accent2)'; fpsEl.style.textShadow='0 0 8px rgba(255,59,107,0.8)'; },
 };
