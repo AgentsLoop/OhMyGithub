@@ -425,11 +425,12 @@ function makeWallTextures(){
   for(let x=87;x<N;x+=172){
     g.beginPath(); g.moveTo(x+1,0); g.lineTo(x+1,N); g.stroke();
   }
-  // horizontal mid seam at ~2.7m (wall mid) — subtle
-  g.strokeStyle='rgba(18,26,42,0.055)'; g.lineWidth=1.4;
+  // horizontal mid seam at ~2.7m (wall mid) — iteration 9: extra dark cavity trough so panel break reads like authored AO/45° chamfer
+  g.fillStyle='rgba(18,22,32,0.095)'; g.fillRect(0, N*0.48-3.5, N, 7);
+  g.strokeStyle='rgba(18,22,32,0.14)'; g.lineWidth=2.2;
   g.beginPath(); g.moveTo(0, N*0.48); g.lineTo(N, N*0.48); g.stroke();
-  g.strokeStyle='rgba(255,255,255,0.22)'; g.lineWidth=1;
-  g.beginPath(); g.moveTo(0, N*0.48+1.5); g.lineTo(N, N*0.48+1.5); g.stroke();
+  g.strokeStyle='rgba(255,255,255,0.26)'; g.lineWidth=1;
+  g.beginPath(); g.moveTo(0, N*0.48+1.6); g.lineTo(N, N*0.48+1.6); g.stroke();
   // cavity AO along top edge + bottom edge — iteration 8: stronger top cavity (was 0.14 → 0.26) so wall-to-ceiling reads like authored AO
   const topGrad=g.createLinearGradient(0,0,0,42);
   topGrad.addColorStop(0,'rgba(14,18,30,0.26)'); topGrad.addColorStop(0.5,'rgba(18,24,38,0.11)'); topGrad.addColorStop(1,'rgba(0,0,0,0)');
@@ -439,6 +440,12 @@ function makeWallTextures(){
   const botGrad=g.createLinearGradient(0,N-46,0,N);
   botGrad.addColorStop(0,'rgba(18,24,38,0)'); botGrad.addColorStop(1,'rgba(18,24,38,0.20)');
   g.fillStyle=botGrad; g.fillRect(0,N-46,N,46);
+  // iteration 9: floor-wall junction extra cavity — dark base + core line like Halo trim-sheet skirting AO
+  g.fillStyle='rgba(18,22,32,0.16)'; g.fillRect(0, N-10, N, 10);
+  g.strokeStyle='rgba(14,18,30,0.22)'; g.lineWidth=2;
+  g.beginPath(); g.moveTo(0, N-11); g.lineTo(N, N-11); g.stroke();
+  g.strokeStyle='rgba(255,255,255,0.10)'; g.lineWidth=1;
+  g.beginPath(); g.moveTo(0, N-9); g.lineTo(N, N-9); g.stroke();
   // iteration 5: fake edge-wear/dirt — broken dark streaks along vertical panel seams + drips near floor joint (Halo didactic wear)
   g.save();
   for(const sx of [86,258,430]){
@@ -570,6 +577,28 @@ for(let i=0;i<6;i++){
   neonTrim.translateZ(0.33);
   wallGroup.add(neonTrim);
   wallNeonTrims.push(neonTrim);
+  // iteration 9: wall mid-seam cavity + highlight — extra dark line at ~2.68m panel break (authored 45° chamfer AO), plus subtle catch light
+  const midCavity = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.05, 0.04), new THREE.MeshStandardMaterial({ color:0x182030, roughness:0.94, metalness:0.04 }));
+  midCavity.position.set(x, h*0.50 - 0.015, z);
+  midCavity.lookAt(0, h*0.50 - 0.015, 0);
+  midCavity.translateZ(0.311);
+  wallGroup.add(midCavity);
+  const midHi = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.014, 0.045), new THREE.MeshStandardMaterial({ color:0xe8eef7, roughness:0.42, metalness:0.08 }));
+  midHi.position.set(x, h*0.50 + 0.027, z);
+  midHi.lookAt(0, h*0.50 + 0.027, 0);
+  midHi.translateZ(0.313);
+  wallGroup.add(midHi);
+  // iteration 9: floor-wall junction cavity — additional dark strip where wall meets kick/soffit, deepens AO like Halo skirting
+  const floorWallCavity = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.036, 0.04), new THREE.MeshStandardMaterial({ color:0x0f1420, roughness:0.96, metalness:0.05 }));
+  floorWallCavity.position.set(x, 0.168, z);
+  floorWallCavity.lookAt(0, 0.168, 0);
+  floorWallCavity.translateZ(0.314);
+  wallGroup.add(floorWallCavity);
+  const floorWallHi = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.012, 0.045), new THREE.MeshStandardMaterial({ color:0xd7deea, roughness:0.48, metalness:0.09 }));
+  floorWallHi.position.set(x, 0.192, z);
+  floorWallHi.lookAt(0, 0.192, 0);
+  floorWallHi.translateZ(0.316);
+  wallGroup.add(floorWallHi);
   const bevelBot = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.042, 0.66), new THREE.MeshStandardMaterial({ color:0xc2cddd, roughness:0.84, metalness:0.05 }));
   bevelBot.position.set(x, 0.205, z);
   bevelBot.lookAt(0, 0.205, 0);
@@ -649,6 +678,55 @@ addContactAO(new THREE.Vector3(0,0,0), 3.4, 3.4, 0.42);
 
 // crates as cover — Halo verticality: flat crates → 2-high stacks + mid Walls for head-glitch cover
 const crates = [];
+// iteration 9: subtle crate emissive pulse variation for wayfinding without new textures (each stack/crate breathes slightly out-of-phase)
+const cratePulseData = [];
+function ensureCrateEmissive(mesh){
+  const isWarm = Math.random() < 0.22;
+  const col = isWarm ? new THREE.Color(0xff7a2a) : new THREE.Color(0x1ec4ff);
+  col.multiplyScalar(0.82);
+  mesh.traverse(o=>{
+    if(o.isMesh && o.material){
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m=>{
+        if(!m.emissive) m.emissive = col.clone();
+        else if(m.emissive.getHex()===0) m.emissive.copy(col);
+        else m.emissive.lerp(col, 0.32);
+        if(m.emissiveIntensity===0 || m.emissiveIntensity===undefined) m.emissiveIntensity = 0.10;
+        // clone so per-crate intensity not shared
+        if(m.userData && m.userData.crateBase===undefined){
+          // mark cloned
+        }
+      });
+    }
+  });
+}
+function registerCratePulse(mesh){
+  ensureCrateEmissive(mesh);
+  // clone mats per crate so emissiveIntensity is instance-local
+  const mats=[];
+  mesh.traverse(o=>{
+    if(o.isMesh && o.material){
+      const isArr = Array.isArray(o.material);
+      const src = isArr ? o.material : [o.material];
+      const cloned = src.map(m=>{
+        if(!m) return m;
+        const nm = m.clone();
+        nm.userData = { ...(m.userData||{}) };
+        if(nm.userData.crateBase===undefined) nm.userData.crateBase = nm.emissiveIntensity ?? 0.11;
+        // slight per-crate brightness jitter like Halo authored emissive variation
+        nm.userData.crateBase *= (0.86 + Math.random()*0.32);
+        // occasional warmer crates pop for wayfinding
+        if(Math.random()<0.18) nm.emissive.setHex(0xff8a2a);
+        mats.push(nm);
+        return nm;
+      });
+      o.material = isArr ? cloned : cloned[0];
+    }
+  });
+  if(mats.length){
+    cratePulseData.push({ mats, phase: Math.random()*Math.PI*2, amp: 0.28 + Math.random()*0.22, speed: 0.85 + Math.random()*0.55 });
+  }
+}
 function addCrate(pos, scale=1){
   let mesh;
   if(crateTemplate){
@@ -663,6 +741,7 @@ function addCrate(pos, scale=1){
   mesh.position.y = 0.55*scale;
   // add collision radius
   mesh.userData.radius = 0.9*scale;
+  registerCratePulse(mesh);
   scene.add(mesh);
   crates.push(mesh);
   addContactAO(pos, 1.55*scale, 1.55*scale, 0.34);
@@ -690,6 +769,7 @@ function addStack(basePos, levels=2, scale=1){
     mesh.userData.radius = 0.9*scale;
     // subtle color temp variation per level for Halo kit-bash read
     mesh.traverse?.(o=>{ if(o.isMesh && o.material && o.material.color){ o.material = o.material.clone(); o.material.color.offsetHSL(0,0, i===1 ? 0.06 : 0); }});
+    registerCratePulse(mesh);
     scene.add(mesh);
     crates.push(mesh);
   }
@@ -1554,6 +1634,12 @@ function updateWave(dt){
   // wall neon wayfinding — subtle breathe synced to reactor
   wallNeonTrims.forEach((m,i)=>{
     m.material.emissiveIntensity = 1.42 + Math.sin(time*2.2 + i*0.55)*0.38 + fast*0.10;
+  });
+  // iteration 9: crate emissive pulse variation — subtle out-of-phase breathe for wayfinding (no new textures)
+  cratePulseData.forEach(d=>{
+    const v = Math.sin(time*d.speed + d.phase);
+    const f = 1 + v*d.amp*0.55;
+    d.mats.forEach(m=>{ m.emissiveIntensity = (m.userData.crateBase ?? 0.11) * f; });
   });
   // subtle point lights — dimmed to not wash bright day
   pink.intensity=2+Math.sin(time*1.3)*0.5;

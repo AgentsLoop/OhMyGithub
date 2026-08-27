@@ -198,6 +198,24 @@ curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
 Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
 ```
 
+## Iteration 9 — mid-seam cavity + floor-wall junction AO + crate pulse wayfinding (gauntlet loop)
+
+**Builder `ses_fbc6fdd82ffe2PYLnA10ritvy8` (parallel):** `project/src/main.js:398-430` wall `makeWallTextures()` strengthened mid-seam `fillRect(0.48-3.5,7 rgba 0.095)` + thicker core `rgba 0.14 lw2.2` + highlight `0.26` (was single `0.055` line) — fake AO trough like Halo 45° chamfer, floor-wall junction `fillRect(N-10,10 rgba 0.16)` + core `rgba 0.22 lw2 at N-11` + highlight `0.10 at N-9` + existing `botGrad` — skirting AO similar to trim-sheet baked AO. `561-595` wall geometry per 6 walls: `midCavity` `Box(w+0.02,0.05,0.04) 0x182030 roughness0.94` at `h*0.50-0.015 translateZ0.311` + `midHi` `0xe8eef7 roughness0.42` at `+0.027` — extra dark cavity + specular catch along mid panel break, `floorWallCavity` `Box 0.036,0.04 0x0f1420 roughness0.96` at `y0.168 translateZ0.314` + `floorWallHi` `0xd7deea` at `y0.192` — dark strip where wall meets kick. `680-777,1634-1642` crate pulse: `cratePulseData[]` + `ensureCrateEmissive()` 22% warm `#ff7a2a` vs cyan `#1ec4ff` + `registerCratePulse()` clones per-crate mats `crateBase *0.86-1.18` jitter 18% + `phase 0-2π amp0.28-0.50 speed0.85-1.45` in `addCrate()/addStack()`, `updateWave()` `emissiveIntensity = base*(1+sin(time*speed+phase)*amp*0.55)` out-of-phase breathe. Preserved `allowedHosts:true`, attribution, sparse `project/` only.
+
+**Critic `ses_fbc6eeae7ffeukP096vfyePQiR` (independent, blind vs Halo Infinite Streets/Bazaar/The Pit, https://mat-busy-devel-paragraph.trycloudflare.com 200 + http://127.0.0.1:3000 200 tmux app-server:3000): HALO WINS DECISIVELY — bright high-albedo trim (0.75+), baked AO in every cavity, 45° chamfers, crisp edge-wear vs procedural pastel flat. Single biggest gap — no real bevel/chamfer + no baked AO/normal, only faked: `518` reuses wall color canvas `c` as `bumpTex` luminance noise not height with `bumpScale:0.055` on flat `Box` walls `539` so `193:dir 2.85` never breaks on edges; fake cavities thin overlapping boxes `558:bevelTop`, `563:bevelHi`, `568:wallCavityAO.translateZ(0.31)`, `581:midCavity`, `592:floorWallCavity` plus `378:addContactAO` Multiply planes at `y=0.015` — no casting, Z-offsets cause aliasing not Halo chamfer shadow, and `355:floorReflect opacity 0.055` fake reflection washes rather than specular. Combined with `60:ACESFilmic exposure 1.20` + `21:Fog(0xa8bed8,38,85)` + `32:heightHaze alpha 0.22` + `51:vignette` walls read uniformly lit pastel at distance (distance-darken `1669:t*0.16` tints RGB), no AO groove/hilight vs Halo authored trim.
+
+**Verifier `ses_fbc6cc1ccffeA0rmhIBJPgD8pw` (parallel):** PASS — `vite v5.4.21 building 9 modules ✓ built in 1.76s` `dist/assets/index-hAyNt49o.js 656.22k gzip 171.18k` (+2.12k vs 654.10k `index-BH4HfFzG.js` deleted), `dist/index.html 9.69k`, `curl http://127.0.0.1:3000 200` 9708 `tmux app-server: vite preview --host 0.0.0.0 --port 3000`, `curl https://mat-busy-devel-paragraph.trycloudflare.com 200` `9708`, `Host trycloudflare → 127.0.0.1:3000 200` not `403`, `/models/*.glb` 200 both `crate 184368 crate-normalized 183216 robot 435108 weapon 1842656`, `vite.config:5,10` `allowedHosts:true` host 0.0.0.0 port 3000, `git sparse-checkout list → project` `73%` present, `src/main.js:328,356,568,581,592,67,682,727,798,1096,945` mechanics (floor height bump `0.058`, floorReflect `0.055`, wall cavity AO `midCavity floorWallCavity`, neon `1.42±0.38`, halo pulse, crate `cratePulseData` per-crate cloned mats phase/speed jitter, hit shake `0.14/0.052` / `0.19/0.10`, envMap CubeCamera 128, platforms `3.5×2.0×1.2m`) pass, Playwright both URLs `goto 200` title `NEXUS ARENA` canvas 1280×720 HUD hp100 GLB 200×3 + `screenshot 260136B` OK (isolated browser avoids `page closed` race), console only `PCFSoftShadowMap deprecated` benign.
+
+**Remediation applied this iteration:** acknowledged extra Canvas dark trough + geometry cavity/highlight pairs simulate authored chamfer shadow + highlight catch and skirting AO, plus per-crate emissive pulse variation improves wayfinding for isolated boxes, but still procedural fake PBR vs baked `aoMap/normalMap` + bevel mesh + edge-wear masks; mid-seam and floor-wall junction still Canvas grout + Box cavity hacks vs Halo tiled `albedo/normal/rough/AO` + bevel geometry.
+
+**Re-verification after builder+remediation:**
+```
+npm run build ✓ 656.22k gzip 171.18k (9 modules, 1.76s) vs 654.10k prev (+2.12k)
+curl http://127.0.0.1:3000 200 9708
+curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
+Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
+```
+
 ## How to re-verify
 
 ```bash
