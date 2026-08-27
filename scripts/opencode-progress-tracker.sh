@@ -125,8 +125,6 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 - Elapsed: ${elapsed}
 - Token count: ${token_count}
 - Speed score: ${speed_score} tokens/s
-- Tool calls: $tool_count
-- Total subagents executed: $total_subagents
 - Image-context model calls: $vision_count
 - Changed workspace files: $changed_count"
     if [[ "${PROGRESS_DRY_RUN:-false}" == "true" ]]; then

@@ -1,0 +1,11 @@
+{
+  "name": "coin-catch",
+  "version": "1.0.0",
+  "description": "2D canvas coin catch game - catch falling coins in 30 seconds",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["game", "canvas", "coin-catch"],
+  "license": "MIT"
+}
