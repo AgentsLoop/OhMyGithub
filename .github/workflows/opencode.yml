@@ -738,6 +738,9 @@ jobs:
         run: |
           set -euo pipefail
           BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH_NAME" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH_NAME"
+          fi
           bash "$GITHUB_WORKSPACE/scripts/normalize-opencode-project.sh" \
             "origin/$BASE_BRANCH" "OpenCode: ${COMMENT_BODY%%$'\n'*}"
           # Dependencies are runtime-only and must never be included in the generated PR.
@@ -758,7 +761,7 @@ jobs:
             git push --force-with-lease="refs/heads/$BRANCH_NAME:$remote_branch_sha" \
               --set-upstream origin "$BRANCH_NAME"
           else
-            git push --set-upstream origin "$BRANCH_NAME"
+          git push --force-with-lease --set-upstream origin "$BRANCH_NAME"
           fi
           FINAL_COMMIT="$(git rev-parse HEAD)"
           TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"

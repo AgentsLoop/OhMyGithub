@@ -7,6 +7,7 @@ project_dir="${PROJECT_DIR:?PROJECT_DIR is required}"
 workspace_dir="${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}"
 snapshot_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/opencode-project.XXXXXX")"
 trap 'rm -rf "$snapshot_dir"' EXIT
+cd "$workspace_dir"
 
 # OpenCode is instructed to work under project/, but it can still create commits
 # outside that boundary. Preserve the generated app, then rebuild the branch from
@@ -16,12 +17,12 @@ if [[ -d "$project_dir" ]]; then
   cp -a "$project_dir/." "$snapshot_dir/project/"
 fi
 
-git -C "$workspace_dir" reset --hard "$target_ref"
+git reset --hard "$target_ref"
 rm -rf "$project_dir"
 mkdir -p "$project_dir"
 cp -a "$snapshot_dir/project/." "$project_dir/"
 
-git -C "$workspace_dir" add -A -- project
-if ! git -C "$workspace_dir" diff --cached --quiet; then
-  git -C "$workspace_dir" commit -m "$commit_message"
+git add -A -- project
+if ! git diff --cached --quiet; then
+  git commit -m "$commit_message"
 fi

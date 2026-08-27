@@ -124,6 +124,8 @@ labels are removed, and the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
 Before delivery and each `/loop` push, `scripts/normalize-opencode-project.sh`
 rebuilds the generated branch from its base while preserving only `project/`.
+Because OpenCode may push that branch before the delivery step, delivery uses
+`--force-with-lease` after fetching the worker branch.
 This prevents OpenCode changes to workflow files from causing GitHub token
 permission failures; `/loop` Git commands also use the workspace root because
 that step runs from `project/`.
