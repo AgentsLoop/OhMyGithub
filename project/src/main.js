@@ -231,17 +231,24 @@ let carModel = null;
 let carBox = new THREE.Box3();
 let carSize = new THREE.Vector3();
 
-// contact AO — fake hard ambient occlusion disc under car for Crossy Road grounded feel
+// contact AO — HARD VOXEL staircase disc (Crossy Road bar vs soft gradient)
+// Iter12 soft radial 0.42→0.18→0 blended to 2.5px feather at 9m chase — Crossy Road contact AO is 2-3 hard quantized rings (28,52,74% radius) with crisp pixel stairs, not airbrushed. Hard edges keep car grounded at grazing chase angle and preserve voxel readability under shadow 2048/±48 hard map.
 function makeContactTexture(){
-  const s=256; const c=document.createElement('canvas'); c.width=s; c.height=s;
+  const s=128; const c=document.createElement('canvas'); c.width=s; c.height=s;
   const x=c.getContext('2d');
-  const g=x.createRadialGradient(s/2,s/2, s*0.12, s/2,s/2, s*0.48);
-  g.addColorStop(0,'rgba(26,14,3,0.42)');
-  g.addColorStop(0.45,'rgba(26,14,3,0.18)');
-  g.addColorStop(1,'rgba(26,14,3,0)');
-  x.fillStyle=g; x.fillRect(0,0,s,s);
+  x.clearRect(0,0,s,s);
+  const cx=s/2, cy=s/2;
+  // 3 hard steps — no gradient interpolation, solid fill per ring so mip preserves crisp edge
+  // outer 74% → 10%, mid 52% → 20%, inner 28% → 38% — umber 26,14,3
+  x.fillStyle='rgba(26,14,3,0.10)';
+  x.beginPath(); x.arc(cx,cy, s*0.37, 0, Math.PI*2); x.fill();
+  x.fillStyle='rgba(26,14,3,0.20)';
+  x.beginPath(); x.arc(cx,cy, s*0.26, 0, Math.PI*2); x.fill();
+  x.fillStyle='rgba(26,14,3,0.38)';
+  x.beginPath(); x.arc(cx,cy, s*0.14, 0, Math.PI*2); x.fill();
   const t=new THREE.CanvasTexture(c);
   t.colorSpace=THREE.SRGBColorSpace;
+  t.minFilter=THREE.NearestFilter; t.magFilter=THREE.NearestFilter;
   return t;
 }
 const contactGeo = new THREE.CircleGeometry(2.6, 40);
