@@ -17,14 +17,19 @@ const wonScreen = document.getElementById('won');
 const attrib = document.getElementById('attrib');
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x0e182e, 38, 72);
-scene.background = new THREE.Color(0x060a14);
+scene.fog = new THREE.Fog(0xc8d4e8, 42, 95);
+scene.background = new THREE.Color(0xaac0d8);
+// large inverted sky dome for bright horizon vs black void
+const skyGeo = new THREE.SphereGeometry(120, 32, 32);
+const skyMat = new THREE.MeshBasicMaterial({ color: 0xeef2f8, side: THREE.BackSide });
+const sky = new THREE.Mesh(skyGeo, skyMat);
+scene.add(sky);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.22;
+renderer.toneMappingExposure = 1.35;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -60,64 +65,59 @@ async function loadModels(){
 }
  // keep weapon fallback handled later
 
-// lights — Halo-like: strong directional sun + soft hemi AO, limited point accents (readability over color soup)
-scene.add(new THREE.HemisphereLight(0xd8e6ff, 0x0e1828, 1.0));
-const dir = new THREE.DirectionalLight(0xffffff, 2.6);
-dir.position.set(14,20,10);
+// lights — bright Halo day: warm sun + soft sky AO, single bounce, no color soup
+scene.add(new THREE.HemisphereLight(0xf0f6ff, 0x303848, 0.9));
+const dir = new THREE.DirectionalLight(0xfff0dd, 3.2);
+dir.position.set(18,22,12);
 dir.castShadow=true;
 dir.shadow.mapSize.set(2048,2048);
-dir.shadow.camera.near=0.5; dir.shadow.camera.far=60;
-dir.shadow.camera.left=-30; dir.shadow.camera.right=30; dir.shadow.camera.top=30; dir.shadow.camera.bottom=-30;
-dir.shadow.bias=-0.0008;
+dir.shadow.camera.near=0.5; dir.shadow.camera.far=80;
+dir.shadow.camera.left=-32; dir.shadow.camera.right=32; dir.shadow.camera.top=32; dir.shadow.camera.bottom=-32;
+dir.shadow.bias=-0.0006;
 scene.add(dir);
-const rim = new THREE.PointLight(0x7af2ff, 8, 40);
-rim.position.set(0,10,0);
+const rim = new THREE.PointLight(0x7af2ff, 4, 36);
+rim.position.set(0,12,0);
 scene.add(rim);
-const pink = new THREE.PointLight(0xff3b82, 6, 24);
-pink.position.set(10,3,-10);
+// keep single warm point for contrast, remove color-spam
+const pink = new THREE.PointLight(0xff3b82, 2, 22);
+pink.position.set(10,2,-10);
 scene.add(pink);
-const blue2 = new THREE.PointLight(0x7a7aff, 5, 24);
-blue2.position.set(-10,3,10);
+const blue2 = new THREE.PointLight(0x7a7aff, 1, 20);
+blue2.position.set(-10,2,10);
 scene.add(blue2);
 
 // arena — Halo trim-sheet style: higher albedo floor with procedural panel texture, clean walls, limited neon wayfinding
 const arenaRadius = 19;
-// procedural floor texture (panel lines + grit) — avoids flat plastic
+// bright concrete trim-sheet floor — Halo albedo 0.75+
 function makeFloorTexture(){
   const c=document.createElement('canvas'); c.width=1024; c.height=1024;
   const g=c.getContext('2d');
-  g.fillStyle='#1a2a48'; g.fillRect(0,0,1024,1024);
-  g.strokeStyle='rgba(122,242,255,0.09)'; g.lineWidth=2;
-  for(let i=0;i<1024;i+=128){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,1024); g.stroke(); g.beginPath(); g.moveTo(0,i); g.lineTo(1024,i); g.stroke(); }
-  g.strokeStyle='rgba(255,255,255,0.06)'; g.lineWidth=1;
-  for(let i=64;i<1024;i+=128){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,1024); g.stroke(); }
-  // subtle noise
-  for(let i=0;i<6000;i++){ const x=Math.random()*1024, y=Math.random()*1024; g.fillStyle=`rgba(255,255,255,${Math.random()*0.04})`; g.fillRect(x,y,1,1); }
-  // center ring highlight
-  g.strokeStyle='rgba(122,242,255,0.18)'; g.lineWidth=3; g.beginPath(); g.arc(512,512, 320, 0, Math.PI*2); g.stroke();
-  g.strokeStyle='rgba(255,59,130,0.12)'; g.beginPath(); g.arc(512,512, 420, 0, Math.PI*2); g.stroke();
-  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(1,1); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=4;
+  g.fillStyle='#d2d8e2'; g.fillRect(0,0,1024,1024);
+  // 3m panel grid — subtle grout
+  g.strokeStyle='rgba(0,0,0,0.08)'; g.lineWidth=2;
+  for(let i=0;i<1024;i+=256){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,1024); g.stroke(); g.beginPath(); g.moveTo(0,i); g.lineTo(1024,i); g.stroke(); }
+  g.strokeStyle='rgba(0,0,0,0.035)'; g.lineWidth=1;
+  for(let i=128;i<1024;i+=256){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,1024); g.stroke(); }
+  // very subtle noise
+  for(let i=0;i<2500;i++){ const x=Math.random()*1024, y=Math.random()*1024; g.fillStyle=`rgba(0,0,0,${Math.random()*0.018})`; g.fillRect(x,y,1,1); }
+  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2.2,2.2); tex.colorSpace=THREE.SRGBColorSpace; tex.anisotropy=4;
   return tex;
 }
 const floorTex = makeFloorTexture();
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(arenaRadius, 64),
-  new THREE.MeshStandardMaterial({ map: floorTex, color:0xffffff, roughness:0.78, metalness:0.12 })
+  new THREE.MeshStandardMaterial({ map: floorTex, color:0xffffff, roughness:0.84, metalness:0.02 })
 );
 floor.rotation.x = -Math.PI/2;
 floor.receiveShadow=true;
 scene.add(floor);
-// subtle grid - reduced to not scream prototype
-const grid = new THREE.GridHelper(arenaRadius*2, 20, 0x24405f, 0x1a2f4a);
-grid.position.y = 0.015;
-grid.material.opacity=0.18; grid.material.transparent=true;
-scene.add(grid);
-// outer ring - cleaner, higher albedo
-const ringGeo = new THREE.TorusGeometry(arenaRadius-0.1, 0.16, 16, 96);
-const ringMat = new THREE.MeshStandardMaterial({ color:0xdbe6ff, emissive:0x7af2ff, emissiveIntensity:0.35, roughness:0.45, metalness:0.35 });
+// removed GridHelper prototype tell — grout via texture only
+// subtle outer trim ring
+const ringGeo = new THREE.TorusGeometry(arenaRadius-0.1, 0.10, 12, 64);
+const ringMat = new THREE.MeshStandardMaterial({ color:0xe6edf7, roughness:0.55, metalness:0.12 });
 const ring = new THREE.Mesh(ringGeo, ringMat);
 ring.rotation.x = Math.PI/2;
-ring.position.y = 0.16;
+ring.position.y = 0.05;
 scene.add(ring);
 // walls (hexagonal)
 const wallGroup = new THREE.Group();
@@ -127,29 +127,35 @@ for(let i=0;i<6;i++){
   const r = arenaRadius-0.6;
   const x = Math.cos(ang)*r, z=Math.sin(ang)*r;
   const w = 12, h=5.5;
-  // two-tone wall: darker base + light cap for Halo clean read
-  const baseColor = i%2===0 ? 0x2a3f66 : 0x1f3154;
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.6), new THREE.MeshStandardMaterial({ color: baseColor, roughness:0.62, metalness:0.22 }));
-  mesh.position.set(x, h/2, z);
-  mesh.lookAt(0, h/2, 0);
-  mesh.castShadow=true; mesh.receiveShadow=true;
-  wallGroup.add(mesh);
-  // light cap trim (top 0.4m)
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(w, 0.42, 0.62), new THREE.MeshStandardMaterial({ color:0xdbe6ff, roughness:0.45, metalness:0.18 }));
-  cap.position.set(x, h-0.21, z);
-  cap.lookAt(0, h-0.21, 0);
+  // bright 3-tone Halo wall: off-white body + charcoal kick + safety orange stripe
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.6), new THREE.MeshStandardMaterial({ color:0xe6edf7, roughness:0.78, metalness:0.06 }));
+  body.position.set(x, h/2, z);
+  body.lookAt(0, h/2, 0);
+  body.castShadow=true; body.receiveShadow=true;
+  wallGroup.add(body);
+  const kick = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, 0.62), new THREE.MeshStandardMaterial({ color:0x1f2636, roughness:0.72, metalness:0.32 }));
+  kick.position.set(x, 0.09, z);
+  kick.lookAt(0, 0.09, 0);
+  wallGroup.add(kick);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(w, 0.09, 0.62), new THREE.MeshStandardMaterial({ color:0xe86a1a, roughness:0.65, metalness:0.08 }));
+  stripe.position.set(x, 1.1, z);
+  stripe.lookAt(0, 1.1, 0);
+  wallGroup.add(stripe);
+  // light cap trim
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(w, 0.22, 0.62), new THREE.MeshStandardMaterial({ color:0xf0f4f8, roughness:0.45, metalness:0.08 }));
+  cap.position.set(x, h-0.11, z);
+  cap.lookAt(0, h-0.11, 0);
   wallGroup.add(cap);
-  // neon strip — only on 2 opposite spawns for wayfinding, not every wall
-  if(i===0 || i===3){
-    const col = i===0 ? 0x7af2ff : 0xff3b82;
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(w-0.8, 0.07, 0.14), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity:1.4 }));
-    strip.position.set(x, 1.15, z);
-    strip.lookAt(0,1.15,0);
-    strip.translateZ(0.34);
-    scene.add(strip);
+  // single orange wayfinding marker per long wall not neon spam
+  if(i===0){
+    const marker = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.45, 0.04), new THREE.MeshStandardMaterial({ color:0xe86a1a, emissive:0xe86a1a, emissiveIntensity:0.35 }));
+    marker.position.set(x, 2.2, z);
+    marker.lookAt(0, 2.2, 0);
+    marker.translateZ(0.32);
+    scene.add(marker);
   }
-  // pillar with metal trim
-  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.48,0.48, h, 12), new THREE.MeshStandardMaterial({ color:0x162540, roughness:0.6, metalness:0.35 }));
+  // pillar with AO base
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.48,0.48, h, 12), new THREE.MeshStandardMaterial({ color:0xe0e8f2, roughness:0.58, metalness:0.14 }));
   pillar.position.set(Math.cos(ang+Math.PI/6)*(r-1.2), h/2, Math.sin(ang+Math.PI/6)*(r-1.2));
   pillar.castShadow=true;
   wallGroup.add(pillar);
@@ -251,26 +257,26 @@ addStack(new THREE.Vector3(-1.8,0,5.8), 2, 0.98);
 addCoverWall(new THREE.Vector3(2.2,0,3.2), 0.55, 3.2, 1.45);
 addCoverWall(new THREE.Vector3(-2.6,0,-3.6), -0.55, 3.2, 1.45);
 
-// weapon viewmodel — Halo Infinite ref: low, center-right, strong silhouette, readable against bright arena
+// weapon viewmodel — Halo: smaller silhouette, readable vs bright floor
 const viewWeapon = new THREE.Group();
 camera.add(viewWeapon);
-viewWeapon.position.set(0.42, -0.28, -0.52);
-viewWeapon.rotation.set(0, -0.08, 0);
+viewWeapon.position.set(0.32, -0.22, -0.48);
+viewWeapon.rotation.set(0, -0.05, 0);
 let weaponMesh=null;
 // Halo-grade weapon feel state
 let recoilKick=0, recoilYaw=0, flashTime=0, shakeTime=0;
 let muzzleFlash=null, muzzleLight=null, muzzleCore=null;
-const baseWeaponPos = new THREE.Vector3(0.42, -0.28, -0.52);
-const baseWeaponRot = new THREE.Euler(0, -0.08, 0);
+const baseWeaponPos = new THREE.Vector3(0.32, -0.22, -0.48);
+const baseWeaponRot = new THREE.Euler(0, -0.05, 0);
 function setupWeapon(){
   if(weaponTemplate){
     weaponMesh = weaponTemplate.clone(true);
-    weaponMesh.scale.setScalar(0.12);
+    weaponMesh.scale.setScalar(0.095);
     weaponMesh.rotation.set(0, Math.PI, 0);
-    weaponMesh.position.set(0, -0.05, 0);
-    weaponMesh.traverse(o=>{ if(o.isMesh){ o.castShadow=true; }});
+    weaponMesh.position.set(0, -0.04, 0);
+    weaponMesh.traverse(o=>{ if(o.isMesh){ o.castShadow=true; if(o.material){ o.material.metalness=0.35; o.material.roughness=0.45; }}});
     viewWeapon.add(weaponMesh);
-    weaponMesh.userData.muzzle = new THREE.Vector3(0,0.05,-1.1);
+    weaponMesh.userData.muzzle = new THREE.Vector3(0,0.05,-1.05);
   } else {
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.08,0.55), new THREE.MeshStandardMaterial({ color:0x1a2a44, metalness:0.7, roughness:0.35 }));
@@ -777,9 +783,9 @@ function updateWave(dt){
   const s=1+Math.sin(time*2.2)*0.03;
   reactor.scale.set(s,s,s);
   coreGlow.material.emissiveIntensity=1.2+Math.sin(time*3)*0.3;
-  // rotate point lights subtle
-  pink.intensity=12+Math.sin(time*1.3)*2;
-  blue2.intensity=10+Math.cos(time*1.1)*1.5;
+  // subtle point lights — dimmed to not wash bright day
+  pink.intensity=2+Math.sin(time*1.3)*0.5;
+  blue2.intensity=1+Math.cos(time*1.1)*0.4;
 }
 
 function animate(){
