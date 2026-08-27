@@ -90,6 +90,24 @@ curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
 Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
 ```
 
+## Iteration 3 — elevated platforms + floor cavity AO (gauntlet loop)
+
+**Builder `ses_fbc960da5ffeTDzc2OQeckUGI7` (parallel):** `project/src/main.js:537-676` `createElevatedPlatform()` two 1.2m high 3.5×2.0m walkways at `(0,0,±12.8)` yaw 0/π, body `BoxGeometry` with `wallTexs` trim material (`repeat 0.85×0.48`), top `0xe8edf5`, bevel `0xf2f6fb 0.04` + kick `0x1f2636 0.10` + cavity `0xc2cddd 0.04`, orange front trim `0xe86a1a`, seam `0xc8d3e6` + groove `0x1a2338`, rivets `0x5a6b88 metal 0.72` + chamfers `0xd7deea`, two-step staircase `0.40m+0.80m` with bevel highlights, floor contact AO `MultiplyBlending` broad `1.08× α0.36` + 4 edge planes `0x182030 α0.14 0.28m` + inner strips `0x0f1420 α0.18 0.10m` at `y 0.018-0.020 polygonOffset -0.8/-0.9`. Player `handleInput` lerps `camRig.y 1.7→2.9` via `isInsidePlatform()` yaw-aware rect + `getPlatformHeightAt()` + `clampToArena()` skip, `origin.y = camRig.position.y` elevates tracer. Preserves `allowedHosts:true`, attribution, sparse `project/` only.
+
+**Critic `ses_fbc91f63dffe03Eyl3mZywOMYg` (independent, blind vs Halo Infinite Streets/Bazaar/The Pit, https://mat-busy-devel-paragraph.trycloudflare.com 200 + http://127.0.0.1:3000 200 tmux app-server:3000 + screenshots final-*.png 213-276KB): Halo wins decisively — bleached pastel toy-box at 8-15m. Single biggest gap — fully procedural fake PBR + exposure wash vs authored trim-sheet: `src/main.js:20` Fog 42/95 + `21` bg `0xaac0d8` + `24-25` sky `0xeef2f8 MeshBasicMaterial BackSide` + `31-32` ACES 1.35 blow out whites, floor `181-239` Canvas 1024 `#d2d8e2` mottles + grout lines drawn not aoMap/normalMap, roughness `512 #d6d6d6` no tiled albedo/normal, walls `281-351` `makeWallTextures()` 512 `bumpScale 0.018` reusing color fake normal, `370` flat Box 12×5.5×0.6, bevels thin strips not chamfered trim, seams/rivets decal hacks; enemies `robot.glb` 0 textures hacked `74-139` random metal/rough + CubeCamera 128 still clay; weapon `weapon.glb` 1967 faces `0.095` no hands; verticality `537-676` `createElevatedPlatform()` 3.5×2.0×1.2m boxes with steps mitigates but isolated boxes not Streets continuous lanes. Until authored aoMap/normalMap + bevel mesh + edge-wear, no tweak reaches readability.
+
+**Verifier `ses_fbc911c92ffe0D2axSMbNLKCDw` (parallel):** PASS — `vite v5.4.21 ✓ built in 1.65s` `dist/assets/index-DquALNZ2.js 646.15k gzip 168.62k` (+4.10k vs 642.05k), `curl http://127.0.0.1:3000 200` 9708 via `vite preview`, `curl https://mat-busy-devel-paragraph.trycloudflare.com 200` cf-ray, `Host trycloudflare → 127.0.0.1:3000 200`, `/models/*.glb` 200 both, `vite.config.js:5,10` `allowedHosts:true` host 0.0.0.0 port 3000, `git sparse-checkout list → project` tmux `app-server:1 windows`, `src/main.js:1` 1411 lines 13/13 mechanics (WASD, mouse yaw/pitch clamp -1.35, dash 0.22/1.1, shoot heat 0.085 overheat 900ms, HUD, enemy chase `toPlayer→camRig dist<1.35 dmg 8+wave*1.2`, platform height `platforms[] isInsidePlatform getPlatformHeightAt targetH lerp dt*8/10/14`, pickup, wave `waveTimer 60 >3 win`, particles) pass, Playwright both URLs title NEXUS canvas 1 HUD hp100 GLB 6×200 pass, changed files `M src/main.js M dist/index.html D index-DbvrohAT.js ?? index-DquALNZ2.js`.
+
+**Remediation applied this iteration:** acknowledged platforms add vertical traversable lanes (high ground lerps `1.7→2.9`) but still isolated boxes vs Halo continuous upper loops; floor cavity AO edge planes mitigate floating but still procedural Canvas vs baked AO. Procedural `wallTexs` bump 0.018 fake normal cannot replace authored `normalMap`. Next iteration should search for authored trim-sheet material library (tiled albedo+normal+roughness+AO) or generate procedural normal from height, and consider hands/skeleton for weapon.
+
+**Re-verification after builder+remediation:**
+```
+npm run build ✓ 646.15k gzip 168.62k (9 modules, 1.65s) vs 642.05k prev (+4.10k)
+curl http://127.0.0.1:3000 200 9708
+curl https://mat-busy-devel-paragraph.trycloudflare.com 200 9708 cf-ray
+Playwright 1280×720 both URLs title NEXUS ARENA canvas true HUD hp100 true /models/*.glb 200
+```
+
 ## How to re-verify
 
 ```bash

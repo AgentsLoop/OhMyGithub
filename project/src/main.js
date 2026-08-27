@@ -534,6 +534,126 @@ function addCoverWall(pos, yawRad=0, len=3.0, h=1.45){
   scene.add(g); crates.push(g);
   addContactAO(pos, len*1.08, 1.25, 0.30);
 }
+// elevated platforms — Halo verticality (Beaver Creek / Lockout style top lanes) + floor cavity AO
+const platforms=[]; // {pos,yaw,w,d,h}
+function isInsidePlatform(x,z,plat){
+  // yaw-aware rect test (inverse rotate)
+  const dx=x-plat.pos.x, dz=z-plat.pos.z;
+  const c=Math.cos(-plat.yaw), s=Math.sin(-plat.yaw);
+  const lx=dx*c - dz*s, lz=dx*s + dz*c;
+  return Math.abs(lx) < plat.w/2 + 0.12 && Math.abs(lz) < plat.d/2 + 0.12;
+}
+function createElevatedPlatform(pos, yawRad=0, w=3.5, d=2.0, h=1.2){
+  const g=new THREE.Group();
+  g.position.copy(pos); g.position.y=0; g.rotation.y=yawRad;
+  // main body — reuses wall trim-sheet material for hard-surface coherence
+  const bodyMat = new THREE.MeshStandardMaterial({ map: wallTexs.color, roughnessMap: wallTexs.rough, bumpMap: wallTexs.bump, bumpScale:0.016, color:0xffffff, roughness:0.78, metalness:0.08 });
+  // clone canvas repeat tweak so platform top not obviously same tiling as walls
+  bodyMat.map = wallTexs.color.clone(); bodyMat.map.repeat.set(0.85,0.48); bodyMat.map.needsUpdate=true;
+  bodyMat.roughnessMap = wallTexs.rough.clone(); bodyMat.roughnessMap.repeat.set(0.85,0.48); bodyMat.roughnessMap.needsUpdate=true;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(w, h, d), bodyMat);
+  body.position.y=h/2; body.castShadow=true; body.receiveShadow=true;
+  g.add(body);
+  // top plate — slightly brighter rim vs wall sides (Halo didactic top vs shadowed sides)
+  const topPlate=new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.05, d+0.02), new THREE.MeshStandardMaterial({ color:0xe8edf5, roughness:0.52, metalness:0.12 }));
+  topPlate.position.y=h-0.025; topPlate.receiveShadow=true;
+  g.add(topPlate);
+  // bevel highlight — light chamfer on top edge (matches wall bevelTop 0xf2f6fb)
+  const bevelT=new THREE.Mesh(new THREE.BoxGeometry(w+0.04, 0.04, d+0.04), new THREE.MeshStandardMaterial({ color:0xf2f6fb, roughness:0.42, metalness:0.10 }));
+  bevelT.position.y=h-0.06;
+  g.add(bevelT);
+  // bottom cavity dark kick — like wall bevelBot but inset
+  const kick=new THREE.Mesh(new THREE.BoxGeometry(w+0.03, 0.10, d+0.03), new THREE.MeshStandardMaterial({ color:0x1f2636, roughness:0.68, metalness:0.28 }));
+  kick.position.y=0.05;
+  g.add(kick);
+  const cave=new THREE.Mesh(new THREE.BoxGeometry(w+0.04, 0.04, d+0.04), new THREE.MeshStandardMaterial({ color:0xc2cddd, roughness:0.84, metalness:0.05 }));
+  cave.position.y=0.12;
+  g.add(cave);
+  // edge trim — orange wayfinding strip along front long edge (reads at distance)
+  const frontTrim=new THREE.Mesh(new THREE.BoxGeometry(w*0.92, 0.06, 0.04), new THREE.MeshStandardMaterial({ color:0xe86a1a, roughness:0.55, metalness:0.12 }));
+  frontTrim.position.set(0, h-0.09, d/2+0.02);
+  g.add(frontTrim);
+  // seam line across platform top (panel joint)
+  const topSeam=new THREE.Mesh(new THREE.BoxGeometry(w, 0.015, 0.04), new THREE.MeshStandardMaterial({ color:0xc8d3e6, roughness:0.86, metalness:0.04 }));
+  topSeam.position.set(0, h+0.028, 0);
+  g.add(topSeam);
+  const topSeamDark=new THREE.Mesh(new THREE.BoxGeometry(w, 0.015, 0.02), new THREE.MeshStandardMaterial({ color:0x1a2338, roughness:0.92, metalness:0.08 }));
+  topSeamDark.position.set(0, h+0.026, 0.015);
+  g.add(topSeamDark);
+  // rivets along top perimeter (reuse shared rivetGeo/mat)
+  const rxOffs=[-w/2+0.16, w/2-0.16], rzOffs=[-d/2+0.16, d/2-0.16];
+  for(const rx of rxOffs) for(const rz of rzOffs){
+    const riv=new THREE.Mesh(rivetGeo, rivetMat);
+    riv.position.set(rx, h-0.04, rz);
+    g.add(riv);
+  }
+  // mid-edge rivets
+  for(const rx of [-w/4, w/4]){
+    const r1=new THREE.Mesh(rivetGeo, rivetMat); r1.position.set(rx, h-0.04, d/2-0.08); g.add(r1);
+    const r2=new THREE.Mesh(rivetGeo, rivetMat); r2.position.set(rx, h-0.04, -d/2+0.08); g.add(r2);
+  }
+  // side face vertical edge bevels (chamfer strips matching wall vBevel)
+  for(const off of [-w/2+0.02, w/2-0.02]){
+    const v=new THREE.Mesh(new THREE.BoxGeometry(0.05, h-0.22, 0.04), new THREE.MeshStandardMaterial({ color:0xd7deea, roughness:0.62, metalness:0.12 }));
+    v.position.set(off, h/2, d/2-0.02); g.add(v);
+    const v2=v.clone(); v2.position.set(off, h/2, -d/2+0.02); g.add(v2);
+  }
+  // two-step staircase on the southern short side (accessible walk-up; south = -z in local)
+  const step1=new THREE.Mesh(new THREE.BoxGeometry(w*0.62, 0.40, 0.62), new THREE.MeshStandardMaterial({ color:0xdbe6ff, roughness:0.58, metalness:0.14 }));
+  step1.position.set(0, 0.20, -d/2 - 0.42); step1.receiveShadow=true; step1.castShadow=true; g.add(step1);
+  const step2=new THREE.Mesh(new THREE.BoxGeometry(w*0.62, 0.80, 0.62), new THREE.MeshStandardMaterial({ color:0xdbe6ff, roughness:0.58, metalness:0.14 }));
+  step2.position.set(0, 0.40, -d/2 + 0.18); step2.receiveShadow=true; step2.castShadow=true; g.add(step2);
+  // step bevel highlights
+  const sBevel1=new THREE.Mesh(new THREE.BoxGeometry(w*0.63, 0.03, 0.64), new THREE.MeshStandardMaterial({ color:0xf2f6fb, roughness:0.42, metalness:0.10 }));
+  sBevel1.position.set(0, 0.40, -d/2 - 0.42); g.add(sBevel1);
+  const sBevel2=new THREE.Mesh(new THREE.BoxGeometry(w*0.63, 0.03, 0.64), new THREE.MeshStandardMaterial({ color:0xf2f6fb, roughness:0.42, metalness:0.10 }));
+  sBevel2.position.set(0, 0.81, -d/2 + 0.18); g.add(sBevel2);
+  scene.add(g);
+  // collision + platform record
+  g.userData.radius = Math.max(w,d)/1.6;
+  crates.push(g);
+  platforms.push({pos:pos.clone(), yaw:yawRad, w, d, h, group:g});
+  // floor AO: broad contact under platform + thin cavity planes along 4 edges (fake cavity AO)
+  addContactAO(pos, w*1.08, d*1.08, 0.36);
+  const edgeAOmat = new THREE.MeshBasicMaterial({ color:0x182030, transparent:true, opacity:0.14, depthWrite:false, blending:THREE.MultiplyBlending });
+  edgeAOmat.polygonOffset=true; edgeAOmat.polygonOffsetFactor=-0.8;
+  const thickness=0.28;
+  // we need world positions for AO planes; use group transform by creating child planes inside g but at y=0.018 (just above floor local)
+  // Actually create world-space AO planes as children of scene for stable blending; compute via pos/yaw offsets
+  function addEdgeAO(localX, localZ, sx, sz){
+    const geo=new THREE.PlaneGeometry(sx, sz);
+    const m=new THREE.Mesh(geo, edgeAOmat.clone());
+    m.rotation.x=-Math.PI/2;
+    // local to world
+    const c=Math.cos(yawRad), s=Math.sin(yawRad);
+    const wx=pos.x + localX*c - localZ*s;
+    const wz=pos.z + localX*s + localZ*c;
+    m.position.set(wx, 0.018, wz);
+    m.renderOrder=1;
+    scene.add(m);
+  }
+  // along 4 sides (outside just beyond the kick)
+  addEdgeAO(0, d/2 + 0.18, w+0.6, thickness);
+  addEdgeAO(0, -d/2 - 0.72 - 0.05, w+0.6, thickness+0.18); // extended for steps footprint (two steps depth 1.24)
+  addEdgeAO(-w/2 - 0.18, 0, thickness, d);
+  addEdgeAO(w/2 + 0.18, 0, thickness, d);
+  // extra darkening strip right under the kick (inner cavity line)
+  const innerMat=new THREE.MeshBasicMaterial({ color:0x0f1420, transparent:true, opacity:0.18, depthWrite:false, blending:THREE.MultiplyBlending });
+  innerMat.polygonOffset=true; innerMat.polygonOffsetFactor=-0.9;
+  function addInnerStrip(lx,lz,sx,sz){
+    const geo=new THREE.PlaneGeometry(sx, sz);
+    const mm=new THREE.Mesh(geo, innerMat.clone());
+    mm.rotation.x=-Math.PI/2;
+    const c=Math.cos(yawRad), s=Math.sin(yawRad);
+    const wx=pos.x + lx*c - lz*s;
+    const wz=pos.z + lx*s + lz*c;
+    mm.position.set(wx, 0.020, wz);
+    mm.renderOrder=1;
+    scene.add(mm);
+  }
+  addInnerStrip(0, d/2+0.05, w+0.08, 0.10);
+  addInnerStrip(0, -d/2-0.05, w*0.62+0.08, 0.10);
+}
 const cratePositions = [
   new THREE.Vector3(6,0,5), new THREE.Vector3(-5,0,7), new THREE.Vector3(8,0,-4),
   new THREE.Vector3(-7,0,-5), new THREE.Vector3(0,0,9), new THREE.Vector3(0,0,-9),
@@ -551,6 +671,9 @@ addStack(new THREE.Vector3(-1.8,0,5.8), 2, 0.98);
 // 2 mid walls for head-glitch lanes (Streets/The Pit style)
 addCoverWall(new THREE.Vector3(2.2,0,3.2), 0.55, 3.2, 1.45);
 addCoverWall(new THREE.Vector3(-2.6,0,-3.6), -0.55, 3.2, 1.45);
+// two elevated walkway platforms — 1.2m high, 3.5×2.0m at opposite ends near walls (verticality + arena lane)
+createElevatedPlatform(new THREE.Vector3(0,0,12.8), 0, 3.5, 2.0, 1.2);
+createElevatedPlatform(new THREE.Vector3(0,0,-12.8), Math.PI, 3.5, 2.0, 1.2);
 
 // weapon viewmodel — Halo: smaller silhouette, readable vs bright floor
 const viewWeapon = new THREE.Group();
@@ -707,18 +830,37 @@ mFire.addEventListener('touchstart', e=>{ fireHeld=true; e.preventDefault(); },{
 mFire.addEventListener('touchend', ()=> fireHeld=false);
 mDash.addEventListener('touchstart', e=>{ tryDash(); e.preventDefault(); },{passive:false});
 
-// utility
+// utility — platform-aware arena clamp (allows walk-up onto 1.2m platforms via steps)
+function getPlatformHeightAt(x,z){
+  for(const p of platforms){
+    if(isInsidePlatform(x,z,p)) return p.h;
+  }
+  return 0;
+}
 function clampToArena(v){
   const d=Math.hypot(v.x,v.z);
   if(d>arenaRadius-1.1){
     const s=(arenaRadius-1.1)/d; v.x*=s; v.z*=s;
   }
-  // crate collision simple push
+  // crate collision simple push — skip if target is on a platform (player climbs via steps)
+  const onPlat = getPlatformHeightAt(v.x, v.z) > 0.5;
   for(const c of crates){
+    // skip platform bodies when climbing (they are crates with isPlatform via platforms list)
+    // allow entry onto platform by ignoring its own radial push when v is inside its footprint
+    let isOwnPlatform=false;
+    for(const p of platforms){ if(c===p.group && isInsidePlatform(v.x,v.z,p)) { isOwnPlatform=true; break; } }
+    if(isOwnPlatform) continue;
+    // also skip all platform crates when onPlat and moving toward platform center (soften)
     const dx=v.x-c.position.x, dz=v.z-c.position.z;
     const dist=Math.hypot(dx,dz);
     const min = 1.0 + c.userData.radius;
     if(dist<min && dist>0.01){
+      // if on platform, only block other crates/platforms not the one we stand on
+      if(onPlat && c.userData.radius>1.2) {
+        // still block if not the platform we're on
+        const otherPlat = platforms.find(p=>p.group===c);
+        if(otherPlat && isInsidePlatform(v.x,v.z,otherPlat)) continue;
+      }
       const push=(min-dist)/dist;
       v.x += dx*push*0.9; v.z += dz*push*0.9;
     }
@@ -835,8 +977,8 @@ function shoot(){
     muzzleFlash.children.forEach(c=>{ if(c.userData.isRing){ c.material.opacity=0.95; c.scale.setScalar(0.85+Math.random()*0.2); }});
     muzzleFlash.rotation.z = Math.random()*Math.PI;
   }
-  // ray
-  const origin = new THREE.Vector3().copy(camRig.position); origin.y=1.7;
+  // ray — use actual eye height (camRig.y already includes platform 1.2m lift via handleInput lerp)
+  const origin = new THREE.Vector3().copy(camRig.position); origin.y = camRig.position.y;
   const dir = new THREE.Vector3(0,0,-1).applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0))).normalize();
   // bullet tracer — Halo bright additive streak
   const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.012,1.4,6), new THREE.MeshBasicMaterial({ color:0x9af0ff, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending }));
@@ -949,11 +1091,26 @@ function handleInput(dt){
   if(move.length()>0) move.normalize().multiplyScalar(speed*dt);
   // dash
   if(dashTime>0){ move.addScaledVector(velocity, dt); dashTime-=dt; }
-  // apply
+  // apply — platform height lerp (walk up 1.2m walkways at opposite ends)
   const next = camRig.position.clone().add(move);
-  next.y=1.7;
+  // desired Y based on platform under next xz (1.7 ground → 2.9 on 1.2m platform)
+  const targetH = getPlatformHeightAt(next.x, next.z);
+  const targetY = 1.7 + targetH;
+  // smooth step so not snapping (0.22s lerp mimics Halo mantling)
+  const curY = camRig.position.y;
+  let nextY = curY;
+  if(Math.abs(curY - targetY) > 0.001){
+    const step = dt * 8.0;
+    nextY = THREE.MathUtils.lerp(curY, targetY, Math.min(1, step));
+    // when jumping onto platform via steps allow slightly higher interpolation
+    if(targetH>0.5 && nextY < targetY) nextY = Math.min(targetY, curY + dt*10);
+    if(targetH===0 && nextY > targetY) nextY = Math.max(targetY, curY - dt*14);
+  } else nextY = targetY;
+  next.y = nextY;
   clampToArena(next);
   camRig.position.copy(next);
+  // keep camera holder eye height offset synced (camHolder already at 0, camera at 0,1.7,0) — instead drive camRig.y as above and keep camera y=0? original set camera.position.y later, preserve
+  // ensure we don't overwrite platform Y with camera shake later — shake is additive on camera
   // heat decay
   heat = Math.max(0, heat - dt*0.55);
   if(heat<0.15) overheat=false;
