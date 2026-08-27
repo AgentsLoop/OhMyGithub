@@ -197,10 +197,20 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
  .analyticsGrid label{font-size:9px;letter-spacing:0.12em;opacity:0.6}
   .analyticsGrid div.warn b{color:var(--warn)}
   .analyticsGrid div.ok b{color:var(--ok)}
-  #filmGrain{position:fixed;inset:0;pointer-events:none;z-index:29;opacity:0.07;mix-blend-mode:multiply;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.4'/></svg>"),linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);background-size:256px 256px, 100% 2px;background-repeat:repeat,repeat;animation:grain 0.18s steps(4) infinite}
-  @keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-1%,1%)}50%{transform:translate(-0.5%,-1%)}75%{transform:translate(1%,0.5%)}100%{transform:translate(0,0)}}
+   /* ── (C) Iteration10: Pause stats + shake slider ── */
+   .pauseStats{margin:10px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+   @media(max-width:560px){.pauseStats{grid-template-columns:repeat(2,1fr)}}
+   .pauseStats div{background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
+   .pauseStats b{display:block;font-size:16px;color:var(--accent)}
+   .pauseStats label{font-size:8px;letter-spacing:0.12em;opacity:0.6}
+   .shakeControl{margin-top:10px;display:flex;align-items:center;gap:10px;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+   .shakeControl label{font-size:10px;letter-spacing:0.12em;opacity:0.7}
+   .shakeControl input[type=range]{width:140px;accent-color:var(--accent)}
+   .shakeControl #shakeVal{font-size:11px;min-width:36px;text-align:right;color:var(--accent)}
+   #filmGrain{position:fixed;inset:0;pointer-events:none;z-index:29;opacity:0.07;mix-blend-mode:multiply;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.4'/></svg>"),linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);background-size:256px 256px, 100% 2px;background-repeat:repeat,repeat;animation:grain 0.18s steps(4) infinite}
+   @keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-1%,1%)}50%{transform:translate(-0.5%,-1%)}75%{transform:translate(1%,0.5%)}100%{transform:translate(0,0)}}
  </style>
-  <script type="module" crossorigin src="/assets/index-Bt5Nj8KZ.js"></script>
+  <script type="module" crossorigin src="/assets/index-DQxj1HCO.js"></script>
 </head>
 <body>
 <canvas id="canvas"></canvas>
@@ -294,11 +304,22 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:#e6edf3;o
       <h1>⏸ PAUSED</h1>
       <p style="opacity:0.7">Isolation frozen — press <span class="kbd">Esc</span> or Resume to continue. Abandon wipes loop/boons but keeps history.</p>
       <p style="font-size:12px;opacity:0.6">SEED <b id="pauseSeed" style="color:var(--accent)">P0</b> · LOOP <b id="pauseLoop">1</b> · BOONS <b id="pauseBoons">none</b></p>
+      <div class="pauseStats" id="pauseStats">
+        <div><label>BEST LOOP</label><b id="pauseBest">1</b></div>
+        <div><label>CURRENT LOOP</label><b id="pauseCurrent">1</b></div>
+        <div><label>KILLS</label><b id="pauseKills">0</b></div>
+        <div><label>DAMAGE</label><b id="pauseDmg">0</b></div>
+      </div>
+      <div class="shakeControl">
+        <label for="shakeSlider">SHAKE</label>
+        <input type="range" id="shakeSlider" min="0" max="1" step="0.05" value="1" aria-label="Camera shake intensity">
+        <span id="shakeVal">100%</span>
+      </div>
       <div class="row" style="justify-content:center;margin-top:12px">
         <button class="btn primary" id="resumeBtn">▶ RESUME</button>
         <button class="btn ghost" id="abandonBtn">⌫ ABANDON RUN</button>
       </div>
-      <div class="hint" style="margin-top:10px"><span class="kbd">Esc</span> toggle pause</div>
+      <div class="hint" style="margin-top:10px"><span class="kbd">Esc</span> toggle pause · shake 0 = off · persists via localStorage</div>
     </div>
   </div>
   <div class="foot">

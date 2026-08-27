@@ -77,6 +77,13 @@ const anFpsEl = document.getElementById('anFps');
 const anThrottleEl = document.getElementById('anThrottle');
 const anSeedEl = document.getElementById('anSeed');
 const anSeedSubEl = document.getElementById('anSeedSub');
+// ── (C) Iteration10: Pause stats + shake slider refs
+const pauseBestEl = document.getElementById('pauseBest');
+const pauseCurrentEl = document.getElementById('pauseCurrent');
+const pauseKillsEl = document.getElementById('pauseKills');
+const pauseDmgEl = document.getElementById('pauseDmg');
+const shakeSliderEl = document.getElementById('shakeSlider');
+const shakeValEl = document.getElementById('shakeVal');
 
 // ── Persistence (localStorage run history) ──
 const HIST_KEY = 'isolated-arena-history-v1';
@@ -208,6 +215,33 @@ function trackHazardsAvoided(dt){
   }
 }
 
+// ── (C) Iteration10: Shake intensity slider + pause run stats
+const SHAKE_KEY = 'isolated-arena-shake-v1';
+let shakeScale = 1;
+try{
+  const sv = localStorage.getItem(SHAKE_KEY);
+  if(sv!==null){ const n=parseFloat(sv); if(!isNaN(n)) shakeScale=Math.max(0,Math.min(1,n)); }
+}catch(e){}
+function updatePauseStats(){
+  if(pauseBestEl) pauseBestEl.textContent = String(runHistory.bestLoop);
+  if(pauseCurrentEl) pauseCurrentEl.textContent = String(loop);
+  if(pauseKillsEl) pauseKillsEl.textContent = String(analytics.totalKills);
+  if(pauseDmgEl) pauseDmgEl.textContent = String(Math.round(analytics.damageDealt));
+  if(shakeSliderEl) shakeSliderEl.value = String(shakeScale);
+  if(shakeValEl) shakeValEl.textContent = Math.round(shakeScale*100)+'%';
+}
+function setShakeScale(v){
+  const n=Math.max(0,Math.min(1,parseFloat(v)||0));
+  shakeScale=n;
+  try{ localStorage.setItem(SHAKE_KEY, String(n)); }catch(e){}
+  if(shakeSliderEl) shakeSliderEl.value=String(n);
+  if(shakeValEl) shakeValEl.textContent=Math.round(n*100)+'%';
+}
+if(shakeSliderEl){
+  shakeSliderEl.value=String(shakeScale);
+  if(shakeValEl) shakeValEl.textContent=Math.round(shakeScale*100)+'%';
+  shakeSliderEl.addEventListener('input', e=> setShakeScale(e.target.value));
+}
 let pausedPrevState=null;
 function togglePause(){
   if(gameState==='playing'){
@@ -217,6 +251,7 @@ function togglePause(){
     historyCard.classList.add('hidden'); startCard.classList.add('hidden'); howCard.classList.add('hidden'); deadCard.classList.add('hidden'); winCard.classList.add('hidden'); boonCard.classList.add('hidden');
     overlay.style.display='flex';
     updateSeedDisplay();
+    updatePauseStats();
     ensureAudio(); duckDrone(0.05, 0.9);
     log('⏸ Paused — Esc to resume');
   } else if(gameState==='paused'){
@@ -753,17 +788,19 @@ addEventListener('keydown', e=>{
   if(tutorialActive && (e.code==='Space' || e.key===' ')) dismissTutorial();
 });
 
-// screen shake — directional + DOM fallback
+// screen shake — directional + DOM fallback (C: scaled by shakeScale 0-1)
 let shakeTimer=0, shakeIntensity=0, shakeDir=new THREE.Vector3();
 function triggerShake(intensity=1, dirVec=null){
-  shakeIntensity=Math.max(shakeIntensity,intensity);
-  shakeTimer=Math.max(shakeTimer, intensity>1.4?0.42:0.32);
+  const scaled = intensity * shakeScale;
+  if(scaled < 0.01) return;
+  shakeIntensity=Math.max(shakeIntensity,scaled);
+  shakeTimer=Math.max(shakeTimer, scaled>1.4?0.42:0.32);
   if(dirVec && dirVec.lengthSq()>1e-6) shakeDir.copy(dirVec).normalize();
   else shakeDir.set((Math.random()-0.5),(Math.random()-0.5)*0.3,(Math.random()-0.5)).normalize();
   const el=document.body;
   el.classList.remove('shake','shakeStrong');
   void el.offsetWidth;
-  el.classList.add(intensity>1.4?'shakeStrong':'shake');
+  el.classList.add(scaled>1.4?'shakeStrong':'shake');
   setTimeout(()=>el.classList.remove('shake','shakeStrong'), 450);
 }
 function triggerHitFlash(type){
@@ -2315,11 +2352,12 @@ updateBoonHud();
 updateSeedDisplay();
 renderHistoryCard();
 updateAnalyticsOverlay();
+updatePauseStats();
 log('Worktree arena ready — awaiting loop start — Tab for analytics');
 
-// expose for verifier — includes pooling + fps warning + tutorial/first-clear + doors + iteration7 haptics/rebind/deadzone + iteration9 analytics
+// expose for verifier — includes pooling + fps warning + tutorial/first-clear + doors + iteration7 haptics/rebind/deadzone + iteration9 analytics + iteration10 pause/shake
 window.__arena={
-  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight, pools: { robotTotal: robotPoolAll.length, knightTotal: knightPoolAll.length, robotAvail: robotPoolAvailable.length, knightAvail: knightPoolAvailable.length, initialized: poolsInitialized }, fps: fpsEl.textContent, fpsColor: fpsEl.style.color, rebindHidden: !!(rebindHintEl && rebindHintEl.classList.contains('hidden')), joyDeadzoneSize: joyDeadzoneEl ? joyDeadzoneEl.style.width : null, hasVibrate: ('vibrate' in navigator), analytics:{...analytics}, lastFps, analyticsVisible: !!(analyticsOverlayEl && !analyticsOverlayEl.classList.contains('hidden')), throttle: lastFps<55?'2-3':'4-6' }),
+  getState:()=>({loop,score,coreHp,playerHp,gameState,enemies:enemies.length, bullets:bullets.length, arenaLoaded, knightLoaded, boons:{...activeBoons}, mods:{...boonModifiers}, isBossLoop, bossHp: bossGroup?bossGroup.userData.hp:null, bossMaxHp: bossGroup?bossGroup.userData.maxHp:null, bossPhase, pendingBoonPicks, paused:gameState==='paused', seed:loop%3, seedName:seedName(loop%3), floorHasAO: !!(floorMat.map && floorMat.map.isCanvasTexture), glassVerified: !!window.__arenaGlassVerified, lowVignetteOn: !!(lowVignetteEl && lowVignetteEl.classList.contains('on')), chromaticOn: !!(chromaticEl && chromaticEl.classList.contains('on')), tutorialActive, firstClearShown, waveKill, waveTotal, forcedNextPalette, doorCount: doorOffer.length, doorRewardWeight, pools: { robotTotal: robotPoolAll.length, knightTotal: knightPoolAll.length, robotAvail: robotPoolAvailable.length, knightAvail: knightPoolAvailable.length, initialized: poolsInitialized }, fps: fpsEl.textContent, fpsColor: fpsEl.style.color, rebindHidden: !!(rebindHintEl && rebindHintEl.classList.contains('hidden')), joyDeadzoneSize: joyDeadzoneEl ? joyDeadzoneEl.style.width : null, hasVibrate: ('vibrate' in navigator), analytics:{...analytics}, lastFps, analyticsVisible: !!(analyticsOverlayEl && !analyticsOverlayEl.classList.contains('hidden')), throttle: lastFps<55?'2-3':'4-6', shakeScale, pauseVisible: !!(pauseCard && !pauseCard.classList.contains('hidden')) }),
   getBoons:()=>({...activeBoons}),
   getHistory:()=>{ try{ return JSON.parse(JSON.stringify(runHistory)); }catch(e){ return {...runHistory}; } },
   pickBoonForTest:(id)=>{ if(gameState==='boon') pickBoon(id); },
@@ -2382,4 +2420,11 @@ window.__arena={
   setFpsForTest:(fps)=>{ lastFps=fps; if(analyticsVisible) updateAnalyticsOverlay(); return lastFps; },
   getThrottleState:()=> ({ lastFps, burst: lastFps<55?'2-3':'4-6', throttled: lastFps<55 }),
   resetAnalyticsForTest:()=> resetAnalytics(),
+  // (C) Iteration10 pause stats + shake slider
+  getPauseStats:()=> ({ best: runHistory.bestLoop, current: loop, kills: analytics.totalKills, damage: Math.round(analytics.damageDealt), visible: !!(pauseCard && !pauseCard.classList.contains('hidden')), elExists: !!pauseCard, killsElText: pauseKillsEl?pauseKillsEl.textContent:null, dmgElText: pauseDmgEl?pauseDmgEl.textContent:null }),
+  getShakeScale:()=> shakeScale,
+  setShakeScaleForTest:(v)=>{ setShakeScale(v); return shakeScale; },
+  getShakeSliderState:()=> ({ value: shakeSliderEl?shakeSliderEl.value:null, display: shakeValEl?shakeValEl.textContent:null, exists: !!shakeSliderEl, min: shakeSliderEl?shakeSliderEl.min:null, max: shakeSliderEl?shakeSliderEl.max:null, step: shakeSliderEl?shakeSliderEl.step:null }),
+  triggerShakeForTest:(intensity=1)=>{ triggerShake(intensity); return { intensity: shakeIntensity, timer: shakeTimer, scale: shakeScale }; },
+  updatePauseStatsForTest:()=>{ updatePauseStats(); return { best: pauseBestEl?pauseBestEl.textContent:null, current: pauseCurrentEl?pauseCurrentEl.textContent:null, kills: pauseKillsEl?pauseKillsEl.textContent:null, damage: pauseDmgEl?pauseDmgEl.textContent:null }; },
 };
