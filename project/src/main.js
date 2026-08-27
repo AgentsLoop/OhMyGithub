@@ -63,6 +63,12 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+// Halo-like wayfinding + crunch state — neon trim registry + reactor halo base colors
+const wallNeonTrims = [];
+const reactorHaloBase = new THREE.Color(0xff3b82);
+const reactorHaloShift = new THREE.Color(0xff8ab8);
+const reactorCoreBase = new THREE.Color(0x7af2ff);
+const reactorCoreShift = new THREE.Color(0x8af0ff);
 // Halo-like environment reflections for metal readability — tiny cube target updated once after first frame
 const envTarget = new THREE.WebGLCubeRenderTarget(128, { type: THREE.HalfFloatType });
 envTarget.texture.type = THREE.HalfFloatType;
@@ -510,6 +516,13 @@ for(let i=0;i<6;i++){
   bevelHi.position.set(x, h-0.212, z);
   bevelHi.lookAt(0, h-0.212, 0);
   wallGroup.add(bevelHi);
+  // iteration 7: Halo neon wayfinding — thin emissive trim along top edge (reads at distance, not color spam)
+  const neonTrim = new THREE.Mesh(new THREE.BoxGeometry(w*0.94, 0.028, 0.04), new THREE.MeshStandardMaterial({ color:0x7af2ff, emissive:0x7af2ff, emissiveIntensity:1.45 }));
+  neonTrim.position.set(x, h-0.46, z);
+  neonTrim.lookAt(0, h-0.46, 0);
+  neonTrim.translateZ(0.33);
+  wallGroup.add(neonTrim);
+  wallNeonTrims.push(neonTrim);
   const bevelBot = new THREE.Mesh(new THREE.BoxGeometry(w+0.02, 0.042, 0.66), new THREE.MeshStandardMaterial({ color:0xc2cddd, roughness:0.84, metalness:0.05 }));
   bevelBot.position.set(x, 0.205, z);
   bevelBot.lookAt(0, 0.205, 0);
@@ -803,6 +816,7 @@ viewWeapon.rotation.set(0, -0.05, 0);
 let weaponMesh=null;
 // Halo-grade weapon feel state
 let recoilKick=0, recoilYaw=0, flashTime=0, shakeTime=0;
+let hitShakeTime=0, hitShakeAmp=0;
 let muzzleFlash=null, muzzleLight=null, muzzleCore=null;
 const baseWeaponPos = new THREE.Vector3(0.32, -0.22, -0.48);
 const baseWeaponRot = new THREE.Euler(0, -0.05, 0);
@@ -1134,8 +1148,16 @@ function shoot(){
     damageDealt+=1;
     // knockback
     hit.position.addScaledVector(dir, 0.35);
+    // iteration 7: weapon crunch — pronounced hit flash + camera holder shake on confirmed hit (Halo didactic hit)
+    const _isKillHit = hit.userData.hp<=0;
+    hitShakeTime = _isKillHit ? 0.19 : 0.14;
+    hitShakeAmp = _isKillHit ? 0.10 : 0.052;
+    shakeTime = Math.max(shakeTime, _isKillHit ? 0.16 : 0.12);
+    recoilKick = Math.max(recoilKick, _isKillHit ? 0.78 : 0.55);
+    if(muzzleLight) muzzleLight.intensity = _isKillHit ? 26 : 20;
+    flashTime = Math.max(flashTime, _isKillHit ? 0.13 : 0.10);
     flashHit();
-    score+= (hit.userData.hp<=0? 50:10);
+    score+= (_isKillHit? 50:10);
     if(hit.userData.hp<=0){
       // death
       kills++;
@@ -1243,17 +1265,28 @@ function handleInput(dt){
   recoilYaw *= Math.pow(0.85, dt*60);
   flashTime = Math.max(0, flashTime - dt);
   shakeTime = Math.max(0, shakeTime - dt);
+  hitShakeTime = Math.max(0, hitShakeTime - dt);
   if(muzzleLight){
     muzzleLight.intensity = flashTime>0 ? 16*(flashTime/0.09) : 0;
     if(muzzleCore) muzzleCore.material.opacity = flashTime>0 ? Math.pow(flashTime/0.09, 0.7) : 0;
     muzzleFlash.children.forEach(c=>{ if(c.userData.isRing) c.material.opacity = flashTime>0 ? (flashTime/0.09) : 0; });
   }
-  // subtle screenshake on fire
+  // subtle screenshake on fire — stronger for Halo crunch, plus holder shake on hit
   if(shakeTime>0){
-    camera.position.x = (Math.random()-0.5)*0.025*(shakeTime/0.09);
-    camera.position.y = (Math.random()-0.5)*0.02*(shakeTime/0.09);
+    const s = shakeTime/0.16;
+    camera.position.x = (Math.random()-0.5)*0.036*s;
+    camera.position.y = 1.7 + (Math.random()-0.5)*0.028*s;
+    camera.position.z = (Math.random()-0.5)*0.014*s;
   } else {
     camera.position.set(0,1.7,0);
+  }
+  if(hitShakeTime>0){
+    const hs = hitShakeTime/0.19;
+    camHolder.position.x = (Math.random()-0.5)*hitShakeAmp*2*hs;
+    camHolder.position.z = (Math.random()-0.5)*hitShakeAmp*1.2*hs;
+    camHolder.position.y = (Math.random()-0.5)*hitShakeAmp*0.7*hs;
+  } else {
+    camHolder.position.set(0,0,0);
   }
   // inertia sway spring (look lag) + breathing
   swayTX *= Math.pow(0.86, dt*60);
@@ -1371,8 +1404,7 @@ function updateEnemies(dt){
         const dmg = 8 + wave*1.2;
         if(shield>0){ const absorb=Math.min(shield,dmg); shield-=absorb; const rem=dmg-absorb; health-=rem; } else health-=dmg;
         e.userData.cooldown=0.9;
-        camHolder.position.x = (Math.random()-0.5)*0.12;
-        setTimeout(()=> camHolder.position.x=0, 80);
+        hitShakeTime = 0.22; hitShakeAmp = 0.14;
         // hurt vignette via flash
         document.body.style.boxShadow='inset 0 0 80px rgba(255,59,130,.6)';
         setTimeout(()=> document.body.style.boxShadow='', 120);
@@ -1455,10 +1487,27 @@ function updateWave(dt){
   } else {
     waveBanner.textContent=`WAVE ${wave} — ${Math.ceil(waveTimer)}s`;
   }
-  // reactor pulse
-  const s=1+Math.sin(time*2.2)*0.03;
+  // reactor pulse — iteration 7: stronger emissiveIntensity + subtle hue shift (Halo authored pulse, not flat)
+  const pulse = Math.sin(time*2.6);
+  const fast = Math.sin(time*7.2);
+  const s=1+ pulse*0.045 + fast*0.012;
   reactor.scale.set(s,s,s);
-  coreGlow.material.emissiveIntensity=1.2+Math.sin(time*3)*0.3;
+  coreGlow.material.emissiveIntensity = 1.65 + pulse*0.65 + fast*0.22;
+  core.material.emissiveIntensity = 0.68 + pulse*0.42 + fast*0.14;
+  // hue shift: lerp core glow cyan↔aqua, halo pink↔magenta
+  coreGlow.material.emissive.lerpColors(reactorCoreBase, reactorCoreShift, (pulse+1)*0.22 + fast*0.06);
+  core.material.emissive.lerpColors(new THREE.Color(0x0088aa), new THREE.Color(0x00c8ff), (pulse+1)*0.18);
+  // halo rings — stronger pulse so emissive reads against bright day
+  const haloPulse = 1.45 + pulse*0.85 + fast*0.32;
+  halo.material.emissiveIntensity = haloPulse;
+  halo2.material.emissiveIntensity = haloPulse*0.96;
+  halo.material.emissive.lerpColors(reactorHaloBase, reactorHaloShift, (pulse+1)*0.28);
+  halo2.material.emissive.copy(halo.material.emissive);
+  halo2.material.emissiveIntensity = haloPulse*0.92;
+  // wall neon wayfinding — subtle breathe synced to reactor
+  wallNeonTrims.forEach((m,i)=>{
+    m.material.emissiveIntensity = 1.42 + Math.sin(time*2.2 + i*0.55)*0.38 + fast*0.10;
+  });
   // subtle point lights — dimmed to not wash bright day
   pink.intensity=2+Math.sin(time*1.3)*0.5;
   blue2.intensity=1+Math.cos(time*1.1)*0.4;
