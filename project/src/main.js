@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const canvas = document.getElementById('canvas');
 const scoreEl = document.getElementById('score');
@@ -27,6 +28,26 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 500);
 let camTarget = new THREE.Vector3(0,0,0);
+
+// — neutral PMREM envMap for car PBR — fixes charcoal 24,21,16 vs lime 80,156,99 flat
+// Uses Three.js RoomEnvironment (PMREMGenerator) as neutral Studio IBL: no HDRI fetch,
+// no ground wash, ~22ms once. Assigned to scene.environment + per-material envMapIntensity.
+let envMap = null;
+let pmrem = null;
+{
+  pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  const roomEnv = new RoomEnvironment();
+  // 0.04 blur keeps reflections crisp for low-poly facets; RoomEnvironment is already neutral white
+  const rt = pmrem.fromScene(roomEnv, 0.04);
+  envMap = rt.texture;
+  scene.environment = envMap;
+  // keep desert background, not envMap
+  scene.background = new THREE.Color(0xF2C97D);
+  // ground stays warm matte — very low env so terraces keep baked AO contrast
+  // (will be re-applied after groundMat creation if not yet defined)
+  roomEnv.dispose?.();
+}
 
 function resize(){
   camera.aspect = innerWidth/innerHeight;
@@ -99,6 +120,7 @@ const groundGeo = new THREE.PlaneGeometry(400,400, 84,84);
   groundGeo.computeVertexNormals();
 }
 const groundMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.92, metalness:0.0 });
+if (envMap) { groundMat.envMap = envMap; groundMat.envMapIntensity = 0.12; } // keep terraces matte, no wash
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI/2;
 ground.receiveShadow = true;
@@ -125,6 +147,7 @@ for(let i=0;i<18;i++){
   const h = 2+Math.random()*4;
   const g = new THREE.ConeGeometry(6+Math.random()*8, h*2, 6);
   const m = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0.085+Math.random()*0.045, 0.52, 0.66), roughness: 1 });
+  if (envMap) { m.envMap = envMap; m.envMapIntensity = 0.16; }
   const mesh = new THREE.Mesh(g,m);
   const ang = Math.random()*Math.PI*2;
   const rad = 45+Math.random()*120;
@@ -175,7 +198,49 @@ loader.load('/models/car.glb', (gltf)=>{
         // ensure correct colour space and crisp non-metal response
         if(o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
         o.material.side = THREE.DoubleSide;
-        // slightly boost saturation vs flat decode, keep roughness as authored (0.6)
+        // — PMREM IBL tuning — neutral RoomEnvironment makes PBR pop without wash
+        // scene.environment already set; per-material intensity keeps ground matte while car shines
+        const n = (o.material.name || '').toLowerCase();
+        // envMap is also assigned explicitly for three < 0.160 compat (no-op if scene.environment used)
+        if (envMap) o.material.envMap = envMap;
+        if (n.includes('carcamero')) {
+          // lime body — 80,156,99 thumbnail vs 24,21,16 charcoal fix
+          // lower roughness for facet specular, slight metal boost for coated paint
+          o.material.roughness = 0.42;
+          o.material.metalness = 0.08;
+          o.material.envMapIntensity = 0.85;
+        } else if (n.includes('material.026')) {
+          // windows / glass — white 0.8,0.8,0.8 needs gloss + reflection
+          o.material.roughness = 0.08;
+          o.material.metalness = 0.04;
+          o.material.transparent = true;
+          o.material.opacity = 0.62;
+          o.material.envMapIntensity = 1.35;
+          // faint blue tint for sky reflection readability
+          o.material.color.setRGB(0.86, 0.92, 0.98);
+        } else if (n.includes('material.030')) {
+          // taillight red 0.8,0,0
+          o.material.roughness = 0.28;
+          o.material.metalness = 0.0;
+          o.material.envMapIntensity = 0.55;
+          o.material.emissive = new THREE.Color(0x550000);
+          o.material.emissiveIntensity = 0.22;
+        } else if (n.includes('material.025')) {
+          // headlight amber
+          o.material.roughness = 0.25;
+          o.material.metalness = 0.06;
+          o.material.envMapIntensity = 0.65;
+        } else if (n.includes('material.029')) {
+          // dark green undercoat
+          o.material.roughness = 0.72;
+          o.material.metalness = 0.0;
+          o.material.envMapIntensity = 0.35;
+        } else {
+          // wheels / dark plastics 027,028,031,032 — keep matte but lift from pure charcoal with slight IBL
+          o.material.roughness = Math.min(0.78, Math.max(0.55, o.material.roughness || 0.6));
+          o.material.metalness = 0.02;
+          o.material.envMapIntensity = 0.42;
+        }
         o.material.needsUpdate = true;
       }
     }
