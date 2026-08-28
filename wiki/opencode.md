@@ -38,8 +38,9 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    refreshes it about every 10 seconds while the run is active. The report also
    counts active child sessions from `/session/status` and all descendant
    subagent sessions from their `parentID` lineage. It also reports inferred
-   aggregate token count and tokens-per-second speed, plus inferred image-context
-   model calls by following image MIME attachments through each session transcript.
+   human-readable elapsed time, aggregate token count and tokens-per-second speed,
+   plus inferred image-context model calls by following image MIME attachments
+   through each session transcript.
    Message text, reasoning, prompts, and tool details are
    never rendered in the live comment; full logs are published only in the
    completion release.

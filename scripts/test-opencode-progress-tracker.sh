@@ -170,6 +170,24 @@ assert_line "- Total failed subagents: 1"
 assert_line "- Image-context model calls: 5"
 assert_line "- Token count: 190"
 assert_line "- Speed score:"
+if ! grep -Eq -- '^- Elapsed: [0-9]+m$' "$output_file"; then
+  echo "FAIL: invalid elapsed format" >&2
+  sed -n '1,120p' "$output_file" >&2
+  exit 1
+fi
+echo "PASS: valid elapsed format"
+
+if [[ "$("$tracker" --format-elapsed 1266)" != "21m" ]]; then
+  echo "FAIL: 1266 seconds should format as 21m" >&2
+  exit 1
+fi
+echo "PASS: 1266 seconds -> 21m"
+
+if [[ "$("$tracker" --format-elapsed 3661)" != "1h 01m" ]]; then
+  echo "FAIL: 3661 seconds should format as 1h 01m" >&2
+  exit 1
+fi
+echo "PASS: 3661 seconds -> 1h 01m"
 
 assert_absent() {
   local unexpected="$1"
