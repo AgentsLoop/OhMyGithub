@@ -13,11 +13,7 @@ In issue comments and workflow instructions, `oc` means OpenCode.
 
 ## Git delivery
 
-After every code change, commit and push the change. For small code changes, amend
-the current commit and push the amended commit instead of creating another commit.
-When correcting a small change that was just pushed, fold it into that commit with
-an amend and use `git push --force-with-lease`; do not leave a needless follow-up
-commit on the branch.
+After every code change, commit and push the change.
 Before running any workflow, verify that the working tree is clean and everything
 is committed.
 
