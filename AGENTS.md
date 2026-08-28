@@ -54,6 +54,9 @@ logs are unavailable until completion. Use `bash scripts/ssh-run-log.sh <run-id>
 for the live Actions log over SSH. Do not use tight `for` loops around `gh run list`,
 which needlessly consume GitHub API rate limit.
 
+To connect to an issue's live worker, run `bash scripts/ssh-run-log.sh <run-id>` to
+discover the host and port, then SSH with `~/.ssh/aiplay-agentsweb` as shown by the helper.
+
 When the user asks to check a live OpenCode workflow, always pull the runner logs
 over SSH first, using `scripts/ssh-run-log.sh` or a targeted SSH read from the
 same runner. Base the answer on those logs before discussing whether an action
