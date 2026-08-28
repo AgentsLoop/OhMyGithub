@@ -45,8 +45,7 @@ protection against out-of-scope changes. Host-side synchronization is preferred.
 ## Acceptance criteria
 
 - The container can read/write only the isolated application directory.
-- A standard `/oc` run and a `/loop` iteration both complete browser and public
-  URL verification.
+- A standard `/oc` run completes browser and public URL verification.
 - The host sync step rejects any changed path outside `project/`.
 - Worker-generated files survive container exit and are committed by the host.
 - No workflow, credential, GitHub token, Docker socket, or private key is
