@@ -33,6 +33,17 @@ worktree would allow direct Git operations, but requires exposing Git metadata,
 handling container path references and UID permissions, and weakens the
 protection against out-of-scope changes. Host-side synchronization is preferred.
 
+## Credential isolation follow-up
+
+The worker should not receive the write-capable `GITHUB_TOKEN` or `GH_TOKEN`.
+Remove the job-level `GH_TOKEN`, set `persist-credentials: false` on repository
+checkout, and provide the token only to trusted runner-side steps that update
+issue status, push the generated branch, or create the pull request. If
+OpenCode needs issue metadata, fetch it on the runner and pass the data to the
+agent, or provide a separate read-only credential. This prevents the agent from
+pushing directly to `main` or arbitrary branches while preserving workflow
+issue statistics and status comments handled by explicit token-scoped steps.
+
 ## Risks to validate before implementation
 
 - Docker availability and permissions on the temporary AgentsWeb worker.
