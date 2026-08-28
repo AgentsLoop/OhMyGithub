@@ -13,10 +13,13 @@ jobs:
       (github.event.issue.pull_request == null) &&
       (contains(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, '/opencode') ||
+      contains(github.event.comment.body, '/goal') ||
       contains(github.event.issue.body, '/oc') ||
       contains(github.event.issue.body, '/opencode') ||
+      contains(github.event.issue.body, '/goal') ||
       contains(github.event.issue.title, '/oc') ||
-      contains(github.event.issue.title, '/opencode'))
+      contains(github.event.issue.title, '/opencode') ||
+      contains(github.event.issue.title, '/goal'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -33,6 +36,7 @@ jobs:
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
       PROJECT_DIR: ${{ github.workspace }}/project
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      OPENCODE_EXPERIMENTAL: "true"
       OPENCODE_ENABLE_EXA: "true"
       OPENCODE_ENABLE_EXPERIMENTAL_MODELS: "true"
       OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS: "true"
@@ -42,6 +46,8 @@ jobs:
       BRANCH_NAME: opencode/${{ github.run_id }}
       TRIGGER_ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
+      GOAL_REQUEST: ${{ contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') }}
+      OMO_REQUEST: ${{ contains(github.event.issue.labels.*.name, 'omo') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -113,6 +119,8 @@ jobs:
               { name: 'in progress', color: 'FBCA04', description: 'OpenCode workflow is running' },
               { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
+              { name: '/Goal', color: '8A2BE2', description: 'OpenCode goal workflow request' },
+              { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',
@@ -170,6 +178,8 @@ jobs:
 
       - name: Mark issue in progress
         uses: actions/github-script@v7
+        env:
+          GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
@@ -186,7 +196,8 @@ jobs:
             }
             await github.rest.issues.addLabels({
               owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: number, labels: ['in progress']
+              issue_number: number,
+              labels: ['in progress', ...(process.env.GOAL_REQUEST === 'true' ? ['/Goal'] : [])]
             });
 
       - name: Start AgentsWeb SSH session
@@ -252,12 +263,56 @@ jobs:
           cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
           {
             "$schema": "https://opencode.ai/config.json",
+            "plugin": [],
             "permission": {
               "*": "allow",
               "task": "allow"
             }
           }
           EOF
+          if [[ "$OMO_REQUEST" == 'true' ]]; then
+            echo 'Installing oh-my-openagent for the omo-labeled request'
+            if ! command -v bun >/dev/null 2>&1; then
+              curl --fail --silent --show-error --location https://bun.sh/install | bash
+            fi
+            export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+            export PATH="$BUN_INSTALL/bin:$PATH"
+            command -v bun
+            bunx oh-my-openagent install \
+              --no-tui \
+              --platform=opencode \
+              --claude=no \
+              --openai=no \
+              --gemini=no \
+              --copilot=no \
+              --opencode-zen=no \
+              --zai-coding-plan=no \
+              --opencode-go=no \
+              --kimi-for-coding=no \
+              --bailian-coding-plan=no \
+              --minimax-cn-coding-plan=no \
+              --minimax-coding-plan=no \
+              --vercel-ai-gateway=no \
+              --skip-auth
+          fi
+          config_tmp="$OPENCODE_WEB_DIR/opencode.json"
+          if [[ "$OMO_REQUEST" != 'true' ]]; then
+            npm install --prefix "$HOME/.config/opencode" --no-save --no-package-lock \
+              --ignore-scripts opencode-goal-plugin@0.8.2
+            jq '
+              .plugin = ((.plugin // []) + [["opencode-goal-plugin", {"noInterruptOnUserMessage": true}]]) |
+              .command.goal = {
+                "description": "Set a session-scoped goal and auto-continue until complete.",
+                "template": "$ARGUMENTS",
+                "agent": "build"
+              } |
+              .permission = ((.permission // {}) + {"*": "allow", "task": "allow"})
+            ' "$HOME/.config/opencode/opencode.json" > "$config_tmp"
+          else
+            jq '.permission = ((.permission // {}) + {"*": "allow", "task": "allow"})' \
+              "$HOME/.config/opencode/opencode.json" > "$config_tmp"
+          fi
+          mv "$config_tmp" "$HOME/.config/opencode/opencode.json"
           nohup "$OPENCODE_BIN" web --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
@@ -370,6 +425,8 @@ jobs:
           OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
           OPENCODE_SKILLS: ${{ steps.opencode_labels.outputs.skills_json }}
+          GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          OMO_REQUEST: ${{ env.OMO_REQUEST }}
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
@@ -378,14 +435,45 @@ jobs:
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
           prompt_template="$(< "$GITHUB_WORKSPACE/.github/prompts/build.md")"
-          prompt="${prompt_template//@COMMENT_BODY@/$COMMENT_BODY}"
+          request_text="$COMMENT_BODY"
+          if [[ "$GOAL_REQUEST" == 'true' ]]; then
+            # The issue marker selects the custom command; do not include the
+            # marker itself in the objective passed to the goal parser.
+            request_text="$(sed -E 's/^[[:space:]]*\/goal([[:space:]]*)?//' <<<"$request_text")"
+          fi
+          prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
+          if [[ "$OMO_REQUEST" == 'true' ]]; then
+            prompt=$'ulw\n\n'"$prompt"
+          fi
           printf '%s\n' "$prompt" > "$PROMPT_FILE"
+          if [[ "$OMO_REQUEST" == 'true' ]]; then
+            cat >> "$PROMPT_FILE" <<'EOF'
+
+            This request has the `omo` issue label. Use oh-my-openagent Ultimate's native Goal system for the persistent objective and `ulw` for full OMO orchestration. Keep the objective active through verified implementation iterations and do not stop after the first successful pass. Preserve the workflow's evidence, commit, and push requirements.
+          EOF
+          fi
+          if [[ "$OMO_REQUEST" == 'true' ]]; then
+            echo 'OpenCode invocation mode: omo-goal-ulw'
+          else
+            echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
+          fi
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
-          nohup bash -c '"$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1; echo $? > "$5"' \
-            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" \
+          nohup bash -c '
+            if [[ "$8" == true ]]; then
+              "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
+            elif [[ "$7" == true ]]; then
+              "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
+            else
+              "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" "$(cat "$3")" > "$4" 2>&1
+            fi
+            code=$?
+            echo "$code" > "$5"
+            exit "$code"
+          ' \
+            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" "$GOAL_REQUEST" "$OMO_REQUEST" \
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
           SESSION_ID=''
@@ -431,10 +519,12 @@ jobs:
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
+          GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const command = process.env.GOAL_REQUEST === 'true' ? '/goal' : '/oc';
             const body = [
               '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
@@ -442,7 +532,7 @@ jobs:
               '```sh', process.env.SSH_COMMAND, '```', '',
               '🌐 **Live OpenCode web session is ready.**', '',
               `URL: ${process.env.OPENCODE_WEB_URL}`, '',
-              'This opens the currently running `/oc` session directly. Access remains available while OpenCode runs and for 5 hours afterwards.'
+              `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
             ].join('\n');
             const result = await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: number, body
@@ -462,38 +552,7 @@ jobs:
         run: |
           set -euo pipefail
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
-          cat > "$TRACKER" <<'TRACKER'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          started_at="$(date +%s)"
-          while :; do
-            payload="$(curl --fail --silent --show-error \
-              -H "x-opencode-directory: $PROJECT_DIR" \
-              "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" 2>/dev/null || true)"
-            if jq -e 'type == "array"' >/dev/null 2>&1 <<<"$payload"; then
-              stats="$(jq -r '
-                def parts: [.[].parts[]?];
-                def tools: [parts[] | select(.type == "tool")];
-                [
-                  length,
-                  ([.[] | select(.info.role == "assistant")] | length),
-                  (tools | length),
-                  ([tools[] | select(.state.status == "completed")] | length),
-                  ([tools[] | select(.state.status == "running" or .state.status == "pending")] | length)
-                ] | @tsv
-              ' <<<"$payload")"
-              IFS=$'\t' read -r message_count assistant_count tool_count completed_count active_count <<<"$stats"
-              changed_count="$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
-              elapsed_seconds="$(( $(date +%s) - started_at ))"
-              body=$'🟡 **OpenCode progress (live)**\n\nUpdated: '"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"$'\n\n🌐 **OpenCode Web UI:** '"$OPENCODE_WEB_URL"$'\n\n- Elapsed: '"${elapsed_seconds}s"$'\n- Session messages: '"$message_count"$'\n- Assistant updates: '"$assistant_count"$'\n- Tool calls: '"$tool_count"$'\n- Completed tool calls: '"$completed_count"$'\n- Active tool calls: '"$active_count"$'\n- Changed workspace files: '"$changed_count"$'\n\n_Message contents and tool details are hidden. Full logs are published in the completion release._'
-              gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
-                -f body="$body" >/dev/null || true
-            fi
-            [[ -f "$OPENCODE_WEB_DIR/response-comment.done" ]] && break
-            sleep 10
-          done
-          TRACKER
-          chmod 700 "$TRACKER"
+          install -m 700 "$GITHUB_WORKSPACE/scripts/opencode-progress-tracker.sh" "$TRACKER"
           # The tracker is intentionally independent of the step shell so it can poll
           # while later workflow steps run; cleanup stops it at the end of the job.
           nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
@@ -615,20 +674,43 @@ jobs:
             > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
           touch "$OPENCODE_WEB_DIR/response-comment.done"
 
-      - name: Verify final screenshots exist
+      - name: Request and verify final screenshots
         id: final_evidence
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
-            \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
-            -printf '%f\n' 2>/dev/null | sort)
-          if [[ "${#screenshots[@]}" -eq 0 ]]; then
-            echo 'No final screenshots found under project/screenshots/.'
-            exit 1
-          fi
-          printf '%s\n' "${screenshots[@]}"
-          printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
+          SCREENSHOT_PROMPT='The final screenshot evidence is still missing. Use the already verified public game and a real browser now, capture at least one meaningful playable-game screenshot, save it under screenshots/ with a filename beginning with final- (for example screenshots/final-gameplay.png), commit and push it on the current branch, and update the triggering issue with the immutable screenshot URL. Do not just explain or claim completion without creating the image. Keep all work inside project/ and do not create a pull request.'
+
+          for attempt in 1 2 3; do
+            mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
+              \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
+              -printf '%f\n' 2>/dev/null | sort)
+            if [[ "${#screenshots[@]}" -gt 0 ]]; then
+              printf '%s\n' "${screenshots[@]}"
+              printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+              printf 'screenshots_status=present\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "No final screenshots found under project/screenshots/ (attempt $attempt/3)."
+            if [[ "$attempt" -lt 3 ]]; then
+              echo "Sending OpenCode screenshot remediation prompt before retry $((attempt + 1))/3."
+              if ! "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
+                --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+                --session "$SESSION_ID" \
+                --model '${{ steps.opencode_labels.outputs.model }}' \
+                "$SCREENSHOT_PROMPT" \
+                > "$OPENCODE_WEB_DIR/screenshot-fix-$attempt.log" 2>&1; then
+                echo "OpenCode screenshot remediation failed on attempt $attempt; continuing to the next evidence check."
+              fi
+            fi
+          done
+
+          echo 'Final screenshots are still missing after three remediation attempts; continuing with delivery.'
+          printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"
+          printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
 
       - name: Create pull request
         id: delivery
@@ -674,13 +756,24 @@ jobs:
             -H "x-opencode-directory: $PROJECT_DIR" \
             "http://127.0.0.1:$OPENCODE_WEB_PORT/session/${{ steps.opencode_run.outputs.session_id }}/message" \
             > "$release_dir/opencode-response.json"
+          if [[ ! -s "$release_dir/opencode-response.json" ]]; then
+            echo 'OpenCode response artifact is empty; refusing to create an incomplete release.' >&2
+            exit 1
+          fi
           find "$OPENCODE_WEB_DIR" -maxdepth 1 -type f \
             \( -name '*.log' -o -name '*.json' \) \
             ! -name 'opencode.json' \
+            -size +0c \
             -exec cp -f {} "$release_dir/" \;
 
+          release_assets=()
+          while IFS= read -r -d '' asset; do
+            release_assets+=("$asset")
+          done < <(find "$release_dir" -maxdepth 1 -type f -size +0c -print0)
+          ((${#release_assets[@]} > 0))
+
           tag="opencode-logs-${GITHUB_RUN_ID}"
-          gh release create "$tag" "$release_dir"/* \
+          gh release create "$tag" "${release_assets[@]}" \
             --target "${{ steps.delivery.outputs.commit || github.sha }}" \
             --title "OpenCode logs for run #${GITHUB_RUN_NUMBER}" \
             --notes "Generated OpenCode response and execution logs for workflow run [#${GITHUB_RUN_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})." \
@@ -701,13 +794,11 @@ jobs:
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
-          OPENCODE_RELEASE_ASSETS: ${{ steps.opencode_release.outputs.assets_json }}
         with:
           script: |
             const number = context.payload.pull_request?.number ?? context.issue.number;
             const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${process.env.FINAL_COMMIT}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
-            const releaseAssets = JSON.parse(process.env.OPENCODE_RELEASE_ASSETS || '[]');
             const images = screenshots.map((name) => {
               const path = `project/screenshots/${name}`.split('/').map(encodeURIComponent).join('/');
               const url = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${process.env.FINAL_COMMIT}/${path}`;
@@ -719,10 +810,6 @@ jobs:
               `Final commit: ${commitUrl}`,
               `Pull request: ${process.env.PR_URL}`,
               `OpenCode logs release: ${process.env.OPENCODE_RELEASE_URL}`,
-              '', '### OpenCode response and logs', '',
-              ...releaseAssets.map(({ name, url }) => `- [${name}](${url})`),
-              'Deployment status: verified through the public URL.',
-              'Known limitations: see the worker progress and completion notes above.',
               '', '### Final screenshots', '', ...images
             ].join('\n');
             await github.rest.issues.createComment({
@@ -767,16 +854,14 @@ jobs:
         shell: bash
         run: sleep 18000
 
-      - name: Mark SSH session closed
+      - name: Append SSH session closed
         if: always() && steps.access_comment.outputs.comment_id != ''
         uses: actions/github-script@v7
-        env:
-          COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
         with:
           script: |
-            await github.rest.issues.updateComment({
+            await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo,
-              comment_id: Number(process.env.COMMENT_ID),
+              issue_number: context.issue.number,
               body: `🔒 **AgentsWeb SSH session closed.**\n\nTemporary access for [run #${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) has expired.`
             });
 
