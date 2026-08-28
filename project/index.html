@@ -908,7 +908,7 @@ function updatePhysics(dt){
       o.intensity= 1.2 + Math.sin(t*4+o.userData.blink)>0 ? 1.8:0.2;
     }
   });
-
+}
 function updateHUD(force){
   document.getElementById('alt').textContent=Math.max(0, Math.round(state.pos.y));
   const kmh=Math.round(state.vel.length()*3.6);
