@@ -33,11 +33,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 port_file = pathlib.Path(sys.argv[1])
 sessions = [
-    {"id": "ses_root"},
-    {"id": "ses_child", "parentID": "ses_root"},
-    {"id": "ses_nested", "parentID": "ses_child"},
-    {"id": "ses_done", "parentID": "ses_root"},
-    {"id": "ses_failed", "parentID": "ses_root"},
+    {"id": "ses_root", "tokens": {"input": 100}},
+    {"id": "ses_child", "parentID": "ses_root", "tokens": {"output": 50}},
+    {"id": "ses_nested", "parentID": "ses_child", "tokens": {"reasoning": 25}},
+    {"id": "ses_done", "parentID": "ses_root", "tokens": {"cache": {"read": 10}}},
+    {"id": "ses_failed", "parentID": "ses_root", "tokens": {"cache": {"write": 5}}},
 ]
 statuses = {
     "ses_child": {"type": "busy"},
@@ -168,6 +168,8 @@ assert_line "- Active subagents: 2"
 assert_line "- Total subagents executed: 4"
 assert_line "- Total failed subagents: 1"
 assert_line "- Image-context model calls: 5"
+assert_line "- Token count: 190"
+assert_line "- Speed score:"
 
 assert_absent() {
   local unexpected="$1"

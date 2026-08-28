@@ -68,6 +68,27 @@ while :; do
       | [.active, .total, .failed] | @tsv
     ')"
     IFS=$'\t' read -r active_subagents total_subagents failed_subagents <<<"$subagent_stats"
+    token_count="$(jq -nr \
+      --arg root "$SESSION_ID" \
+      --argjson sessions "$sessions_payload" '
+      def descendants($all; $parent):
+        [$all[] | select(.parentID == $parent)] as $children
+        | ($children | map(.id)) as $ids
+        | if ($ids | length) == 0 then $ids
+          else $ids + ([$ids[] | descendants($all; .)] | add)
+          end;
+      ([$root] + ($sessions | descendants($sessions; $root))) as $tracked
+      | reduce $sessions[] as $session (0;
+          if ($tracked | index($session.id)) == null then .
+          else .
+            + ($session.tokens.input // 0)
+            + ($session.tokens.output // 0)
+            + ($session.tokens.reasoning // 0)
+            + ($session.tokens.cache.read // 0)
+            + ($session.tokens.cache.write // 0)
+          end
+        )
+    ')"
     subagent_ids="$(jq -nr \
       --arg root "$SESSION_ID" \
       --argjson sessions "$sessions_payload" '
@@ -92,6 +113,8 @@ while :; do
     done <<<"$subagent_ids"
     changed_count="$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
     elapsed_seconds="$(( $(date +%s) - started_at ))"
+    speed_score="$(awk -v tokens="$token_count" -v elapsed="$elapsed_seconds" \
+      'BEGIN { if (elapsed > 0) printf "%.1f", tokens / elapsed; else print "0.0" }')"
     body="🟡 **OpenCode progress (live)**
 
 Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
@@ -99,6 +122,8 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 🌐 **OpenCode Web UI:** $OPENCODE_WEB_URL
 
 - Elapsed: ${elapsed_seconds}s
+- Token count: ${token_count}
+- Speed score: ${speed_score} tokens/s
 - Tool calls: $tool_count
 - Active tool calls: $active_count
 - Active subagents: $active_subagents
