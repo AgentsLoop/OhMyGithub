@@ -105,6 +105,30 @@ The workflow validates the selected labels, passes them into OpenCode, and recor
 .agents/skills/<skill-name>/SKILL.md
 ```
 
+## 🔄 OpenCode Workflow
+
+```mermaid
+flowchart TD
+    A[Trigger] --> B[Prepare project]
+    B --> C[Run build.md]
+    C --> D[Run verify.md]
+    D --> E{Public app works?}
+
+    E -- No --> F[Run public-app-fix.md]
+    F --> E
+
+    E -- Yes --> G[Run completion-report.md]
+    G --> H{Screenshots exist?}
+
+    H -- No --> I[Run screenshot-evidence.md]
+    I --> H
+
+    H -- Yes --> J[Commit and push]
+    J --> K[Create PR]
+    K --> L[Publish report]
+    L --> M[Complete]
+```
+
 ## 🏗️ Architecture
 
 ```text
