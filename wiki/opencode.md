@@ -76,9 +76,12 @@ including user and tool image attachments, then asserts the three derived
 progress counters.
 
 The workflow uses the built-in OpenCode model path and does not require an
-`OPENCODE_API_KEY` secret. Branch creation, pushing, and pull-request creation
-are deliberately handled by the workflow rather than by OpenCode's GitHub
-integration.
+`OPENCODE_API_KEY` secret. To authenticate an ephemeral worker with the Mac's
+OpenAI OAuth login, save the complete local OpenCode `auth.json` as the
+`OPENCODE_AUTH_JSON` repository secret; startup restores it to
+`~/.local/share/opencode/auth.json` with owner-only permissions. Branch
+creation, pushing, and pull-request creation are deliberately handled by the
+workflow rather than by OpenCode's GitHub integration.
 
 ## Findings: tracking the GitHub run in Web UI
 
