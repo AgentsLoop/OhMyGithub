@@ -82,3 +82,27 @@ ssh -i ~/.ssh/aiplay-agentsweb -p <port> runner@<run-name>.agentsweb.space
 ```
 
 The command works only while the corresponding Actions job is running.
+
+## Connecting to a live OpenCode worker
+
+Use the repository helper to discover the worker host and port from the broker
+or issue comment. It uses the persistent local key `~/.ssh/aiplay-agentsweb`:
+
+```sh
+bash scripts/ssh-run-log.sh <run-id> --repo agents-dev/aiplay
+```
+
+For an interactive shell, reuse the host and port printed by the helper and
+use the same key:
+
+```sh
+ssh -tt -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  -i ~/.ssh/aiplay-agentsweb \
+  -p <port> runner@<run-name>.agentsweb.space
+```
+
+Do not substitute the generated runner key under `sshworker/outputs/keys/`; it
+can produce a misleading `Permission denied (publickey)` result. Temporary
+worker SSH access ends when the Actions job and session are cleaned up. Never
+print secrets while inspecting a worker.
