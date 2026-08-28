@@ -51,6 +51,14 @@ apply only labels supported by the issue's requirements. If a matching label
 does not exist, continue without inventing or creating one and record that in
 the test report.
 
+When the caller requests the Luna model, use the OpenAI provider label
+`model/openai/gpt-5.6-luna`. Confirm that label exists before creating the
+issue; if it is missing, create the model label with `gh label create` because
+the workflow synchronizes model labels during the run but cannot add a label to
+the triggering issue retroactively. Do not use
+`model/opencode/gpt-5.6-luna`, which selects OpenCode Zen instead of the OpenAI
+OAuth provider.
+
 ## Procedure
 
 1. Before starting the test, inspect the working tree with `git status --short`.
