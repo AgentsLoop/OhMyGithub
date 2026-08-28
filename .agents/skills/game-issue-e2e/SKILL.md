@@ -10,6 +10,11 @@ with a new game or create a game issue. This skill intentionally ends after the
 workflow publishes the OpenCode Web UI session link; it does not watch the
 workflow to completion or claim that the game, PR, or public app is finished.
 
+If the caller does not provide a game concept or prompt, invent a random,
+small playable browser game and write a brief issue prompt for it. Do not ask
+the caller to supply the missing concept. Apply matching skill labels only when
+the invented game clearly requires them.
+
 ## Required outcome
 
 The kickoff is complete when all of these are true:
@@ -61,7 +66,8 @@ the test report.
    `opencode run --command goal` path. Use `/oc` instead only when the caller
    explicitly requests the standard OpenCode path. Do not add a comment
    because this tests the `issues` trigger.
-   Ask for a concrete playable game and include its functional requirements.
+   If the caller supplied a game or prompt, preserve its intent. Otherwise,
+   generate a random game concept and a concise playable implementation brief.
    For any 3D game, also pass `--label skill/load-sketchfab-threejs` when that
    label exists, and require the issue prompt to use the
    `load-sketchfab-threejs` skill for a suitable downloadable GLB asset while
