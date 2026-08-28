@@ -708,9 +708,8 @@ jobs:
             fi
           done
 
-          echo 'Final screenshots are still missing after three remediation attempts; continuing with delivery.'
-          printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"
-          printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
+          echo 'Final screenshots are still missing after three remediation attempts; refusing delivery.' >&2
+          exit 1
 
       - name: Create pull request
         id: delivery
