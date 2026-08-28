@@ -606,7 +606,7 @@ jobs:
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          FIX_PROMPT='The browser verification cannot reach the app through its public trycloudflare.com URL. Diagnose the current app and fix the public runtime, including dev-server host/allowed-host configuration or startup scripts if needed. Keep the app self-contained under project/, run the relevant tests, and do not just explain the problem. Make the fix in the workspace so the next verification attempt can run.'
+          FIX_PROMPT="$(< "$GITHUB_WORKSPACE/.github/prompts/public-app-fix.md")"
 
           for attempt in 1 2 3; do
             echo "Starting public app verification attempt $attempt/3."
@@ -680,11 +680,14 @@ jobs:
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          completion_prompt="$(< "$GITHUB_WORKSPACE/.github/prompts/completion-report.md")"
+          completion_prompt="${completion_prompt//@APP_URL@/$APP_URL}"
+          completion_prompt="${completion_prompt//@TRIGGER_ISSUE_NUMBER@/$TRIGGER_ISSUE_NUMBER}"
           "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
-            "The public game is verified at $APP_URL. Follow ./Agents.md now: capture and commit final playable-game screenshots under screenshots/ using final-* filenames, push the current branch, and post the final completion comment to issue #$TRIGGER_ISSUE_NUMBER. Include this public game URL, embedded screenshots, the final commit, deployment and test status, and known limitations. Do not create a pull request." \
+            "$completion_prompt" \
             > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
           touch "$OPENCODE_WEB_DIR/response-comment.done"
 
@@ -695,7 +698,7 @@ jobs:
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          SCREENSHOT_PROMPT='The final screenshot evidence is still missing. Use the already verified public game and a real browser now, capture at least one meaningful playable-game screenshot, save it under screenshots/ with a filename beginning with final- (for example screenshots/final-gameplay.png), commit and push it on the current branch, and update the triggering issue with the immutable screenshot URL. Do not just explain or claim completion without creating the image. Keep all work inside project/ and do not create a pull request.'
+          SCREENSHOT_PROMPT="$(< "$GITHUB_WORKSPACE/.github/prompts/screenshot-evidence.md")"
 
           for attempt in 1 2 3; do
             mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
