@@ -11,6 +11,12 @@
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
 In issue comments and workflow instructions, `oc` means OpenCode.
 
+## Ideas
+
+Store durable implementation ideas as individual Markdown files under
+`./ideas/`, using descriptive kebab-case filenames such as
+`ideas/opencode-oauth-env-auth.md`.
+
 ## Git delivery
 
 After every code change, commit and push the change.
