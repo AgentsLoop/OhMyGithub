@@ -114,7 +114,8 @@ This keeps the regular OpenCode session while making branch and PR behavior
 explicit and reviewable in YAML.
 Model labels are refreshed from the live OpenCode catalog on each run and are
 limited to models with zero input, output, and cache-read cost, plus the
-explicitly allowed `gpt-5.6-luna` model. Default GitHub labels are removed, and
+explicitly allowed `opencode/gpt-5.6-luna` and `openai/gpt-5.6-luna` models.
+Use `model/openai/gpt-5.6-luna` when the OpenAI provider is required. Default GitHub labels are removed, and
 the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
