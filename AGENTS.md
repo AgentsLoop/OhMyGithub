@@ -23,6 +23,7 @@ is committed.
 
 ## Git Commits
 - Write evidence-rich commit messages, not short subject-only messages. Use a specific subject and a body that records the motivating symptom or context, root cause, decision rationale and alternatives considered, material changes, verification performed, discovered Throughput bottlenecks or Hung commands, relevant Pitfalls and Gotchas, and known caveats or follow-up. Preserve the durable reasoning summary needed for diagnosis, rollback, and future extension.
+- Always include the current Codex chat/task ID in the commit message, using a clear field such as `Chat-ID: <chat-id>` in the body.
 
 ## Links in handoffs
 
@@ -78,4 +79,3 @@ ssh -i ~/.ssh/aiplay-agentsweb -p <port> runner@<run-name>.agentsweb.space
 ```
 
 The command works only while the corresponding Actions job is running.
-
