@@ -16,11 +16,36 @@ actionlint .github/workflows/opencode.yml
 git diff --check
 ```
 
+For goal support, also confirm the workflow trigger checks `/goal`, installs
+and configures `opencode-goal-plugin`, and branches the initial invocation to
+`opencode run --command goal` while leaving `/oc` and `/opencode` on the
+standard `opencode run` path. The configured
+`noInterruptOnUserMessage: true` option should remain visible in the generated
+OpenCode config.
+
+When a request contains `/goal`, verify that label synchronization creates the
+`/Goal` label and that `Mark issue in progress` applies it alongside
+`in progress`. Standard `/oc` and `/opencode` requests must not receive `/Goal`.
+
+For the `omo` issue label, verify that an otherwise normal `/oc` request causes
+the OpenCode startup step to install `oh-my-openagent` with Bun before starting
+the web server and launches `opencode ... --command goal` with `ulw` in the
+objective; an unlabelled `/oc` request must not run that installer, and the
+`omo` label alone must not trigger a workflow. The OMO config must use its
+native Goal command and must not register a compatibility `ulw-loop` command.
+
+The log-release step must copy and upload only non-empty `.log`/`.json` files;
+empty service logs such as `nginx.log` can make GitHub's upload API return
+`400 Bad Content-Length`. The OpenCode response JSON remains required and must
+be non-empty.
+
 Focused completion-evidence checks should also confirm that the workflow copies
-`agents.template.md` to `project/Agents.md`, and that a run fails before delivery
-when no `project/screenshots/final-*` image exists. A successful run must leave a
-final issue comment containing the public URL, final commit, PR, and embedded
-screenshots served from that immutable commit.
+`agents.template.md` to `project/Agents.md`, and that a run sends up to two
+same-session follow-up prompts when no `project/screenshots/final-*` image
+exists, with three total evidence checks. Missing screenshots warn and do not
+block delivery; when present, a successful run must leave a final issue comment
+containing the public URL, final commit, PR, and embedded screenshots served
+from that immutable commit.
 
 Watch a running workflow with live per-step logs using the same internal
 endpoints as the GitHub Actions web UI:

@@ -6,6 +6,11 @@
 - [Temporary Mac SSH access](wiki/access.md)
 - [Testing and verification](wiki/testing.md)
 
+## Main project file
+
+The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
+In issue comments and workflow instructions, `oc` means OpenCode.
+
 ## Git delivery
 
 After every code change, commit and push the change. For small code changes, amend
@@ -15,6 +20,9 @@ an amend and use `git push --force-with-lease`; do not leave a needless follow-u
 commit on the branch.
 Before running any workflow, verify that the working tree is clean and everything
 is committed.
+
+## Git Commits
+- Write evidence-rich commit messages, not short subject-only messages. Use a specific subject and a body that records the motivating symptom or context, root cause, decision rationale and alternatives considered, material changes, verification performed, discovered Throughput bottlenecks or Hung commands, relevant Pitfalls and Gotchas, and known caveats or follow-up. Preserve the durable reasoning summary needed for diagnosis, rollback, and future extension.
 
 ## Links in handoffs
 
@@ -70,3 +78,4 @@ ssh -i ~/.ssh/aiplay-agentsweb -p <port> runner@<run-name>.agentsweb.space
 ```
 
 The command works only while the corresponding Actions job is running.
+

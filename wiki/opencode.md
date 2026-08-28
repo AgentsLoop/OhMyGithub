@@ -6,9 +6,21 @@ The build and verification prompt templates are stored as Markdown files in
 
 ## Trigger
 
-`/oc <request>` or `/opencode <request>` can appear in a newly created or
-edited issue/PR title or body, an issue comment, or a pull-request review
-comment. Bot-authored events are ignored, so status comments do not recurse.
+`/oc <request>`, `/opencode <request>`, or `/goal <objective>` can appear in a
+newly created or edited issue/PR title or body, an issue comment, or a
+pull-request review comment. Bot-authored events are ignored, so status
+comments do not recurse. `/goal` selects the installed
+`opencode-goal-plugin`, configures `noInterruptOnUserMessage: true`, and starts
+the runner with `opencode run --command goal`; `/oc` and `/opencode` retain the
+standard `opencode run` path. A `/goal` trigger also automatically adds the
+`/Goal` GitHub issue label.
+
+An issue labeled `omo` additionally installs and configures the OpenCode Ultimate
+edition of `oh-my-openagent` with Bun before the OpenCode server starts. The
+installer runs non-interactively with provider authentication skipped; `/omo` is
+not a command and does not trigger a run by itself. An `omo`-labeled `/oc` run
+uses OMO's native `goal` command and prepends `ulw` to the objective. The Codex
+Light `ulw-loop` component is not recreated or registered for OpenCode.
 
 ## What the job does
 
@@ -23,9 +35,13 @@ comment. Bot-authored events are ignored, so status comments do not recurse.
    server-backed session store, then posts a direct URL to that live session.
 7. Verifies SSH connectivity.
 8. Replaces the access comment with aggregate OpenCode progress statistics and
-   refreshes it about every 10 seconds while the run is active. Message text,
-   reasoning, prompts, and tool details are never rendered in the live comment;
-   full logs are published only in the completion release.
+   refreshes it about every 10 seconds while the run is active. The report also
+   counts active child sessions from `/session/status` and all descendant
+   subagent sessions from their `parentID` lineage. It also reports inferred
+   image-context model calls by following image MIME attachments through each
+   session transcript. Message text, reasoning, prompts, and tool details are
+   never rendered in the live comment; full logs are published only in the
+   completion release.
 9. Runs a second verification prompt in the same OpenCode session as the build,
    starts the app, and exposes it through a
    separate temporary trycloudflare.com tunnel, and verifies the public URL.
@@ -33,12 +49,14 @@ comment. Bot-authored events are ignored, so status comments do not recurse.
    remediation prompt to the same OpenCode session and retries up to three
    times. Detects both uncommitted generated files and commits already created
    by OpenCode, then pushes the branch and creates the pull request in YAML.
-11. Gives the verified public URL back to the worker, requires committed final
+11. Gives the verified public URL back to the worker, requests committed final
     browser screenshots, and embeds immutable screenshot URLs with the game,
-    commit, and PR links in the triggering issue.
+    commit, and PR links in the triggering issue. If screenshots are missing,
+    it sends up to two follow-up prompts to the same OpenCode session before
+    continuing delivery with a warning.
 12. Creates a uniquely tagged GitHub release containing the final OpenCode
-    response JSON and safe runner log files, then adds the release and asset
-    download links to the final issue comment.
+    response JSON and safe runner log files, then adds only the release link
+    to the final issue comment.
 13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
    verification,
    then marks the comment closed and terminates both tunnels.
@@ -47,6 +65,13 @@ The comment URL opens `/<encoded-worktree>/session/<session-id>` rather than
 the web home page. This matters because the web home page stores its project
 selection in the browser, while the runner's project exists only on the
 temporary GitHub Actions filesystem.
+
+## Local tracker test
+
+On macOS, run `./scripts/test-opencode-progress-tracker.sh`. It starts a local
+mock OpenCode HTTP server with nested, active, and completed child sessions,
+including user and tool image attachments, then asserts the three derived
+progress counters.
 
 The workflow uses the built-in OpenCode model path and does not require an
 `OPENCODE_API_KEY` secret. Branch creation, pushing, and pull-request creation
@@ -63,6 +88,15 @@ opencode github run
 
 The workflow now sends the comment text directly to `opencode run --attach`.
 
+For the installed `opencode-goal-plugin`, invoke a goal from the non-interactive
+CLI with `opencode run --command goal "<objective>"`; passing `/goal <objective>`
+as the message sends literal text instead of invoking the custom command. To
+send a follow-up to the same attached session, use `opencode run --attach
+<server-url> --session <session-id> "<message>"`. In this workflow, the
+`/goal` marker is stripped from the objective before it is passed to the
+custom command, and later human messages steer the running goal instead of
+pausing it.
+
 Before starting OpenCode, the workflow checks out `agents-dev/skills` into
 `project/.agents`. OpenCode discovers project skills from
 `project/.agents/skills/**/SKILL.md`.
@@ -78,9 +112,8 @@ limited to models with zero input, output, and cache-read cost. Default GitHub
 labels are removed, and the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
-`model/opencode/x-preview-f-free` label, which is the catalog ID for Ox Alpha
-Free; if that label is unavailable, the skill records that it used the
-workflow default instead.
+`model/opencode/muse-spark-1.2-contributor-free` label; if that label is
+unavailable, the skill records that it used the workflow default instead.
 
 The workflow starts OpenCode Web from `$GITHUB_WORKSPACE/project` and uses the
 same directory for OpenCode runs, so both browser-created sessions and generated
