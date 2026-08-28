@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Spider Swing - City Traversal</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a1020;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#fff}
+#canvas{width:100%;height:100%;display:block}
+#hud{position:absolute;inset:0;pointer-events:none}
+#topBar{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pill{background:rgba(0,0,0,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:8px 14px;font-size:13px;display:flex;align-items:center;gap:8px;min-width:110px}
+.pill b{color:#ff3040}
+#crosshair{position:absolute;left:50%;top:50%;width:28px;height:28px;transform:translate(-50%,-50%)}
+#crosshair:before,#crosshair:after{content:'';position:absolute;background:rgba(255,255,255,.95);box-shadow:0 0 6px #ff3040}
+#crosshair:before{left:50%;top:0;width:2px;height:100%;transform:translateX(-50%)}
+#crosshair:after{top:50%;left:0;width:100%;height:2px;transform:translateY(-50%)}
+#crosshair div{position:absolute;left:50%;top:50%;width:10px;height:10px;border:2px solid #ff3040;border-radius:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,.15)}
+#controlsHelp{position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,.55);border-radius:10px;padding:10px 12px;font-size:11px;line-height:1.5;border:1px solid rgba(255,255,255,.12);max-width:420px}
+#controlsHelp b{color:#6ec7ff}
+#minimap{position:absolute;top:10px;right:10px;width:160px;height:160px;background:rgba(0,0,0,.55);border-radius:12px;border:1px solid rgba(255,255,255,.15);overflow:hidden}
+#minimap canvas{width:100%;height:100%}
+#overlay{position:absolute;inset:0;background:radial-gradient(800px 500px at 50% 20%,#1a2a6a 0%,#0a1020 60%,#04070f 100%);display:flex;align-items:center;justify-content:center;z-index:10;padding:18px}
+#panel{max-width:560px;width:100%;background:rgba(8,14,30,.9);border:1px solid rgba(255,255,255,.15);border-radius:18px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.6);text-align:center}
+#panel h1{font-size:34px;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:10px}
+#panel h1 span.spid{color:#ff3040;text-shadow:0 0 16px rgba(255,48,64,.6)}
+#panel p{font-size:13px;color:#cbd5e1;line-height:1.6;margin:10px 0}
+.badge{display:inline-block;background:linear-gradient(90deg,#ff3040,#3a86ff);padding:6px 12px;border-radius:999px;font-weight:700;font-size:12px;letter-spacing:.08em}
+.btn{display:inline-block;margin:8px 6px 0;padding:12px 22px;border-radius:12px;border:0;font-weight:800;letter-spacing:.04em;cursor:pointer;font-size:14px}
+.btn-primary{background:#ff3040;color:#fff;box-shadow:0 8px 24px rgba(255,48,64,.4)}
+.btn-ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15)}
+.kbd{display:inline-block;border:1px solid rgba(255,255,255,.25);border-bottom-width:2px;background:rgba(255,255,255,.08);padding:1px 6px;border-radius:6px;font-size:11px;margin:0 2px}
+#speedBar{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:min(420px,70vw);height:8px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden;pointer-events:none}
+#speedFill{height:100%;width:0%;background:linear-gradient(90deg,#ff3040,#ffd166,#3aff66);transition:width .1s}
+#touch{position:absolute;inset:0;pointer-events:none}
+.joystick{position:absolute;left:14px;bottom:14px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);pointer-events:auto;touch-action:none}
+.stick{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.tbtn{position:absolute;right:14px;bottom:14px;display:flex;flex-direction:column;gap:10px;pointer-events:auto}
+.tbtn button{width:74px;height:74px;border-radius:50%;border:0;font-weight:900;font-size:12px;letter-spacing:.06em;box-shadow:0 8px 22px rgba(0,0,0,.35);cursor:pointer}
+#tShoot{background:radial-gradient(circle at 30% 30%,#ff6b7a,#ff3040);color:#fff;border:2px solid rgba(255,255,255,.7)}
+#tZip{background:radial-gradient(circle at 30% 30%,#7ab8ff,#3a86ff);color:#fff;border:2px solid rgba(255,255,255,.7)}
+#tJump{background:rgba(255,255,255,.9);color:#0a1020}
+#pauseHint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);padding:10px 16px;border-radius:999px;font-size:13px;display:none}
+@media(max-width:700px){#controlsHelp{display:none}#minimap{width:120px;height:120px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="hud">
+  <div id="topBar">
+    <div class="pill">🕷 <b id="score">0</b> &nbsp; Rings <span id="rings">0/18</span></div>
+    <div class="pill">ALT <b id="alt">0</b>m</div>
+    <div class="pill">SPD <b id="spd">0</b> km/h</div>
+    <div class="pill" id="swingState">READY</div>
+  </div>
+  <div id="crosshair"><div></div></div>
+  <div id="controlsHelp">
+    <b>PC:</b> <span class="kbd">WASD</span> air strafe &nbsp;<span class="kbd">Mouse</span> look (drag/pointer-lock) &nbsp;<span class="kbd">Left Click</span> Web-Swing &nbsp;<span class="kbd">Right Click</span> Web-Zip &nbsp;<span class="kbd">SPACE</span> Jump/Detach &nbsp;<span class="kbd">Q</span><span class="kbd">E</span> reel &nbsp;<span class="kbd">ESC</span>/<span class="kbd">P</span> Pause<br>
+    <b>Mobile:</b> left joystick move · SHOOT swing · ZIP zip · JUMP
+  </div>
+  <div id="minimap"><canvas id="mini" width="160" height="160"></canvas></div>
+  <div id="speedBar"><div id="speedFill"></div></div>
+  <div id="pauseHint">PAUSED — Press P or Resume</div>
+</div>
+<div id="touch">
+  <div class="joystick" id="joy"><div class="stick" id="stick"></div></div>
+  <div class="tbtn">
+    <button id="tShoot">SHOOT</button>
+    <button id="tZip">ZIP</button>
+    <button id="tJump">JUMP</button>
+  </div>
+</div>
+<div id="overlay">
+  <div id="panel">
+    <div class="badge">SPIDER-SWING · CITY TRAVERSAL</div>
+    <h1><span class="spid">SPIDER</span> SWING</h1>
+    <p><b>Story:</b> A new wave of signal drones has scattered 18 spider-rings across the skyline. Swing, zip and wall-run to recover them. Master momentum — your webs are real pendulums.</p>
+    <p>Tip: Swing side-to-side to pump, release at the bottom for max speed. Zip (right click) to perch. Hold <span class="kbd">Q</span> to shorten web for tighter arcs.</p>
+    <div>
+      <button class="btn btn-primary" id="playBtn">▶ PLAY — SWING</button>
+      <button class="btn btn-ghost" id="howBtn">How to swing?</button>
+    </div>
+    <p style="font-size:11px;opacity:.75">Pointer-lock on desktop gives immersive look. On mobile use touch + drag on screen to look. No build step — pure Three.js.</p>
+    <p id="howText" style="display:none;background:rgba(255,255,255,.06);border-radius:10px;padding:10px;font-size:12px">1) Aim crosshair at building → Left Click to fire web. You attach only if surface hit within 140m.<br>2) You become a pendulum — <span class="kbd">W</span> to pump forward, <span class="kbd">A/D</span> to strafe, <span class="kbd">Q/E</span> reel in/out.<br>3) Press <span class="kbd">SPACE</span> at lowest point to launch far. Right-Click zip instantly pulls you to aim point.<br>4) Collect gold rings for score. Fall resets at 20 m.</p>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ---------- renderer / scene ----------
+const canvas=document.getElementById('canvas');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x0a162e,0.008);
+scene.background=new THREE.Color(0x0a162e);
+
+const camera=new THREE.PerspectiveCamera(78,innerWidth/innerHeight,0.1,2000);
+let yaw=Math.PI*0.15, pitch=0.08;
+const cameraOffset=new THREE.Vector3();
+
+const ambient=new THREE.HemisphereLight(0x8fb8ff,0x0a0a0a,0.9);
+scene.add(ambient);
+const sun=new THREE.DirectionalLight(0xffffff,1.2);
+sun.position.set(120,180,60);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.near=1; sun.shadow.camera.far=500;
+sun.shadow.camera.left=-200; sun.shadow.camera.right=200; sun.shadow.camera.top=200; sun.shadow.camera.bottom=-200;
+scene.add(sun);
+
+// ground
+const groundGeo=new THREE.PlaneGeometry(1200,1200);
+const groundMat=new THREE.MeshStandardMaterial({color:0x0e1a33,roughness:0.95,metalness:0});
+const ground=new THREE.Mesh(groundGeo,groundMat);
+ground.rotation.x=-Math.PI/2;
+ground.receiveShadow=true;
+ground.position.y=0;
+scene.add(ground);
+const grid=new THREE.GridHelper(1200,60,0x1a2f66,0x13224a);
+grid.position.y=0.1; scene.add(grid);
+
+// clouds
+for(let i=0;i<6;i++){
+  const g=new THREE.SphereGeometry(40+Math.random()*30,12,8);
+  const m=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.06});
+  const cl=new THREE.Mesh(g,m);
+  cl.position.set((Math.random()-0.5)*800, 180+Math.random()*80, (Math.random()-0.5)*800);
+  cl.scale.set(2,0.6,1.2);
+  scene.add(cl);
+}
+
+// ---------- buildings ----------
+function makeWindowTexture(){
+  const c=document.createElement('canvas'); c.width=256; c.height=256;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#0a142e'; ctx.fillRect(0,0,256,256);
+  ctx.fillStyle='#182a55';
+  for(let y=8;y<256;y+=18){
+    for(let x=8;x<256;x+=14){
+      const lit=Math.random()>0.32;
+      ctx.fillStyle=lit? (Math.random()>0.2?'#ffdd66':'#8fd0ff') : '#0e1e3f';
+      ctx.fillRect(x,y,9,11);
+      if(lit && Math.random()>0.7){ ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.fillRect(x,y,9,2);}
+    }
+  }
+  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.colorSpace=THREE.SRGBColorSpace; return tex;
+}
+const winTex=makeWindowTexture();
+const cityGroup=new THREE.Group(); scene.add(cityGroup);
+const raycastTargets=[];
+const buildings=[];
+const citySize=7; // grid radius
+let count=0;
+for(let x=-citySize;x<=citySize;x++){
+ for(let z=-citySize;z<=citySize;z++){
+  if(Math.abs(x)<1 && Math.abs(z)<1) continue;
+  if(Math.random()>0.78) continue;
+  const w=8+Math.random()*10;
+  const d=8+Math.random()*10;
+  const h=18+Math.random()*75;
+  const cx=x*28 + (Math.random()-0.5)*6;
+  const cz=z*28 + (Math.random()-0.5)*6;
+  const geo=new THREE.BoxGeometry(w,h,d);
+  const mat=new THREE.MeshStandardMaterial({map:winTex,emissive:0x111111,emissiveMap:winTex,emissiveIntensity:0.55,roughness:0.7,metalness:0.08});
+  // vary texture repeat
+  winTex.repeat.set(1,1);
+  const m=new THREE.Mesh(geo,mat);
+  m.position.set(cx,h/2,cz);
+  m.castShadow=true; m.receiveShadow=true;
+  // rooftop
+  const topGeo=new THREE.BoxGeometry(w+1,1.2,d+1);
+  const topMat=new THREE.MeshStandardMaterial({color:0x18284f,roughness:0.8});
+  const top=new THREE.Mesh(topGeo,topMat);
+  top.position.y=h/2+0.6; m.add(top);
+  // antenna
+  if(Math.random()>0.6){
+    const ant=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,6,6), new THREE.MeshStandardMaterial({color:0xff3040}));
+    ant.position.y=h/2+3; top.add(ant);
+  }
+  cityGroup.add(m);
+  raycastTargets.push(m);
+  buildings.push({mesh:m, x:cx,z:cz,w,h,d});
+  count++; if(count>=38) break;
+ }
+ if(count>=38) break;
+}
+// ensure at least 30
+while(buildings.length<30){
+  const x=(Math.random()-0.5)*360, z=(Math.random()-0.5)*360;
+  const w=10,d=10,h=35+Math.random()*60;
+  const geo=new THREE.BoxGeometry(w,h,d);
+  const mat=new THREE.MeshStandardMaterial({map:winTex,emissive:0x111111,emissiveIntensity:0.5});
+  const m=new THREE.Mesh(geo,mat); m.position.set(x,h/2,z); m.castShadow=true; m.receiveShadow=true; cityGroup.add(m); raycastTargets.push(m); buildings.push({mesh:m,x,z,w,h,d});
+}
+
+// ---------- collectibles (rings) ----------
+const rings=[];
+const ringGeo=new THREE.TorusGeometry(3.2,0.45,12,22);
+const ringMat=new THREE.MeshStandardMaterial({color:0xffd166,emissive:0xffa000,emissiveIntensity:0.6,roughness:0.3,metalness:0.2});
+for(let i=0;i<18;i++){
+  const m=new THREE.Mesh(ringGeo,ringMat.clone());
+  // place between buildings airborne
+  const b=buildings[Math.floor(Math.random()*buildings.length)];
+  m.position.set(b.x+(Math.random()-0.5)*18, 22+Math.random()*42, b.z+(Math.random()-0.5)*18);
+  m.rotation.y=Math.random()*Math.PI;
+  m.userData.spin=Math.random()*2+1;
+  m.userData.phase=Math.random()*Math.PI*2;
+  m.castShadow=false;
+  scene.add(m);
+  rings.push(m);
+  // light
+  const pt=new THREE.PointLight(0xffd166,1.5,18); pt.position.copy(m.position); scene.add(pt); m.userData.light=pt;
+}
+
+// ---------- player ----------
+const playerGroup=new THREE.Group(); scene.add(playerGroup);
+// simple spiderman: capsule + parts
+const bodyMat=new THREE.MeshStandardMaterial({color:0xd80a1a,roughness:0.45});
+const blueMat=new THREE.MeshStandardMaterial({color:0x0a2a8a,roughness:0.5});
+const skinMat=new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:0.6});
+const headGeo=new THREE.SphereGeometry(0.55,16,12);
+const head=new THREE.Mesh(headGeo,new THREE.MeshStandardMaterial({color:0xc8101a,roughness:0.4}));
+head.position.y=1.05;
+playerGroup.add(head);
+// eyes
+const eyeGeo=new THREE.SphereGeometry(0.22,10,8);
+const eyeMat=new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:0.4});
+const eyeL=new THREE.Mesh(eyeGeo,eyeMat); eyeL.scale.set(1,1.3,0.3); eyeL.position.set(-0.22,1.08,0.42);
+const eyeR=eyeL.clone(); eyeR.position.x=0.22;
+playerGroup.add(eyeL,eyeR);
+// torso
+const torso=new THREE.Mesh(new THREE.CapsuleGeometry(0.5,0.9,4,12), bodyMat);
+torso.position.y=0.25; playerGroup.add(torso);
+// spider emblem
+const emblem=new THREE.Mesh(new THREE.CircleGeometry(0.18,12), new THREE.MeshBasicMaterial({color:0x0a0a0a}));
+emblem.position.set(0,0.4,0.51); emblem.rotation.x=0; torso.add(emblem);
+// arms
+const armGeo=new THREE.CapsuleGeometry(0.16,0.7,4,8);
+const armL=new THREE.Mesh(armGeo, blueMat); armL.position.set(-0.62,0.35,0); armL.rotation.z=0.2;
+const armR=armL.clone(); armR.position.x=0.62; armR.rotation.z=-0.2;
+playerGroup.add(armL,armR);
+// legs
+const legGeo=new THREE.CapsuleGeometry(0.18,0.75,4,8);
+const legL=new THREE.Mesh(legGeo, blueMat); legL.position.set(-0.22,-0.55,0);
+const legR=legL.clone(); legR.position.x=0.22;
+playerGroup.add(legL,legR);
+// shadow blob
+const shadowBlob=new THREE.Mesh(new THREE.CircleGeometry(1.1,16), new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.35}));
+shadowBlob.rotation.x=-Math.PI/2; shadowBlob.position.y=0.05; scene.add(shadowBlob);
+
+const state={
+  pos:new THREE.Vector3(0,38,24),
+  vel:new THREE.Vector3(0,0,0),
+  onGround:false,
+  isSwinging:false,
+  isZipping:false,
+  anchor:new THREE.Vector3(),
+  ropeLength:40,
+  score:0,
+  collected:0,
+  zipTarget:new THREE.Vector3(),
+  zipTime:0,
+};
+playerGroup.position.copy(state.pos);
+
+// web line
+const webGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+const webMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.9});
+const webLine=new THREE.Line(webGeo,webMat); scene.add(webLine);
+const webHitMarker=new THREE.Mesh(new THREE.SphereGeometry(0.35,10,10), new THREE.MeshBasicMaterial({color:0xffffff}));
+webHitMarker.visible=false; scene.add(webHitMarker);
+
+// particles
+const particles=[];
+function spawnParticles(p, n=10){
+  for(let i=0;i<n;i++){
+    const s=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,6), new THREE.MeshBasicMaterial({color:0xffffff}));
+    s.position.copy(p);
+    s.userData.vel=new THREE.Vector3((Math.random()-0.5)*14, Math.random()*10, (Math.random()-0.5)*14);
+    s.userData.life=0.6; scene.add(s); particles.push(s);
+  }
+}
+
+// ---------- input ----------
+const keys={};
+addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Space'){ if(state.isSwinging) detach(false); else if(state.onGround) state.vel.y=14; }
+  if(e.code==='KeyQ') reel(-1);
+  if(e.code==='KeyE') reel(1);
+  if(e.code==='KeyP' || e.code==='Escape') togglePause();
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+
+let isPointerLocked=false;
+canvas.addEventListener('click',()=>{
+  if(overlay.style.display!=='none') return;
+  if(!isPointerLocked) canvas.requestPointerLock();
+});
+document.addEventListener('pointerlockchange',()=>{
+  isPointerLocked=document.pointerLockElement===canvas;
+});
+addEventListener('mousemove',e=>{
+  if(overlay.style.display!=='none' || paused) return;
+  const mx=e.movementX||0, my=e.movementY||0;
+  if(isPointerLocked || e.buttons===1){
+    yaw-=mx*0.0022; pitch-=my*0.0022;
+    pitch=Math.max(-1.35,Math.min(1.35,pitch));
+  }
+});
+// touch look
+let lookTouchId=null, lastTx=0,lastTy=0;
+canvas.addEventListener('touchstart',e=>{
+  for(const t of e.changedTouches){
+    if(t.clientX>120 || t.clientY< window.innerHeight-160){
+      if(lookTouchId===null){ lookTouchId=t.identifier; lastTx=t.clientX; lastTy=t.clientY; }
+    }
+  }
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier===lookTouchId){
+      const dx=t.clientX-lastTx, dy=t.clientY-lastTy;
+      yaw-=dx*0.004; pitch-=dy*0.004; pitch=Math.max(-1.35,Math.min(1.35,pitch));
+      lastTx=t.clientX; lastTy=t.clientY;
+    }
+  }
+  e.preventDefault();
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  for(const t of e.changedTouches) if(t.identifier===lookTouchId) lookTouchId=null;
+});
+
+const raycaster=new THREE.Raycaster();
+function getAimRay(){
+  // from camera forward
+  const dir=new THREE.Vector3(); camera.getWorldDirection(dir);
+  return {origin:camera.position.clone(), dir};
+}
+function trySwing(){
+  const {origin,dir}=getAimRay();
+  raycaster.set(origin,dir);
+  const hits=raycaster.intersectObjects(raycastTargets,false);
+  if(hits.length && hits[0].distance<140){
+    const p=hits[0].point;
+    attachSwing(p);
+    spawnParticles(p,12);
+    webHitMarker.position.copy(p); webHitMarker.visible=true; setTimeout(()=>webHitMarker.visible=false,320);
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(30);
+  } else {
+    // miss buzz
+    const el=document.getElementById('swingState'); el.textContent='MISS'; setTimeout(()=>el.textContent=state.isSwinging?'SWINGING':'READY',400);
+  }
+}
+function tryZip(){
+  const {origin,dir}=getAimRay();
+  raycaster.set(origin,dir);
+  const hits=raycaster.intersectObjects(raycastTargets,false);
+  const fallback=origin.clone().add(dir.clone().multiplyScalar(80));
+  const target=hits.length && hits[0].distance<160 ? hits[0].point.clone() : fallback;
+  // offset a bit from surface
+  if(hits.length) target.add(hits[0].face.normal.clone().multiplyScalar(1.2));
+  startZip(target);
+}
+
+function attachSwing(point){
+  state.isSwinging=true;
+  state.isZipping=false;
+  state.anchor.copy(point);
+  state.ropeLength=Math.min( Math.max(state.pos.distanceTo(point)*0.98, 8), 90);
+  document.getElementById('swingState').textContent='SWINGING';
+  document.getElementById('swingState').style.color='#ff3040';
+}
+function detach(withBoost=true){
+  if(!state.isSwinging) return;
+  state.isSwinging=false;
+  document.getElementById('swingState').textContent='READY';
+  document.getElementById('swingState').style.color='';
+  if(withBoost){
+    // keep velocity, add small boost along tangent
+    // already preserved
+  }
+}
+function startZip(target){
+  state.isZipping=true;
+  state.isSwinging=false;
+  state.zipTarget.copy(target);
+  state.zipTime=0.65;
+  state.vel.set(0,0,0);
+  document.getElementById('swingState').textContent='ZIPPING';
+}
+function reel(dir){
+  if(!state.isSwinging) return;
+  state.ropeLength=Math.max(6, Math.min(90, state.ropeLength+dir*2.2));
+}
+addEventListener('wheel',e=>{
+  if(state.isSwinging){ state.ropeLength=Math.max(6,Math.min(90, state.ropeLength + Math.sign(e.deltaY)*2)); }
+});
+
+// mouse buttons
+canvas.addEventListener('mousedown',e=>{
+  if(overlay.style.display!=='none' || paused) return;
+  if(e.button===0) trySwing();
+  if(e.button===2) tryZip();
+});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('mouseup',e=>{ if(e.button===0 && state.isSwinging) { /* hold */ }});
+
+// keyboard swing
+addEventListener('mousedown',()=>{});
+addEventListener('keydown',e=>{
+  if(e.code==='KeyF') trySwing();
+  if(e.code==='KeyX') tryZip();
+});
+
+// touch buttons
+let shootHeld=false;
+document.getElementById('tShoot').addEventListener('touchstart',e=>{e.preventDefault(); trySwing(); shootHeld=true;});
+document.getElementById('tShoot').addEventListener('touchend',e=>{e.preventDefault(); shootHeld=false;});
+// keep swinging while held? release on second tap detach
+document.getElementById('tShoot').addEventListener('click',()=>{ if(state.isSwinging) detach(); else trySwing(); });
+document.getElementById('tZip').addEventListener('touchstart',e=>{e.preventDefault(); tryZip();});
+document.getElementById('tZip').addEventListener('click',tryZip);
+document.getElementById('tJump').addEventListener('touchstart',e=>{e.preventDefault(); if(state.isSwinging) detach(true); else if(state.onGround) state.vel.y=14; else state.vel.y=Math.max(state.vel.y,6);});
+document.getElementById('tJump').addEventListener('click',()=>{ if(state.isSwinging) detach(true); else if(state.onGround) state.vel.y=14;});
+
+// joystick
+const joy=document.getElementById('joy'), stick=document.getElementById('stick');
+let joyActive=false, joyVec={x:0,y:0};
+function joyPos(e){
+  const r=joy.getBoundingClientRect();
+  const t=e.touches?e.touches[0]:e;
+  let x=t.clientX - (r.left+r.width/2), y=t.clientY - (r.top+r.height/2);
+  const mag=Math.hypot(x,y), max=42;
+  if(mag>max){ x=x/mag*max; y=y/mag*max; }
+  stick.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%)`;
+  joyVec.x=x/max; joyVec.y=y/max;
+}
+joy.addEventListener('touchstart',e=>{joyActive=true; joyPos(e); e.preventDefault();},{passive:false});
+joy.addEventListener('touchmove',e=>{if(joyActive) joyPos(e); e.preventDefault();},{passive:false});
+joy.addEventListener('touchend',e=>{joyActive=false; joyVec.x=0; joyVec.y=0; stick.style.transform='translate(-50%,-50%)';});
+joy.addEventListener('mousedown',e=>{
+  joyActive=true;
+  const mv=ev=>{ if(!joyActive) return; const r=joy.getBoundingClientRect(); let x=ev.clientX-(r.left+r.width/2), y=ev.clientY-(r.top+r.height/2); const mag=Math.hypot(x,y),max=42; if(mag>max){x=x/mag*max;y=y/mag*max} stick.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%)`; joyVec.x=x/max; joyVec.y=y/max; };
+  const up=()=>{joyActive=false; joyVec.x=0;joyVec.y=0; stick.style.transform='translate(-50%,-50%)'; removeEventListener('mousemove',mv); removeEventListener('mouseup',up);};
+  addEventListener('mousemove',mv); addEventListener('mouseup',up);
+  mv(e);
+});
+
+// ---------- pause / overlay ----------
+const overlay=document.getElementById('overlay');
+const pauseHint=document.getElementById('pauseHint');
+let paused=false;
+function togglePause(){
+  if(overlay.style.display!=='none') return;
+  paused=!paused;
+  pauseHint.style.display=paused?'block':'none';
+}
+document.getElementById('playBtn').addEventListener('click',()=>{
+  overlay.style.display='none';
+  paused=false;
+  // gentle forward push
+  state.vel.set(0,2, -6);
+  canvas.requestPointerLock();
+});
+document.getElementById('howBtn').addEventListener('click',()=>{
+  const t=document.getElementById('howText');
+  t.style.display=t.style.display==='none'?'block':'none';
+});
+addEventListener('keydown',e=>{ if(e.code==='KeyP') togglePause(); });
+
+// ---------- minimap ----------
+const mini=document.getElementById('mini');
+const miniCtx=mini.getContext('2d');
+
+// ---------- physics loop ----------
+let last=performance.now();
+const gravity=new THREE.Vector3(0,-28,0);
+const tmp=new THREE.Vector3();
+
+function updatePhysics(dt){
+  if(paused) return;
+  // input strafe (air control)
+  const forward=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+  // careful: yaw 0 looks toward +Z? adjust
+  // our yaw: direction vector
+  const camFwd=new THREE.Vector3(); // actual camera forward projected
+  camFwd.set(Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), Math.cos(yaw)*Math.cos(pitch));
+  const right=new THREE.Vector3().crossVectors(camFwd, new THREE.Vector3(0,1,0)).normalize();
+  // WASD force
+  let ax=0,az=0;
+  if(keys['KeyW']||keys['ArrowUp']) az+=1;
+  if(keys['KeyS']||keys['ArrowDown']) az-=1;
+  if(keys['KeyA']||keys['ArrowLeft']) ax-=1;
+  if(keys['KeyD']||keys['ArrowRight']) ax+=1;
+  // joystick
+  ax+=joyVec.x; az+=-joyVec.y;
+
+  const move=new THREE.Vector3();
+  if(ax!==0||az!==0){
+    // combine relative to yaw
+    const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+    const r=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+    // normalize
+    move.addScaledVector(f, az).addScaledVector(r, ax);
+    if(move.length()>1) move.normalize();
+  }
+
+  if(state.isZipping){
+    state.zipTime-=dt;
+    const to=state.zipTarget.clone().sub(state.pos);
+    const dist=to.length();
+    if(dist<1.2 || state.zipTime<=0){
+      state.pos.copy(state.zipTarget);
+      // give outward velocity
+      const dir=camFwd.clone(); dir.y=Math.max(dir.y,0.15);
+      state.vel.copy(dir.multiplyScalar(22));
+      state.isZipping=false;
+      document.getElementById('swingState').textContent='READY';
+      spawnParticles(state.pos,10);
+    } else {
+      const speed=58 + dist*0.6;
+      state.vel.copy(to.normalize().multiplyScalar(speed));
+      state.pos.addScaledVector(state.vel, dt);
+      // trail
+      state.vel.y+=2*dt*10;
+    }
+  } else if(state.isSwinging){
+    // pendulum
+    // gravity
+    state.vel.addScaledVector(gravity, dt);
+    // air strafe tangential
+    if(move.length()){
+      // project move onto tangent plane
+      const toAnchor=state.anchor.clone().sub(state.pos);
+      const radial=toAnchor.clone().normalize();
+      // remove radial component
+      const tangent=move.clone().sub(radial.clone().multiplyScalar(move.dot(radial)));
+      state.vel.addScaledVector(tangent, 28*dt);
+    }
+    // shorten/length via Q/E already
+    // reel with hold?
+    if(keys['KeyQ']) reel(-1*dt*8);
+    if(keys['KeyE']) reel(1*dt*8);
+
+    state.pos.addScaledVector(state.vel, dt);
+
+    // constraint to sphere
+    const offset=state.pos.clone().sub(state.anchor);
+    const dist=offset.length();
+    if(dist> state.ropeLength){
+      const n=offset.clone().normalize();
+      state.pos.copy(state.anchor.clone().addScaledVector(n, state.ropeLength));
+      // remove radial velocity component (inelastic except small bounce)
+      const vDotN=state.vel.dot(n);
+      if(vDotN>0){
+        // moving outward, project out
+        state.vel.addScaledVector(n, -vDotN*1.02); // slight elasticity
+      } else {
+        // moving inward allowed but damp radial inward a bit
+        // state.vel.addScaledVector(n, -vDotN*0.1);
+      }
+      // apply small damping along tangent
+      state.vel.multiplyScalar(0.998);
+    }
+    // auto detach if rope too slack or ground?
+    if(dist<2) detach(false);
+  } else {
+    // freefall / ground
+    state.vel.addScaledVector(gravity, dt);
+    if(move.length()){
+      const accel= state.onGround ? 42 : 18;
+      state.vel.addScaledVector(move, accel*dt);
+      // cap horizontal speed
+      const horiz=new THREE.Vector3(state.vel.x,0,state.vel.z);
+      const maxSpd= state.onGround? 14 : 26;
+      if(horiz.length()>maxSpd){
+        horiz.normalize().multiplyScalar(maxSpd);
+        state.vel.x=horiz.x; state.vel.z=horiz.z;
+      }
+    }
+    // drag
+    state.vel.x*= (1 - (state.onGround? 0.08:0.015));
+    state.vel.z*= (1 - (state.onGround? 0.08:0.015));
+    state.pos.addScaledVector(state.vel, dt);
+  }
+
+  // ground collision
+  if(state.pos.y<1.1){
+    state.pos.y=1.1;
+    if(state.vel.y<0) state.vel.y=0;
+    state.onGround=true;
+    // friction already
+  } else state.onGround=false;
+
+  // building collision simple push out
+  for(const b of buildings){
+    const halfW=b.w/2+0.9, halfD=b.d/2+0.9;
+    const dx=state.pos.x-b.x, dz=state.pos.z-b.z;
+    if(Math.abs(dx)<halfW && Math.abs(dz)<halfD){
+      // check vertical overlap
+      if(state.pos.y < b.h && state.pos.y > 0){
+        // push out to nearest edge
+        const px = halfW - Math.abs(dx), pz = halfD - Math.abs(dz);
+        if(px < pz){
+          state.pos.x += Math.sign(dx)* (px+0.05);
+          state.vel.x *= -0.2;
+          // wall run hint: allow wall cling
+          if(state.isSwinging===false && Math.abs(state.vel.y)<8 && (keys['KeyW']||joyVec.y< -0.2)){
+            state.vel.y = Math.max(state.vel.y, -2);
+          }
+        } else {
+          state.pos.z += Math.sign(dz)* (pz+0.05);
+          state.vel.z *= -0.2;
+          if(state.isSwinging===false && Math.abs(state.vel.y)<8) state.vel.y=Math.max(state.vel.y,-2);
+        }
+      }
+    }
+  }
+
+  // respawn if fall too low (void) - already ground, but if y < -20 reset
+  if(state.pos.y<-18){
+    state.pos.set(0,45,0); state.vel.set(0,0,0); state.isSwinging=false; state.isZipping=false;
+  }
+
+  // collect rings
+  for(let i=rings.length-1;i>=0;i--){
+    const r=rings[i];
+    if(r.visible===false) continue;
+    if(state.pos.distanceTo(r.position)<3.4){
+      r.visible=false; if(r.userData.light) r.userData.light.visible=false;
+      state.score+=250; state.collected++;
+      spawnParticles(r.position,14);
+      // speed bonus
+      state.vel.multiplyScalar(1.06);
+      updateHUD(true);
+    }
+  }
+
+  playerGroup.position.copy(state.pos);
+  // animate spider pose
+  const speed=state.vel.length();
+  const t=performance.now()*0.001;
+  if(state.isSwinging){
+    const toAnchor=state.anchor.clone().sub(state.pos).normalize();
+    // orient toward swing direction
+    const look=new THREE.Vector3().copy(state.vel).normalize();
+    if(look.length()>0.1){
+      const targetYaw=Math.atan2(look.x, look.z);
+      playerGroup.rotation.y+= (targetYaw - playerGroup.rotation.y)*0.12;
+    }
+    // lean
+    playerGroup.rotation.z= Math.sin(t*2.2)*0.15 + (state.vel.x*0.02);
+    playerGroup.rotation.x= Math.max(-0.9, Math.min(0.9, toAnchor.y*0.9)) + Math.sin(t*4)*0.08;
+    armL.rotation.x=Math.sin(t*9)*0.5; armR.rotation.x=-Math.sin(t*9)*0.5;
+    legL.rotation.x=0.35; legR.rotation.x=0.35;
+  } else if(!state.onGround){
+    playerGroup.rotation.x+= ( -0.15 - playerGroup.rotation.x)*0.06;
+    playerGroup.rotation.z*=0.92;
+    armL.rotation.x= -0.7 + Math.sin(t*6)*0.25; armR.rotation.x= -0.7 - Math.sin(t*6)*0.25;
+    legL.rotation.x= -0.2; legR.rotation.x= -0.2;
+  } else {
+    playerGroup.rotation.x*=0.85; playerGroup.rotation.z*=0.85; playerGroup.rotation.y+= (yaw - playerGroup.rotation.y)*0.08;
+    armL.rotation.x*=0.9; armR.rotation.x*=0.9; legL.rotation.x*=0.9; legR.rotation.x*=0.9;
+  }
+
+  shadowBlob.position.set(state.pos.x, 0.06, state.pos.z);
+  const h=Math.max(0, state.pos.y);
+  shadowBlob.material.opacity=Math.max(0, 0.35*(1 - Math.min(h,70)/70));
+  shadowBlob.scale.setScalar(1 + h*0.02);
+
+  // web line
+  if(state.isSwinging){
+    const pts=[state.pos.clone().add(new THREE.Vector3(0.3,0.8,0)), state.anchor.clone()];
+    // add slight sag
+    const mid=pts[0].clone().lerp(pts[1],0.5); mid.y-=1.2;
+    // for line we just two points; sag approximated via opacity
+    webGeo.setFromPoints(pts);
+    webLine.visible=true;
+  } else if(state.isZipping){
+    webGeo.setFromPoints([state.pos.clone().add(new THREE.Vector3(0,0.5,0)), state.zipTarget.clone()]);
+    webLine.visible=true; webLine.material.opacity=0.5;
+  } else webLine.visible=false;
+
+  // camera follow
+  const desired=new THREE.Vector3();
+  const camDist= state.isSwinging ? 9 : 8;
+  const camHeight= state.isSwinging? 3.2: 2.8;
+  // forward from yaw/pitch
+  // place camera behind player relative to look direction
+  const fwd=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), Math.cos(yaw)*Math.cos(pitch));
+  desired.copy(state.pos).sub(fwd.clone().multiplyScalar(camDist)).add(new THREE.Vector3(0,camHeight,0));
+  // avoid building clipping: raycast from player to camera
+  const toCam=desired.clone().sub(state.pos);
+  raycaster.set(state.pos.clone().add(new THREE.Vector3(0,1,0)), toCam.clone().normalize());
+  const hits=raycaster.intersectObjects(raycastTargets);
+  if(hits.length && hits[0].distance < toCam.length()){
+    desired.copy(state.pos.clone().add(toCam.normalize().multiplyScalar(Math.max(1.5, hits[0].distance-0.4))).add(new THREE.Vector3(0,camHeight*0.5,0)));
+  }
+  camera.position.lerp(desired, 0.14);
+  camera.lookAt(state.pos.clone().add(new THREE.Vector3(0,1.1,0)).add(fwd.clone().multiplyScalar(6)));
+
+  // fov based on speed
+  const targetFov=78 + Math.min(18, speed*0.9);
+  camera.fov += (targetFov - camera.fov)*0.08;
+  camera.updateProjectionMatrix();
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.position.addScaledVector(p.userData.vel, dt);
+    p.userData.vel.y-=18*dt;
+    p.userData.life-=dt;
+    p.material.opacity=p.userData.life/0.6;
+    p.scale.setScalar(p.userData.life*1.8);
+    if(p.userData.life<=0){ scene.remove(p); particles.splice(i,1); }
+  }
+
+  // rings animate
+  for(const r of rings){
+    if(!r.visible) continue;
+    r.rotation.y+= dt*1.2;
+    r.position.y+= Math.sin(t*r.userData.spin + r.userData.phase)*0.015;
+    if(r.userData.light) { r.userData.light.position.copy(r.position); r.userData.light.intensity=1.2+Math.sin(t*3)*0.4; }
+  }
+}
+
+function updateHUD(force){
+  document.getElementById('alt').textContent=Math.max(0, Math.round(state.pos.y));
+  const kmh=Math.round(state.vel.length()*3.6);
+  document.getElementById('spd').textContent=kmh;
+  document.getElementById('score').textContent=state.score + Math.floor(state.pos.distanceTo(new THREE.Vector3(0,0,0))*0.1);
+  document.getElementById('rings').textContent=state.collected+'/18';
+  document.getElementById('speedFill').style.width=Math.min(100, kmh/1.2)+'%';
+  // minimap draw
+  const w=160,h=160;
+  miniCtx.clearRect(0,0,w,h);
+  miniCtx.fillStyle='#0a162e'; miniCtx.fillRect(0,0,w,h);
+  miniCtx.strokeStyle='rgba(255,255,255,0.06)'; miniCtx.lineWidth=1;
+  for(let i=0;i<=4;i++){ miniCtx.beginPath(); miniCtx.moveTo(i*w/4,0); miniCtx.lineTo(i*w/4,h); miniCtx.stroke(); miniCtx.beginPath(); miniCtx.moveTo(0,i*h/4); miniCtx.lineTo(w,i*h/4); miniCtx.stroke();}
+  // buildings
+  miniCtx.fillStyle='#1e3a6a';
+  for(const b of buildings){
+    const x=(b.x/600)*w + w/2, y=(b.z/600)*h + h/2;
+    const bw=Math.max(2, b.w/600*w*2), bh=Math.max(2,b.d/600*h*2);
+    miniCtx.fillRect(x-bw/2, y-bh/2, bw,bh);
+  }
+  // rings
+  miniCtx.fillStyle='#ffd166';
+  for(const r of rings){ if(!r.visible) continue; const x=(r.position.x/600)*w+w/2, y=(r.position.z/600)*h+h/2; miniCtx.beginPath(); miniCtx.arc(x,y,3,0,Math.PI*2); miniCtx.fill();}
+  // player
+  const px=(state.pos.x/600)*w+w/2, py=(state.pos.z/600)*h+h/2;
+  miniCtx.fillStyle='#ff3040'; miniCtx.beginPath(); miniCtx.arc(px,py,4,0,Math.PI*2); miniCtx.fill();
+  miniCtx.strokeStyle='#fff'; miniCtx.lineWidth=1.2; miniCtx.beginPath(); miniCtx.moveTo(px,py); miniCtx.lineTo(px+Math.sin(yaw)*12, py+Math.cos(yaw)*12); miniCtx.stroke();
+  // anchor
+  if(state.isSwinging){
+    const axo=(state.anchor.x/600)*w+w/2, ay=(state.anchor.z/600)*h+h/2;
+    miniCtx.strokeStyle='#ffffff'; miniCtx.setLineDash([3,3]); miniCtx.beginPath(); miniCtx.moveTo(px,py); miniCtx.lineTo(axo,ay); miniCtx.stroke(); miniCtx.setLineDash([]);
+    miniCtx.fillStyle='#fff'; miniCtx.beginPath(); miniCtx.arc(axo,ay,3,0,Math.PI*2); miniCtx.fill();
+  }
+  if(state.collected===18 && !window._won){
+    window._won=true;
+    const el=document.createElement('div'); el.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:5';
+    el.innerHTML='<div style="background:#0a162e;border:1px solid rgba(255,255,255,.2);padding:20px;border-radius:16px;text-align:center"><h2 style="color:#ffd166">ALL RINGS COLLECTED!</h2><p>Amazing swing, hero. Score: '+document.getElementById('score').textContent+'</p><button onclick="this.parentElement.parentElement.remove();window._won=false" style="margin-top:10px;padding:10px 18px;border-radius:10px;border:0;background:#ff3040;color:#fff;font-weight:800;cursor:pointer">Continue Swinging</button></div>';
+    document.body.appendChild(el);
+  }
+}
+
+// loop
+function animate(){
+  requestAnimationFrame(animate);
+  const now=performance.now(); let dt=(now-last)/1000; last=now; dt=Math.min(dt,0.033);
+  updatePhysics(dt);
+  updateHUD();
+  renderer.render(scene,camera);
+}
+animate();
+
+// resize
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+renderer.setSize(innerWidth,innerHeight);
+
+// prevent context menu already handled
+console.log('Spider Swing ready');
+</script>
+</body>
+</html>
