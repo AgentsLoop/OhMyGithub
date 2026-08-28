@@ -113,8 +113,9 @@ in the repository.
 This keeps the regular OpenCode session while making branch and PR behavior
 explicit and reviewable in YAML.
 Model labels are refreshed from the live OpenCode catalog on each run and are
-limited to models with zero input, output, and cache-read cost. Default GitHub
-labels are removed, and the triggering issue is marked `in progress`,
+limited to models with zero input, output, and cache-read cost, plus the
+explicitly allowed `gpt-5.6-luna` model. Default GitHub labels are removed, and
+the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 `model/opencode/muse-spark-1.2-contributor-free` label; if that label is

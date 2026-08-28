@@ -101,7 +101,10 @@ jobs:
               return response.json();
             });
             const models = Object.values(catalog.opencode?.models ?? {})
-              .filter((model) => model.cost?.input === 0 && model.cost?.output === 0 && model.cost?.cache_read === 0)
+              .filter((model) =>
+                (model.cost?.input === 0 && model.cost?.output === 0 && model.cost?.cache_read === 0) ||
+                model.id === 'gpt-5.6-luna'
+              )
               .map((model) => model.id)
               .filter(Boolean)
               .sort();
