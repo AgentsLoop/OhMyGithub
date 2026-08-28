@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080b12" />
+    <title>NIGHTSHIFT // Range Protocol</title>
+  </head>
+  <body>
+    <main id="game" aria-label="Nightshift first-person shooter">
+      <div id="hud" class="hud hidden">
+        <div class="hud-topline"><span class="eyebrow">NIGHTSHIFT / RANGE PROTOCOL</span><span id="status">LIVE FEED</span></div>
+        <div class="hud-left">
+          <div class="readout"><span class="label">SECTOR</span><strong id="wave">01</strong><small id="wave-state">INBOUND</small></div>
+          <div class="readout"><span class="label">HOSTILES</span><strong id="hostiles">04</strong><small>TRACKED</small></div>
+        </div>
+        <div class="hud-right">
+          <div class="readout score"><span class="label">CREDITS</span><strong id="score">000000</strong><small>CONFIRMED</small></div>
+          <div class="ammo"><span class="label">AMMO / 9MM</span><strong id="ammo">12</strong><span class="ammo-max">/ 12</span><div class="ammo-bar"><i></i></div><small>R RELOAD</small></div>
+        </div>
+        <div class="health"><span class="label">VITALS</span><strong id="health">100</strong><div class="health-bar"><i></i></div></div>
+        <div id="crosshair" class="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
+        <div id="hit-marker" class="hit-marker">+</div>
+        <div class="weapon"><div class="weapon-glow"></div><div class="weapon-body"></div><div class="weapon-barrel"></div><div class="weapon-sight"></div></div>
+        <div id="toast" class="toast"></div>
+        <div class="controls-hint"><kbd>W A S D</kbd> MOVE <kbd>SHIFT</kbd> SPRINT <kbd>LMB</kbd> FIRE <kbd>R</kbd> RELOAD</div>
+      </div>
+      <section id="start-screen" class="start-screen">
+        <div class="start-card">
+          <div class="brand-mark"><span></span><span></span><span></span></div>
+          <p class="eyebrow">FIELD TEST 07 / ORBITAL YARD</p>
+          <h1>NIGHT<span>SHIFT</span></h1>
+          <p class="lede">A live-fire calibration run in the drowned industrial ring.<br />Clear each sector. Keep the signal alive.</p>
+          <button id="start-button">ENTER RANGE <b>-></b></button>
+          <div class="start-meta"><span>POINTER LOCK FPS</span><span>BUILD 0.7.4</span><span>NO SIGNAL / NO MERCY</span></div>
+        </div>
+        <div class="start-grid"></div><div class="start-scanline"></div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
