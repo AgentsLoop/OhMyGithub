@@ -27,7 +27,7 @@ jobs:
       pull-requests: write
       issues: write
     env:
-      SSH_NAME: opencode-${{ github.run_id }}-ssh
+      SSH_NAME: opencode-issue-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
       SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
       SSH_PUBLIC_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519.pub
       SSH_DIR: ${{ github.workspace }}/.opencode-ssh
