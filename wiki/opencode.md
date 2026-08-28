@@ -22,12 +22,6 @@ not a command and does not trigger a run by itself. An `omo`-labeled `/oc` run
 uses OMO's native `goal` command and prepends `ulw` to the objective. The Codex
 Light `ulw-loop` component is not recreated or registered for OpenCode.
 
-The build prompt requires real child-session evidence for exploration, research,
-planning, builder, critic, and verifier roles. Visual critique must use an
-image-attached browser screenshot and a failed critique must be followed by
-remediation and re-verification. Missing final screenshots now fail delivery;
-they are not silently accepted as a complete run.
-
 ## What the job does
 
 1. Checks out the repository with persisted `GITHUB_TOKEN` credentials.
