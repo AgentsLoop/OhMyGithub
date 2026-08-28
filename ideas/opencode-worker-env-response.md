@@ -1,21 +1,29 @@
-# OpenCode worker environment response
+# Workflow: ask OpenCode for worker environment
 
-OpenCode reported these workflow-process variables for run `33130446163`:
+1. Find the active run for the issue:
 
-- `GH_TOKEN` — present, redacted
-- `OPENCODE_API_KEY` — present, redacted
-- `GITHUB_RUN_ID=33130446163`
-- `GITHUB_REPOSITORY=agents-dev/aiplay`
-- `BRANCH_NAME=opencode/33130446163`
-- `PROJECT_DIR=/home/runner/work/aiplay/aiplay/project`
-- `APP_PORT=3000`
-- `OPENCODE_WEB_PORT=4096`
-- `OPENCODE_PROXY_PORT=4097`
-- `GITHUB_ACTOR=agents-dev`
-- `TRIGGER_ISSUE_NUMBER=138`
+   ```sh
+   gh run list --repo agents-dev/aiplay --workflow opencode.yml --status in_progress
+   ```
 
-Standard runner variables included `HOME`, `PATH`, `CI`, `RUNNER_OS`,
-`ANDROID_HOME`, and `JAVA_HOME`.
+2. Discover the worker SSH host and port:
 
-The run predates the `OPENCODE_AUTH_JSON` configuration, so that variable was
-not listed.
+   ```sh
+   bash scripts/ssh-run-log.sh <run-id> --repo agents-dev/aiplay
+   ```
+
+3. Connect using the host, port, and key printed by the helper:
+
+   ```sh
+   ssh -tt -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+     -i ~/.ssh/aiplay-agentsweb -p <port> runner@<host>
+   ```
+
+4. Find the OpenCode root session:
+
+   ```sh
+   curl -s http://127.0.0.1:4096/session | jq -r '.[] | [.id, (.title // "")] | @tsv'
+   ```
+
+5. Ask OpenCode to list environment variables, requiring sensitive values to
+   be redacted. Read the response from the session messages.
