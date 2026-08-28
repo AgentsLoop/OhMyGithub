@@ -54,8 +54,10 @@ logs are unavailable until completion. Use `bash scripts/ssh-run-log.sh <run-id>
 for the live Actions log over SSH. Do not use tight `for` loops around `gh run list`,
 which needlessly consume GitHub API rate limit.
 
-To connect to an issue's live worker, run `bash scripts/ssh-run-log.sh <run-id>` to
-discover the host and port, then SSH with `~/.ssh/aiplay-agentsweb` as shown by the helper.
+To connect to an issue's live worker, find its run ID with
+`gh run list --repo agents-dev/aiplay --workflow opencode.yml --status in_progress`,
+then run `bash scripts/ssh-run-log.sh <run-id>` to discover the host and port and SSH
+with `~/.ssh/aiplay-agentsweb` as shown by the helper.
 
 When the user asks to check a live OpenCode workflow, always pull the runner logs
 over SSH first, using `scripts/ssh-run-log.sh` or a targeted SSH read from the
