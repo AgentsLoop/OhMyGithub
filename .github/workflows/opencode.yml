@@ -37,7 +37,7 @@ jobs:
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
       PROJECT_DIR: ${{ github.workspace }}/project
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-      OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+      OPENCODE_AUTH_CONTENT: ${{ secrets.OPENCODE_AUTH_JSON }}
       OPENCODE_EXPERIMENTAL: "true"
       OPENCODE_ENABLE_EXA: "true"
       OPENCODE_ENABLE_EXPERIMENTAL_MODELS: "true"
@@ -262,11 +262,6 @@ jobs:
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           [[ -x "$OPENCODE_BIN" ]]
           install -d -m 700 "$HOME/.config/opencode"
-          install -d -m 700 "$HOME/.local/share/opencode"
-          if [[ -n "$OPENCODE_AUTH_JSON" ]]; then
-            printf '%s' "$OPENCODE_AUTH_JSON" > "$HOME/.local/share/opencode/auth.json"
-            chmod 600 "$HOME/.local/share/opencode/auth.json"
-          fi
           cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
           {
             "$schema": "https://opencode.ai/config.json",
