@@ -39,7 +39,12 @@ only its GitHub Actions build capabilities.
 
 ## Configuration and secrets
 
-- The generated repository needs GitHub Actions permissions to run on macOS.
+- The generated repository needs GitHub Actions permissions to run on a
+  `macos-*` runner with a supported Xcode version; iOS builds cannot run on the
+  existing Linux worker.
+- Builder must be able to trigger and read the nested GitHub Actions build with
+  an appropriate GitHub token. Keep this authentication separate from Apple
+  signing credentials and do not expose either in issue text or logs.
 - Unsigned builds should be the default so contributors can validate the
   project without Apple credentials.
 - Signed builds require Apple Developer membership and Builder's signing
@@ -47,6 +52,27 @@ only its GitHub Actions build capabilities.
   logs. OMG must not add, read, or configure `MOBAI_API_KEY`.
 - The local Builder configuration may use `builder.json` for project path and
   scheme, but must not include MobAI device integration settings.
+
+## Non-default integration work
+
+- Generate a valid Xcode project, scheme, bundle identifier, deployment target,
+  and source layout before invoking Builder. Swift/SwiftUI is the default;
+  Flutter, React Native, and Kotlin Multiplatform need framework-specific
+  dependency-install and build commands.
+- Run `builder init` in the generated project and review the resulting
+  `ios-build.yml`; Builder setup is not a substitute for validating the app's
+  project structure.
+- Replace the web workflow's `npm run start`, browser/public-URL checks, and
+  web screenshots with iOS checks: dependency resolution, Xcode compilation,
+  IPA existence and non-empty size, archive metadata, and the nested build URL.
+- Add longer macOS/Xcode timeouts and cache Swift Package Manager, CocoaPods,
+  Gradle, or npm dependencies where the selected framework needs them.
+- Handle artifact handoff explicitly: locate the IPA produced by Builder,
+  verify it, and link or attach it from the OMG issue/release. A successful
+  nested workflow alone is not sufficient evidence if the artifact is missing.
+- Keep signing opt-in. Unsigned builds are the default acceptance path; signed
+  builds need a separate secret configuration and must report their signing
+  status without claiming device installation.
 
 ## Prompt and workflow changes
 
@@ -66,6 +92,8 @@ only its GitHub Actions build capabilities.
   reviewed `ios-build.yml` workflow.
 - `builder ios build` completes on GitHub Actions macOS and yields a non-empty
   IPA artifact, with the run and artifact linked from the issue report.
+- The OMG worker handles Builder/GitHub authentication, nested-run polling,
+  artifact transfer, and macOS/Xcode timeouts without exposing credentials.
 - Goal-mode issues use the same persistent Goal orchestration as other OMG
   requests; standard web issues remain unchanged.
 - Missing Apple signing credentials produce a clear unsigned/build-only result,
