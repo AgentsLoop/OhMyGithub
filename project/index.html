@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Neon Tide Courier</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#020a1a;font-family:'Segoe UI',system-ui,sans-serif}
+  #wrap{position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 20%, #0a2a4a 0%, #020a1a 70%)}
+  #hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;z-index:10;pointer-events:none}
+  .hud-group{display:flex;gap:10px;align-items:center}
+  .pill{background:rgba(0,0,0,0.55);border:1px solid rgba(0,255,255,0.35);backdrop-filter:blur(6px);border-radius:999px;padding:6px 14px;color:#e0ffff;font-size:13px;letter-spacing:0.06em;box-shadow:0 0 12px rgba(0,255,255,0.2), inset 0 0 8px rgba(0,255,255,0.08)}
+  .pill b{color:#00ffff}
+  #healthBar{width:110px;height:8px;background:rgba(255,255,255,0.15);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.2)}
+  #healthFill{height:100%;width:100%;background:linear-gradient(90deg,#ff2a5a,#ff7a00);box-shadow:0 0 8px #ff2a5a;transition:width 0.25s}
+  #canvas{border-radius:16px;box-shadow:0 0 0 1px rgba(0,255,255,0.2), 0 0 40px rgba(0,200,255,0.25), 0 20px 60px rgba(0,0,0,0.6);max-width:100%;max-height:100%;display:block;background:#031422}
+  #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;background:rgba(2,10,26,0.65);backdrop-filter:blur(4px)}
+  #overlay.hidden{display:none}
+  .card{background:linear-gradient(180deg, rgba(10,30,60,0.95), rgba(5,18,38,0.98));border:1px solid rgba(0,255,255,0.3);border-radius:20px;padding:28px 24px;max-width:420px;width:90%;text-align:center;box-shadow:0 0 30px rgba(0,255,255,0.15), 0 20px 50px rgba(0,0,0,0.5)}
+  .card h1{font-size:28px;color:#00ffff;letter-spacing:0.12em;text-shadow:0 0 20px rgba(0,255,255,0.8), 0 0 40px rgba(0,150,255,0.5);margin-bottom:6px}
+  .card h1 span{color:#ff3b7a;text-shadow:0 0 20px rgba(255,59,122,0.7)}
+  .card p{color:#9ecaff;font-size:13px;line-height:1.6;margin:8px 0}
+  .card .sub{color:#5a8ab0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase}
+  .btn{margin-top:16px;background:linear-gradient(90deg,#00e5ff,#00ffaa);border:none;color:#001a1a;font-weight:900;letter-spacing:0.08em;font-size:14px;padding:12px 28px;border-radius:999px;cursor:pointer;box-shadow:0 0 20px rgba(0,255,170,0.5), 0 4px 15px rgba(0,0,0,0.3);transition:transform 0.1s, box-shadow 0.2s}
+  .btn:hover{transform:translateY(-1px) scale(1.02);box-shadow:0 0 30px rgba(0,255,170,0.7)}
+  .btn:active{transform:scale(0.97)}
+  .btn.secondary{background:rgba(255,255,255,0.08);color:#e0ffff;border:1px solid rgba(0,255,255,0.3);box-shadow:none}
+  #controlsHint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:9;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.1);color:#7fb0d0;font-size:11px;padding:6px 12px;border-radius:999px;letter-spacing:0.06em;pointer-events:none;text-align:center;white-space:nowrap}
+  @media (max-width:600px){ #controlsHint{font-size:10px;padding:5px 10px;bottom:6px} .pill{font-size:11px;padding:5px 10px} #healthBar{width:80px} }
+  /* touch dpad */
+  #touch{position:absolute;bottom:46px;left:0;right:0;display:none;justify-content:space-between;padding:0 14px;z-index:9;pointer-events:none}
+  #touch .dpad{display:grid;grid-template-columns:40px 40px 40px;grid-template-rows:40px 40px;gap:6px;pointer-events:auto}
+  #touch button{border-radius:12px;border:1px solid rgba(0,255,255,0.3);background:rgba(0,20,40,0.6);color:#00ffff;font-size:16px;backdrop-filter:blur(6px);-webkit-tap-highlight-color:transparent;user-select:none}
+  #touch button:active{background:rgba(0,255,255,0.25)}
+  @media (max-width:700px),(pointer:coarse){ #touch{display:flex} #controlsHint{bottom:120px} }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <div class="hud-group">
+      <div class="pill">BUOYS <b id="score">0</b> / 10</div>
+      <div class="pill" style="gap:8px">HP <div id="healthBar"><div id="healthFill"></div></div> <b id="hpText">100</b></div>
+    </div>
+    <div class="pill" id="timePill">TIME <b id="time">00:00</b></div>
+  </div>
+  <canvas id="canvas" width="480" height="800"></canvas>
+  <div id="controlsHint">ARROWS / WASD to steer • Collect 10 buoys • Avoid red mines</div>
+  <div id="touch">
+    <div class="dpad">
+      <div></div><button data-dir="up">▲</button><div></div>
+      <button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
+    </div>
+    <div style="width:80px"></div>
+  </div>
+  <div id="overlay">
+    <div class="card" id="card">
+      <div class="sub">Neon Tide Courier</div>
+      <h1>NEON <span>TIDE</span></h1>
+      <p><b style="color:#00ffaa">Pilot your courier skiff</b> across the endless neon ocean.<br>Collect <b style="color:#ffd54a">10 signal buoys</b> and dodge <b style="color:#ff3b5a">drifting mines</b>!</p>
+      <p class="sub" style="margin-top:10px">Arrow keys or WASD • Mobile: on-screen pad</p>
+      <button class="btn" id="startBtn">LAUNCH SKIFF ▶</button>
+      <p style="font-size:10px;color:#4a6a8a;margin-top:10px">Scrolling neon ocean • Glowing trail • Responsive</p>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const hpText = document.getElementById('hpText');
+  const healthFill = document.getElementById('healthFill');
+  const timeEl = document.getElementById('time');
+  const overlay = document.getElementById('overlay');
+  const card = document.getElementById('card');
+  const startBtn = document.getElementById('startBtn');
+
+  // Responsive canvas sizing
+  function resize(){
+    const wrap = document.getElementById('wrap');
+    const maxH = Math.min(window.innerHeight - 16, 860);
+    const maxW = Math.min(window.innerWidth - 16, 520);
+    // keep portrait 3:5 ratio roughly
+    let w = maxW, h = maxW * 1.66;
+    if(h > maxH){ h = maxH; w = h / 1.66; }
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const W = 480, H = 800; // logical size
+  let keys = {};
+  let touchDir = {x:0,y:0};
+
+  window.addEventListener('keydown', e=>{
+    const k = e.key.toLowerCase();
+    keys[k]=true;
+    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d',' '].includes(k)) e.preventDefault();
+    // restart with Enter/Space/R when game over
+    if((gameState==='won'||gameState==='lost') && (k==='enter' || k===' ' || k==='r')){
+      e.preventDefault();
+      startGame();
+    }
+  });
+  window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+  window.addEventListener('blur', ()=>{ keys={}; touchDir={x:0,y:0}; });
+
+  document.querySelectorAll('#touch button').forEach(b=>{
+    const dir=b.dataset.dir;
+    const set = (v)=>{
+      if(dir==='up') touchDir.y = v ? -1 : 0;
+      if(dir==='down') touchDir.y = v ? 1 : 0;
+      if(dir==='left') touchDir.x = v ? -1 : 0;
+      if(dir==='right') touchDir.x = v ? 1 : 0;
+    };
+    b.addEventListener('touchstart', e=>{e.preventDefault(); set(true);});
+    b.addEventListener('touchend', e=>{e.preventDefault(); set(false);});
+    b.addEventListener('mousedown', ()=>set(true));
+    b.addEventListener('mouseup', ()=>set(false));
+    b.addEventListener('mouseleave', ()=>set(false));
+  });
+
+  // Game state
+  let player, buoys, mines, particles, wakes, score, health, gameState, time, lastTime, invuln, scrollOffset;
+  let spawnTimer = 0;
+
+  function reset(){
+    player = {x: W/2, y: H-90, vx:0, vy:0, r:18, angle: -Math.PI/2};
+    buoys = [];
+    mines = [];
+    particles = [];
+    wakes = [];
+    score = 0;
+    health = 100;
+    time = 0;
+    invuln = 0;
+    scrollOffset = 0;
+    spawnTimer = 0;
+    for(let i=0;i<3;i++) spawnBuoy(true);
+    for(let i=0;i<5;i++) spawnMine(true);
+    updateHUD();
+  }
+
+  function rand(a,b){ return Math.random()*(b-a)+a; }
+  function spawnBuoy(initial){
+    const y = initial ? rand(-H*1.2, H*0.6) : -30;
+    buoys.push({x: rand(30,W-30), y, r:16, phase: rand(0,Math.PI*2), vy: rand(1.2,2.2)});
+  }
+  function spawnMine(initial){
+    const y = initial ? rand(-H, H*0.7) : -30;
+    mines.push({x: rand(30,W-30), y, r:18, vx: rand(-1.2,1.2), vy: rand(1.4,2.8), spin: rand(-0.08,0.08), a:0});
+  }
+
+  function updateHUD(){
+    scoreEl.textContent = score;
+    hpText.textContent = Math.max(0,Math.round(health));
+    healthFill.style.width = Math.max(0,health)+'%';
+    healthFill.style.background = health>50 ? 'linear-gradient(90deg,#00ffaa,#00e5ff)' : health>25 ? 'linear-gradient(90deg,#ffd23b,#ff7a00)' : 'linear-gradient(90deg,#ff2a5a,#ff7a00)';
+    const m = Math.floor(time/60).toString().padStart(2,'0');
+    const s = Math.floor(time%60).toString().padStart(2,'0');
+    timeEl.textContent = `${m}:${s}`;
+  }
+
+  function explode(x,y,color,count){
+    for(let i=0;i<count;i++){
+      particles.push({x,y, vx:rand(-4,4), vy:rand(-5,2), life:1, decay: rand(0.02,0.04), r: rand(2,5), color});
+    }
+  }
+
+  // Input vector
+  function getInput(){
+    let ix=0, iy=0;
+    if(keys['arrowleft']||keys['a']) ix-=1;
+    if(keys['arrowright']||keys['d']) ix+=1;
+    if(keys['arrowup']||keys['w']) iy-=1;
+    if(keys['arrowdown']||keys['s']) iy+=1;
+    // touch overrides/augments
+    ix += touchDir.x;
+    iy += touchDir.y;
+    // clamp diagonal
+    if(ix!==0 && iy!==0){ ix*=0.707; iy*=0.707; }
+    return {x:ix, y:iy};
+  }
+
+  function update(dt){
+    if(gameState!=='playing') return;
+    time += dt;
+    scrollOffset = (scrollOffset + dt*90) % 40;
+    invuln = Math.max(0, invuln - dt);
+
+    const inp = getInput();
+    const accel = 1400;
+    const friction = 0.88;
+    const maxSpeed = 360;
+
+    // steer
+    player.vx += inp.x * accel * dt;
+    player.vy += inp.y * accel * dt;
+
+    // friction when no input somewhat
+    if(inp.x===0) player.vx *= Math.pow(0.18, dt);
+    if(inp.y===0) player.vy *= Math.pow(0.18, dt);
+
+    // speed limit
+    let sp = Math.hypot(player.vx, player.vy);
+    if(sp > maxSpeed){ player.vx = player.vx/sp*maxSpeed; player.vy = player.vy/sp*maxSpeed; }
+
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+
+    // bounds
+    player.x = Math.max(player.r, Math.min(W-player.r, player.x));
+    player.y = Math.max(player.r+40, Math.min(H-player.r-6, player.y));
+    if(player.x===player.r || player.x===W-player.r) player.vx*= -0.3;
+    if(player.y===player.r+40 || player.y===H-player.r-6) player.vy*= -0.3;
+
+    // tilt based on velocity
+    player.angle = -Math.PI/2 + player.vx * 0.0025;
+
+    // wakes
+    if(Math.hypot(player.vx, player.vy) > 20){
+      wakes.push({x: player.x + rand(-4,4), y: player.y+14, life:1, r: rand(3,7)});
+    }
+    wakes.forEach(w=> w.life -= dt*0.9);
+    wakes = wakes.filter(w=> w.life>0);
+
+    // buoys: drift down + bob
+    buoys.forEach(b=>{
+      b.y += b.vy + 1.0; // scroll speed extra
+      b.x += Math.sin(time*1.2 + b.phase)*0.6;
+    });
+    // respawn offscreen buoys
+    for(let i=buoys.length-1;i>=0;i--){
+      if(buoys[i].y > H+40){ buoys.splice(i,1); if(score<10) spawnBuoy(false); }
+    }
+    while(buoys.length < 3 && score<10) spawnBuoy(false);
+
+    // mines
+    mines.forEach(m=>{
+      m.y += m.vy + 1.1;
+      m.x += m.vx + Math.sin(time*0.8 + m.y*0.01)*0.8;
+      m.a += m.spin;
+      // bounce walls
+      if(m.x < m.r || m.x > W-m.r) m.vx*=-1;
+    });
+    for(let i=mines.length-1;i>=0;i--){
+      if(mines[i].y > H+50){ mines.splice(i,1); spawnMine(false); }
+    }
+    // gradually increase mine count with score
+    if(mines.length < 5 + Math.floor(score/2)){
+      if(Math.random()<0.02) spawnMine(false);
+    }
+
+    // collisions: buoys
+    for(let i=buoys.length-1;i>=0;i--){
+      const b = buoys[i];
+      const d = Math.hypot(player.x - b.x, player.y - b.y);
+      if(d < player.r + b.r -2){
+        buoys.splice(i,1);
+        score++;
+        explode(b.x, b.y, '#ffd54a', 14);
+        explode(b.x, b.y, '#00ffff', 8);
+        updateHUD();
+        if(score>=10){ win(); return; }
+        else spawnBuoy(false);
+      }
+    }
+    // mines
+    if(invuln<=0){
+      for(let i=0;i<mines.length;i++){
+        const m = mines[i];
+        const d = Math.hypot(player.x - m.x, player.y - m.y);
+        if(d < player.r + m.r -4){
+          health -= 25;
+          invuln = 1.1;
+          explode(player.x, player.y, '#ff3b5a', 18);
+          m.y = -50; m.x = rand(30,W-30);
+          // knockback
+          player.vx += rand(-180,180); player.vy += rand(-120,120);
+          updateHUD();
+          if(health<=0){ health=0; updateHUD(); lose(); return; }
+          break;
+        }
+      }
+    }
+
+    // particles
+    particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+= 30*dt; p.life -= p.decay; if(p.life<0) p.life=0; });
+    particles = particles.filter(p=> p.life>0);
+
+    updateHUD();
+  }
+
+  function drawOcean(){
+    // base gradient
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0, '#071a33');
+    g.addColorStop(0.4, '#0a2d52');
+    g.addColorStop(1, '#031422');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+
+    // grid lines scrolling
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,200,255,0.08)';
+    ctx.lineWidth = 1;
+    for(let y = -40 + (scrollOffset%40); y < H; y+=40){
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(0,200,255,0.06)';
+    for(let x=0;x<W;x+=48){
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    // diagonal wave lines
+    ctx.strokeStyle = 'rgba(0,255,200,0.05)';
+    ctx.lineWidth = 1.2;
+    for(let y=-80 + (scrollOffset%40)*0.7; y<H+80; y+=36){
+      ctx.beginPath();
+      for(let x=0;x<W;x+=12){
+        const wy = y + Math.sin(x*0.02 + time*1.2)*6 + Math.cos(time*0.7)*2;
+        if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
+      }
+      ctx.stroke();
+    }
+    // vignette
+    const vg = ctx.createRadialGradient(W/2,H/2, W*0.4, W/2,H/2,W*0.9);
+    vg.addColorStop(0,'transparent');
+    vg.addColorStop(1,'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
+    ctx.restore();
+  }
+
+  function draw(){
+    drawOcean();
+
+    // wakes
+    wakes.forEach(w=>{
+      ctx.save();
+      ctx.globalAlpha = w.life*0.35;
+      ctx.fillStyle = '#00e5ff';
+      ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.ellipse(w.x, w.y, w.r*w.life, w.r*0.6*w.life, 0,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+
+    // buoys
+    buoys.forEach(b=>{
+      const bob = Math.sin(time*2.4 + b.phase)*4;
+      const y = b.y + bob;
+      ctx.save();
+      // glow
+      ctx.shadowColor = '#ffd54a'; ctx.shadowBlur = 18;
+      ctx.fillStyle = '#ffd54a';
+      ctx.beginPath(); ctx.arc(b.x, y, b.r, 0, Math.PI*2); ctx.fill();
+      // inner
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fff8c0';
+      ctx.beginPath(); ctx.arc(b.x-3, y-3, 6, 0, Math.PI*2); ctx.fill();
+      // ring pulse
+      ctx.globalAlpha = 0.35 + Math.sin(time*4 + b.phase)*0.15;
+      ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(b.x,y, b.r+6 + Math.sin(time*3+b.phase)*2, 0, Math.PI*2); ctx.stroke();
+      // antenna
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(b.x, y - b.r); ctx.lineTo(b.x, y - b.r - 10); ctx.stroke();
+      ctx.fillStyle = '#00ffff'; ctx.shadowColor='#00ffff'; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(b.x, y - b.r -12, 4,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+
+    // mines
+    mines.forEach(m=>{
+      ctx.save();
+      ctx.translate(m.x, m.y); ctx.rotate(m.a);
+      // glow
+      ctx.shadowColor = '#ff2a5a'; ctx.shadowBlur = 22;
+      ctx.fillStyle = '#ff1a3a';
+      ctx.beginPath(); ctx.arc(0,0,m.r,0,Math.PI*2); ctx.fill();
+      // spikes
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#7a0a1a';
+      for(let k=0;k<8;k++){
+        const ang = k*Math.PI/4;
+        ctx.save(); ctx.rotate(ang);
+        ctx.beginPath(); ctx.moveTo(m.r-2,0); ctx.lineTo(m.r+7,0); ctx.lineTo(m.r+2,4); ctx.lineTo(m.r+2,-4); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      // core highlight
+      ctx.fillStyle = '#ff6a80';
+      ctx.beginPath(); ctx.arc(-4,-5,5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath(); ctx.arc(-3,-4,2,0,Math.PI*2); ctx.fill();
+      // outer ring
+      ctx.strokeStyle = 'rgba(255,40,80,0.5)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0,0,m.r+4,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    });
+
+    // player skiff
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    const flicker = invuln>0 ? Math.floor(invuln*20)%2===0 : false;
+    if(flicker) ctx.globalAlpha = 0.3;
+
+    // engine glow
+    ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 20;
+    ctx.fillStyle = '#00eaff';
+    ctx.beginPath(); ctx.ellipse(-18,0,10,8,0,0,Math.PI*2); ctx.fill();
+    // trail
+    ctx.globalAlpha = flicker?0.2:0.6; ctx.fillStyle='#00ffaa';
+    ctx.beginPath(); ctx.moveTo(-18,0); ctx.lineTo(-32+rand(-2,0), -5); ctx.lineTo(-32+rand(-2,0),5); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = flicker?0.3:1;
+
+    // hull
+    ctx.shadowBlur = 14; ctx.shadowColor='#00ffff';
+    ctx.fillStyle = '#e6fbff';
+    ctx.beginPath();
+    ctx.moveTo(22,0); ctx.lineTo(-10,-12); ctx.lineTo(-16,-6); ctx.lineTo(-16,6); ctx.lineTo(-10,12); ctx.closePath(); ctx.fill();
+    // cockpit
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#0a2a4a'; ctx.beginPath(); ctx.ellipse(4,0,8,6,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#00ffff'; ctx.globalAlpha=0.9; ctx.beginPath(); ctx.ellipse(5,0,6,4,0,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    // side fins neon
+    ctx.fillStyle='#00ffaa'; ctx.shadowColor='#00ffaa'; ctx.shadowBlur=10;
+    ctx.fillRect(-12,-12,10,2); ctx.fillRect(-12,10,10,2);
+    // outline
+    ctx.shadowBlur=0; ctx.strokeStyle='rgba(0,255,255,0.9)'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(22,0); ctx.lineTo(-10,-12); ctx.lineTo(-16,-6); ctx.lineTo(-16,6); ctx.lineTo(-10,12); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+
+    // particles
+    particles.forEach(p=>{
+      ctx.save(); ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(p.x,p.y, p.r*p.life,0,Math.PI*2); ctx.fill(); ctx.restore();
+    });
+
+    // top vignette line
+    ctx.fillStyle='rgba(0,255,255,0.08)'; ctx.fillRect(0,0,W,1);
+  }
+
+  function loop(ts){
+    if(!lastTime) lastTime = ts;
+    const dt = Math.min(0.033, (ts - lastTime)/1000);
+    lastTime = ts;
+    if(gameState==='playing'){
+      update(dt);
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function showCard(html){
+    card.innerHTML = html;
+    overlay.classList.remove('hidden');
+  }
+  function hideCard(){ overlay.classList.add('hidden'); }
+
+  function win(){
+    gameState='won';
+    showCard(`
+      <div class="sub" style="color:#00ffaa">Transmission complete</div>
+      <h1 style="color:#00ffaa">SIGNAL <span style="color:#ffd54a">DELIVERED</span></h1>
+      <p style="color:#b0ffe8">You collected 10 buoys in <b>${Math.floor(time/60).toString().padStart(2,'0')}:${Math.floor(time%60).toString().padStart(2,'0')}</b>!<br>Health remaining: <b style="color:${health>50?'#00ffaa':'#ffd54a'}">${Math.round(health)}%</b></p>
+      <button class="btn" id="restartBtn">PLAY AGAIN ↻</button>
+      <p class="sub" style="margin-top:12px">Neon tide conquered. Press Enter or R to restart</p>
+    `);
+    const rb = card.querySelector('#restartBtn');
+    if(rb) rb.onclick = startGame;
+  }
+  function lose(){
+    gameState='lost';
+    showCard(`
+      <div class="sub" style="color:#ff3b5a">Hull breach</div>
+      <h1 style="color:#ff3b5a">SKIFF <span>LOST</span></h1>
+      <p style="color:#ffb0c0">Your skiff was destroyed after collecting <b>${score}/10</b> buoys.</p>
+      <button class="btn" id="restartBtn" style="background:linear-gradient(90deg,#ff3b5a,#ff7a00)">RESTART ↻</button>
+      <p class="sub" style="margin-top:12px">Dodge the red mines! Press Enter or R</p>
+    `);
+    const rb = card.querySelector('#restartBtn');
+    if(rb) rb.onclick = startGame;
+  }
+
+  function startGame(){
+    reset();
+    gameState='playing';
+    hideCard();
+    lastTime = 0;
+  }
+
+  startBtn.addEventListener('click', startGame);
+
+  // initial
+  reset();
+  gameState='ready';
+  updateHUD();
+  draw();
+  requestAnimationFrame(loop);
+
+  // expose for testing
+  window.__game = {
+    get state(){return gameState;},
+    get score(){return score;},
+    get health(){return health;},
+    get player(){return player;},
+    start: startGame,
+    win, lose,
+    canvas
+  };
+
+})();
+</script>
+</body>
+</html>
