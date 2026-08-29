@@ -5,7 +5,7 @@ on:
   issue_comment:
     types: [created]
   issues:
-    types: [opened, edited, labeled]
+    types: [opened, edited]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -30,7 +30,6 @@ jobs:
   forward_to_branch:
     if: >-
       github.event_name != 'workflow_dispatch' &&
-      (github.event.action != 'labeled' || github.event.label.name == '/Goal') &&
       (contains(github.event.comment.body, '--branch ') ||
       contains(github.event.comment.body, '--branch=') ||
       contains(github.event.issue.body, '--branch ') ||
@@ -73,7 +72,6 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (
       github.event.sender.type != 'Bot' &&
-      (github.event.action != 'labeled' || github.event.label.name == '/Goal') &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.comment.body, '--branch')) &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.body, '--branch')) &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.title, '--branch')) &&

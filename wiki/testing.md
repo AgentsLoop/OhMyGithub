@@ -16,8 +16,9 @@ actionlint .github/workflows/opencode.yml
 git diff --check
 ```
 
-For goal support, confirm the workflow trigger checks `/omg`, listens for the
-`/Goal` label, installs and configures `opencode-goal-plugin`, and branches the
+For goal support, confirm the workflow trigger checks `/omg`, reads the `/Goal`
+label without subscribing to `issues: labeled`, installs and configures
+`opencode-goal-plugin`, and branches the
 initial invocation to `opencode run --command goal` only when that label is on
 the issue. An unlabelled `/omg` request must retain the standard `opencode run`
 path. The configured
@@ -27,7 +28,8 @@ OpenCode config.
 Verify that label synchronization creates `/Goal`, and that `Mark issue in
 progress` preserves the label alongside `in progress`. `/Goal` must be the only
 way an `/omg` request enters goal mode; `/goal`, `/oc`, and `/opencode` must not
-trigger the workflow.
+trigger the workflow. Creating an issue with both `/omg` and `/Goal` must start
+one `issues: opened` run, not separate `opened` and `labeled` runs.
 
 For the `omo` issue label, verify that an otherwise normal `/omg` request causes
 the OpenCode startup step to install `oh-my-openagent` with Bun before starting
