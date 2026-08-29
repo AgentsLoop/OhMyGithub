@@ -6,7 +6,7 @@ Add an OMG execution path that generates a native iOS app instead of a browser
 app, using [MobAI-App/ios-builder](https://github.com/MobAI-App/ios-builder) for
 remote macOS builds and IPA artifacts. MobAI simulator/device sharing is
 explicitly out of scope because OMG must not require a `MOBAI_API_KEY`. The
-existing `/omg` issue and `/Goal` label semantics remain the
+existing `/omg` issue and `Goal` label semantics remain the
 entry point; this idea changes the project target selected by an explicit iOS
 platform label or request requirement.
 
@@ -81,7 +81,7 @@ only its GitHub Actions build capabilities.
 - Replace browser/public-tunnel checks with framework-aware checks: project
   structure, generated Xcode/Builder workflow, `builder ios build` success,
   artifact existence, and a reproducible build URL.
-- Keep the existing `/Goal` label behavior: goal mode is selected by the issue
+- Keep the existing `Goal` label behavior: goal mode is selected by the issue
   label, never by a `/goal` command.
 - Add explicit delivery metadata so the final issue comment distinguishes
   unsigned versus signed IPAs and clearly reports build-only verification.
