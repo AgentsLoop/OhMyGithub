@@ -6,11 +6,67 @@ on:
     types: [created]
   issues:
     types: [opened, edited]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number that requested the run
+        required: true
+        type: string
+      comment_body:
+        description: Original OpenCode request
+        required: true
+        type: string
+      base_branch:
+        description: Branch that owns this workflow execution
+        required: true
+        type: string
 
 jobs:
+  forward_to_branch:
+    if: >-
+      github.event_name != 'workflow_dispatch' &&
+      (contains(github.event.comment.body, '--branch ') ||
+      contains(github.event.comment.body, '--branch=') ||
+      contains(github.event.issue.body, '--branch ') ||
+      contains(github.event.issue.body, '--branch=') ||
+      contains(github.event.issue.title, '--branch ') ||
+      contains(github.event.issue.title, '--branch='))
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      issues: read
+    steps:
+      - name: Dispatch workflow on requested branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const request = context.payload.comment?.body ?? context.payload.issue?.body ?? context.payload.issue?.title ?? '';
+            const match = request.match(/\/(?:oc|opencode|goal)\s+--branch(?:=|\s+)([^\s]+)/);
+            if (!match) throw new Error('Could not parse --branch from the request');
+            const branch = match[1];
+            if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.startsWith('-') || branch.startsWith('/') || branch.endsWith('/') || branch.includes('..')) {
+              throw new Error(`Invalid branch: ${branch}`);
+            }
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'opencode.yml',
+              ref: branch,
+              inputs: {
+                issue_number: String(context.issue.number),
+                comment_body: request,
+                base_branch: branch
+              }
+            });
+            core.info(`Dispatched opencode.yml on ${branch}`);
+
   opencode:
     if: >-
-      (github.event.sender.type != 'Bot') &&
+      (github.event_name == 'workflow_dispatch' || github.event.sender.type != 'Bot') &&
+      (github.event_name == 'workflow_dispatch' || !contains(github.event.comment.body, '--branch')) &&
+      (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.body, '--branch')) &&
+      (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.title, '--branch')) &&
       (github.event.issue.pull_request == null) &&
       (contains(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, '/opencode') ||
@@ -28,7 +84,7 @@ jobs:
       pull-requests: write
       issues: write
     env:
-      SSH_NAME: opencode-issue-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
+      SSH_NAME: opencode-issue-${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
       SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
       SSH_PUBLIC_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519.pub
       SSH_DIR: ${{ github.workspace }}/.opencode-ssh
@@ -46,9 +102,9 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
-      TRIGGER_ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
-      COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
-      GOAL_REQUEST: ${{ contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') }}
+      TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}
+      COMMENT_BODY: ${{ inputs.comment_body || github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
+      GOAL_REQUEST: ${{ inputs.comment_body && contains(inputs.comment_body, '/goal') || contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') }}
       OMO_REQUEST: ${{ contains(github.event.issue.labels.*.name, 'omo') }}
     steps:
       - name: Checkout repository
@@ -196,7 +252,7 @@ jobs:
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
         with:
           script: |
-            const number = context.payload.pull_request?.number ?? context.issue.number;
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const statuses = ['in progress', 'complete', 'failed'];
             for (const status of statuses) {
               try {
@@ -403,7 +459,7 @@ jobs:
         run: |
           set -euo pipefail
           request="$COMMENT_BODY"
-          branch='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          branch='${{ inputs.base_branch || github.event.pull_request.base.ref || github.event.repository.default_branch }}'
           if [[ "$request" =~ /(oc|opencode|goal)[[:space:]]+--branch[=[:space:]]+([^[:space:]]+) ]]; then
             branch="${BASH_REMATCH[2]}"
           fi
@@ -427,7 +483,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const number = context.payload.pull_request?.number ?? context.issue.number;
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const response = await github.rest.issues.listLabelsOnIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -553,7 +609,7 @@ jobs:
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
         with:
           script: |
-            const number = context.payload.pull_request?.number ?? context.issue.number;
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const command = process.env.GOAL_REQUEST === 'true' ? '/goal' : '/oc';
             const body = [
@@ -830,7 +886,7 @@ jobs:
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
         with:
           script: |
-            const number = context.payload.pull_request?.number ?? context.issue.number;
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${process.env.FINAL_COMMIT}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
             const images = screenshots.map((name) => {
@@ -858,7 +914,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const number = context.payload.pull_request?.number ?? context.issue.number;
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             await github.rest.issues.removeLabel({
               owner: context.repo.owner, repo: context.repo.repo,
               issue_number: number, name: 'in progress'
@@ -895,7 +951,7 @@ jobs:
           script: |
             await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER),
               body: `🔒 **AgentsWeb SSH session closed.**\n\nTemporary access for [run #${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) has expired.`
             });
 
