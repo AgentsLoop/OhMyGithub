@@ -448,7 +448,7 @@ jobs:
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
-          prompt_template="$(< "$GITHUB_WORKSPACE/.github/prompts/build.md")"
+          prompt_template="$(< "$GITHUB_WORKSPACE/.github/prompts/01-build.md")"
           request_text="$COMMENT_BODY"
           if [[ "$GOAL_REQUEST" == 'true' ]]; then
             # The issue marker selects the custom command; do not include the
@@ -595,7 +595,7 @@ jobs:
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --session "${{ steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
-            "$(< "$GITHUB_WORKSPACE/.github/prompts/verify.md")" \
+            "$(< "$GITHUB_WORKSPACE/.github/prompts/02-verify.md")" \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
       - name: Expose verified app
@@ -606,7 +606,7 @@ jobs:
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          FIX_PROMPT="$(< "$GITHUB_WORKSPACE/.github/prompts/public-app-fix.md")"
+          FIX_PROMPT="$(< "$GITHUB_WORKSPACE/.github/prompts/03-public-app-fix.md")"
 
           for attempt in 1 2 3; do
             echo "Starting public app verification attempt $attempt/3."
@@ -680,7 +680,7 @@ jobs:
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          completion_prompt="$(< "$GITHUB_WORKSPACE/.github/prompts/completion-report.md")"
+          completion_prompt="$(< "$GITHUB_WORKSPACE/.github/prompts/04-completion-report.md")"
           completion_prompt="${completion_prompt//@APP_URL@/$APP_URL}"
           completion_prompt="${completion_prompt//@TRIGGER_ISSUE_NUMBER@/$TRIGGER_ISSUE_NUMBER}"
           "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
@@ -698,7 +698,7 @@ jobs:
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          SCREENSHOT_PROMPT="$(< "$GITHUB_WORKSPACE/.github/prompts/screenshot-evidence.md")"
+          SCREENSHOT_PROMPT="$(< "$GITHUB_WORKSPACE/.github/prompts/05-screenshot-evidence.md")"
 
           for attempt in 1 2 3; do
             mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
