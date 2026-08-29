@@ -15,6 +15,12 @@ the runner with `opencode run --command goal`; `/oc` and `/opencode` retain the
 standard `opencode run` path. A `/goal` trigger also automatically adds the
 `/Goal` GitHub issue label.
 
+An optional `--branch <name>` (or `--branch=<name>`) immediately after the
+command selects an existing remote branch as the execution base, for example
+`/oc --branch feature/login build the requested change`. GitHub's
+`issue_comment` event always loads this workflow from the default branch, so
+the requested branch controls the checked-out project and generated PR base.
+
 An issue labeled `omo` additionally installs and configures the OpenCode Ultimate
 edition of `oh-my-openagent` with Bun before the OpenCode server starts. The
 installer runs non-interactively with provider authentication skipped; `/omo` is

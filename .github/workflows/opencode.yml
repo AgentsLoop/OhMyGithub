@@ -397,12 +397,29 @@ jobs:
           git config user.name 'opencode[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
+      - name: Resolve execution branch
+        id: execution_branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          request="$COMMENT_BODY"
+          branch='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          if [[ "$request" =~ /(oc|opencode|goal)[[:space:]]+--branch[=[:space:]]+([^[:space:]]+) ]]; then
+            branch="${BASH_REMATCH[2]}"
+          fi
+          if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ || "$branch" == -* || "$branch" == */ || "$branch" == /* || "$branch" == *..* ]]; then
+            echo "Invalid execution branch: $branch" >&2
+            exit 1
+          fi
+          git fetch --depth=1 origin "refs/heads/$branch:refs/remotes/origin/$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "Using execution branch: $branch"
+
       - name: Create OpenCode branch
         shell: bash
         run: |
           set -euo pipefail
-          BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
-          git fetch origin "$BASE_BRANCH"
+          BASE_BRANCH='${{ steps.execution_branch.outputs.branch }}'
           git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
 
       - name: Resolve OpenCode model and skill labels
@@ -734,7 +751,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          BASE_BRANCH='${{ steps.execution_branch.outputs.branch }}'
           # Dependencies are runtime-only and must never be included in the generated PR.
           touch "$PROJECT_DIR/.gitignore"
           grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
