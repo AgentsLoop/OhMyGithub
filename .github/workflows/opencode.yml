@@ -827,7 +827,7 @@ jobs:
               `Final commit: ${commitUrl}`,
               `Pull request: ${process.env.PR_URL}`,
               `OpenCode logs release: ${process.env.OPENCODE_RELEASE_URL}`,
-              '', '### Final screenshots', '', ...images
+              '', '<details><summary>Final screenshots</summary>', '', ...images, '', '</details>'
             ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
