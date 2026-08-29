@@ -63,7 +63,9 @@ jobs:
 
   opencode:
     if: >-
-      (github.event_name == 'workflow_dispatch' || github.event.sender.type != 'Bot') &&
+      github.event_name == 'workflow_dispatch' ||
+      (
+      github.event.sender.type != 'Bot' &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.comment.body, '--branch')) &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.body, '--branch')) &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.title, '--branch')) &&
@@ -77,6 +79,7 @@ jobs:
       contains(github.event.issue.title, '/oc') ||
       contains(github.event.issue.title, '/opencode') ||
       contains(github.event.issue.title, '/goal'))
+      )
     runs-on: ubuntu-latest
     permissions:
       id-token: write
