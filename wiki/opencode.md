@@ -8,12 +8,12 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 `/omg <request>` is the single request marker. It can appear in a newly created
 or edited issue title or body, or in an issue comment. Bot-authored events are
-ignored, so status comments do not recurse. An issue with the `/Goal` label
+ignored, so status comments do not recurse. An issue with the `Goal` label
 uses the installed `opencode-goal-plugin`, configures
 `noInterruptOnUserMessage: true`, and starts the runner with `opencode run
 --command goal`; an unlabelled `/omg` request uses the standard `opencode run`
 path. Labels select behavior but do not launch the workflow by themselves; add
-`/Goal` before creating, editing, or commenting the `/omg` request. This keeps
+`Goal` before creating, editing, or commenting the `/omg` request. This keeps
 one request event mapped to one OpenCode session.
 
 An optional `--branch <name>` (or `--branch=<name>`) immediately after the

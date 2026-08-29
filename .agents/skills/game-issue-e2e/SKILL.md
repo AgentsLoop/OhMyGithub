@@ -20,7 +20,7 @@ the invented game clearly requires them.
 The kickoff is complete when all of these are true:
 
 - A fresh GitHub issue was created with `/omg` in its title or body. Add the
-  `/Goal` label by default; omit it only when the caller explicitly requests a
+  `Goal` label by default; omit it only when the caller explicitly requests a
   standard-mode workflow test.
 - The `issues` event triggered `.github/workflows/opencode.yml`.
 - The initial OpenCode Web UI session link was posted.
@@ -77,9 +77,9 @@ OAuth provider.
    `skill/*` labels and model label from the request, and create a new issue
    with one `--label` option per applicable label. Put `/omg` in the title or
    body. If a branch flag is required, use the exact command form
-   `/omg --branch <current-branch> <objective>`. Add `/Goal` by default; this
+   `/omg --branch <current-branch> <objective>`. Add `Goal` by default; this
    specifically exercises the goal plugin and `opencode run --command goal`
-   path. Omit `/Goal` only when the caller explicitly requests the standard
+   path. Omit `Goal` only when the caller explicitly requests the standard
    OpenCode path. Do not add a comment
    because this tests the `issues` trigger.
    If the caller supplied a game or prompt, preserve its intent. Otherwise,

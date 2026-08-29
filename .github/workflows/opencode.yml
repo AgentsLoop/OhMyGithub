@@ -21,7 +21,7 @@ on:
         required: true
         type: string
       goal_request:
-        description: Whether the triggering issue had the /Goal label
+        description: Whether the triggering issue had the Goal label
         required: false
         default: 'false'
         type: string
@@ -62,7 +62,7 @@ jobs:
                 issue_number: String(context.issue.number),
                 comment_body: request,
                 base_branch: branch,
-                goal_request: String(context.payload.issue?.labels?.some(({ name }) => name === '/Goal') ?? false)
+                goal_request: String(context.payload.issue?.labels?.some(({ name }) => name === 'Goal') ?? false)
               }
             });
             core.info(`Dispatched opencode.yml on ${branch}`);
@@ -107,7 +107,7 @@ jobs:
       BRANCH_NAME: opencode/${{ github.run_id }}
       TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}
       COMMENT_BODY: ${{ inputs.comment_body || github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
-      GOAL_REQUEST: ${{ inputs.goal_request == 'true' || contains(github.event.issue.labels.*.name, '/Goal') }}
+      GOAL_REQUEST: ${{ inputs.goal_request == 'true' || contains(github.event.issue.labels.*.name, 'Goal') }}
       OMO_REQUEST: ${{ contains(github.event.issue.labels.*.name, 'omo') }}
     steps:
       - name: Checkout repository
@@ -187,7 +187,7 @@ jobs:
               { name: 'in progress', color: 'FBCA04', description: 'OpenCode workflow is running' },
               { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
-              { name: '/Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
+              { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
@@ -270,7 +270,7 @@ jobs:
             await github.rest.issues.addLabels({
               owner: context.repo.owner, repo: context.repo.repo,
               issue_number: number,
-              labels: ['in progress', ...(process.env.GOAL_REQUEST === 'true' ? ['/Goal'] : [])]
+              labels: ['in progress', ...(process.env.GOAL_REQUEST === 'true' ? ['Goal'] : [])]
             });
 
       - name: Start AgentsWeb SSH session
@@ -526,7 +526,7 @@ jobs:
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
           prompt_template="$(< "$GITHUB_WORKSPACE/.github/prompts/01-build.md")"
           request_text="$COMMENT_BODY"
-          # /omg is the sole request marker. The /Goal issue label selects the
+          # /omg is the sole request marker. The Goal issue label selects the
           # persistent goal command, so remove the marker from either prompt.
           request_text="$(sed -E 's/^[[:space:]]*\/omg([[:space:]]*)?//' <<<"$request_text")"
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
@@ -612,7 +612,7 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const command = process.env.GOAL_REQUEST === 'true' ? '/omg with /Goal' : '/omg';
+            const command = process.env.GOAL_REQUEST === 'true' ? '/omg with Goal' : '/omg';
             const body = [
               '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',

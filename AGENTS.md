@@ -51,7 +51,7 @@ token. It does not require an `OPENCODE_API_KEY` repository secret. When workflo
 the GitHub API, use the authenticated `GITHUB_TOKEN`; do not rely on unauthenticated API requests.
 
 Trigger it by adding `/omg <request>` to an issue title, body, or comment. Add
-the `/Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
+the `Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 
 When monitoring a triggered run, use `gh run watch <run-id> --repo agents-dev/aiplay --exit-status` for overall job status.
