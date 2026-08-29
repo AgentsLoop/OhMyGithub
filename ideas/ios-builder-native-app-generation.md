@@ -4,8 +4,9 @@
 
 Add an OMG execution path that generates a native iOS app instead of a browser
 app, using [MobAI-App/ios-builder](https://github.com/MobAI-App/ios-builder) for
-remote macOS builds, IPA artifacts, simulator sharing, and optional device
-development. The existing `/omg` issue and `/Goal` label semantics remain the
+remote macOS builds and IPA artifacts. MobAI simulator/device sharing is
+explicitly out of scope because OMG must not require a `MOBAI_API_KEY`. The
+existing `/omg` issue and `/Goal` label semantics remain the
 entry point; this idea changes the project target selected by an explicit iOS
 platform label or request requirement.
 
@@ -15,7 +16,8 @@ OMG currently optimizes for a web runtime and validates the result through a
 browser and public tunnel. iOS projects need Xcode-compatible source, a macOS
 GitHub Actions build, an IPA artifact, and (when available) a simulator or
 device session. MobAI Builder supplies a supported CLI and generated
-`ios-build.yml`, avoiding a bespoke macOS runner implementation.
+`ios-build.yml`, avoiding a bespoke macOS runner implementation; OMG will use
+only its GitHub Actions build capabilities.
 
 ## Proposed flow
 
@@ -30,11 +32,10 @@ device session. MobAI Builder supplies a supported CLI and generated
 4. Run `builder ios build` from the OMG worker, capture the resulting IPA and
    GitHub Actions run URL, and publish the artifact as a workflow output or
    release asset.
-5. When MobAI Pro credentials are configured, run `builder ios share` and
-   collect simulator evidence. Treat simulator sharing as optional: an IPA
-   build plus static/source checks is the fallback acceptance path.
+5. Validate the generated source, build logs, and IPA metadata. Do not invoke
+   `builder ios share` or any MobAI device integration from the OMG workflow.
 6. Ask OpenCode for a final implementation report that links the source PR,
-   iOS build run, IPA artifact, signing status, and simulator evidence.
+   iOS build run, IPA artifact, and signing status.
 
 ## Configuration and secrets
 
@@ -42,11 +43,10 @@ device session. MobAI Builder supplies a supported CLI and generated
 - Unsigned builds should be the default so contributors can validate the
   project without Apple credentials.
 - Signed builds require Apple Developer membership and Builder's signing
-  secrets; never place certificates, provisioning profiles, or `MOBAI_API_KEY`
-  in issue text or logs.
-- `MOBAI_API_KEY` is required only for `builder ios share` and should be an
-  opt-in repository secret. The local Builder configuration can use
-  `builder.json` with the project path, scheme, and optional MobAI device ID.
+  secrets; never place certificates or provisioning profiles in issue text or
+  logs. OMG must not add, read, or configure `MOBAI_API_KEY`.
+- The local Builder configuration may use `builder.json` for project path and
+  scheme, but must not include MobAI device integration settings.
 
 ## Prompt and workflow changes
 
@@ -58,8 +58,7 @@ device session. MobAI Builder supplies a supported CLI and generated
 - Keep the existing `/Goal` label behavior: goal mode is selected by the issue
   label, never by a `/goal` command.
 - Add explicit delivery metadata so the final issue comment distinguishes
-  unsigned versus signed IPAs and simulator verification from build-only
-  verification.
+  unsigned versus signed IPAs and clearly reports build-only verification.
 
 ## Acceptance criteria
 
@@ -69,10 +68,10 @@ device session. MobAI Builder supplies a supported CLI and generated
   IPA artifact, with the run and artifact linked from the issue report.
 - Goal-mode issues use the same persistent Goal orchestration as other OMG
   requests; standard web issues remain unchanged.
-- Missing Apple signing or MobAI credentials produce a clear build-only result,
+- Missing Apple signing credentials produce a clear unsigned/build-only result,
   not a false claim that the app was installed or tested on a device.
-- If `MOBAI_API_KEY` is present, `builder ios share` creates simulator evidence
-  that is linked in the final report and cleaned up after the test.
+- The workflow never requires or consumes `MOBAI_API_KEY` and never claims
+  simulator/device verification.
 
 ## Open questions
 
@@ -80,8 +79,8 @@ device session. MobAI Builder supplies a supported CLI and generated
   iOS deliverables when both labels are present?
 - Should the IPA be attached to the OMG release, the nested iOS workflow run,
   or both?
-- Which simulator screenshots or interaction trace should be mandatory for a
-  signed build versus an unsigned build?
+- Should a future credential-free simulator integration be considered, or should
+  iOS delivery remain intentionally build-only?
 
 ## Reference
 
