@@ -126,6 +126,7 @@
   // Game state
   let player, buoys, mines, particles, wakes, score, health, gameState, time, lastTime, invuln, scrollOffset;
   let spawnTimer = 0;
+  let shake = 0;
 
   function reset(){
     player = {x: W/2, y: H-90, vx:0, vy:0, r:18, angle: -Math.PI/2};
@@ -188,8 +189,9 @@
   function update(dt){
     if(gameState!=='playing') return;
     time += dt;
-    scrollOffset = (scrollOffset + dt*90) % 40;
+    scrollOffset = (scrollOffset + dt*160) % 40;
     invuln = Math.max(0, invuln - dt);
+    shake = Math.max(0, shake - dt*3.5);
 
     const inp = getInput();
     const accel = 1400;
@@ -227,9 +229,10 @@
     wakes.forEach(w=> w.life -= dt*0.9);
     wakes = wakes.filter(w=> w.life>0);
 
-    // buoys: drift down + bob
+    // buoys: drift down + bob — faster conveyor (addresses critic: add forward momentum)
+    const worldSpeed = 110 + Math.min(60, time*1.2); // accelerates slightly with time
     buoys.forEach(b=>{
-      b.y += b.vy + 1.0; // scroll speed extra
+      b.y += b.vy + worldSpeed*dt;
       b.x += Math.sin(time*1.2 + b.phase)*0.6;
     });
     // respawn offscreen buoys
@@ -240,7 +243,7 @@
 
     // mines
     mines.forEach(m=>{
-      m.y += m.vy + 1.1;
+      m.y += m.vy + worldSpeed*dt*0.95;
       m.x += m.vx + Math.sin(time*0.8 + m.y*0.01)*0.8;
       m.a += m.spin;
       // bounce walls
@@ -276,9 +279,10 @@
         if(d < player.r + m.r -4){
           health -= 25;
           invuln = 1.1;
+          shake = 1;
           explode(player.x, player.y, '#ff3b5a', 18);
           m.y = -50; m.x = rand(30,W-30);
-          // knockback
+          // knockback + screenshake
           player.vx += rand(-180,180); player.vy += rand(-120,120);
           updateHUD();
           if(health<=0){ health=0; updateHUD(); lose(); return; }
@@ -298,29 +302,70 @@
     // base gradient
     const g = ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0, '#071a33');
-    g.addColorStop(0.4, '#0a2d52');
+    g.addColorStop(0.35, '#0a2d52');
     g.addColorStop(1, '#031422');
     ctx.fillStyle = g;
     ctx.fillRect(0,0,W,H);
 
-    // grid lines scrolling
     ctx.save();
-    ctx.strokeStyle = 'rgba(0,200,255,0.08)';
-    ctx.lineWidth = 1;
-    for(let y = -40 + (scrollOffset%40); y < H; y+=40){
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    // perspective neon canal rails (addresses critic: no perspective)
+    const horizonY = 34;
+    const leftTop = W*0.32, rightTop = W*0.68;
+    const leftBot = 42, rightBot = W-42;
+    // runway surface trapezoid
+    const rg = ctx.createLinearGradient(0,horizonY,0,H);
+    rg.addColorStop(0,'rgba(0,255,255,0.04)');
+    rg.addColorStop(0.5,'rgba(0,180,255,0.06)');
+    rg.addColorStop(1,'rgba(0,255,200,0.07)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.moveTo(leftTop, horizonY); ctx.lineTo(rightTop, horizonY);
+    ctx.lineTo(rightBot, H); ctx.lineTo(leftBot, H); ctx.closePath(); ctx.fill();
+    // side walls glow
+    ctx.strokeStyle='rgba(0,255,255,0.18)'; ctx.lineWidth=2;
+    ctx.shadowColor='#00ffff'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.moveTo(leftTop,horizonY); ctx.lineTo(leftBot,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rightTop,horizonY); ctx.lineTo(rightBot,H); ctx.stroke();
+    ctx.shadowBlur=0;
+    // perspective dashed center line scrolling
+    ctx.strokeStyle='rgba(0,255,200,0.55)'; ctx.lineWidth=1.4; ctx.setLineDash([16,14]);
+    ctx.lineDashOffset = -scrollOffset*3;
+    ctx.beginPath(); ctx.moveTo(W/2, horizonY); ctx.lineTo(W/2, H); ctx.stroke();
+    ctx.setLineDash([]);
+    // perspective tick marks on rails
+    ctx.strokeStyle='rgba(0,255,255,0.32)'; ctx.lineWidth=1.2;
+    for(let i=0;i<14;i++){
+      const t = (i + (scrollOffset/40))%14 /14; // 0..1
+      const y = horizonY + Math.pow(t,1.35)*(H-horizonY);
+      const lw = leftTop + (leftBot-leftTop)*Math.pow(t,1.05);
+      const rw = rightTop + (rightBot-rightTop)*Math.pow(t,1.05);
+      const len = 6 + t*18;
+      ctx.beginPath(); ctx.moveTo(lw, y); ctx.lineTo(lw+len, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(rw, y); ctx.lineTo(rw-len, y); ctx.stroke();
+      // horizontal glow line
+      ctx.strokeStyle='rgba(0,200,255,0.07)';
+      ctx.beginPath(); ctx.moveTo(lw, y); ctx.lineTo(rw, y); ctx.stroke();
+      ctx.strokeStyle='rgba(0,255,255,0.32)';
     }
-    ctx.strokeStyle = 'rgba(0,200,255,0.06)';
-    for(let x=0;x<W;x+=48){
-      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    // horizon glow
+    ctx.fillStyle='rgba(0,255,255,0.12)'; ctx.shadowColor='#00ffff'; ctx.shadowBlur=18;
+    ctx.fillRect(leftTop-6, horizonY-1, rightTop-leftTop+12, 2);
+    ctx.shadowBlur=0;
+    // faint grid inside canal
+    ctx.strokeStyle='rgba(0,200,255,0.06)'; ctx.lineWidth=1;
+    for(let y=-40+(scrollOffset%40); y<H; y+=40){
+      if(y<horizonY) continue;
+      const t = (y-horizonY)/(H-horizonY);
+      const lx = leftTop + (leftBot-leftTop)*t;
+      const rx = rightTop + (rightBot-rightTop)*t;
+      ctx.beginPath(); ctx.moveTo(lx,y); ctx.lineTo(rx,y); ctx.stroke();
     }
-    // diagonal wave lines
-    ctx.strokeStyle = 'rgba(0,255,200,0.05)';
-    ctx.lineWidth = 1.2;
-    for(let y=-80 + (scrollOffset%40)*0.7; y<H+80; y+=36){
+    // diagonal wave lines outside canal subtle
+    ctx.strokeStyle='rgba(0,255,200,0.04)'; ctx.lineWidth=1.1;
+    for(let y=-80+(scrollOffset%40)*0.7; y<H+80; y+=36){
       ctx.beginPath();
       for(let x=0;x<W;x+=12){
-        const wy = y + Math.sin(x*0.02 + time*1.2)*6 + Math.cos(time*0.7)*2;
+        const wy = y + Math.sin(x*0.02 + time*1.2)*5;
         if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
       }
       ctx.stroke();
@@ -328,12 +373,17 @@
     // vignette
     const vg = ctx.createRadialGradient(W/2,H/2, W*0.4, W/2,H/2,W*0.9);
     vg.addColorStop(0,'transparent');
-    vg.addColorStop(1,'rgba(0,0,0,0.55)');
+    vg.addColorStop(1,'rgba(0,0,0,0.52)');
     ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
     ctx.restore();
   }
 
   function draw(){
+    ctx.save();
+    if(shake>0){
+      const s = shake*6;
+      ctx.translate(rand(-s,s), rand(-s,s));
+    }
     drawOcean();
 
     // wakes
@@ -442,6 +492,11 @@
 
     // top vignette line
     ctx.fillStyle='rgba(0,255,255,0.08)'; ctx.fillRect(0,0,W,1);
+    // hit flash
+    if(invuln>0 && Math.floor(invuln*14)%2===0){
+      ctx.fillStyle='rgba(255,40,80,0.10)'; ctx.fillRect(0,0,W,H);
+    }
+    ctx.restore();
   }
 
   function loop(ts){
