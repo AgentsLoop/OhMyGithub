@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎮 aiplay
+# 🤯 OMG — Oh My GitHub
 
 ### 🚀 One Prompt In. A Full Game or App Out. 🚀
 
@@ -23,13 +23,13 @@
 
 ---
 
-## 🤯 What Is aiplay?
+## 🤯 What Is OMG?
 
 > **Your GitHub issue becomes the product brief.**
 
-`aiplay` is an automated GitHub Actions workflow for creating complete browser games and app projects from one natural-language prompt.
+OMG (Oh My GitHub) is an automated GitHub Actions workflow for creating complete browser games and app projects from one natural-language prompt.
 
-Write what you want in an issue. Add `/oc`. OpenCode checks out the project, uses the shared skills, builds the experience, runs tests, verifies the result, and opens a pull request with the finished work.
+Write what you want in an issue. Add `/omg`. OpenCode checks out the project, uses the shared skills, builds the experience, runs tests, verifies the result, and opens a pull request with the finished work.
 
 Yes, it creates the code. Yes, it runs the verification loop. Yes, it can expose the result in a temporary browser URL.
 
@@ -37,7 +37,7 @@ Yes, it creates the code. Yes, it runs the verification loop. Yes, it can expose
 
 1. Open a GitHub issue.
 2. Describe the game or app you want.
-3. Put `/oc` in the issue.
+3. Put `/omg` in the issue.
 4. Let GitHub Actions build, test, verify, and propose the result.
 
 ```text
@@ -49,7 +49,7 @@ Your idea → GitHub issue → OpenCode → tests → verified app → pull requ
 Create an issue in your repository with a concrete request:
 
 ```text
-/oc Build a neon asteroid game.
+/omg Build a neon asteroid game.
 
 Requirements:
 - Arrow-key movement
@@ -134,7 +134,7 @@ flowchart TD
 ```text
 ┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
 │ GitHub issue │ ──▶ │ GitHub Actions  │ ──▶ │   OpenCode   │
-│ + /oc prompt │     │ runner + labels │     │ + .agents    │
+│ + /omg prompt│     │ runner + labels │     │ + .agents    │
 └──────────────┘     └─────────────────┘     └──────┬───────┘
                                                     │
                               ┌─────────────────────┼─────────────────────┐
@@ -155,14 +155,14 @@ flowchart TD
 - ☁️ Execution happens in GitHub Actions.
 - 🔒 Temporary SSH and preview access exists only for the workflow run.
 - 👀 Review the generated pull request before merging.
-- 🛡️ Restrict who can trigger `/oc` in repositories that accept public issues.
+- 🛡️ Restrict who can trigger `/omg` in repositories that accept public issues.
 
 > “No servers needed” means no servers for you to provision or maintain. The workflow still uses GitHub-hosted Actions infrastructure and temporary workflow services.
 
 ## 📁 Project Structure
 
 ```text
-📦 aiplay
+📦 OMG
  ├─ .github/workflows/opencode.yml  # 🤖 Main issue-to-project workflow
  ├─ wiki/opencode.md                # 📖 Workflow and session notes
  ├─ wiki/testing.md                 # 🧪 Verification guidance
@@ -182,7 +182,7 @@ git diff --check
 
 | Problem | What to check |
 |---|---|
-| The workflow did not start | Confirm `/oc` appears in the issue title or body. |
+| The workflow did not start | Confirm `/omg` appears in the issue title or body. |
 | A skill was not selected | Add a matching `skill/<name>` label. |
 | The app URL is missing | Check the local app verification step and runner log. |
 | The PR was not created | Confirm OpenCode produced a diff and the workflow reached the PR step. |
@@ -193,7 +193,7 @@ git diff --check
 Ideas, skills, game templates, verification improvements, and workflow fixes are welcome.
 
 1. Open an issue describing the improvement.
-2. Use `/oc` when you want the workflow to prototype it.
+2. Use `/omg` when you want the workflow to prototype it.
 3. Review the generated pull request carefully.
 4. Add tests and runtime proof for workflow changes.
 
@@ -201,7 +201,7 @@ Ideas, skills, game templates, verification improvements, and workflow fixes are
 
 The old workflow was: idea → tickets → scaffolding → setup → implementation → debugging → deployment.
 
-The aiplay workflow is: **idea → issue → playable project.**
+The OMG workflow is: **idea → issue → playable project.**
 
 If you believe software should start with a sentence instead of a sprint plan, [⭐ star the repository](https://github.com/agents-dev/aiplay) and try it.
 

@@ -1,4 +1,4 @@
-# aiplay agent instructions
+# OMG (Oh My GitHub) agent instructions
 
 ## Wiki index
 
@@ -50,8 +50,8 @@ The issue-triggered workflow uses `opencode/muse-spark-1.2-contributor-free` and
 token. It does not require an `OPENCODE_API_KEY` repository secret. When workflow steps call
 the GitHub API, use the authenticated `GITHUB_TOKEN`; do not rely on unauthenticated API requests.
 
-Trigger it by commenting `/oc <request>` or `/opencode <request>` on an issue
-or pull request. The workflow starts a temporary AgentsWeb SSH session,
+Trigger it by adding `/omg <request>` to an issue title, body, or comment. Add
+the `/Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 
 When monitoring a triggered run, use `gh run watch <run-id> --repo agents-dev/aiplay --exit-status` for overall job status.

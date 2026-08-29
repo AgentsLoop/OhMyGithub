@@ -1,11 +1,11 @@
-name: OpenCode
-run-name: "OpenCode #${{ github.event.issue.number || github.event.pull_request.number }} — ${{ github.event.issue.title || github.event.pull_request.title }}"
+name: OMG
+run-name: "OMG #${{ github.event.issue.number || github.event.pull_request.number }} — ${{ github.event.issue.title || github.event.pull_request.title }}"
 
 on:
   issue_comment:
     types: [created]
   issues:
-    types: [opened, edited]
+    types: [opened, edited, labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -20,11 +20,17 @@ on:
         description: Branch that owns this workflow execution
         required: true
         type: string
+      goal_request:
+        description: Whether the triggering issue had the /Goal label
+        required: false
+        default: 'false'
+        type: string
 
 jobs:
   forward_to_branch:
     if: >-
       github.event_name != 'workflow_dispatch' &&
+      (github.event.action != 'labeled' || github.event.label.name == '/Goal') &&
       (contains(github.event.comment.body, '--branch ') ||
       contains(github.event.comment.body, '--branch=') ||
       contains(github.event.issue.body, '--branch ') ||
@@ -42,7 +48,7 @@ jobs:
         with:
           script: |
             const request = context.payload.comment?.body ?? context.payload.issue?.body ?? context.payload.issue?.title ?? '';
-            const match = request.match(/\/(?:oc|opencode|goal)\s+--branch(?:=|\s+)([^\s]+)/);
+            const match = request.match(/\/omg\s+--branch(?:=|\s+)([^\s]+)/);
             if (!match) throw new Error('Could not parse --branch from the request');
             const branch = match[1];
             if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.startsWith('-') || branch.startsWith('/') || branch.endsWith('/') || branch.includes('..')) {
@@ -56,7 +62,8 @@ jobs:
               inputs: {
                 issue_number: String(context.issue.number),
                 comment_body: request,
-                base_branch: branch
+                base_branch: branch,
+                goal_request: String(context.payload.issue?.labels?.some(({ name }) => name === '/Goal') ?? false)
               }
             });
             core.info(`Dispatched opencode.yml on ${branch}`);
@@ -66,19 +73,14 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (
       github.event.sender.type != 'Bot' &&
+      (github.event.action != 'labeled' || github.event.label.name == '/Goal') &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.comment.body, '--branch')) &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.body, '--branch')) &&
       (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.title, '--branch')) &&
       (github.event.issue.pull_request == null) &&
-      (contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode') ||
-      contains(github.event.comment.body, '/goal') ||
-      contains(github.event.issue.body, '/oc') ||
-      contains(github.event.issue.body, '/opencode') ||
-      contains(github.event.issue.body, '/goal') ||
-      contains(github.event.issue.title, '/oc') ||
-      contains(github.event.issue.title, '/opencode') ||
-      contains(github.event.issue.title, '/goal'))
+      (contains(github.event.comment.body, '/omg') ||
+      contains(github.event.issue.body, '/omg') ||
+      contains(github.event.issue.title, '/omg'))
       )
     runs-on: ubuntu-latest
     permissions:
@@ -107,7 +109,7 @@ jobs:
       BRANCH_NAME: opencode/${{ github.run_id }}
       TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}
       COMMENT_BODY: ${{ inputs.comment_body || github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
-      GOAL_REQUEST: ${{ inputs.comment_body && contains(inputs.comment_body, '/goal') || contains(github.event.comment.body, '/goal') || contains(github.event.issue.body, '/goal') || contains(github.event.issue.title, '/goal') }}
+      GOAL_REQUEST: ${{ inputs.goal_request == 'true' || contains(github.event.issue.labels.*.name, '/Goal') }}
       OMO_REQUEST: ${{ contains(github.event.issue.labels.*.name, 'omo') }}
     steps:
       - name: Checkout repository
@@ -187,7 +189,7 @@ jobs:
               { name: 'in progress', color: 'FBCA04', description: 'OpenCode workflow is running' },
               { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
-              { name: '/Goal', color: '8A2BE2', description: 'OpenCode goal workflow request' },
+              { name: '/Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
@@ -463,7 +465,7 @@ jobs:
           set -euo pipefail
           request="$COMMENT_BODY"
           branch='${{ inputs.base_branch || github.event.pull_request.base.ref || github.event.repository.default_branch }}'
-          if [[ "$request" =~ /(oc|opencode|goal)[[:space:]]+--branch[=[:space:]]+([^[:space:]]+) ]]; then
+          if [[ "$request" =~ /omg[[:space:]]+--branch[=[:space:]]+([^[:space:]]+) ]]; then
             branch="${BASH_REMATCH[2]}"
           fi
           if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ || "$branch" == -* || "$branch" == */ || "$branch" == /* || "$branch" == *..* ]]; then
@@ -526,11 +528,9 @@ jobs:
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
           prompt_template="$(< "$GITHUB_WORKSPACE/.github/prompts/01-build.md")"
           request_text="$COMMENT_BODY"
-          if [[ "$GOAL_REQUEST" == 'true' ]]; then
-            # The issue marker selects the custom command; do not include the
-            # marker itself in the objective passed to the goal parser.
-            request_text="$(sed -E 's/^[[:space:]]*\/goal([[:space:]]*)?//' <<<"$request_text")"
-          fi
+          # /omg is the sole request marker. The /Goal issue label selects the
+          # persistent goal command, so remove the marker from either prompt.
+          request_text="$(sed -E 's/^[[:space:]]*\/omg([[:space:]]*)?//' <<<"$request_text")"
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
@@ -614,7 +614,7 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const command = process.env.GOAL_REQUEST === 'true' ? '/goal' : '/oc';
+            const command = process.env.GOAL_REQUEST === 'true' ? '/omg with /Goal' : '/omg';
             const body = [
               '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',

@@ -16,21 +16,23 @@ actionlint .github/workflows/opencode.yml
 git diff --check
 ```
 
-For goal support, also confirm the workflow trigger checks `/goal`, installs
-and configures `opencode-goal-plugin`, and branches the initial invocation to
-`opencode run --command goal` while leaving `/oc` and `/opencode` on the
-standard `opencode run` path. The configured
+For goal support, confirm the workflow trigger checks `/omg`, listens for the
+`/Goal` label, installs and configures `opencode-goal-plugin`, and branches the
+initial invocation to `opencode run --command goal` only when that label is on
+the issue. An unlabelled `/omg` request must retain the standard `opencode run`
+path. The configured
 `noInterruptOnUserMessage: true` option should remain visible in the generated
 OpenCode config.
 
-When a request contains `/goal`, verify that label synchronization creates the
-`/Goal` label and that `Mark issue in progress` applies it alongside
-`in progress`. Standard `/oc` and `/opencode` requests must not receive `/Goal`.
+Verify that label synchronization creates `/Goal`, and that `Mark issue in
+progress` preserves the label alongside `in progress`. `/Goal` must be the only
+way an `/omg` request enters goal mode; `/goal`, `/oc`, and `/opencode` must not
+trigger the workflow.
 
-For the `omo` issue label, verify that an otherwise normal `/oc` request causes
+For the `omo` issue label, verify that an otherwise normal `/omg` request causes
 the OpenCode startup step to install `oh-my-openagent` with Bun before starting
 the web server and launches `opencode ... --command goal` with `ulw` in the
-objective; an unlabelled `/oc` request must not run that installer, and the
+objective; an unlabelled `/omg` request must not run that installer, and the
 `omo` label alone must not trigger a workflow. The OMO config must use its
 native Goal command and must not register a compatibility `ulw-loop` command.
 
