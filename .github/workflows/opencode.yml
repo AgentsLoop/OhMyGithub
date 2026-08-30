@@ -46,7 +46,7 @@ on:
 
 jobs:
   opencode:
-    uses: GauntletLoop/OhMyGithub/.github/workflows/opencode-reusable.yml@main
+    uses: ./.github/workflows/opencode-reusable.yml
     with:
       target_repository: ${{ inputs.target_repository || github.repository }}
       target_owner: ${{ inputs.target_owner || github.repository_owner }}
