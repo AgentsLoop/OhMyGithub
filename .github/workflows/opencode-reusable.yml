@@ -296,7 +296,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SSH_PORT=$((32000 + GITHUB_RUN_NUMBER % 1000))
+          # GITHUB_RUN_NUMBER starts at 1 in every repository, so using it here
+          # makes every new repository's first OMG run contend for port 32001.
+          # GITHUB_RUN_ID is globally unique and distributes runs across the
+          # broker's 32000-32999 public-port range.
+          SSH_PORT=$((32000 + GITHUB_RUN_ID % 1000))
           echo "SSH_PORT=$SSH_PORT" >> "$GITHUB_ENV"
           sudo apt-get update
           sudo apt-get install -y openssh-server tmux

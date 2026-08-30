@@ -9,6 +9,12 @@ For an issue-triggered run, verify these checkpoints in order:
 5. `Mark SSH session closed` and `Clean up AgentsWeb SSH session` succeed.
 6. The expected branch and pull request exist.
 
+The AgentsWeb public port must be derived from `GITHUB_RUN_ID`, not
+`GITHUB_RUN_NUMBER`. Run numbers restart at `1` for each repository, which made
+the first OMG run in every newly installed repository contend for port `32001`
+and close during SSH verification. The globally unique run ID spreads those
+runs across the broker's `32000-32999` port range.
+
 Validate workflow edits locally with:
 
 ```sh
