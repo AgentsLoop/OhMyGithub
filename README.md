@@ -5,7 +5,7 @@
 ### 🚀 One Prompt In. A Full Game or App Out. 🚀
 
 [![Status](https://img.shields.io/badge/status-🔥%20works-brightgreen?style=for-the-badge)](https://github.com/Issuefy/OhMyGithub/actions)
-[![GitHub Issues](https://img.shields.io/github/issues/agents-dev/aiplay?style=for-the-badge&logo=github)](https://github.com/Issuefy/OhMyGithub/issues)
+[![GitHub Issues](https://img.shields.io/github/issues/Issuefy/OhMyGithub?style=for-the-badge&logo=github)](https://github.com/Issuefy/OhMyGithub/issues)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-automated-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Issuefy/OhMyGithub/actions)
 [![OpenCode](https://img.shields.io/badge/powered%20by-OpenCode-111111?style=for-the-badge)](https://opencode.ai/)
 
