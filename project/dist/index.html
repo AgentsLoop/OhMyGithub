@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Prism Relay — Route the Light</title>
+  <script type="module" crossorigin src="/assets/index-D1rfocGO.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BTONQjS3.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo-glow">◈</span>
+      <div>
+        <h1>PRISM RELAY</h1>
+        <p>Route pulses • Match colors • Beat the clock</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">LEVEL</span><span id="levelLabel" class="v">1 — Ignition</span></div>
+      <div class="stat"><span class="k">SCORE</span><span id="scoreLabel" class="v">0</span></div>
+      <div class="stat"><span class="k">COMBO</span><span id="comboLabel" class="v">—</span></div>
+      <div class="stat"><span class="k">TIME</span><span id="timeLabel" class="v">45s</span></div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="panel left">
+      <div class="panel-title">How to play</div>
+      <ol class="help">
+        <li><b>Tap</b> or <b>click</b> any junction to rotate it 90°</li>
+        <li>Light pulses move automatically from <span class="dot cyan"></span> emitters</li>
+        <li>Route each pulse to its <span class="dot magenta"></span> matching receiver</li>
+        <li>Mismatched color or dead end breaks combo</li>
+      </ol>
+      <div class="legend">
+        <div><span class="sw straight"></span> Straight — N↔S</div>
+        <div><span class="sw elbow"></span> Elbow — 90°</div>
+        <div><span class="sw tee"></span> T-split</div>
+        <div><span class="sw cross"></span> Cross</div>
+      </div>
+      <div class="controls">
+        <button id="tutorialBtn" class="btn ghost">Tutorial</button>
+        <button id="restartBtn" class="btn">Restart Level</button>
+        <button id="nextBtn" class="btn primary" style="display:none">Next Level →</button>
+      </div>
+      <div class="keys">
+        <div class="panel-title">Keys</div>
+        <div><kbd>R</kbd> rotate selected • <kbd>←→↑↓</kbd> move • <kbd>Space</kbd> rotate • <kbd>Enter</kbd> next</div>
+      </div>
+      <div class="progress">
+        <div class="panel-title">Progress <span id="goalLabel">0 / 6</span></div>
+        <div class="bar"><div id="progressBar" class="fill"></div></div>
+      </div>
+    </aside>
+
+    <main class="stage">
+      <div class="canvasWrap">
+        <canvas id="game" width="700" height="700" aria-label="Prism Relay board" tabindex="0"></canvas>
+        <div id="comboToast" class="combo-toast" aria-live="polite"></div>
+        <div id="levelToast" class="level-toast" aria-live="polite"></div>
+      </div>
+      <div class="statusline">
+        <span id="statusText">Rotate junctions to connect the path. Pulses emit every second.</span>
+        <span id="pulseInfo"></span>
+      </div>
+    </main>
+
+    <aside class="panel right">
+      <div class="panel-title">Pulse Queue</div>
+      <div id="queue" class="queue"></div>
+      <div class="panel-title" style="margin-top:16px">Receivers</div>
+      <div id="receiverInfo" class="receiverInfo"></div>
+    </aside>
+  </div>
+
+  <!-- Tutorial / Modal -->
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-label="Tutorial">
+    <div class="modal">
+      <h2>Welcome to Prism Relay</h2>
+      <p class="sub">Rotate junctions to guide colored light to its matching receiver before time runs out.</p>
+      <div class="tutorial-grid">
+        <div class="tcard"><div class="ticon">◈</div><b>1 — Rotate</b><p>Click or tap a junction. Each tap rotates 90°. Use <kbd>R</kbd> or <kbd>Space</kbd> for keyboard.</p></div>
+        <div class="tcard"><div class="ticon" style="color:#00e5ff">●→</div><b>2 — Route</b><p>Cyan pulses need cyan receivers. Same for magenta & amber. Straight through or around bends.</p></div>
+        <div class="tcard"><div class="ticon" style="color:#ffb700">⚡</div><b>3 — Combo</b><p>Deliver quickly to build combo. Each streak adds +50% score. A miss resets it.</p></div>
+      </div>
+      <div class="level-tips">
+        <b>Level goals:</b> Level 1 needs 6 deliveries in 45s. Higher levels add a third color and obstacles. You can restart anytime.
+      </div>
+      <div class="modal-actions">
+        <button id="startBtn" class="btn primary large">Start Relay →</button>
+        <button id="dismissBtn" class="btn ghost">Skip</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gameOver" class="overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Game over">
+    <div class="modal">
+      <h2 id="overTitle">Time!</h2>
+      <p id="overDesc" class="sub">You delivered 0 pulses.</p>
+      <div class="modal-actions">
+        <button id="againBtn" class="btn primary large">Play Again</button>
+        <button id="overNextBtn" class="btn ghost" style="display:none">Next Level</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">Neon routing puzzle • Prism Relay • Keyboard + Pointer • Responsive</footer>
+</div>
+</body>
+</html>
