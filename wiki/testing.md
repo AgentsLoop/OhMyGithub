@@ -12,9 +12,13 @@ For an issue-triggered run, verify these checkpoints in order:
 Validate workflow edits locally with:
 
 ```sh
-actionlint .github/workflows/opencode.yml
+actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.yml
 git diff --check
 ```
+
+The caller must grant every permission requested by the reusable workflow.
+Otherwise GitHub rejects the run at startup before creating a job, even when
+`actionlint` succeeds.
 
 For goal support, confirm the workflow trigger checks `/omg`, reads the `Goal`
 label without subscribing to `issues: labeled`, installs and configures
