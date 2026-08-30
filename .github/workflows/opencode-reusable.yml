@@ -60,7 +60,7 @@ on:
       OPENCODE_AUTH_JSON:
         required: false
       AGENTSWEB_SSH_PUBLIC_KEY:
-        required: true
+        required: false
 jobs:
   opencode:
     runs-on: ubuntu-latest
