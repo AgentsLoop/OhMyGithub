@@ -3,6 +3,7 @@
 ## Wiki index
 
 - [OpenCode workflow](wiki/opencode.md)
+- [Oh My Github App](wiki/oh-my-github-app.md)
 - [Temporary Mac SSH access](wiki/access.md)
 - [Testing and verification](wiki/testing.md)
 
