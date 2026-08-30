@@ -63,6 +63,13 @@ on:
         required: true
 jobs:
   opencode:
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event.sender.type != 'Bot') &&
+      (github.event.issue.pull_request == null) &&
+      (github.event_name == 'workflow_dispatch' ||
+      contains(github.event.comment.body, '/omg') ||
+      contains(github.event.issue.body, '/omg') ||
+      contains(github.event.issue.title, '/omg'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write
