@@ -45,7 +45,7 @@ skill labels are:
   search support.
 
 These labels are based on the skill labels currently configured in
-`agents-dev/aiplay`; refresh them with `gh label list` before each test because
+`GauntletLoop/OhMyGithub`; refresh them with `gh label list` before each test because
 the set can change. Do not add a skill label merely because a skill exists:
 apply only labels supported by the issue's requirements. If a matching label
 does not exist, continue without inventing or creating one and record that in
