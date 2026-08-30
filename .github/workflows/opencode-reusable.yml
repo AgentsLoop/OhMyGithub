@@ -126,7 +126,7 @@ jobs:
       - name: Checkout centralized OMG runtime
         uses: actions/checkout@v6
         with:
-          repository: Issuefy/OhMyGithub
+          repository: GautletLoop/OhMyGithub
           ref: main
           path: .omgithub-runtime
           token: ${{ github.token }}
