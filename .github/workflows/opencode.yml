@@ -6,80 +6,15 @@ on:
     types: [created]
   issues:
     types: [opened, edited]
-  workflow_dispatch:
-    inputs:
-      issue_number:
-        description: Issue number that requested the run
-        required: true
-        type: string
-      comment_body:
-        description: Original OpenCode request
-        required: true
-        type: string
-      base_branch:
-        description: Branch that owns this workflow execution
-        required: true
-        type: string
-      goal_request:
-        description: Whether the triggering issue had the Goal label
-        required: false
-        default: 'false'
-        type: string
 
 jobs:
-  forward_to_branch:
-    if: >-
-      github.event_name != 'workflow_dispatch' &&
-      (contains(github.event.comment.body, '--branch ') ||
-      contains(github.event.comment.body, '--branch=') ||
-      contains(github.event.issue.body, '--branch ') ||
-      contains(github.event.issue.body, '--branch=') ||
-      contains(github.event.issue.title, '--branch ') ||
-      contains(github.event.issue.title, '--branch='))
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-      contents: read
-      issues: read
-    steps:
-      - name: Dispatch workflow on requested branch
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const request = context.payload.comment?.body ?? context.payload.issue?.body ?? context.payload.issue?.title ?? '';
-            const match = request.match(/\/omg\s+--branch(?:=|\s+)([^\s]+)/);
-            if (!match) throw new Error('Could not parse --branch from the request');
-            const branch = match[1];
-            if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.startsWith('-') || branch.startsWith('/') || branch.endsWith('/') || branch.includes('..')) {
-              throw new Error(`Invalid branch: ${branch}`);
-            }
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'opencode.yml',
-              ref: branch,
-              inputs: {
-                issue_number: String(context.issue.number),
-                comment_body: request,
-                base_branch: branch,
-                goal_request: String(context.payload.issue?.labels?.some(({ name }) => name === 'Goal') ?? false)
-              }
-            });
-            core.info(`Dispatched opencode.yml on ${branch}`);
-
   opencode:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
       github.event.sender.type != 'Bot' &&
-      (github.event_name == 'workflow_dispatch' || !contains(github.event.comment.body, '--branch')) &&
-      (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.body, '--branch')) &&
-      (github.event_name == 'workflow_dispatch' || !contains(github.event.issue.title, '--branch')) &&
       (github.event.issue.pull_request == null) &&
       (contains(github.event.comment.body, '/omg') ||
       contains(github.event.issue.body, '/omg') ||
       contains(github.event.issue.title, '/omg'))
-      )
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -87,7 +22,7 @@ jobs:
       pull-requests: write
       issues: write
     env:
-      SSH_NAME: opencode-issue-${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
+      SSH_NAME: opencode-issue-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
       SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
       SSH_PUBLIC_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519.pub
       SSH_DIR: ${{ github.workspace }}/.opencode-ssh
@@ -105,9 +40,9 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
-      TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}
-      COMMENT_BODY: ${{ inputs.comment_body || github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
-      GOAL_REQUEST: ${{ inputs.goal_request == 'true' || contains(github.event.issue.labels.*.name, 'Goal') }}
+      TRIGGER_ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+      COMMENT_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.pull_request.body || github.event.issue.title || github.event.pull_request.title }}
+      GOAL_REQUEST: ${{ contains(github.event.issue.labels.*.name, 'Goal') }}
       OMO_REQUEST: ${{ contains(github.event.issue.labels.*.name, 'omo') }}
     steps:
       - name: Checkout repository
@@ -456,29 +391,12 @@ jobs:
           git config user.name 'opencode[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-      - name: Resolve execution branch
-        id: execution_branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          request="$COMMENT_BODY"
-          branch='${{ inputs.base_branch || github.event.pull_request.base.ref || github.event.repository.default_branch }}'
-          if [[ "$request" =~ /omg[[:space:]]+--branch[=[:space:]]+([^[:space:]]+) ]]; then
-            branch="${BASH_REMATCH[2]}"
-          fi
-          if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ || "$branch" == -* || "$branch" == */ || "$branch" == /* || "$branch" == *..* ]]; then
-            echo "Invalid execution branch: $branch" >&2
-            exit 1
-          fi
-          git fetch --depth=1 origin "refs/heads/$branch:refs/remotes/origin/$branch"
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "Using execution branch: $branch"
-
       - name: Create OpenCode branch
         shell: bash
         run: |
           set -euo pipefail
-          BASE_BRANCH='${{ steps.execution_branch.outputs.branch }}'
+          BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
+          git fetch origin "$BASE_BRANCH"
           git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
 
       - name: Resolve OpenCode model and skill labels
@@ -808,7 +726,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BASE_BRANCH='${{ steps.execution_branch.outputs.branch }}'
+          BASE_BRANCH='${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}'
           # Dependencies are runtime-only and must never be included in the generated PR.
           touch "$PROJECT_DIR/.gitignore"
           grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \

@@ -63,22 +63,15 @@ OAuth provider.
 
 1. Before starting the test, inspect the working tree with `git status --short`.
    Stage and commit all current changes, then push the current branch. Verify
-   that the working tree is clean and the pushed commit is the branch tip.
-   Determine the current branch with `git branch --show-current` and the
-   repository default branch with `gh repo view --json defaultBranchRef --jq
-   .defaultBranchRef.name`. When the current branch differs from the default
-   branch, include `--branch <current-branch>` immediately after `/omg` in the
-   issue title or body. This forwards the complete workflow to that branch's
-   YAML; do not merely describe the branch in prose. On the default branch,
-   omit the flag.
-   Do not start the test with uncommitted or unpushed changes.
+   that the working tree is clean and the pushed commit is the branch tip
+   before creating the issue or triggering any Action. Do not start the test
+   with uncommitted or unpushed changes.
 2. Confirm `gh auth status` and identify the repository with `gh repo view`.
 3. Inspect the current labels with `gh label list`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
    with one `--label` option per applicable label. Put `/omg` in the title or
-   body. If a branch flag is required, use the exact command form
-   `/omg --branch <current-branch> <objective>`. Add `Goal` by default; this
-   specifically exercises the goal plugin and `opencode run --command goal`
+   body. Add `Goal` by default; this specifically exercises the goal plugin and
+   `opencode run --command goal`
    path. Omit `Goal` only when the caller explicitly requests the standard
    OpenCode path. Do not add a comment
    because this tests the `issues` trigger.
@@ -98,11 +91,8 @@ OAuth provider.
    gh run list --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
    ```
 
-   Confirm its event is `issues` on the default branch when no branch flag was
-   used. When `--branch` was used, confirm the dispatcher `issue` run is
-   followed by a `workflow_dispatch` run whose `headBranch` is the requested
-   branch; poll that forwarded run or issue comments only until the initial
-   OpenCode session link appears.
+   Confirm its event is `issues` and its title matches the new issue. Poll the
+   run or issue comments only until the initial OpenCode session link appears.
    Do not use `gh run watch` through completion.
 5. Extract the OpenCode Web UI URL from the issue comment or the completed
    `Run OpenCode and locate its web session` step. Return the issue, run, and

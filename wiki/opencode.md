@@ -16,12 +16,6 @@ path. Labels select behavior but do not launch the workflow by themselves; add
 `Goal` before creating, editing, or commenting the `/omg` request. This keeps
 one request event mapped to one OpenCode session.
 
-An optional `--branch <name>` (or `--branch=<name>`) immediately after the
-command selects an existing remote branch as the execution base, for example
-`/omg --branch feature/login build the requested change`. GitHub's
-`issue_comment` event always loads this workflow from the default branch, so
-the requested branch controls the checked-out project and generated PR base.
-
 An issue labeled `omo` additionally installs and configures the OpenCode Ultimate
 edition of `oh-my-openagent` with Bun before the OpenCode server starts. The
 installer runs non-interactively with provider authentication skipped; `/omo` is
