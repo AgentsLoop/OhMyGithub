@@ -829,9 +829,14 @@ jobs:
           FINAL_COMMIT="$(git rev-parse HEAD)"
           TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
           TITLE="${TITLE:0:120}"
-          PR_URL="$(gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
+          if PR_URL="$(gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
             --title "$TITLE" \
-            --body "Automated implementation requested in comment:\n\n$COMMENT_BODY")"
+            --body "Automated implementation requested in comment:\n\n$COMMENT_BODY")"; then
+            echo "Pull request created: $PR_URL"
+          else
+            PR_URL=''
+            echo 'Pull request creation was blocked; treating PR delivery as optional.' >&2
+          fi
           printf 'commit=%s\npr_url=%s\n' "$FINAL_COMMIT" "$PR_URL" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
@@ -904,7 +909,7 @@ jobs:
               '✅ **Game complete and publicly verified.**', '',
               `Public game: ${process.env.APP_URL}`,
               `Final commit: ${commitUrl}`,
-              `Pull request: ${process.env.PR_URL}`,
+              `Pull request: ${process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.'}`,
               `OpenCode logs release: ${process.env.OPENCODE_RELEASE_URL}`,
               '', '<details><summary>Final screenshots</summary>', '', ...images, '', '</details>'
             ].join('\n');
