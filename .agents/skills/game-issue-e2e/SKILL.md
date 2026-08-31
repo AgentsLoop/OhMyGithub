@@ -5,6 +5,14 @@ description: Start the issue-triggered workflow from the caller's prompt, wait f
 
 # Issue workflow kickoff
 
+## Trigger rule
+
+GitHub uses the term **label**. The required execution label is exactly
+`OpenCode`. Create the issue with that label, or add it to an existing issue;
+do not use `/omg`, comments, edits, or the word “tag” as a trigger. The
+workflow executes once for the issue-opened event or once when `OpenCode` is
+added.
+
 Use this skill when the user asks to start the issue-triggered workflow with a
 request or create an issue. Treat the user's next message after invoking this
 skill as the task prompt. Preserve that prompt's intent and details; do not

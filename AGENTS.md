@@ -59,9 +59,9 @@ The issue-triggered workflow uses `opencode/muse-spark-1.2-contributor-free` and
 token. It does not require an `OPENCODE_API_KEY` repository secret. When workflow steps call
 the GitHub API, use the authenticated `GITHUB_TOKEN`; do not rely on unauthenticated API requests.
 
-Trigger it by opening an issue with the `OpenCode` label or adding that label to
-an existing issue. If the label is absent on a newly opened issue, the workflow
-replies asking for it. Add
+To execute an issue, open it with the `OpenCode` label, or add that label to an
+existing issue. If a newly opened issue does not have the label, the workflow
+replies asking for it. Edits, comments, and other labels do not execute it. Add
 the `Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 
