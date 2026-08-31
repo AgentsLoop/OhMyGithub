@@ -21,10 +21,13 @@ and use the repository default branch.
 
 Use this skill when the user asks to start the issue-triggered workflow with a
 request or create an issue. Treat the user's next message after invoking this
-skill as the task prompt. Preserve that prompt's intent and details; do not
-invent, replace, summarize, or augment it with a random task. This skill intentionally ends after the
-workflow publishes the OpenCode Web UI session link; it does not watch the
-workflow to completion or claim that the implementation, PR, or public app is finished.
+skill as the task prompt when one is supplied. Preserve a supplied prompt's
+intent and details; do not invent, replace, summarize, or augment it with a
+random task. When no prompt is supplied (or the prompt is empty), randomly
+choose a small playable browser-game concept and write a brief implementation
+prompt for it. This skill intentionally ends after the workflow publishes the
+OpenCode Web UI session link; it does not watch the workflow to completion or
+claim that the implementation, PR, or public app is finished.
 
 ## Repository boundary
 
@@ -36,10 +39,10 @@ URLs as contextual references only, and run the test against
 `AgentsLoop/OhMyGithub`.
 
 The caller's following message is sufficient as the prompt when one is
-provided, even when it is short or does not describe a game. If the caller
-does not provide a game concept or prompt, invent a random, small playable
-browser game and write a brief issue prompt for it. Apply matching skill
-labels only when the prompt or invented game clearly requires them.
+provided, even when it is short or does not describe a game. If no prompt is
+provided or the prompt is empty, invent a random, small playable browser game
+and write a brief issue prompt for it. Apply matching skill labels only when
+the prompt or invented game clearly requires them.
 
 ## Required outcome
 
