@@ -938,6 +938,30 @@ jobs:
           github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+              per_page: 100
+            });
+            const failedSteps = jobs
+              .flatMap((job) => (job.steps || [])
+                .filter((step) => step.conclusion === 'failure')
+                .map((step) => `${job.name}: ${step.name}`));
+            const details = failedSteps.length
+              ? failedSteps.map((step) => `- \`${step}\``).join('\n')
+              : '- See the workflow logs for the failing step.';
+            await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER,
+              repo: process.env.TARGET_REPO,
+              issue_number: number,
+              body: [
+                '❌ **OpenCode workflow failed.**', '',
+                `Actions run: ${runUrl}`,
+                '', '**Failed step(s):**', details
+              ].join('\n')
+            });
             await github.rest.issues.removeLabel({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, name: 'in progress'
