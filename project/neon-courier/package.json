@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 5173",
+    "dev": "vite --host 0.0.0.0 --port 3000 --strictPort",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "preview": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
     "preview:3000": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
-    "start": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
+    "start": "npm run build && vite preview --host 0.0.0.0 --port 3000 --strictPort",
     "test": "node test.js"
   },
   "devDependencies": {
