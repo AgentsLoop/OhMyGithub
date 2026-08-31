@@ -29,9 +29,10 @@ prompt clearly requires them.
 
 The kickoff is complete when all of these are true:
 
-- A fresh GitHub issue was created with `/omg` in its title or body. Add the
-  `Goal` label by default; omit it only when the caller explicitly requests a
-  standard-mode workflow test.
+- A fresh GitHub issue was created with the `OpenCode` label. Add the `Goal`
+  label by default; omit it only when the caller explicitly requests a
+  standard-mode workflow test. The workflow runs once for the issue-opened
+  event, or once when `OpenCode` is added to an existing issue.
 - The `issues` event triggered `.github/workflows/opencode.yml`.
 - The initial OpenCode Web UI session link was posted.
 
@@ -83,12 +84,13 @@ OAuth provider.
 3. Inspect the current labels in `GauntletLoop/OhMyGithub` with
    `gh label list --repo GauntletLoop/OhMyGithub`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
-   with one `--label` option per applicable label. Put `/omg` in the title or
-   body. Add `Goal` by default; this specifically exercises the goal plugin and
+   with one `--label` option per applicable label, always including `OpenCode`.
+   Add `Goal` by default; this specifically exercises the goal plugin and
    `opencode run --command goal`
    path. Omit `Goal` only when the caller explicitly requests the standard
-   OpenCode path. Do not add a comment
-   because this tests the `issues` trigger.
+   OpenCode path. Do not add a comment because comments do not trigger the
+   workflow. If testing an existing issue instead, adding the `OpenCode` label
+   is the only supported way to start it.
    Use the caller's following message as the complete issue prompt and preserve
    it verbatim. Do not generate a substitute prompt. If the prompt requests
    3D content, also pass `--label skill/load-sketchfab-threejs` when that label
