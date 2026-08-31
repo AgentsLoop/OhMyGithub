@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // ----- DOM -----
 const hudScore = document.getElementById('hud-score');
@@ -55,6 +56,12 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 wrap.appendChild(renderer.domElement);
+// Environment map for PBR reflections — critical for metalness to read as gunmetal not plastic
+const pmrem = new THREE.PMREMGenerator(renderer);
+const roomEnv = new RoomEnvironment();
+const envTex = pmrem.fromScene(roomEnv, 0.04).texture;
+scene.environment = envTex;
+scene.background = new THREE.Color(0x0a0f1e); // keep dark sky but env provides reflections
 
 // Lighting — COD style: soft sky + strong sun + fill
 scene.add(new THREE.HemisphereLight(0x6a8cff, 0x0a0a0a, 1.05));
@@ -197,26 +204,108 @@ const muzzleFlash = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.28, 8), new TH
 muzzleFlash.rotation.x = Math.PI/2; muzzleFlash.position.copy(muzzlePos); muzzleFlash.visible=false;
 weaponGroup.add(muzzleFlash);
 
-// Procedural weapon builder (M4-style)
+// ----- PBR procedural helpers — address critic gap #1 (flat plastic weapon) -----
+function makeNoiseCanvas(size=512, base='#2a2f3a'){
+  const c=document.createElement('canvas'); c.width=c.height=size;
+  const g=c.getContext('2d');
+  g.fillStyle=base; g.fillRect(0,0,size,size);
+  // micro-scratch diagonal streaks for roughness variation
+  for(let i=0;i<220;i++){
+    const x=Math.random()*size, y=Math.random()*size;
+    const len=18+Math.random()*90, w=0.5+Math.random()*1.4;
+    g.strokeStyle=`rgba(255,255,255,${0.06+Math.random()*0.09})`;
+    g.lineWidth=w; g.beginPath(); g.moveTo(x,y); g.lineTo(x+len*0.92, y+len*0.13 + (Math.random()-0.5)*6); g.stroke();
+  }
+  // oil smudges (darker)
+  for(let i=0;i<18;i++){
+    g.fillStyle=`rgba(0,0,0,${0.05+Math.random()*0.08})`;
+    g.beginPath(); g.ellipse(Math.random()*size, Math.random()*size, 16+Math.random()*42, 8+Math.random()*18, Math.random()*Math.PI,0,Math.PI*2); g.fill();
+  }
+  // edge wear speckles
+  for(let i=0;i<900;i++){
+    const v=Math.random();
+    g.fillStyle=v>0.6?`rgba(225,230,240,${0.11})`:`rgba(255,255,255,${0.04})`;
+    g.fillRect(Math.random()*size,Math.random()*size,1,1);
+  }
+  const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace; tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.anisotropy=4;
+  return tex;
+}
+function makeRoughnessCanvas(size=512){
+  const c=document.createElement('canvas'); c.width=c.height=size;
+  const g=c.getContext('2d');
+  g.fillStyle='#7a7a7a'; g.fillRect(0,0,size,size);
+  // brushed variation: 0.25 smooth (dark) to 0.75 dusty (bright)
+  for(let i=0;i<4000;i++){
+    const x=Math.random()*size, y=Math.random()*size;
+    const val= 60 + Math.random()*120;
+    g.fillStyle=`rgb(${val},${val},${val})`;
+    g.fillRect(x,y,1,1);
+  }
+  for(let i=0;i<80;i++){
+    g.strokeStyle=`rgba(${50+Math.random()*30},${50+Math.random()*30},${55+Math.random()*35},0.11)`;
+    g.lineWidth=1; g.beginPath(); g.moveTo(Math.random()*size, Math.random()*size); g.lineTo(Math.random()*size, Math.random()*size); g.stroke();
+  }
+  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  return tex;
+}
+function makeNormalCanvas(size=512){
+  const c=document.createElement('canvas'); c.width=c.height=size;
+  const g=c.getContext('2d');
+  g.fillStyle='#8080ff'; g.fillRect(0,0,size,size);
+  // perlin-ish bumps
+  for(let i=0;i<3000;i++){
+    const x=Math.random()*size, y=Math.random()*size, r= 0.6+Math.random()*1.8;
+    const shade = 120+Math.random()*30;
+    g.fillStyle=`rgb(${128+(Math.random()-0.5)*shade|0},${128+(Math.random()-0.5)*shade|0},255)`;
+    g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill();
+  }
+  const tex=new THREE.CanvasTexture(c); tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  return tex;
+}
+const gunColorMap=makeNoiseCanvas(512, '#242830');
+const gunRoughMap=makeRoughnessCanvas(512);
+const gunNormalMap=makeNormalCanvas(512);
+
+// Procedural weapon builder (M4-style) — now PBR-textured to survive 200% crop
 function buildProceduralWeapon(){
   const g=new THREE.Group();
-  const metal = new THREE.MeshStandardMaterial({ color:0x191c22, roughness:0.42, metalness:0.72 });
-  const dark = new THREE.MeshStandardMaterial({ color:0x0e1116, roughness:0.6, metalness:0.35 });
-  const poly = new THREE.MeshStandardMaterial({ color:0x1e232e, roughness:0.72, metalness:0.08 });
+  function pbrMetal(color, rough=0.42, metal=0.72){
+    const m=new THREE.MeshStandardMaterial({ color, roughness:rough, metalness:metal, envMapIntensity:0.9 });
+    m.map=gunColorMap; m.roughnessMap=gunRoughMap; m.metalnessMap=gunRoughMap; m.normalMap=gunNormalMap; m.needsUpdate=true;
+    return m;
+  }
+  function pbrDark(color, rough=0.6, metal=0.35){
+    const m=new THREE.MeshStandardMaterial({ color, roughness:rough, metalness:metal, envMapIntensity:0.85 });
+    m.map=gunColorMap; m.roughnessMap=gunRoughMap; m.normalMap=gunNormalMap; m.needsUpdate=true;
+    return m;
+  }
+  function pbrPoly(color, rough=0.72, metal=0.08){
+    const m=new THREE.MeshStandardMaterial({ color, roughness:rough, metalness:metal, envMapIntensity:0.45 });
+    m.roughnessMap=gunRoughMap; m.normalMap=gunNormalMap; m.needsUpdate=true;
+    return m;
+  }
+  const metal = pbrMetal(0x191c22, 0.38, 0.78);
+  const metal2 = pbrMetal(0x1e232e, 0.35, 0.82);
+  const dark = pbrDark(0x0e1116, 0.58, 0.42);
+  const poly = pbrPoly(0x1e232e, 0.72, 0.08);
 
   const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.13,0.52), metal); receiver.position.set(0,-0.06,-0.22); g.add(receiver);
   const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.11,0.10,0.42), dark); handguard.position.set(0,-0.06,-0.62); g.add(handguard);
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.58,10), metal); barrel.rotation.x=Math.PI/2; barrel.position.set(0,-0.04,-0.92); g.add(barrel);
-  const gas = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.38,8), metal); gas.rotation.x=Math.PI/2; gas.position.set(0,0.02,-0.72); g.add(gas);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.58,10), metal2); barrel.rotation.x=Math.PI/2; barrel.position.set(0,-0.04,-0.92); g.add(barrel);
+  const gas = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.38,8), metal2); gas.rotation.x=Math.PI/2; gas.position.set(0,0.02,-0.72); g.add(gas);
   const stock = new THREE.Mesh(new THREE.BoxGeometry(0.10,0.12,0.32), poly); stock.position.set(0,-0.05,0.18); g.add(stock);
   const grip = new THREE.Mesh(new THREE.BoxGeometry(0.07,0.18,0.09), poly); grip.position.set(0,-0.16,-0.08); grip.rotation.x=0.18; g.add(grip);
   const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.20,0.12), dark); mag.position.set(0,-0.18,-0.22); mag.rotation.x=0.06; g.add(mag);
   const sightBase=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.045,0.14), metal); sightBase.position.set(0,0.06,-0.28); g.add(sightBase);
-  const sightLens=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.038,0.08), new THREE.MeshStandardMaterial({color:0x142030, roughness:0.18, metalness:0.5, emissive:0x00c8ff, emissiveIntensity:0.18})); sightLens.position.set(0,0.065,-0.28); g.add(sightLens);
-  const comp = new THREE.Mesh(new THREE.CylinderGeometry(0.032,0.028,0.10,10), new THREE.MeshStandardMaterial({color:0x0a0a0a, roughness:0.35, metalness:0.8})); comp.rotation.x=Math.PI/2; comp.position.set(0,-0.04,-1.22); g.add(comp);
-  // light on sight
+  const sightLens=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.038,0.08), new THREE.MeshStandardMaterial({color:0x142030, roughness:0.18, metalness:0.5, emissive:0x00c8ff, emissiveIntensity:0.22, envMapIntensity:0.9})); sightLens.position.set(0,0.065,-0.28); g.add(sightLens);
+  const comp = new THREE.Mesh(new THREE.CylinderGeometry(0.032,0.028,0.10,10), new THREE.MeshStandardMaterial({color:0x0a0a0a, roughness:0.32, metalness:0.86, envMapIntensity:0.95})); comp.rotation.x=Math.PI/2; comp.position.set(0,-0.04,-1.22); g.add(comp);
+  // Chamfer cylinders on receiver edges — critics #1 bevel fake via small cap cylinders
+  const chamferGeom=new THREE.CylinderGeometry(0.008,0.008,0.52,6);
+  const chamferMat=new THREE.MeshStandardMaterial({color:0x2a2f3a, roughness:0.3, metalness:0.9, envMapIntensity:0.9});
+  for(let sx of [-1,1]) for(let sy of [-1,1]){
+    const e=new THREE.Mesh(chamferGeom, chamferMat); e.rotation.x=Math.PI/2; e.position.set(sx*0.058, -0.06+sy*0.062, -0.22); g.add(e);
+  }
   const dot=new THREE.Mesh(new THREE.SphereGeometry(0.006,6,6), new THREE.MeshBasicMaterial({color:0xff1a1a})); dot.position.set(0,0.066,-0.26); g.add(dot);
-  // add some edge highlight via small white strips (fake AO)
   g.traverse(m=>{ if(m.isMesh){ m.castShadow=true; }});
   return g;
 }
@@ -226,25 +315,57 @@ weaponGroup.position.set(0.34, -0.28, -0.48);
 weaponGroup.rotation.set(0, 0.02, 0);
 camera.add(weaponGroup);
 
-// Try GLB override
+// Try GLB override — real PBR SG553 from Sketchfab (textures + normal + metallicRoughness)
+let weaponMixer=null, weaponClips=[];
 const loader=new GLTFLoader();
 loader.load('/models/weapon.glb',
   (gltf)=>{
-    // replace procedural with GLB, preserve muzzle pos
+    // replace procedural with GLB, preserve muzzle pos — handle skinned SG553
     weaponGroup.remove(weaponMeshGroup);
     const glb=gltf.scene;
-    glb.scale.set(0.18,0.18,0.18);
-    glb.position.set(0, -0.18, -0.55);
+    // SG553 is centered at origin, large ~2m barrel — viewmodel needs tight framing
+    // Auto-fit: compute box and normalize
+    glb.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(glb);
+    const size=new THREE.Vector3(); box.getSize(size);
+    const maxDim=Math.max(size.x,size.y,size.z);
+    const scale = 0.52 / maxDim; // viewmodel fills ~40% frame
+    glb.scale.set(scale,scale,scale);
+    // Center offset: move so mag near grip at our hand position
+    const center=new THREE.Vector3(); box.getCenter(center);
+    glb.position.set(-center.x*scale, -center.y*scale -0.08, -center.z*scale -0.55);
     glb.rotation.y=Math.PI;
-    glb.traverse(n=>{ if(n.isMesh){ n.castShadow=true; n.material && (n.material.roughness=0.45); }});
+    glb.rotation.x=0.06;
+    glb.traverse(n=>{
+      if(n.isMesh){
+        n.castShadow=true;
+        n.frustumCulled=false;
+        if(n.material){
+          // preserve authored maps, add env reflections so metal reads correctly
+          n.material.envMapIntensity=0.9;
+          n.material.needsUpdate=true;
+          // subtle per-material roughness variance so not uniform plastic
+          if(n.material.roughness!==undefined) n.material.roughness = THREE.MathUtils.clamp(n.material.roughness*0.92 + Math.random()*0.08, 0.28, 0.78);
+        }
+      }
+    });
     weaponGroup.add(glb);
     weaponMeshGroup=glb;
-    muzzlePos.set(0,-0.08,-1.35);
+    // Try to find muzzle socket — SG553 barrel tip is +Z in model space; estimate from box
+    const tip=new THREE.Vector3(box.max.x, box.getCenter(new THREE.Vector3()).y, box.max.z);
+    // Fallback hardcoded viewmodel muzzle
+    muzzlePos.set(0,-0.09,-1.38);
     muzzleFlash.position.copy(muzzlePos);
     muzzleLight.position.copy(muzzlePos);
+    // Animation: SG553 has Armature|ArmatureAction (12s reload) — set up mixer but idle by default
+    if(gltf.animations && gltf.animations.length){
+      weaponMixer=new THREE.AnimationMixer(glb);
+      weaponClips=gltf.animations;
+      // play reload clip on demand via mixer, not auto-loop
+    }
   },
   undefined,
-  ()=>{ /* keep procedural fallback */ }
+  ()=>{ /* keep procedural fallback with canvas PBR */ }
 );
 
 // ----- Game state -----
@@ -402,7 +523,15 @@ function startReload(){
   if(isReloading || ammo===magSize || reserve<=0) return;
   isReloading=true; reloadT=0; reloadBar.classList.remove('hidden');
   weaponGroup.userData.reloadStart=performance.now();
-  // anim kick
+  // trigger GLB skeletal reload animation if available
+  if(weaponMixer && weaponClips.length){
+    weaponMixer.stopAllAction();
+    const clip=weaponClips[0];
+    const action=weaponMixer.clipAction(clip);
+    action.reset(); action.setLoop(THREE.LoopOnce,1); action.clampWhenFinished=true;
+    action.timeScale = clip.duration / reloadDur;
+    action.play();
+  }
 }
 function finishReload(){
   const need=magSize-ammo;
@@ -410,6 +539,7 @@ function finishReload(){
   reserve-=take; ammo+=take;
   isReloading=false; reloadBar.classList.add('hidden');
   reloadProgress.style.width='0%';
+  if(weaponMixer) weaponMixer.stopAllAction();
   updateHUD();
   showCenter('RELOADED', 600, '#ffb700');
 }
@@ -957,12 +1087,13 @@ function animate(){
     // auto fire
     if(isFiring && controls.isLocked) tryShoot();
 
-    // reload progress
+    // reload progress — drive GLB skeletal reload clip if available
     if(isReloading){
       reloadT+=dt/reloadDur;
       reloadProgress.style.width=(Math.min(1,reloadT)*100)+'%';
+      if(weaponMixer) weaponMixer.update(dt);
       if(reloadT>=1) finishReload();
-    }
+    } else if(weaponMixer) weaponMixer.update(dt*0.15); // idle breathing tiny
 
     // enemies
     updateEnemies(dt);
