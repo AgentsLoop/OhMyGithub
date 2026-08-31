@@ -9,9 +9,15 @@ description: Start the issue-triggered workflow from the caller's prompt, wait f
 
 GitHub uses the term **label**. The required execution label is exactly
 `OpenCode`. Create the issue with that label, or add it to an existing issue;
-do not use `/omg`, comments, edits, or the word “tag” as a trigger. The
-workflow executes once for the issue-opened event or once when `OpenCode` is
-added.
+do not use comments, edits, or the word “tag” as a trigger. The
+App dispatches the workflow once when an issue is opened with the label or when
+`OpenCode` is added.
+
+When the caller explicitly requests a custom branch, append
+` branch: <existing-branch>` to the issue title. Treat that suffix as routing
+metadata rather than part of the caller's implementation prompt.
+Verify the branch exists before creating the issue. Otherwise omit the directive
+and use the repository default branch.
 
 Use this skill when the user asks to start the issue-triggered workflow with a
 request or create an issue. Treat the user's next message after invoking this
@@ -41,9 +47,11 @@ The kickoff is complete when all of these are true:
 
 - A fresh GitHub issue was created with the `OpenCode` label. Add the `Goal`
   label by default; omit it only when the caller explicitly requests a
-  standard-mode workflow test. The workflow runs once for the issue-opened
-  event, or once when `OpenCode` is added to an existing issue.
-- The `issues` event triggered `.github/workflows/opencode.yml`.
+  standard-mode workflow test. The App dispatches the workflow once.
+- The App triggered `.github/workflows/opencode.yml` through `workflow_dispatch`.
+  For a custom branch, the run's head branch is that requested branch. An
+  `issues` event or default-branch run is a routing failure, not a successful
+  custom-branch test.
 - The initial OpenCode Web UI session link was posted.
 
 Do not wait for `gh run watch`, the verification prompt, the public tunnel, the
@@ -120,8 +128,12 @@ OAuth provider.
    gh run list --repo AgentsLoop/OhMyGithub --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
    ```
 
-   Confirm its event is `issues` and its title matches the new issue. Poll the
-   run or issue comments only until the initial OpenCode session link appears.
+   Confirm its event is `workflow_dispatch`, its title matches the new issue,
+   and its head branch matches the requested branch (or the default branch when
+   no directive was supplied). If it is an `issues` event or uses the wrong
+   branch, report the routing failure and do not treat a session as validation.
+   Poll the run or issue comments only until the initial OpenCode session link
+   appears.
    Do not use `gh run watch` through completion.
 5. Extract the OpenCode Web UI URL from the issue comment or the completed
    `Run OpenCode and locate its web session` step. Return the issue, run, and

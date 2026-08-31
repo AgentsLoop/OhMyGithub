@@ -3,22 +3,6 @@ name: OpenCode reusable pipeline
 on:
   workflow_call:
     inputs:
-      target_repository:
-        description: Repository receiving the generated pull request
-        required: true
-        type: string
-      target_owner:
-        description: Target repository owner
-        required: true
-        type: string
-      target_repo:
-        description: Target repository name
-        required: true
-        type: string
-      target_ref:
-        description: Target repository default branch
-        required: true
-        type: string
       issue_number:
         description: Issue containing the OpenCode label
         required: true
@@ -40,26 +24,14 @@ on:
         description: GitHub login that submitted the request
         required: true
         type: string
-      use_app_token:
-        description: Mint a target installation token from inherited App secrets
-        required: false
-        default: false
-        type: boolean
     secrets:
-      installation_token:
-        description: Optional pre-minted token for the target repository
-        required: false
-      OMG_APP_ID:
-        description: GitHub App ID used by centralized fallback runs
-        required: false
-      OMG_APP_PRIVATE_KEY:
-        description: GitHub App private key used by centralized fallback runs
-        required: false
       OPENCODE_API_KEY:
         required: false
       OPENCODE_AUTH_JSON:
         required: false
       AGENTSWEB_SSH_PUBLIC_KEY:
+        required: false
+      OMGHITHUB_PUBLISH_TOKEN:
         required: false
 jobs:
   opencode:
@@ -85,11 +57,11 @@ jobs:
       OPENCODE_ENABLE_EXPERIMENTAL_MODELS: "true"
       OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS: "true"
       OPENCODE_EXPERIMENTAL_WEBSOCKETS: "true"
-      TARGET_OWNER: ${{ inputs.target_owner }}
-      TARGET_REPO: ${{ inputs.target_repo }}
-      TARGET_REPOSITORY: ${{ inputs.target_repository }}
-      GH_REPO: ${{ inputs.target_repository }}
-      TARGET_REF: ${{ inputs.target_ref }}
+      TARGET_OWNER: ${{ github.repository_owner }}
+      TARGET_REPO: ${{ github.event.repository.name }}
+      TARGET_REPOSITORY: ${{ github.repository }}
+      GH_REPO: ${{ github.repository }}
+      TARGET_REF: ${{ github.ref_name }}
       RUNTIME_DIR: ${{ github.workspace }}/.omgithub-runtime
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
@@ -98,28 +70,16 @@ jobs:
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
     steps:
-      - name: Create target installation token
-        if: ${{ inputs.use_app_token }}
-        id: app_token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.OMG_APP_ID }}
-          private-key: ${{ secrets.OMG_APP_PRIVATE_KEY }}
-          owner: ${{ inputs.target_owner }}
-          repositories: ${{ inputs.target_repo }}
-
       - name: Export target token
         shell: bash
-        env:
-          TARGET_TOKEN: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
-        run: echo "GH_TOKEN=$TARGET_TOKEN" >> "$GITHUB_ENV"
+        run: echo "GH_TOKEN=${{ github.token }}" >> "$GITHUB_ENV"
 
       - name: Checkout target repository
         uses: actions/checkout@v6
         with:
-          repository: ${{ inputs.target_repository }}
-          ref: ${{ inputs.target_ref }}
-          token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref_name }}
+          token: ${{ github.token }}
           fetch-depth: 1
           persist-credentials: true
 
@@ -167,7 +127,7 @@ jobs:
         env:
           OPENCODE_MODEL: opencode/muse-spark-1.2-contributor-free
         with:
-          github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const fs = require('node:fs');
             const path = require('node:path');
@@ -271,7 +231,7 @@ jobs:
         env:
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
         with:
-          github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const statuses = ['in progress', 'complete', 'failed'];
@@ -490,7 +450,7 @@ jobs:
         id: opencode_labels
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const response = await github.rest.issues.listLabelsOnIssue({
@@ -519,7 +479,7 @@ jobs:
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
-          GITHUB_TOKEN: ${{ steps.app_token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
           OPENCODE_SKILLS: ${{ steps.opencode_labels.outputs.skills_json }}
@@ -614,7 +574,7 @@ jobs:
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
         with:
-          github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -637,12 +597,12 @@ jobs:
         id: response_comment
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          GH_TOKEN: ${{ github.token }}
           COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
           SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
-          REPOSITORY: ${{ inputs.target_repository }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
@@ -833,7 +793,7 @@ jobs:
           TITLE="${TITLE:0:120}"
           if PR_URL="$(gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
             --title "$TITLE" \
-            --body "Automated implementation requested in comment:\n\n$COMMENT_BODY")"; then
+            --body "Automated implementation requested in issue:\n\n$COMMENT_BODY")"; then
             echo "Pull request created: $PR_URL"
           else
             PR_URL=''
@@ -841,8 +801,63 @@ jobs:
           fi
           printf 'commit=%s\npr_url=%s\n' "$FINAL_COMMIT" "$PR_URL" >> "$GITHUB_OUTPUT"
         env:
-          GH_TOKEN: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          GH_TOKEN: ${{ github.token }}
 
+      - name: Publish game to OmGithub
+        id: omgithub_publish
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
+          PR_URL: ${{ steps.delivery.outputs.pr_url }}
+          SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
+          REQUEST_SENDER: ${{ inputs.sender }}
+          OMGHITHUB_PUBLISH_TOKEN: ${{ secrets.OMGHITHUB_PUBLISH_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ -n "$GH_TOKEN" ]]
+          [[ -n "$OMGHITHUB_PUBLISH_TOKEN" ]]
+          [[ -f dist/index.html ]]
+          [[ -n "$FINAL_COMMIT" ]]
+
+          pr_number=''
+          if [[ "$PR_URL" =~ /pull/([0-9]+)$ ]]; then
+            pr_number="${BASH_REMATCH[1]}"
+          fi
+
+          package_name="$(jq -r '.name // empty' package.json 2>/dev/null || true)"
+          request_title="${COMMENT_BODY%%$'\n'*}"
+          game_name="${package_name:-$request_title}"
+          game_name="$(sed -E 's/[^[:alnum:]]+/-/g; s/^-+|-+$//g' <<<"$game_name" | tr '[:upper:]' '[:lower:]')"
+          [[ -n "$game_name" ]] || game_name="game-$TRIGGER_ISSUE_NUMBER"
+
+          screenshots="$(jq -c --arg repository "$TARGET_REPOSITORY" --arg commit "$FINAL_COMMIT" '
+            map("https://raw.githubusercontent.com/\($repository)/\($commit)/project/screenshots/\(.)")
+          ' <<<"${SCREENSHOTS_JSON:-[]}")"
+          archive="$RUNNER_TEMP/omgithub-dist.zip"
+          (cd dist && zip -q -r "$archive" .)
+          response="$RUNNER_TEMP/omgithub-publish.json"
+          curl --fail-with-body --silent --show-error \
+            -X POST "https://omgithub.com/api/publish" \
+            -H "Authorization: Bearer $OMGHITHUB_PUBLISH_TOKEN" \
+            -H 'Content-Type: application/zip' \
+            -H "X-OmGithub-Name: $game_name" \
+            -H "X-OmGithub-Title: ${request_title:0:150}" \
+            -H "X-OmGithub-Description: ${request_title:0:500}" \
+            -H "X-OmGithub-Owner: $TARGET_OWNER" \
+            -H "X-OmGithub-Repo: $TARGET_REPO" \
+            -H "X-OmGithub-Issue: $TRIGGER_ISSUE_NUMBER" \
+            -H "X-OmGithub-PR: $pr_number" \
+            -H "X-OmGithub-Commit: $FINAL_COMMIT" \
+            -H "X-OmGithub-Actor: $REQUEST_SENDER" \
+            -H "X-OmGithub-Screenshots: $screenshots" \
+            --data-binary "@$archive" > "$response"
+          jq -e '.ok == true and .project.url and .project.install_url' "$response" >/dev/null
+          published_url="$(jq -r '.project.url' "$response")"
+          install_url="$(jq -r '.project.install_url' "$response")"
+          curl --fail --silent --show-error --retry 10 --retry-delay 2 "$published_url" >/dev/null
+          printf 'url=%s\ninstall_url=%s\n' "$published_url" "$install_url" >> "$GITHUB_OUTPUT"
+          echo "Published permanent game URL: $published_url"
       - name: Create OpenCode logs release
         if: success()
         id: opencode_release
@@ -885,19 +900,20 @@ jobs:
           printf 'url=%s\n' "$(jq -r '.url' <<<"$release_json")" >> "$GITHUB_OUTPUT"
           printf 'assets_json=%s\n' "$(jq -c '[.assets[] | {name, url: .browserDownloadUrl}]' <<<"$release_json")" >> "$GITHUB_OUTPUT"
         env:
-          GH_TOKEN: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          GH_TOKEN: ${{ github.token }}
 
       - name: Post final game report
         if: success() && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
-          APP_URL: ${{ env.APP_URL }}
+          APP_URL: ${{ steps.omgithub_publish.outputs.url || env.APP_URL }}
+          OMGITHUB_INSTALL_URL: ${{ steps.omgithub_publish.outputs.install_url }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
         with:
-          github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
@@ -910,6 +926,7 @@ jobs:
             const body = [
               '✅ **Game complete and publicly verified.**', '',
               `Public game: [${process.env.APP_URL}](${process.env.APP_URL})`,
+              `Install game: [${process.env.OMGHITHUB_INSTALL_URL}](${process.env.OMGHITHUB_INSTALL_URL})`,
               `Final commit: [${process.env.FINAL_COMMIT}](${commitUrl})`,
               `Pull request: ${process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.'}`,
               `OpenCode logs release: [${process.env.OPENCODE_RELEASE_URL}](${process.env.OPENCODE_RELEASE_URL})`,
@@ -939,7 +956,7 @@ jobs:
         if: success()
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             await github.rest.issues.removeLabel({
@@ -955,7 +972,7 @@ jobs:
         if: failure()
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
@@ -1000,7 +1017,7 @@ jobs:
         if: always() && steps.access_comment.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.installation_token || steps.app_token.outputs.token || github.token }}
+          github-token: ${{ github.token }}
           script: |
             await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,

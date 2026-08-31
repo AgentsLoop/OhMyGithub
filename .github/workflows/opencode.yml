@@ -1,5 +1,5 @@
 name: OpenCode
-run-name: "OpenCode #${{ inputs.issue_number || github.event.issue.number }} — ${{ inputs.issue_title || github.event.issue.title }}"
+run-name: "OpenCode #${{ inputs.issue_number }} — ${{ inputs.issue_title }}"
 
 on:
   workflow_dispatch:
@@ -20,28 +20,6 @@ on:
       sender:
         description: GitHub login that submitted the request
         required: true
-      source:
-        description: Dispatch source identifier
-        required: false
-        default: manual
-      target_repository:
-        description: Fallback target repository; empty means this repository
-        required: false
-      target_owner:
-        description: Fallback target owner
-        required: false
-      target_repo:
-        description: Fallback target repository name
-        required: false
-      target_ref:
-        description: Fallback target default branch
-        required: false
-      installation_id:
-        description: GitHub App installation ID used for traceability
-        required: false
-  issues:
-    types: [opened, labeled]
-
 permissions:
   contents: write
   issues: write
@@ -49,46 +27,12 @@ permissions:
   id-token: write
 
 jobs:
-  missing-opencode-label:
-    if: >-
-      github.event_name != 'workflow_dispatch' &&
-      github.event.sender.type != 'Bot' &&
-      github.event.issue.pull_request == null &&
-      github.event.action == 'opened' &&
-      !contains(github.event.issue.labels.*.name, 'OpenCode')
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - name: Ask for the OpenCode label
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: 'Please add the `OpenCode` label to this issue to execute it.'
-            });
-
   opencode:
-    if: >-
-      (github.event_name == 'workflow_dispatch' || github.event.sender.type != 'Bot') &&
-      (github.event.issue.pull_request == null) &&
-      (github.event_name == 'workflow_dispatch' ||
-      (contains(github.event.issue.labels.*.name, 'OpenCode') &&
-      (github.event.action == 'opened' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'OpenCode'))))
     uses: ./.github/workflows/opencode-reusable.yml
     with:
-      target_repository: ${{ inputs.target_repository || github.repository }}
-      target_owner: ${{ inputs.target_owner || github.repository_owner }}
-      target_repo: ${{ inputs.target_repo || github.event.repository.name }}
-      target_ref: ${{ inputs.target_ref || github.event.repository.default_branch }}
-      issue_number: ${{ inputs.issue_number || github.event.issue.number }}
-      request: ${{ inputs.request || github.event.comment.body || github.event.issue.body || github.event.issue.title }}
-      issue_title: ${{ inputs.issue_title || github.event.issue.title }}
-      labels_json: ${{ inputs.labels_json || toJSON(github.event.issue.labels.*.name) }}
-      sender: ${{ inputs.sender || github.event.sender.login }}
-      use_app_token: ${{ inputs.target_repository != '' }}
+      issue_number: ${{ inputs.issue_number }}
+      request: ${{ inputs.request }}
+      issue_title: ${{ inputs.issue_title }}
+      labels_json: ${{ inputs.labels_json }}
+      sender: ${{ inputs.sender }}
     secrets: inherit
