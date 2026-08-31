@@ -39,10 +39,8 @@ on:
       installation_id:
         description: GitHub App installation ID used for traceability
         required: false
-  issue_comment:
-    types: [created]
   issues:
-    types: [opened, edited]
+    types: [opened, labeled]
 
 permissions:
   contents: write
@@ -56,6 +54,7 @@ jobs:
       github.event_name != 'workflow_dispatch' &&
       github.event.sender.type != 'Bot' &&
       github.event.issue.pull_request == null &&
+      github.event.action == 'opened' &&
       !contains(github.event.issue.labels.*.name, 'OpenCode')
     runs-on: ubuntu-latest
     permissions:
@@ -77,7 +76,9 @@ jobs:
       (github.event_name == 'workflow_dispatch' || github.event.sender.type != 'Bot') &&
       (github.event.issue.pull_request == null) &&
       (github.event_name == 'workflow_dispatch' ||
-      contains(github.event.issue.labels.*.name, 'OpenCode'))
+      (contains(github.event.issue.labels.*.name, 'OpenCode') &&
+      (github.event.action == 'opened' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'OpenCode'))))
     uses: ./.github/workflows/opencode-reusable.yml
     with:
       target_repository: ${{ inputs.target_repository || github.repository }}
