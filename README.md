@@ -29,7 +29,7 @@
 
 OMG (Oh My GitHub) is an automated GitHub Actions workflow for creating complete browser games and app projects from one natural-language prompt.
 
-Write what you want in an issue. Add `/omg`. OpenCode checks out the project, uses the shared skills, builds the experience, runs tests, verifies the result, and opens a pull request with the finished work.
+Write what you want in an issue and add the `OpenCode` label. OpenCode checks out the project, uses the shared skills, builds the experience, runs tests, verifies the result, and opens a pull request with the finished work.
 
 Yes, it creates the code. Yes, it runs the verification loop. Yes, it can expose the result in a temporary browser URL.
 
@@ -37,7 +37,7 @@ Yes, it creates the code. Yes, it runs the verification loop. Yes, it can expose
 
 1. Open a GitHub issue.
 2. Describe the game or app you want.
-3. Put `/omg` in the issue.
+3. Add the `OpenCode` label to the issue.
 4. Let GitHub Actions build, test, verify, and propose the result.
 
 ```text
@@ -49,7 +49,7 @@ Your idea → GitHub issue → OpenCode → tests → verified app → pull requ
 Create an issue in your repository with a concrete request:
 
 ```text
-/omg Build a neon asteroid game.
+Build a neon asteroid game.
 
 Requirements:
 - Arrow-key movement
@@ -134,7 +134,7 @@ flowchart TD
 ```text
 ┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
 │ GitHub issue │ ──▶ │ GitHub Actions  │ ──▶ │   OpenCode   │
-│ + /omg prompt│     │ runner + labels │     │ + .agents    │
+│ + issue text │     │ runner + labels │     │ + .agents    │
 └──────────────┘     └─────────────────┘     └──────┬───────┘
                                                     │
                               ┌─────────────────────┼─────────────────────┐
@@ -155,7 +155,7 @@ flowchart TD
 - ☁️ Execution happens in GitHub Actions.
 - 🔒 Temporary SSH and preview access exists only for the workflow run.
 - 👀 Review the generated pull request before merging.
-- 🛡️ Restrict who can trigger `/omg` in repositories that accept public issues.
+- 🛡️ Restrict who can apply the `OpenCode` label in repositories that accept public issues.
 
 > “No servers needed” means no servers for you to provision or maintain. The workflow still uses GitHub-hosted Actions infrastructure and temporary workflow services.
 
@@ -182,7 +182,7 @@ git diff --check
 
 | Problem | What to check |
 |---|---|
-| The workflow did not start | Confirm `/omg` appears in the issue title or body. |
+| The workflow did not start | Confirm the `OpenCode` label is applied to the issue. |
 | A skill was not selected | Add a matching `skill/<name>` label. |
 | The app URL is missing | Check the local app verification step and runner log. |
 | The PR was not created | Confirm OpenCode produced a diff and the workflow reached the PR step. |
@@ -193,7 +193,7 @@ git diff --check
 Ideas, skills, game templates, verification improvements, and workflow fixes are welcome.
 
 1. Open an issue describing the improvement.
-2. Use `/omg` when you want the workflow to prototype it.
+2. Add the `OpenCode` label when you want the workflow to prototype it.
 3. Review the generated pull request carefully.
 4. Add tests and runtime proof for workflow changes.
 

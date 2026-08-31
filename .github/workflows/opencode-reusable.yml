@@ -1,4 +1,4 @@
-name: OMG reusable pipeline
+name: OpenCode reusable pipeline
 
 on:
   workflow_call:
@@ -20,11 +20,11 @@ on:
         required: true
         type: string
       issue_number:
-        description: Issue containing the /omg request
+        description: Issue containing the OpenCode label
         required: true
         type: string
       request:
-        description: Exact /omg request text
+        description: Exact issue request text
         required: true
         type: string
       issue_title:
@@ -532,9 +532,6 @@ jobs:
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
           prompt_template="$(< "$RUNTIME_DIR/.github/prompts/01-build.md")"
           request_text="$COMMENT_BODY"
-          # /omg is the sole request marker. The Goal issue label selects the
-          # persistent goal command, so remove the marker from either prompt.
-          request_text="$(sed -E 's/^[[:space:]]*\/omg([[:space:]]*)?//' <<<"$request_text")"
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
@@ -619,7 +616,7 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const command = process.env.GOAL_REQUEST === 'true' ? '/omg with Goal' : '/omg';
+            const command = process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode';
             const body = [
               '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
               `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',

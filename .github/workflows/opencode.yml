@@ -1,14 +1,14 @@
-name: OMG
-run-name: "OMG #${{ inputs.issue_number || github.event.issue.number }} — ${{ inputs.issue_title || github.event.issue.title }}"
+name: OpenCode
+run-name: "OpenCode #${{ inputs.issue_number || github.event.issue.number }} — ${{ inputs.issue_title || github.event.issue.title }}"
 
 on:
   workflow_dispatch:
     inputs:
       issue_number:
-        description: Issue containing the /omg request
+        description: Issue containing the OpenCode label
         required: true
       request:
-        description: Exact /omg request text
+        description: Exact issue request text
         required: true
       issue_title:
         description: Issue title for the Actions run name
@@ -51,14 +51,33 @@ permissions:
   id-token: write
 
 jobs:
+  missing-opencode-label:
+    if: >-
+      github.event_name != 'workflow_dispatch' &&
+      github.event.sender.type != 'Bot' &&
+      github.event.issue.pull_request == null &&
+      !contains(github.event.issue.labels.*.name, 'OpenCode')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Ask for the OpenCode label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: 'Please add the `OpenCode` tag to this issue to execute it.'
+            });
+
   opencode:
     if: >-
       (github.event_name == 'workflow_dispatch' || github.event.sender.type != 'Bot') &&
       (github.event.issue.pull_request == null) &&
       (github.event_name == 'workflow_dispatch' ||
-      contains(github.event.comment.body, '/omg') ||
-      contains(github.event.issue.body, '/omg') ||
-      contains(github.event.issue.title, '/omg'))
+      contains(github.event.issue.labels.*.name, 'OpenCode'))
     uses: ./.github/workflows/opencode-reusable.yml
     with:
       target_repository: ${{ inputs.target_repository || github.repository }}

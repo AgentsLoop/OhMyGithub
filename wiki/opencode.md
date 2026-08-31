@@ -6,14 +6,14 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 ## Trigger
 
-`/omg <request>` is the single request marker. It can appear in a newly created
-or edited issue title or body, or in an issue comment. Bot-authored events are
+The `OpenCode` issue label is the execution marker. The issue title, body, or
+comment supplies the request text. Bot-authored events are
 ignored, so status comments do not recurse. An issue with the `Goal` label
 uses the installed `opencode-goal-plugin`, configures
 `noInterruptOnUserMessage: true`, and starts the runner with `opencode run
---command goal`; an unlabelled `/omg` request uses the standard `opencode run`
-path. Labels select behavior but do not launch the workflow by themselves; add
-`Goal` before creating, editing, or commenting the `/omg` request. This keeps
+--command goal`; an issue without `Goal` uses the standard `opencode run`
+path. The `OpenCode` label launches the workflow; add `Goal` to select
+persistent goal mode. This keeps
 one request event mapped to one OpenCode session.
 
 See the dedicated [Oh My Github App documentation](oh-my-github-app.md) for
@@ -22,7 +22,7 @@ App ownership, installation scope, permissions, events, and webhook details.
 An issue labeled `omo` additionally installs and configures the OpenCode Ultimate
 edition of `oh-my-openagent` with Bun before the OpenCode server starts. The
 installer runs non-interactively with provider authentication skipped; `/omo` is
-not a command and does not trigger a run by itself. An `omo`-labeled `/omg` run
+not a command and does not trigger a run by itself. An `omo`-labeled OpenCode run
 uses OMO's native `goal` command and prepends `ulw` to the objective. The Codex
 Light `ulw-loop` component is not recreated or registered for OpenCode.
 
@@ -102,7 +102,7 @@ CLI with `opencode run --command goal "<objective>"`; passing `/goal <objective>
 as the message sends literal text instead of invoking the custom command. To
 send a follow-up to the same attached session, use `opencode run --attach
 <server-url> --session <session-id> "<message>"`. In this workflow, the
-`/omg` marker is stripped from the objective before it is passed to the custom
+issue text is passed directly as the objective before it is passed to the custom
 command, and later human messages steer the running goal instead of
 pausing it.
 
