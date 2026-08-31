@@ -21,9 +21,11 @@ or an explicitly owned fork confirmed by `gh repo view`. Treat other repository
 URLs as contextual references only, and run the test against
 `GauntletLoop/OhMyGithub`.
 
-The caller's following message is sufficient as the prompt, even when it is
-short or does not describe a game. Apply matching skill labels only when the
-prompt clearly requires them.
+The caller's following message is sufficient as the prompt when one is
+provided, even when it is short or does not describe a game. If the caller
+does not provide a game concept or prompt, invent a random, small playable
+browser game and write a brief issue prompt for it. Apply matching skill
+labels only when the prompt or invented game clearly requires them.
 
 ## Required outcome
 
@@ -91,10 +93,12 @@ OAuth provider.
    OpenCode path. Do not add a comment because comments do not trigger the
    workflow. If testing an existing issue instead, adding the `OpenCode` label
    is the only supported way to start it.
-   Use the caller's following message as the complete issue prompt and preserve
-   it verbatim. Do not generate a substitute prompt. If the prompt requests
-   3D content, also pass `--label skill/load-sketchfab-threejs` when that label
-   exists, and require the issue prompt to use the
+   If the caller supplied a prompt, use it as the complete issue prompt and
+   preserve it verbatim. If no prompt was supplied, generate a random, small
+   playable browser game and use a concise implementation brief as the issue
+   prompt. If the prompt requests 3D content, also pass
+   `--label skill/load-sketchfab-threejs` when that label exists, and require
+   the issue prompt to use the
    `load-sketchfab-threejs` skill for a suitable downloadable GLB asset while
    preserving attribution and verifying geometry, materials, and animations.
    Do not add this label or requirement when the prompt does not request 3D
