@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 5173",
+    "dev": "vite --host 0.0.0.0 --port 5173 --allowedHosts",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "preview": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
+    "start": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
     "test": "node test.js"
   },
   "devDependencies": {

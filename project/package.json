@@ -1,0 +1,13 @@
+{
+  "name": "ohmygithub-project",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix neon-courier run dev -- --host 0.0.0.0",
+    "build": "npm --prefix neon-courier run build",
+    "preview": "npm --prefix neon-courier run preview",
+    "start": "npm --prefix neon-courier run preview -- --host 0.0.0.0 --port 3000",
+    "test": "npm --prefix neon-courier run test"
+  }
+}
