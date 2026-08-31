@@ -85,7 +85,7 @@ let touchDir = {x:0, y:0};
 
 function rand(a,b){ return Math.random()*(b-a)+a; }
 
-// power-ups: shield (temporary invuln, cyan) and time bonus (+5s, yellow)
+// power-ups: shield (temporary invuln, purple diamond) and time bonus (+5s, yellow)
 let powerUps = [];
 let powerUpTimer = 0;
 let nextSpawnInterval = 9;
@@ -345,7 +345,7 @@ function spawnRandomPowerUp(){
   const type = rng() < 0.5 ? 'shield' : 'time';
   // ensure at least one of each if only one left? random is fine
   powerUps.push({x,y, type, phase: seededRand(0, Math.PI*2)});
-  spawnParticles(x,y, type==='shield' ? '#38e6ff' : '#ffd93d', 10);
+  spawnParticles(x,y, type==='shield' ? '#7c5cff' : '#ffd93d', 10);
 }
 
 // Input
@@ -516,8 +516,8 @@ function update(dt){
       if(p.type==='shield'){
         drone.shieldTime = 5;
         score += 50;
-        spawnParticles(p.x,p.y,'#38e6ff',18);
-        spawnFloater(p.x, p.y-18, 'SHIELD +50', '#38e6ff');
+        spawnParticles(p.x,p.y,'#7c5cff',18);
+        spawnFloater(p.x, p.y-18, 'SHIELD +50', '#7c5cff');
         shake = Math.max(shake,5);
       } else {
         timeLeft += 5;
@@ -570,8 +570,8 @@ function update(dt){
     if(Math.hypot(p.x-drone.x, p.y-drone.y) < PULSE_R+PLAYER_R -2){
       if(drone.hitCooldown<=0){
         if(isShielded){
-          // shield blocks damage, just bounce and particles
-          spawnParticles(p.x,p.y,'#38e6ff',10);
+          // shield blocks damage, just bounce and particles (purple)
+          spawnParticles(p.x,p.y,'#7c5cff',10);
           const ang=Math.atan2(drone.y-p.y, drone.x-p.x);
           drone.vx+=Math.cos(ang)*180;
           drone.vy+=Math.sin(ang)*180;
@@ -782,32 +782,86 @@ function render(t){
     ctx.restore();
   });
 
-  // power-ups
+  // power-ups — shield vs beacon must be instantly distinguishable (critic fix: no cyan+◈ clone)
   powerUps.forEach(p=>{
     const bob = Math.sin(p.phase)*4;
     ctx.save();
     const isShield = p.type==='shield';
-    const col = isShield ? '#38e6ff' : '#ffd93d';
-    const glow = isShield ? 'rgba(56,230,255,0.9)' : 'rgba(255,217,61,0.9)';
-    ctx.shadowColor = glow; ctx.shadowBlur = 18;
-    ctx.fillStyle = isShield ? 'rgba(56,230,255,0.18)' : 'rgba(255,217,61,0.18)';
-    ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R+10,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = col;
-    ctx.shadowBlur = 14;
-    ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R,0,Math.PI*2); ctx.fill();
-    ctx.shadowBlur=0;
-    ctx.fillStyle='rgba(255,255,255,0.95)';
-    ctx.font='700 13px JetBrains Mono,monospace';
-    ctx.textAlign='center';
-    ctx.fillText(isShield ? '◈' : '+', p.x, p.y+bob+4.5);
-    // outer ring pulse
-    ctx.strokeStyle = isShield ? 'rgba(56,230,255,0.55)' : 'rgba(255,217,61,0.55)';
-    ctx.lineWidth=1.7;
-    ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R+6+Math.sin(p.phase*1.6)*2,0,Math.PI*2); ctx.stroke();
-    // label tiny
-    ctx.font='600 7px JetBrains Mono,monospace';
-    ctx.fillStyle = isShield ? '#b6f6ff' : '#fff3a0';
-    ctx.fillText(isShield ? 'SHIELD' : '+5S', p.x, p.y+bob+POWERUP_R+12);
+    const col = isShield ? '#7c5cff' : '#ffd93d';
+    const glow = isShield ? 'rgba(124,92,255,0.95)' : 'rgba(255,217,61,0.9)';
+    // outer aura — distinct hue + larger for shield
+    ctx.shadowColor = glow; ctx.shadowBlur = isShield ? 20 : 16;
+    ctx.fillStyle = isShield ? 'rgba(124,92,255,0.18)' : 'rgba(255,217,61,0.18)';
+    ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R+12,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    if(isShield){
+      // SHIELD: purple diamond + rotating double-hex ring — never a cyan circle
+      ctx.save();
+      ctx.translate(p.x, p.y+bob);
+      // diamond body
+      ctx.shadowColor='rgba(124,92,255,0.95)'; ctx.shadowBlur=16;
+      ctx.fillStyle='#7c5cff';
+      ctx.beginPath();
+      ctx.moveTo(0,-POWERUP_R-1); ctx.lineTo(POWERUP_R+1,0); ctx.lineTo(0,POWERUP_R+1); ctx.lineTo(-POWERUP_R-1,0); ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur=0;
+      // inner highlight diamond
+      ctx.fillStyle='rgba(255,255,255,0.18)';
+      ctx.beginPath(); ctx.moveTo(0,-POWERUP_R+4); ctx.lineTo(POWERUP_R-4,0); ctx.lineTo(0,POWERUP_R-4); ctx.lineTo(-POWERUP_R+4,0); ctx.closePath(); ctx.fill();
+      // inner glyph ✦ (star) vs beacon ◈
+      ctx.fillStyle='#fff';
+      ctx.font='800 13px JetBrains Mono,monospace';
+      ctx.textAlign='center';
+      ctx.fillText('✦', 0, 5);
+      ctx.restore();
+      // rotating hex ring — fast spin distinct cadence
+      ctx.save();
+      ctx.translate(p.x, p.y+bob);
+      ctx.rotate(p.phase*1.8);
+      ctx.strokeStyle='rgba(124,92,255,0.85)';
+      ctx.lineWidth=1.8;
+      ctx.shadowColor='rgba(124,92,255,0.7)'; ctx.shadowBlur=8;
+      const r = POWERUP_R+8+Math.sin(p.phase*1.6)*1.5;
+      ctx.beginPath();
+      for(let k=0;k<6;k++){ const a=k/6*Math.PI*2; const x=Math.cos(a)*r, y=Math.sin(a)*r; if(k===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+      ctx.closePath(); ctx.stroke();
+      ctx.restore();
+      // second contra-rotating ring
+      ctx.save();
+      ctx.translate(p.x, p.y+bob);
+      ctx.rotate(-p.phase*2.2);
+      ctx.strokeStyle='rgba(255,255,255,0.35)';
+      ctx.lineWidth=1;
+      ctx.setLineDash([3,4]);
+      const r2 = POWERUP_R+13;
+      ctx.beginPath();
+      for(let k=0;k<6;k++){ const a=k/6*Math.PI*2; const x=Math.cos(a)*r2, y=Math.sin(a)*r2; if(k===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+      ctx.closePath(); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      // label
+      ctx.font='700 7px JetBrains Mono,monospace';
+      ctx.fillStyle='#cbb8ff';
+      ctx.textAlign='center';
+      ctx.shadowColor='rgba(124,92,255,0.9)'; ctx.shadowBlur=8;
+      ctx.fillText('SHIELD', p.x, p.y+bob+POWERUP_R+16);
+    } else {
+      // TIME: yellow circle with + (stays distinct)
+      ctx.shadowColor=glow; ctx.shadowBlur=14;
+      ctx.fillStyle=col;
+      ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+      ctx.fillStyle='rgba(255,255,255,0.95)';
+      ctx.font='800 16px JetBrains Mono,monospace';
+      ctx.textAlign='center';
+      ctx.fillText('+', p.x, p.y+bob+5.5);
+      ctx.strokeStyle='rgba(255,217,61,0.55)';
+      ctx.lineWidth=1.7;
+      ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R+6+Math.sin(p.phase*1.6)*2,0,Math.PI*2); ctx.stroke();
+      ctx.font='600 7px JetBrains Mono,monospace';
+      ctx.fillStyle='#fff3a0';
+      ctx.fillText('+5S', p.x, p.y+bob+POWERUP_R+12);
+    }
     ctx.restore();
   });
 
@@ -869,16 +923,16 @@ function render(t){
   ctx.save();
   ctx.translate(drone.x, drone.y);
   ctx.rotate(drone.angle);
-  // glow — shield adds cyan halo
+  // glow — shield adds purple halo (distinct from beacon cyan)
   if(drone.shieldTime>0){
-    ctx.shadowColor='#38e6ff'; ctx.shadowBlur=22;
-    ctx.strokeStyle='rgba(56,230,255,0.85)';
+    ctx.shadowColor='#7c5cff'; ctx.shadowBlur=24;
+    ctx.strokeStyle='rgba(124,92,255,0.9)';
     ctx.lineWidth=2.2;
     ctx.beginPath(); ctx.arc(0,0, PLAYER_R+10 + Math.sin(nowTick*0.008)*2,0,Math.PI*2); ctx.stroke();
     ctx.shadowBlur=0;
   }
   ctx.shadowColor='#38e6ff'; ctx.shadowBlur=18;
-  ctx.fillStyle= drone.hitCooldown>0 ? 'rgba(255,100,100,0.9)' : (drone.shieldTime>0 ? '#b6f6ff' : '#eaf6ff');
+  ctx.fillStyle= drone.hitCooldown>0 ? 'rgba(255,100,100,0.9)' : (drone.shieldTime>0 ? '#d8ccff' : '#eaf6ff');
   // body
   ctx.beginPath();
   // drone shape: hexagon + wings
@@ -886,7 +940,7 @@ function render(t){
   ctx.fill();
   ctx.shadowBlur=0;
   // cockpit
-  ctx.fillStyle= drone.shieldTime>0 ? '#38e6ff' : '#38e6ff';
+  ctx.fillStyle= drone.shieldTime>0 ? '#7c5cff' : '#38e6ff';
   ctx.beginPath(); ctx.arc(6,0,5,0,Math.PI*2); ctx.fill();
   if(drone.shieldTime>0){
     ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1; ctx.stroke();
@@ -935,11 +989,11 @@ function render(t){
     ctx.restore();
   }
 
-  // shield vignette subtle
+  // shield vignette subtle — purple
   if(drone.shieldTime>0){
     ctx.save();
-    ctx.globalAlpha = 0.06 + Math.sin(nowTick*0.008)*0.03;
-    ctx.strokeStyle='#38e6ff'; ctx.lineWidth=10;
+    ctx.globalAlpha = 0.07 + Math.sin(nowTick*0.008)*0.03;
+    ctx.strokeStyle='#7c5cff'; ctx.lineWidth=10;
     ctx.strokeRect(0,0,W,H);
     ctx.restore();
   }

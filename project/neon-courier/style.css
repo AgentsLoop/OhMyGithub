@@ -155,8 +155,10 @@ canvas#game{
 .s-pulse{background:var(--magenta);box-shadow:0 0 8px var(--magenta)}
 .s-exit{background:var(--green);box-shadow:0 0 8px var(--green)}
 .s-drone{background:#fff;box-shadow:0 0 8px #fff}
-.s-shield{background:var(--cyan);box-shadow:0 0 8px var(--cyan);border:1px solid #fff}
+.s-shield{background:#7c5cff;box-shadow:0 0 10px #7c5cff;transform:rotate(45deg);border-radius:2px;width:10px;height:10px;border:1px solid #fff}
 .s-time{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.shield-dot{background:#7c5cff;color:#7c5cff;transform:rotate(45deg);border-radius:2px}
+.time-dot{background:var(--yellow);color:var(--yellow)}
 .seed-hud{min-width:150px;align-items:flex-start}
 .seed-value{font-size:11px;letter-spacing:0.06em;word-break:break-all;max-width:130px}
 .btn-randomize{margin-top:6px;appearance:none;border:none;padding:5px 10px;border-radius:999px;font-weight:700;letter-spacing:0.07em;font-size:10px;cursor:pointer;background:linear-gradient(135deg, var(--cyan), #7c5cff);color:#001018;box-shadow:0 4px 12px rgba(56,230,255,0.3);transition:transform .12s, box-shadow .12s}
