@@ -200,7 +200,7 @@
     }catch(e){
       // fallback
       const ta=document.createElement('textarea'); ta.value=BRANCH; document.body.appendChild(ta); ta.select();
-      try{ document.execCommand('copy'); status.textContent='Copied ✓'; } catch{ status.textContent=BRANCH; }
+      try{ status.textContent=document.execCommand('copy') ? 'Copied ✓' : BRANCH; } catch{ status.textContent=BRANCH; }
       ta.remove();
     }
   }

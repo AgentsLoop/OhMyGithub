@@ -31,6 +31,8 @@ on:
         required: false
       AGENTSWEB_SSH_PUBLIC_KEY:
         required: false
+      OMGHITHUB_PUBLISH_TOKEN:
+        required: false
 jobs:
   opencode:
     runs-on: ubuntu-latest
@@ -810,9 +812,11 @@ jobs:
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
           REQUEST_SENDER: ${{ inputs.sender }}
+          OMGHITHUB_PUBLISH_TOKEN: ${{ secrets.OMGHITHUB_PUBLISH_TOKEN }}
         run: |
           set -euo pipefail
           [[ -n "$GH_TOKEN" ]]
+          [[ -n "$OMGHITHUB_PUBLISH_TOKEN" ]]
           [[ -f dist/index.html ]]
           [[ -n "$FINAL_COMMIT" ]]
 
@@ -835,8 +839,7 @@ jobs:
           response="$RUNNER_TEMP/omgithub-publish.json"
           curl --fail-with-body --silent --show-error \
             -X POST "https://omgithub.com/api/publish" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "X-OmGithub-GitHub-Token: $GH_TOKEN" \
+            -H "Authorization: Bearer $OMGHITHUB_PUBLISH_TOKEN" \
             -H 'Content-Type: application/zip' \
             -H "X-OmGithub-Name: $game_name" \
             -H "X-OmGithub-Title: ${request_title:0:150}" \
@@ -855,7 +858,6 @@ jobs:
           curl --fail --silent --show-error --retry 10 --retry-delay 2 "$published_url" >/dev/null
           printf 'url=%s\ninstall_url=%s\n' "$published_url" "$install_url" >> "$GITHUB_OUTPUT"
           echo "Published permanent game URL: $published_url"
-
       - name: Create OpenCode logs release
         if: success()
         id: opencode_release

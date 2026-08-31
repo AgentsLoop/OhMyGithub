@@ -178,8 +178,6 @@ canvas#game{
   .subtitle{display:none}
   .hud-item{min-width:78px;padding:6px 10px}
   .overlay h1{font-size:26px}
-  .branch-badge{padding:6px 10px;gap:6px}
-  .branch-badge-name{font-size:11px}
 }
 
 /* Branch badge (index.html topbar) + branch.html polish — works on both themes */
@@ -199,3 +197,4 @@ canvas#game{
 .branch-badge-dot{width:8px;height:8px;border-radius:50%;background:#3cff8a;box-shadow:0 0 10px rgba(60,255,138,0.85);flex-shrink:0}
 .branch-badge-label{font-size:10px;letter-spacing:0.12em;font-weight:800;color:var(--muted);text-transform:uppercase}
 .branch-badge-name{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;color:var(--yellow);letter-spacing:0.02em;word-break:break-all}
+@media (max-width: 560px){.branch-badge{padding:6px 10px;gap:6px}.branch-badge-name{font-size:11px}}
