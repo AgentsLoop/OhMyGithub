@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "description": "Starfall Salvage — polished 1280x720 canvas game",
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
 }
