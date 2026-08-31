@@ -22,6 +22,23 @@ const EXIT_W = 80, EXIT_H = 100;
 const GAME_TIME = 60;
 const BEACON_COUNT = 5;
 const PULSE_COUNT = 6;
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+// High-DPI crisp canvas — keeps logical 960x640 coords but renders at DPR resolution
+function setupHiDPI(){
+  // resizing canvas resets ctx state, so re-apply transform via scale
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+setupHiDPI();
+window.addEventListener('resize', ()=>{
+  // debounce slightly to avoid thrash on mobile rotation
+  clearTimeout(setupHiDPI._t);
+  setupHiDPI._t = setTimeout(setupHiDPI, 120);
+});
 
 let state = 'start'; // start, playing, paused, won, lost
 let score = 0;
@@ -33,6 +50,7 @@ let floaters = []; // +100 / -50 floating text
 let trail = []; // drone trail positions
 let shake = 0;
 let hitFlash = 0;
+let wonBonusApplied = false;
 let exit = { x: W-90, y: H/2-50, open:false };
 let drone = { x: 80, y: H/2, vx:0, vy:0, angle:0, hitCooldown:0 };
 
@@ -51,16 +69,26 @@ function resetGame(){
   trail = [];
   shake = 0;
   hitFlash = 0;
+  wonBonusApplied = false;
   drone = { x: 80, y: H/2, vx:0, vy:0, angle:0, hitCooldown:0 };
   exit = { x: W-90, y: H/2-50, open:false };
-  // beacons random but not too close to spawn or exit
+  // beacons random but not too close to spawn, exit, or walls (prevents unwinnable spawn inside wall)
+  function beaconInWall(x,y){
+    for(const w of walls) if(rectCollideCircle(w.x,w.y,w.w,w.h, x,y, BEACON_R+8)) return true;
+    return false;
+  }
   for(let i=0;i<BEACON_COUNT;i++){
     let x,y,tries=0;
     do{
       x = rand(160, W-160);
       y = rand(80, H-80);
       tries++;
-    } while(beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90) && tries<50);
+    } while((beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90) || beaconInWall(x,y) || Math.hypot(x-exit.x, y-exit.y)<90 || Math.hypot(x-80, y-H/2)<80) && tries<80);
+    // fallback: if still in wall after tries, nudge out
+    if(beaconInWall(x,y)){
+      x = Math.max(30, Math.min(W-30, x));
+      y = Math.max(30, Math.min(H-30, y));
+    }
     beacons.push({x,y,collected:false, pulse: Math.random()*Math.PI*2});
   }
   // pulses: traffic — now faster with light chase for threat (2.5× speed + steering)
@@ -111,7 +139,7 @@ function updateHUD(){
       dot.className = i < collected ? 'on' : (i===collected ? 'next' : '');
     });
   }
-  elTimer.textContent = timeLeft.toFixed(1);
+  elTimer.textContent = Math.max(0, timeLeft).toFixed(1);
   if(state==='playing'){
     if(!exit.open) elStatus.textContent = `COLLECT`;
     else elStatus.textContent = `EXIT OPEN`;
@@ -169,16 +197,21 @@ function updateTouchVisibility(){
 }
 updateTouchVisibility();
 window.addEventListener('resize', updateTouchVisibility);
+// robust per-direction tracking so releasing one key doesn't cancel the opposite
+const touchActive = { up:false, down:false, left:false, right:false };
+function syncTouchDir(){
+  touchDir.x = (touchActive.right?1:0) + (touchActive.left?-1:0);
+  touchDir.y = (touchActive.down?1:0) + (touchActive.up?-1:0);
+}
 touchWrap.querySelectorAll('button').forEach(b=>{
   const dir=b.dataset.dir;
   const set = (v)=>{
-    if(dir==='up') touchDir.y = v ? -1 : 0;
-    if(dir==='down') touchDir.y = v ? 1 : 0;
-    if(dir==='left') touchDir.x = v ? -1 : 0;
-    if(dir==='right') touchDir.x = v ? 1 : 0;
+    touchActive[dir]=v;
+    syncTouchDir();
   };
-  b.addEventListener('touchstart', e=>{e.preventDefault(); set(true);});
-  b.addEventListener('touchend', e=>{e.preventDefault(); set(false);});
+  b.addEventListener('touchstart', e=>{e.preventDefault(); set(true);}, {passive:false});
+  b.addEventListener('touchend', e=>{e.preventDefault(); set(false);}, {passive:false});
+  b.addEventListener('touchcancel', e=>{e.preventDefault(); set(false);}, {passive:false});
   b.addEventListener('mousedown', ()=>set(true));
   b.addEventListener('mouseup', ()=>set(false));
   b.addEventListener('mouseleave', ()=>set(false));
@@ -195,6 +228,20 @@ function startPlaying(){
   resetGame();
   setState('playing');
 }
+// auto-pause when tab hidden or window loses focus — prevents timer cheesing / surprise death
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && state==='playing') setState('paused');
+});
+window.addEventListener('blur', ()=>{
+  if(state==='playing') setState('paused');
+});
+// quick ESC also toggles pause for UX
+window.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    if(state==='playing') setState('paused');
+    else if(state==='paused') setState('playing');
+  }
+});
 
 // walls — neon city blocks (denser maze for Pac-Man routing pressure + Gear Wars enclosure)
 const walls = [
@@ -367,9 +414,23 @@ function update(dt){
     }
   }
 
-  // trail — keep last 10
+  // trail — keep last 12 for smoother ribbon
   trail.push({x:drone.x, y:drone.y, a:drone.angle});
-  if(trail.length>10) trail.shift();
+  if(trail.length>12) trail.shift();
+  // subtle engine exhaust when thrusting fast
+  if(spd>90){
+    const ang = drone.angle + Math.PI;
+    const ex = drone.x + Math.cos(ang)*16;
+    const ey = drone.y + Math.sin(ang)*0;
+    particles.push({
+      x: ex + rand(-2,2), y: ey + rand(-3,3),
+      vx: Math.cos(ang)*rand(1.2,2.0)+rand(-0.6,0.6),
+      vy: Math.sin(ang)*rand(1.2,2.0)+rand(-0.6,0.6),
+      life: 0.55, decay: rand(0.045,0.075),
+      color: spd>170 ? '#b6f6ff' : 'rgba(56,230,255,0.9)',
+      r: rand(1.2,2.4)
+    });
+  }
   // shake decay
   shake *= Math.pow(0.12, dt); // fast decay, frame-rate independent-ish
   if(shake<0.12) shake=0;
@@ -391,24 +452,31 @@ function update(dt){
 }
 let nowTick=0;
 function win(){
-  state='won';
+  if(state==='won' || state==='lost') return;
+  // bonus is time-left *2, applied once
+  const bonus = Math.floor(Math.max(0,timeLeft)*2);
+  if(!wonBonusApplied){
+    score += bonus;
+    wonBonusApplied = true;
+  }
   elEndTitle.textContent='DELIVERED';
   elEndTitle.style.color='var(--green)';
   elEndMsg.textContent='All beacons delivered — exit reached!';
-  elEndScore.textContent=score + Math.floor(timeLeft*2);
-  score+=Math.floor(timeLeft*2);
-  elEndTime.textContent=timeLeft.toFixed(1)+'s';
+  elEndScore.textContent=score;
+  elEndTime.textContent=Math.max(0,timeLeft).toFixed(1)+'s';
   elEndBeacons.textContent=`${beacons.filter(b=>b.collected).length}/${BEACON_COUNT}`;
+  state='won';
   setState('won');
 }
 function fail(reason){
-  state='lost';
+  if(state==='won' || state==='lost') return;
   elEndTitle.textContent='SIGNAL LOST';
   elEndTitle.style.color='var(--magenta)';
   elEndMsg.textContent=reason;
   elEndScore.textContent=score;
-  elEndTime.textContent=timeLeft.toFixed(1)+'s';
+  elEndTime.textContent=Math.max(0,timeLeft).toFixed(1)+'s';
   elEndBeacons.textContent=`${beacons.filter(b=>b.collected).length}/${BEACON_COUNT}`;
+  state='lost';
   setState('lost');
 }
 
@@ -430,9 +498,11 @@ function render(t){
   g.addColorStop(0,'#0c1024'); g.addColorStop(1,'#070a14');
   ctx.fillStyle=g;
   ctx.fillRect(0,0,W,H);
-  // grid — additive bloom (Geometry Wars HDR feel)
+  // grid — additive bloom with breathing phosphor pulse (Geometry Wars HDR feel)
   ctx.save();
   ctx.globalCompositeOperation='lighter';
+  const gridBreath = 0.7 + Math.sin(nowTick*0.0015)*0.3;
+  ctx.globalAlpha = gridBreath;
   ctx.strokeStyle='rgba(56,230,255,0.09)';
   ctx.lineWidth=1;
   for(let x=0;x<W;x+=48){
@@ -441,10 +511,13 @@ function render(t){
   for(let y=0;y<H;y+=48){
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   }
-  // second bloom pass
-  ctx.strokeStyle='rgba(56,230,255,0.04)';
+  // second bloom pass — sub-grid
+  ctx.globalAlpha = gridBreath*0.45;
+  ctx.strokeStyle='rgba(56,230,255,0.05)';
   ctx.lineWidth=2;
   for(let x=24;x<W;x+=48){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=24;y<H;y+=48){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  ctx.globalAlpha = 1;
   ctx.restore();
   // building silhouettes
   ctx.fillStyle='rgba(14,18,40,0.9)';
@@ -463,17 +536,33 @@ function render(t){
   }
   ctx.restore();
 
-  // walls — neon edges
+  // walls — HDR tube: 3-pass bloom (outer aureola + mid + inner white core)
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
   walls.forEach(w=>{
     ctx.fillStyle='#0f1533';
-    ctx.fillRect(w.x,w.y,w.w,w.h);
-    ctx.strokeStyle='rgba(124,92,255,0.9)';
-    ctx.lineWidth=2;
-    ctx.shadowColor='rgba(124,92,255,0.8)';
-    ctx.shadowBlur=10;
-    ctx.strokeRect(w.x,w.y,w.w,w.h);
+    ctx.globalAlpha=1;
     ctx.shadowBlur=0;
+    ctx.fillRect(w.x,w.y,w.w,w.h);
+    // outer bloom — wide, faint
+    ctx.strokeStyle='rgba(124,92,255,0.16)';
+    ctx.lineWidth=10;
+    ctx.shadowColor='rgba(124,92,255,1)';
+    ctx.shadowBlur=22;
+    ctx.strokeRect(w.x,w.y,w.w,w.h);
+    // mid — saturated
+    ctx.strokeStyle='rgba(124,92,255,0.58)';
+    ctx.lineWidth=3;
+    ctx.shadowBlur=12;
+    ctx.strokeRect(w.x,w.y,w.w,w.h);
+    // inner white-hot core — signature GW tube
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='rgba(255,255,255,0.92)';
+    ctx.lineWidth=1;
+    ctx.strokeRect(w.x+0.5,w.y+0.5,w.w-1,w.h-1);
   });
+  ctx.restore();
+  ctx.shadowBlur=0;
 
   // exit gate
   ctx.save();
@@ -503,6 +592,10 @@ function render(t){
     ctx.beginPath(); ctx.moveTo(exit.x+EXIT_W/2-10, exit.y+EXIT_H/2-12); ctx.lineTo(exit.x+EXIT_W/2+10, exit.y+EXIT_H/2); ctx.lineTo(exit.x+EXIT_W/2-10, exit.y+EXIT_H/2+12); ctx.closePath(); ctx.fill();
   }
   ctx.restore();
+
+  // ——— HDR bloom layer: beacons, pulses, drone, particles additively bleed to white ———
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
 
   // beacons — Pac-Man collect clarity: high-contrast + breathing ring
   beacons.forEach(b=>{
@@ -544,13 +637,13 @@ function render(t){
     ctx.restore();
   });
 
-  // pulses — Geometry Wars double-glow for instant hazard read
+  // pulses — Geometry Wars double-glow for instant hazard read (now in HDR bloom layer)
   pulses.forEach(p=>{
     ctx.save();
-    // outer danger field
-    ctx.shadowColor='#ff2e7a'; ctx.shadowBlur=18;
-    ctx.fillStyle='rgba(255,46,122,0.18)';
-    ctx.beginPath(); ctx.arc(p.x,p.y, PULSE_R+12,0,Math.PI*2); ctx.fill();
+    // outer danger field — larger aureola in bloom mode
+    ctx.shadowColor='#ff2e7a'; ctx.shadowBlur=22;
+    ctx.fillStyle='rgba(255,46,122,0.22)';
+    ctx.beginPath(); ctx.arc(p.x,p.y, PULSE_R+16,0,Math.PI*2); ctx.fill();
     ctx.shadowBlur=14;
     ctx.fillStyle='rgba(255,46,122,0.26)';
     ctx.beginPath(); ctx.arc(p.x,p.y, PULSE_R+7,0,Math.PI*2); ctx.fill();
@@ -624,14 +717,18 @@ function render(t){
   }
   ctx.restore();
 
-  // particles
+  // particles — bloom doubles: outer aura + core (additive, so overlapping bursts go white-hot)
   particles.forEach(p=>{
-    ctx.globalAlpha=p.life;
+    ctx.globalAlpha=p.life*0.45;
     ctx.fillStyle=p.color;
-    ctx.shadowColor=p.color; ctx.shadowBlur=8;
+    ctx.shadowColor=p.color; ctx.shadowBlur=16;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r*1.8,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=p.life;
+    ctx.shadowBlur=6;
     ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
   });
   ctx.globalAlpha=1; ctx.shadowBlur=0;
+  ctx.restore(); // end HDR bloom layer (lighter)
 
   // floaters
   floaters.forEach(f=>{
