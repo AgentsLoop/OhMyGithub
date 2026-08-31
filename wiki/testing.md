@@ -43,8 +43,8 @@ Creating an issue with both `OpenCode` and `Goal` labels must start one
 `workflow_dispatch` run through the App, not separate `opened` and `labeled`
 runs.
 
-For custom-branch support, create an issue whose first body line is
-`branch: <existing-branch>`. Confirm the App strips the directive from the
+For custom-branch support, create an issue whose title ends with
+`branch: <existing-branch>`. Confirm the App strips the suffix from the
 OpenCode request and dispatches the workflow from that branch for checkout and
 pull-request base.
 A missing or syntactically invalid branch must receive an issue comment and must

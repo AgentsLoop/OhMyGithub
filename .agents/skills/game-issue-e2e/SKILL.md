@@ -13,9 +13,9 @@ do not use comments, edits, or the word “tag” as a trigger. The
 App dispatches the workflow once when an issue is opened with the label or when
 `OpenCode` is added.
 
-When the caller explicitly requests a custom branch, prepend
-`branch: <existing-branch>` and a blank line to the issue body. Treat that line
-as routing metadata rather than part of the caller's implementation prompt.
+When the caller explicitly requests a custom branch, append
+` branch: <existing-branch>` to the issue title. Treat that suffix as routing
+metadata rather than part of the caller's implementation prompt.
 Verify the branch exists before creating the issue. Otherwise omit the directive
 and use the repository default branch.
 

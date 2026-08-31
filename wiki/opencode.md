@@ -18,9 +18,10 @@ path. The `OpenCode` label asks the App to launch the workflow; add `Goal` to se
 persistent goal mode. This keeps
 one request event mapped to one OpenCode session.
 
-An optional first body line in the exact form `branch: <existing-branch>` selects
-the checkout and pull-request base. The App removes that line from the OpenCode
-request and validates the branch before dispatching the thin workflow wrapper.
+An optional issue-title suffix in the exact form `branch: <existing-branch>`
+selects the checkout and pull-request base. The App removes that suffix from the
+OpenCode request and validates the branch before dispatching the thin workflow
+wrapper.
 Invalid or missing branches receive an issue comment and do not start the build.
 Without the directive, the repository default branch is used.
 

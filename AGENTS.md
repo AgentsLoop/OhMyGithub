@@ -20,7 +20,7 @@ The GitHub App dispatches execution for an issue opened with `OpenCode` or when
 the `OpenCode` label is added to an existing issue. The workflow itself accepts
 only `workflow_dispatch`; edits, comments, and unrelated labels must not be
 documented as triggers.
-An optional first issue-body line `branch: <existing-branch>` selects the target
+An optional issue-title suffix `branch: <existing-branch>` selects the target
 checkout and pull-request base; without it, the default branch is used.
 
 ## Ideas
