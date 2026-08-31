@@ -1,5 +1,5 @@
 ---
-name: game-issue-e2e
+name: issue-e2e
 description: Start the issue-triggered workflow from the caller's prompt, wait for the OpenCode session link, and return that link without waiting for the workflow to finish.
 ---
 
