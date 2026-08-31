@@ -81,9 +81,9 @@ scene.add(fill);
 const bulb1 = new THREE.PointLight(0xff3c00, 18, 22); bulb1.position.set(12, 4.5, -8); scene.add(bulb1);
 const bulb2 = new THREE.PointLight(0x00e5ff, 12, 18); bulb2.position.set(-16, 5, 14); scene.add(bulb2);
 
-// Controls
+// Controls — three@0.185 PointerLockControls uses controls.object (the camera) directly, no getObject()
 const controls = new PointerLockControls(camera, renderer.domElement);
-scene.add(controls.getObject());
+// camera is already the controls.object; no extra object to add
 
 // ----- Map geometry & colliders -----
 const colliders = []; // { box: Box3, mesh: Mesh}
@@ -395,7 +395,8 @@ let bobPhase=0;
 // Player collider position (camera base)
 const playerPos = new THREE.Vector3(0, 1.72, 14);
 camera.position.copy(playerPos);
-controls.getObject().position.copy(playerPos);
+// controls.object is camera itself in three r185, no getObject
+if (controls.object) controls.object.position.copy(playerPos);
 
 // Enemies
 const enemies=[];
@@ -773,7 +774,7 @@ function restart(){
   // reset all
   health=100; ammo=30; reserve=90; score=0; kills=0; killStreak=0; timeLeft=GAME_TIME;
   shotsFired=0; shotsHit=0; isReloading=false; reloadBar.classList.add('hidden');
-  playerPos.set(0,1.72,14); camera.position.copy(playerPos); controls.getObject().position.copy(playerPos);
+  playerPos.set(0,1.72,14); camera.position.copy(playerPos); if (controls.object) controls.object.position.copy(playerPos);
   playerVel.set(0,0,0); onGround=true; curHeight=targetHeight=1.72;
   spawnEnemies(7);
   tracers.forEach(t=>scene.remove(t.mesh)); tracers.length=0;
@@ -978,7 +979,6 @@ function drawMinimap(){
   mctx.fillStyle='#00e5ff'; mctx.shadowColor='#00e5ff'; mctx.shadowBlur=8;
   mctx.beginPath(); mctx.arc(px,pz,4,0,Math.PI*2); mctx.fill(); mctx.shadowBlur=0;
   // facing cone
-  const yaw = controls.getObject().rotation.y; // actually not reliable; use camera quaternion
   const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
   const ang=Math.atan2(dir.x, dir.z);
   mctx.fillStyle='rgba(0,229,255,0.22)'; mctx.beginPath(); mctx.moveTo(px,pz); mctx.arc(px,pz,28, ang-0.45, ang+0.45); mctx.closePath(); mctx.fill();
@@ -1044,7 +1044,7 @@ function animate(){
     nextPos.z += playerVel.z*dt;
     collideAndSlide(nextPos);
     camera.position.x=nextPos.x; camera.position.z=nextPos.z;
-    controls.getObject().position.x=nextPos.x; controls.getObject().position.z=nextPos.z;
+    // controls.object is camera itself in r185, sync already via camera
     // vertical
     camera.position.y += playerVel.y*dt;
     if(camera.position.y < curHeight){
@@ -1052,7 +1052,6 @@ function animate(){
     } else {
       // check ceiling? not needed
     }
-    controls.getObject().position.y=camera.position.y;
 
     // FOV sprint
     const targetFov = sprinting? 82 : crouching? 72 : 74;
