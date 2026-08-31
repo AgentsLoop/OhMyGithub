@@ -1,3 +1,15 @@
+// Selected branch — tiny page compliance
+const SELECTED_BRANCH = "codex/omgithub-site";
+window.__branch = SELECTED_BRANCH;
+window.__BRANCH = SELECTED_BRANCH;
+document.documentElement.dataset.branch = SELECTED_BRANCH;
+try {
+  const _b = document.getElementById('branch-display');
+  if(_b) _b.dataset.branch = SELECTED_BRANCH;
+  const _b2 = document.getElementById('branch');
+  if(_b2) _b2.dataset.branch = SELECTED_BRANCH;
+} catch {}
+
 // Neon Courier — 2D Canvas Game
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -681,4 +693,4 @@ setState('start');
 requestAnimationFrame(loop);
 
 // expose for tests
-window.__game = { resetGame, getState:()=>state, getScore:()=>score, getBeacons:()=>beacons, W,H };
+window.__game = { resetGame, getState:()=>state, getScore:()=>score, getBeacons:()=>beacons, W,H, branch: SELECTED_BRANCH, GAME_TIME };
