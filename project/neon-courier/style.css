@@ -59,6 +59,15 @@ body{
 .beacon-dots i.on{background:var(--cyan);box-shadow:0 0 10px rgba(56,230,255,0.9), 0 0 18px rgba(56,230,255,0.5);transform:scale(1.12)}
 .beacon-dots i.next{border-color:var(--yellow);box-shadow:0 0 10px rgba(255,217,61,0.55);animation:dotPulse 0.9s ease-in-out infinite}
 @keyframes dotPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.25);opacity:0.9}}
+.seed-hud .seed-value{font-size:13px;letter-spacing:0.06em;color:var(--yellow)}
+.seed-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;background:rgba(14,18,36,0.9);border:1px solid var(--border);border-radius:10px;padding:10px 12px;max-width:560px;width:100%}
+.seed-label{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);letter-spacing:0.08em}
+.seed-label strong{color:var(--yellow)}
+.seed-actions{display:flex;gap:6px}
+.btn.small{padding:6px 12px;font-size:11px;border-radius:999px}
+.seed-input-wrap{display:flex;gap:6px;align-items:center}
+.seed-input-wrap input{background:#0e1220;border:1px solid var(--border);border-radius:999px;padding:6px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;width:130px;outline:none}
+.seed-input-wrap input:focus{border-color:var(--cyan);box-shadow:0 0 8px rgba(56,230,255,0.35)}
 .hud-value.pop{animation:hudPop .28s cubic-bezier(.2,.8,.3,1)}
 @keyframes hudPop{0%{transform:scale(1)}35%{transform:scale(1.18)}100%{transform:scale(1)}}
 .hud-value.urgent{animation:urgentPulse .5s ease-in-out infinite}

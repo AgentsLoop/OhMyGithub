@@ -41,6 +41,61 @@ let touchDir = {x:0, y:0};
 
 function rand(a,b){ return Math.random()*(b-a)+a; }
 
+// ---- Seeded RNG & Map Seed System ----
+function mulberry32(a){
+  return function(){
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashSeed(str){
+  let h = 2166136261;
+  for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+let currentSeed = Math.floor(Math.random()*9000000)+1000000;
+let currentSeedStr = String(currentSeed);
+let rng = mulberry32(currentSeed);
+function sRand(a,b){ return rng()*(b-a)+a; }
+function sRandInt(a,b){ return Math.floor(sRand(a,b+1)); }
+function setSeed(seedInput){
+  if(seedInput==null || seedInput===''){
+    currentSeed = Math.floor(Math.random()*9000000)+1000000;
+    currentSeedStr = String(currentSeed);
+  } else if(typeof seedInput==='number' && Number.isFinite(seedInput)){
+    currentSeed = seedInput>>>0;
+    currentSeedStr = String(currentSeed);
+  } else {
+    const s = String(seedInput).trim();
+    if(/^\d+$/.test(s)){
+      currentSeed = parseInt(s,10)>>>0;
+      currentSeedStr = s;
+    } else {
+      currentSeed = hashSeed(s);
+      currentSeedStr = s;
+    }
+  }
+  rng = mulberry32(currentSeed);
+  updateSeedDisplay();
+  return currentSeedStr;
+}
+function randomizeSeedAndApply(){
+  setSeed(Math.floor(Math.random()*9000000)+1000000);
+}
+function updateSeedDisplay(){
+  const el = document.getElementById('seed-value');
+  if(el) el.textContent = '#' + currentSeedStr;
+  const el2 = document.getElementById('seed-value2');
+  if(el2) el2.textContent = '#' + currentSeedStr;
+}
+// daily seed helper (YYYYMMDD)
+function dailySeedStr(){
+  const d=new Date();
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function resetGame(){
   score = 0;
   timeLeft = GAME_TIME;
@@ -53,32 +108,45 @@ function resetGame(){
   hitFlash = 0;
   drone = { x: 80, y: H/2, vx:0, vy:0, angle:0, hitCooldown:0 };
   exit = { x: W-90, y: H/2-50, open:false };
-  // beacons random but not too close to spawn or exit
+  // random wall layout from seed
+  applyWallsForSeed();
+  // reset random events
+  eventTimer = 0;
+  nextEventIn = rand(8,12);
+  activeEvent = null;
+  pulseSpeedBoost = 1;
+  beaconSurgeUntil = 0;
+  eventAnnouncement = {text:'', ttl:0};
+  // beacons random with wall collision checks (seeded)
   for(let i=0;i<BEACON_COUNT;i++){
     let x,y,tries=0;
     do{
-      x = rand(160, W-160);
-      y = rand(80, H-80);
+      x = sRand(160, W-160);
+      y = sRand(80, H-80);
       tries++;
-    } while(beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90) && tries<50);
-    beacons.push({x,y,collected:false, pulse: Math.random()*Math.PI*2});
+    } while((beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90) || collidesWalls(x,y, BEACON_R+8)) && tries<80);
+    beacons.push({x,y,collected:false, pulse: rng()*Math.PI*2});
   }
-  // pulses: traffic — now faster with light chase for threat (2.5× speed + steering)
+  // pulses: traffic — seeded positions with wall collision checks
   const laneYs = [110, 190, 290, 380, 460, 520];
   for(let i=0;i<PULSE_COUNT;i++){
-    const ang = rand(0, Math.PI*2);
-    const spd = rand(1.4, 2.2);
+    const ang = sRand(0, Math.PI*2);
+    const spd = sRand(1.4, 2.2);
+    let px, py, tries=0;
+    do{
+      px = sRand(220, W-140);
+      py = laneYs[i % laneYs.length] + sRand(-10,10);
+      tries++;
+    } while(collidesWalls(px,py,PULSE_R+6) && tries<30);
     pulses.push({
-      x: rand(220, W-140),
-      y: laneYs[i % laneYs.length] + rand(-10,10),
+      x: px,
+      y: py,
       vx: Math.cos(ang)*spd,
       vy: Math.sin(ang)*spd,
-      phase: Math.random()*Math.PI*2,
-      baseX: 0,
-      baseY: 0
+      phase: rng()*Math.PI*2,
+      baseX: px,
+      baseY: py
     });
-    pulses[i].baseX = pulses[i].x;
-    pulses[i].baseY = pulses[i].y;
   }
   updateHUD();
 }
@@ -150,7 +218,12 @@ window.addEventListener('keydown', e=>{
   keys.add(k);
   if(k==='p' && state==='playing'){ setState('paused'); }
   else if(k==='p' && state==='paused'){ setState('playing'); }
-  if(k==='r'){ startPlaying(); }
+  if(k==='r'){ randomizeSeedAndApply(); startPlaying(); }
+  if(k==='n'){
+    e.preventDefault();
+    randomizeSeedAndApply();
+    startPlaying();
+  }
   if(k===' ' || k==='enter'){
     if(state==='start' || state==='won' || state==='lost') startPlaying();
     else if(state==='paused') setState('playing');
@@ -159,7 +232,18 @@ window.addEventListener('keydown', e=>{
 window.addEventListener('keyup', e=> keys.delete(e.key.toLowerCase()));
 document.getElementById('btn-start').onclick = ()=> startPlaying();
 document.getElementById('btn-resume').onclick = ()=> setState('playing');
-document.getElementById('btn-restart').onclick = ()=> startPlaying();
+document.getElementById('btn-restart').onclick = ()=> { randomizeSeedAndApply(); startPlaying(); };
+// seed controls
+document.getElementById('btn-new-seed')?.addEventListener('click', ()=>{ randomizeSeedAndApply(); startPlaying(); });
+document.getElementById('btn-daily')?.addEventListener('click', ()=>{ setSeed(dailySeedStr()); startPlaying(); });
+document.getElementById('btn-apply-seed')?.addEventListener('click', ()=>{
+  const inp=document.getElementById('seed-input');
+  if(inp){ setSeed(inp.value); startPlaying(); }
+});
+// allow Enter in seed input
+document.getElementById('seed-input')?.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); setSeed(e.target.value); startPlaying(); }
+});
 
 // Touch
 const touchWrap=document.getElementById('touch');
@@ -196,30 +280,111 @@ function startPlaying(){
   setState('playing');
 }
 
-// walls — neon city blocks (denser maze for Pac-Man routing pressure + Gear Wars enclosure)
-const walls = [
+// walls — 3 preset configurations for seeded random maps
+const OUTER_WALLS = [
   {x:0,y:0,w:W,h:10},
   {x:0,y:H-10,w:W,h:10},
   {x:0,y:0,w:10,h:H},
   {x:W-10,y:0,w:10,h:H},
-  // interlocking maze — forces corridors
-  {x:150,y:90,w:180,h:14},
-  {x:420,y:50,w:14,h:130},
-  {x:520,y:120,w:190,h:14},
-  {x:740,y:90,w:14,h:140},
-  {x:100,y:200,w:14,h:120},
-  {x:190,y:300,w:180,h:14},
-  {x:470,y:200,w:14,h:120},
-  {x:390,y:250,w:140,h:14},
-  {x:600,y:290,w:160,h:14},
-  {x:160,y:400,w:14,h:100},
-  {x:120,y:460,w:180,h:14},
-  {x:380,y:400,w:160,h:14},
-  {x:620,y:400,w:14,h:130},
-  {x:420,y:520,w:260,h:14},
-  {x:800,y:380,w:14,h:150},
-  {x:40,y:380,w:90,h:14},
 ];
+const WALL_PRESETS = [
+  // 0: Maze (original interlocking)
+  [
+    {x:150,y:90,w:180,h:14},
+    {x:420,y:50,w:14,h:130},
+    {x:520,y:120,w:190,h:14},
+    {x:740,y:90,w:14,h:140},
+    {x:100,y:200,w:14,h:120},
+    {x:190,y:300,w:180,h:14},
+    {x:470,y:200,w:14,h:120},
+    {x:390,y:250,w:140,h:14},
+    {x:600,y:290,w:160,h:14},
+    {x:160,y:400,w:14,h:100},
+    {x:120,y:460,w:180,h:14},
+    {x:380,y:400,w:160,h:14},
+    {x:620,y:400,w:14,h:130},
+    {x:420,y:520,w:260,h:14},
+    {x:800,y:380,w:14,h:150},
+    {x:40,y:380,w:90,h:14},
+  ],
+  // 1: Corridors — long vertical/horizontal lanes
+  [
+    {x:200,y:80,w:14,h:220},
+    {x:480,y:40,w:14,h:260},
+    {x:700,y:100,w:14,h:380},
+    {x:120,y:180,w:200,h:14},
+    {x:560,y:220,w:220,h:14},
+    {x:100,y:360,w:260,h:14},
+    {x:500,y:380,w:160,h:14},
+    {x:120,y:500,w:240,h:14},
+    {x:620,y:520,w:200,h:14},
+    {x:400,y:460,w:14,h:100},
+    {x:820,y:280,w:14,h:180},
+    {x:180,y:420,w:14,h:90},
+    {x:600,y:80,w:90,h:14},
+  ],
+  // 2: Islands — scattered blocks
+  [
+    {x:180,y:120,w:90,h:90},
+    {x:420,y:80,w:120,h:14},
+    {x:650,y:110,w:100,h:100},
+    {x:120,y:280,w:100,h:14},
+    {x:320,y:260,w:14,h:140},
+    {x:520,y:240,w:140,h:14},
+    {x:740,y:300,w:14,h:120},
+    {x:150,y:420,w:120,h:120},
+    {x:380,y:460,w:180,h:14},
+    {x:650,y:480,w:14,h:120},
+    {x:400,y:340,w:110,h:14},
+    {x:800,y:200,w:14,h:80},
+    {x:250,y:520,w:90,h:14},
+    {x:500,y:500,w:90,h:14},
+  ],
+];
+let walls = [...OUTER_WALLS, ...WALL_PRESETS[0]];
+let currentPresetIdx = 0;
+function applyWallsForSeed(){
+  currentPresetIdx = Math.floor(rng()*WALL_PRESETS.length);
+  walls = [...OUTER_WALLS, ...WALL_PRESETS[currentPresetIdx]];
+}
+function collidesWalls(x,y,r){
+  return walls.some(w=> rectCollideCircle(w.x,w.y,w.w,w.h, x,y,r));
+}
+
+// ---- Random Events System ----
+let eventTimer = 0;
+let nextEventIn = rand(8,12);
+let activeEvent = null; // {type, ttl}
+let pulseSpeedBoost = 1;
+let beaconSurgeUntil = 0;
+let eventAnnouncement = {text:'', ttl:0, color:'#fff'};
+function triggerRandomEvent(){
+  const roll = Math.floor(rng()*3);
+  if(roll===0){
+    // Wind Gust — push drone
+    const ang = rng()*Math.PI*2;
+    const force = sRand(220, 360);
+    drone.vx += Math.cos(ang)*force;
+    drone.vy += Math.sin(ang)*force;
+    const spd = Math.hypot(drone.vx, drone.vy);
+    if(spd>320){ drone.vx*=320/spd; drone.vy*=320/spd; }
+    shake = Math.max(shake, 9);
+    spawnFloater(drone.x, drone.y-18, 'WIND GUST!', '#ffd93d');
+    eventAnnouncement = {text:'⚡ WIND GUST', ttl:2.0, color:'#ffd93d'};
+  } else if(roll===1){
+    // EMP Storm — pulses speed up 50% for 3s
+    activeEvent = {type:'emp', ttl:3};
+    pulseSpeedBoost = 1.5;
+    shake = Math.max(shake, 6);
+    spawnParticles(W/2, H/2, '#ff2e7a', 10);
+    eventAnnouncement = {text:'⚡ EMP STORM — PULSES SURGING', ttl:2.2, color:'#ff2e7a'};
+  } else {
+    // Beacon Surge — highlight next beacon with arrow
+    beaconSurgeUntil = performance.now() + 5000;
+    eventAnnouncement = {text:'◈ BEACON SURGE — FOLLOW ARROW', ttl:2.2, color:'#38e6ff'};
+    spawnFloater(W/2, 90, 'BEACON SURGE!', '#38e6ff');
+  }
+}
 
 function rectCollideCircle(rx,ry,rw,rh, cx,cy, r){
   const nx = Math.max(rx, Math.min(cx, rx+rw));
@@ -306,22 +471,39 @@ function update(dt){
     }
   });
 
+  // random events timer (8-12s)
+  eventTimer += dt;
+  if(eventTimer >= nextEventIn){
+    triggerRandomEvent();
+    eventTimer = 0;
+    nextEventIn = rand(8,12);
+  }
+  if(activeEvent){
+    activeEvent.ttl -= dt;
+    if(activeEvent.ttl<=0){
+      activeEvent=null;
+      pulseSpeedBoost=1;
+    }
+  }
+  if(eventAnnouncement.ttl>0) eventAnnouncement.ttl-=dt;
+  const surgeActive = beaconSurgeUntil > performance.now();
+
   // pulses movement — faster drift + light chase when near player
   pulses.forEach(p=>{
     // light homing when within 190px (makes them feel alive without being unfair)
     const dx = drone.x - p.x, dy = drone.y - p.y;
     const dist = Math.hypot(dx,dy);
     if(dist < 190 && dist>12){
-      const steer = 0.85; // gentle steering
+      const steer = 0.85 * pulseSpeedBoost; // slightly more aggressive during EMP
       p.vx += (dx/dist)*steer * dt;
       p.vy += (dy/dist)*steer * dt;
-      // clamp pulse speed
+      // clamp pulse speed (higher during EMP)
       const ps = Math.hypot(p.vx,p.vy);
-      const maxPS = 2.6;
+      const maxPS = 2.6 * pulseSpeedBoost;
       if(ps>maxPS){ p.vx*=maxPS/ps; p.vy*=maxPS/ps; }
     }
-    p.x += p.vx * 60 * dt;
-    p.y += (p.vy + Math.sin(nowTick*0.001 + p.phase)*0.3) * 60 * dt;
+    p.x += p.vx * 60 * dt * pulseSpeedBoost;
+    p.y += (p.vy * pulseSpeedBoost + Math.sin(nowTick*0.001 + p.phase)*0.3) * 60 * dt;
     // bounce off walls/bounds
     if(p.x < 20 || p.x > W-20) p.vx*=-1;
     if(p.y < 20 || p.y > H-20) p.vy*=-1;
@@ -505,21 +687,24 @@ function render(t){
   ctx.restore();
 
   // beacons — Pac-Man collect clarity: high-contrast + breathing ring
-  beacons.forEach(b=>{
+  const surgeActiveRender = beaconSurgeUntil > performance.now();
+  const nextBeaconIdx = beacons.findIndex(x=>!x.collected);
+  beacons.forEach((b, idx)=>{
     if(b.collected) return;
     const bob=Math.sin(b.pulse)*3;
-    const isNext = beacons.findIndex(x=>!x.collected) === beacons.indexOf(b);
+    const isNext = nextBeaconIdx === idx;
+    const isSurge = isNext && surgeActiveRender;
     ctx.save();
-    // outer beacon field — stronger when next
-    ctx.shadowColor='#38e6ff'; ctx.shadowBlur=isNext?22:16;
-    ctx.fillStyle=isNext?'rgba(56,230,255,0.24)':'rgba(56,230,255,0.16)';
-    ctx.beginPath(); ctx.arc(b.x, b.y+bob, 26,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(56,230,255,0.10)';
-    ctx.beginPath(); ctx.arc(b.x, b.y+bob, 36+Math.sin(b.pulse)*2,0,Math.PI*2); ctx.fill();
-    ctx.shadowBlur=18;
-    ctx.fillStyle='#38e6ff';
+    // outer beacon field — stronger when next / surge
+    ctx.shadowColor= isSurge ? '#ffd93d' : '#38e6ff'; ctx.shadowBlur=isSurge?30: isNext?22:16;
+    ctx.fillStyle= isSurge ? 'rgba(255,217,61,0.32)' : isNext?'rgba(56,230,255,0.24)':'rgba(56,230,255,0.16)';
+    ctx.beginPath(); ctx.arc(b.x, b.y+bob, isSurge?34:26,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle= isSurge ? 'rgba(255,217,61,0.18)' : 'rgba(56,230,255,0.10)';
+    ctx.beginPath(); ctx.arc(b.x, b.y+bob, 36+Math.sin(b.pulse)*2 + (isSurge?10:0),0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur= isSurge?24:18;
+    ctx.fillStyle= isSurge ? '#ffd93d' : '#38e6ff';
     // double glow for Geometry Wars punch
-    ctx.beginPath(); ctx.arc(b.x, b.y+bob, BEACON_R+2,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(b.x, b.y+bob, BEACON_R+ (isSurge?5:2),0,Math.PI*2); ctx.fill();
     ctx.shadowBlur=0;
     ctx.fillStyle='#eaffff';
     ctx.beginPath(); ctx.arc(b.x-2.5, b.y+bob-2.5, 3.2,0,Math.PI*2); ctx.fill();
@@ -528,17 +713,37 @@ function render(t){
     ctx.textAlign='center';
     ctx.fillText('◈', b.x, b.y+bob+3);
     // breathing ring + next-beacon arrow hint
-    ctx.strokeStyle=isNext?'rgba(255,217,61,0.95)':'rgba(56,230,255,0.75)';
-    ctx.lineWidth=isNext?2:1.5;
-    ctx.shadowColor=isNext?'#ffd93d':'#38e6ff'; ctx.shadowBlur=isNext?10:6;
-    ctx.beginPath(); ctx.arc(b.x, b.y+bob, 18+ Math.sin(b.pulse*1.5)*2.5,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle= isSurge ? 'rgba(255,217,61,1)' : isNext?'rgba(255,217,61,0.95)':'rgba(56,230,255,0.75)';
+    ctx.lineWidth=isSurge?3: isNext?2:1.5;
+    ctx.shadowColor=isSurge?'#ffd93d': isNext?'#ffd93d':'#38e6ff'; ctx.shadowBlur=isSurge?14: isNext?10:6;
+    ctx.beginPath(); ctx.arc(b.x, b.y+bob, 18+ Math.sin(b.pulse*1.5)*2.5 + (isSurge?6:0),0,Math.PI*2); ctx.stroke();
     if(isNext){
       ctx.shadowBlur=0;
       const ddx=drone.x-b.x, ddy=drone.y-b.y; const dist=Math.hypot(ddx,ddy);
-      if(dist>90){
+      if(dist>90 || isSurge){
         const ang=Math.atan2(ddy,ddx);
-        ctx.fillStyle='rgba(56,230,255,0.85)';
-        ctx.beginPath(); ctx.arc(b.x+Math.cos(ang+Math.PI)*22, b.y+bob+Math.sin(ang+Math.PI)*22, 3,0,Math.PI*2); ctx.fill();
+        // small dot for normal, large arrow for surge
+        if(isSurge){
+          const ax = b.x + Math.cos(ang+Math.PI)*28;
+          const ay = b.y+bob + Math.sin(ang+Math.PI)*28;
+          ctx.save();
+          ctx.translate(ax, ay);
+          ctx.rotate(ang+Math.PI);
+          ctx.fillStyle='#ffd93d';
+          ctx.shadowColor='#ffd93d'; ctx.shadowBlur=10;
+          ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-6,6); ctx.lineTo(-6,-6); ctx.closePath(); ctx.fill();
+          ctx.restore();
+          // dashed line to beacon
+          ctx.strokeStyle='rgba(255,217,61,0.65)';
+          ctx.lineWidth=2;
+          ctx.setLineDash([6,4]);
+          ctx.beginPath(); ctx.moveTo(drone.x, drone.y); ctx.lineTo(b.x, b.y+bob); ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          const ang2=Math.atan2(ddy,ddx);
+          ctx.fillStyle='rgba(56,230,255,0.85)';
+          ctx.beginPath(); ctx.arc(b.x+Math.cos(ang2+Math.PI)*22, b.y+bob+Math.sin(ang2+Math.PI)*22, 3,0,Math.PI*2); ctx.fill();
+        }
       }
     }
     ctx.restore();
@@ -673,12 +878,45 @@ function render(t){
   ctx.fillStyle='rgba(255,255,255,0.03)';
   for(let y=0;y<H;y+=4) ctx.fillRect(0,y,W,1);
 
+  // random event announcement
+  if(eventAnnouncement.ttl>0){
+    const alpha = Math.min(1, eventAnnouncement.ttl*1.2);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle='rgba(0,0,0,0.62)';
+    const txt = eventAnnouncement.text;
+    ctx.font='800 18px JetBrains Mono,monospace';
+    const tw = ctx.measureText(txt).width;
+    const pad=18;
+    const bx = W/2 - tw/2 - pad, bw = tw+pad*2, bh=30;
+    const by = 46;
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle=eventAnnouncement.color;
+    ctx.lineWidth=2;
+    ctx.shadowColor=eventAnnouncement.color; ctx.shadowBlur=12;
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.shadowBlur=0;
+    ctx.fillStyle=eventAnnouncement.color;
+    ctx.textAlign='center';
+    ctx.fillText(txt, W/2, by+20);
+    ctx.restore();
+  }
+  // EMP storm overlay hint
+  if(activeEvent && activeEvent.type==='emp'){
+    ctx.save();
+    ctx.globalAlpha = 0.08 + Math.sin(nowTick*0.02)*0.04;
+    ctx.fillStyle='#ff2e7a';
+    ctx.fillRect(0,0,W,H);
+    ctx.restore();
+  }
+
   ctx.restore(); // shake restore
 }
 
+updateSeedDisplay();
 resetGame();
 setState('start');
 requestAnimationFrame(loop);
 
 // expose for tests
-window.__game = { resetGame, getState:()=>state, getScore:()=>score, getBeacons:()=>beacons, W,H };
+window.__game = { resetGame, startPlaying, getState:()=>state, getScore:()=>score, getBeacons:()=>beacons, getSeed:()=>currentSeedStr, setSeed, getWalls:()=>walls, getPreset:()=>currentPresetIdx, triggerRandomEvent, W,H, WALL_PRESETS };

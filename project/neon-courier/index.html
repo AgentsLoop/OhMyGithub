@@ -20,6 +20,7 @@
       <div class="hud-item beacons-hud"><span class="hud-label">BEACONS</span><span class="hud-value" id="beacons">0 / 5</span><div class="beacon-dots" id="beacon-dots" aria-hidden="true"></div></div>
       <div class="hud-item"><span class="hud-label">TIME</span><span class="hud-value" id="timer">60.0</span></div>
       <div class="hud-item status" id="status-wrap"><span class="hud-label">STATUS</span><span class="hud-value" id="status">FLY</span></div>
+      <div class="hud-item seed-hud"><span class="hud-label">SEED</span><span class="hud-value seed-value" id="seed-value">#000000</span></div>
     </div>
   </header>
 
@@ -30,10 +31,22 @@
       <div id="overlay-start" class="overlay">
         <h1>◈ NEON COURIER</h1>
         <p class="tagline">Pilot your courier drone through the neon city. Collect all beacons, dodge traffic pulses, reach the <strong>EXIT</strong> before time runs out.</p>
+        <div class="seed-bar">
+          <span class="seed-label">SEED <strong id="seed-value2">#000000</strong></span>
+          <span class="seed-actions">
+            <button id="btn-new-seed" class="btn small">🎲 NEW (N)</button>
+            <button id="btn-daily" class="btn small">📅 DAILY</button>
+          </span>
+          <span class="seed-input-wrap">
+            <input id="seed-input" type="text" placeholder="enter seed" maxlength="16" autocomplete="off">
+            <button id="btn-apply-seed" class="btn small">GO</button>
+          </span>
+        </div>
         <div class="instructions">
           <div class="keys">
             <span class="kbd">WASD</span> or <span class="kbd">ARROWS</span> to fly
-            <span class="sep">·</span> <span class="kbd">R</span> restart
+            <span class="sep">·</span> <span class="kbd">R</span> restart (new map)
+            <span class="sep">·</span> <span class="kbd">N</span> new seed
             <span class="sep">·</span> <span class="kbd">P</span> pause
             <span class="sep">·</span> <span class="kbd">SPACE</span> start
           </div>
@@ -84,7 +97,9 @@
       <div class="card controls">
         <h3>Controls</h3>
         <div class="control-row"><span>Move</span><span>WASD / ↑←↓→</span></div>
-        <div class="control-row"><span>Restart</span><span>R</span></div>
+        <div class="control-row"><span>Restart</span><span>R (new map)</span></div>
+        <div class="control-row"><span>New Seed</span><span>N</span></div>
+        <div class="control-row"><span>Daily Challenge</span><span id="daily-seed-hint">📅 Daily</span></div>
         <div class="control-row"><span>Pause</span><span>P</span></div>
         <div class="control-row"><span>Start</span><span>SPACE</span></div>
       </div>
