@@ -15,11 +15,11 @@ workflow to completion or claim that the implementation, PR, or public app is fi
 ## Repository boundary
 
 The default and only issue/workflow repository for this skill is
-`GauntletLoop/OhMyGithub`. Never create an issue, add a label, or trigger a
+`AgentsLoop/OhMyGithub`. Never create an issue, add a label, or trigger a
 workflow in a repository supplied by the caller unless it is that repository
 or an explicitly owned fork confirmed by `gh repo view`. Treat other repository
 URLs as contextual references only, and run the test against
-`GauntletLoop/OhMyGithub`.
+`AgentsLoop/OhMyGithub`.
 
 The caller's following message is sufficient as the prompt when one is
 provided, even when it is short or does not describe a game. If the caller
@@ -58,7 +58,7 @@ skill labels are:
   search support.
 
 These labels are based on the skill labels currently configured in
-`GauntletLoop/OhMyGithub`; refresh them with `gh label list` before each test because
+`AgentsLoop/OhMyGithub`; refresh them with `gh label list` before each test because
 the set can change. Do not add a skill label merely because a skill exists:
 apply only labels supported by the issue's requirements. If a matching label
 does not exist, continue without inventing or creating one and record that in
@@ -80,11 +80,11 @@ OAuth provider.
    before creating the issue or triggering any Action. Do not start the test
    with uncommitted or unpushed changes.
 2. Confirm `gh auth status` and identify the target with
-   `gh repo view GauntletLoop/OhMyGithub`. If the caller supplied another
+   `gh repo view AgentsLoop/OhMyGithub`. If the caller supplied another
    repository URL, do not use it as the issue target; use the default repository
    above.
-3. Inspect the current labels in `GauntletLoop/OhMyGithub` with
-   `gh label list --repo GauntletLoop/OhMyGithub`, identify the applicable
+3. Inspect the current labels in `AgentsLoop/OhMyGithub` with
+   `gh label list --repo AgentsLoop/OhMyGithub`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
    with one `--label` option per applicable label, always including `OpenCode`.
    Add `Goal` by default; this specifically exercises the goal plugin and
@@ -106,10 +106,10 @@ OAuth provider.
    If multiple skills are needed, pass one `--label` option per matching
    label. Record the issue's final labels and verify them with
    `gh issue view <issue-number> --json labels`.
-4. Locate the newest `opencode.yml` run in `GauntletLoop/OhMyGithub` with:
+4. Locate the newest `opencode.yml` run in `AgentsLoop/OhMyGithub` with:
 
    ```sh
-   gh run list --repo GauntletLoop/OhMyGithub --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
+   gh run list --repo AgentsLoop/OhMyGithub --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
    ```
 
    Confirm its event is `issues` and its title matches the new issue. Poll the

@@ -66,7 +66,7 @@ endpoints as the GitHub Actions web UI:
 
 ```sh
 python3 scripts/gh-run-watch-logs.py <run-id> \
-  --repo GauntletLoop/OhMyGithub --internal-job-id <web-job-id> --exit-status
+  --repo AgentsLoop/OhMyGithub --internal-job-id <web-job-id> --exit-status
 ```
 
 The script authenticates with `gh auth token`. GitHub's web log endpoints are

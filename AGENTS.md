@@ -65,14 +65,14 @@ replies asking for it. Add
 the `Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 
-When monitoring a triggered run, use `gh run watch <run-id> --repo GauntletLoop/OhMyGithub --exit-status` for overall job status.
+When monitoring a triggered run, use `gh run watch <run-id> --repo AgentsLoop/OhMyGithub --exit-status` for overall job status.
 Do not use `gh run view --log` to read logs from a running task: GitHub reports that
 logs are unavailable until completion. Use `bash scripts/ssh-run-log.sh <run-id>`
 for the live Actions log over SSH. Do not use tight `for` loops around `gh run list`,
 which needlessly consume GitHub API rate limit.
 
 To connect to an issue's live worker, find its run ID with
-`gh run list --repo GauntletLoop/OhMyGithub --workflow opencode.yml --status in_progress`,
+`gh run list --repo AgentsLoop/OhMyGithub --workflow opencode.yml --status in_progress`,
 then run `bash scripts/ssh-run-log.sh <run-id>` to discover the host and port and SSH
 with `~/.ssh/aiplay-agentsweb` as shown by the helper.
 
@@ -111,7 +111,7 @@ Use the repository helper to discover the worker host and port from the broker
 or issue comment. It uses the persistent local key `~/.ssh/aiplay-agentsweb`:
 
 ```sh
-bash scripts/ssh-run-log.sh <run-id> --repo GauntletLoop/OhMyGithub
+bash scripts/ssh-run-log.sh <run-id> --repo AgentsLoop/OhMyGithub
 ```
 
 For an interactive shell, reuse the host and port printed by the helper and
