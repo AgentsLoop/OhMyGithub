@@ -49,6 +49,9 @@ The kickoff is complete when all of these are true:
   label by default; omit it only when the caller explicitly requests a
   standard-mode workflow test. The App dispatches the workflow once.
 - The App triggered `.github/workflows/opencode.yml` through `workflow_dispatch`.
+  For a custom branch, the run's head branch is that requested branch. An
+  `issues` event or default-branch run is a routing failure, not a successful
+  custom-branch test.
 - The initial OpenCode Web UI session link was posted.
 
 Do not wait for `gh run watch`, the verification prompt, the public tunnel, the
@@ -125,8 +128,12 @@ OAuth provider.
    gh run list --repo AgentsLoop/OhMyGithub --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
    ```
 
-   Confirm its event is `issues` and its title matches the new issue. Poll the
-   run or issue comments only until the initial OpenCode session link appears.
+   Confirm its event is `workflow_dispatch`, its title matches the new issue,
+   and its head branch matches the requested branch (or the default branch when
+   no directive was supplied). If it is an `issues` event or uses the wrong
+   branch, report the routing failure and do not treat a session as validation.
+   Poll the run or issue comments only until the initial OpenCode session link
+   appears.
    Do not use `gh run watch` through completion.
 5. Extract the OpenCode Web UI URL from the issue comment or the completed
    `Run OpenCode and locate its web session` step. Return the issue, run, and
