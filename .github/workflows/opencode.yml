@@ -1,5 +1,5 @@
 name: OpenCode
-run-name: "OpenCode #${{ inputs.issue_number || github.event.issue.number }} — ${{ inputs.issue_title || github.event.issue.title }}"
+run-name: "OpenCode #${{ inputs.issue_number }} — ${{ inputs.issue_title }}"
 
 on:
   workflow_dispatch:
@@ -20,25 +20,9 @@ on:
       sender:
         description: GitHub login that submitted the request
         required: true
-      source:
-        description: Dispatch source identifier
-        required: false
-        default: manual
-      target_repository:
-        description: Fallback target repository; empty means this repository
-        required: false
-      target_owner:
-        description: Fallback target owner
-        required: false
-      target_repo:
-        description: Fallback target repository name
-        required: false
       target_ref:
         description: Target checkout and pull-request base branch
-        required: false
-      installation_id:
-        description: GitHub App installation ID used for traceability
-        required: false
+        required: true
 permissions:
   contents: write
   issues: write
@@ -49,14 +33,10 @@ jobs:
   opencode:
     uses: ./.github/workflows/opencode-reusable.yml
     with:
-      target_repository: ${{ inputs.target_repository || github.repository }}
-      target_owner: ${{ inputs.target_owner || github.repository_owner }}
-      target_repo: ${{ inputs.target_repo || github.event.repository.name }}
-      target_ref: ${{ inputs.target_ref || github.event.repository.default_branch }}
+      target_ref: ${{ inputs.target_ref }}
       issue_number: ${{ inputs.issue_number }}
       request: ${{ inputs.request }}
       issue_title: ${{ inputs.issue_title }}
       labels_json: ${{ inputs.labels_json }}
       sender: ${{ inputs.sender }}
-      use_app_token: ${{ inputs.target_repository != '' }}
     secrets: inherit
