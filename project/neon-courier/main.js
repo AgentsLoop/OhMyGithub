@@ -63,14 +63,16 @@ function resetGame(){
     } while(beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90) && tries<50);
     beacons.push({x,y,collected:false, pulse: Math.random()*Math.PI*2});
   }
-  // pulses: slow-moving traffic
-  const laneYs = [90, 170, 250, 390, 470, 550];
+  // pulses: traffic — now faster with light chase for threat (2.5× speed + steering)
+  const laneYs = [110, 190, 290, 380, 460, 520];
   for(let i=0;i<PULSE_COUNT;i++){
+    const ang = rand(0, Math.PI*2);
+    const spd = rand(1.4, 2.2);
     pulses.push({
-      x: rand(200, W-120),
-      y: laneYs[i % laneYs.length] + rand(-12,12),
-      vx: rand(-0.7,0.7) || 0.5,
-      vy: rand(-0.5,0.5),
+      x: rand(220, W-140),
+      y: laneYs[i % laneYs.length] + rand(-10,10),
+      vx: Math.cos(ang)*spd,
+      vy: Math.sin(ang)*spd,
       phase: Math.random()*Math.PI*2,
       baseX: 0,
       baseY: 0
@@ -194,19 +196,29 @@ function startPlaying(){
   setState('playing');
 }
 
-// walls — neon city blocks
+// walls — neon city blocks (denser maze for Pac-Man routing pressure + Gear Wars enclosure)
 const walls = [
   {x:0,y:0,w:W,h:10},
   {x:0,y:H-10,w:W,h:10},
   {x:0,y:0,w:10,h:H},
   {x:W-10,y:0,w:10,h:H},
-  // inner blocks
-  {x:220,y:120,w:120,h:18},
-  {x:500,y:90,w:18,h:140},
-  {x:380,y:360,w:200,h:18},
-  {x:650,y:320,w:18,h:160},
-  {x:150,y:420,w:140,h:18},
-  {x:420,y:500,w:220,h:18},
+  // interlocking maze — forces corridors
+  {x:150,y:90,w:180,h:14},
+  {x:420,y:50,w:14,h:130},
+  {x:520,y:120,w:190,h:14},
+  {x:740,y:90,w:14,h:140},
+  {x:100,y:200,w:14,h:120},
+  {x:190,y:300,w:180,h:14},
+  {x:470,y:200,w:14,h:120},
+  {x:390,y:250,w:140,h:14},
+  {x:600,y:290,w:160,h:14},
+  {x:160,y:400,w:14,h:100},
+  {x:120,y:460,w:180,h:14},
+  {x:380,y:400,w:160,h:14},
+  {x:620,y:400,w:14,h:130},
+  {x:420,y:520,w:260,h:14},
+  {x:800,y:380,w:14,h:150},
+  {x:40,y:380,w:90,h:14},
 ];
 
 function rectCollideCircle(rx,ry,rw,rh, cx,cy, r){
@@ -294,17 +306,28 @@ function update(dt){
     }
   });
 
-  // pulses movement — slow drift + bounce
+  // pulses movement — faster drift + light chase when near player
   pulses.forEach(p=>{
-    p.x += p.vx;
-    p.y += p.vy + Math.sin(nowTick*0.001 + p.phase)*0.3;
+    // light homing when within 190px (makes them feel alive without being unfair)
+    const dx = drone.x - p.x, dy = drone.y - p.y;
+    const dist = Math.hypot(dx,dy);
+    if(dist < 190 && dist>12){
+      const steer = 0.85; // gentle steering
+      p.vx += (dx/dist)*steer * dt;
+      p.vy += (dy/dist)*steer * dt;
+      // clamp pulse speed
+      const ps = Math.hypot(p.vx,p.vy);
+      const maxPS = 2.6;
+      if(ps>maxPS){ p.vx*=maxPS/ps; p.vy*=maxPS/ps; }
+    }
+    p.x += p.vx * 60 * dt;
+    p.y += (p.vy + Math.sin(nowTick*0.001 + p.phase)*0.3) * 60 * dt;
     // bounce off walls/bounds
     if(p.x < 20 || p.x > W-20) p.vx*=-1;
     if(p.y < 20 || p.y > H-20) p.vy*=-1;
     // bounce off inner walls (reflect)
     for(const w of walls){
       if(rectCollideCircle(w.x,w.y,w.w,w.h, p.x,p.y,PULSE_R)){
-        // simple reverse
         p.vx*=-1; p.vy*=-1;
         p.x+=p.vx*2; p.y+=p.vy*2;
       }
@@ -407,8 +430,10 @@ function render(t){
   g.addColorStop(0,'#0c1024'); g.addColorStop(1,'#070a14');
   ctx.fillStyle=g;
   ctx.fillRect(0,0,W,H);
-  // grid
-  ctx.strokeStyle='rgba(56,230,255,0.07)';
+  // grid — additive bloom (Geometry Wars HDR feel)
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+  ctx.strokeStyle='rgba(56,230,255,0.09)';
   ctx.lineWidth=1;
   for(let x=0;x<W;x+=48){
     ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
@@ -416,6 +441,11 @@ function render(t){
   for(let y=0;y<H;y+=48){
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   }
+  // second bloom pass
+  ctx.strokeStyle='rgba(56,230,255,0.04)';
+  ctx.lineWidth=2;
+  for(let x=24;x<W;x+=48){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  ctx.restore();
   // building silhouettes
   ctx.fillStyle='rgba(14,18,40,0.9)';
   const buildings=[
