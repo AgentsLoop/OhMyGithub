@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON COURIER — Black Ops 6 FPS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-DtkmjESD.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Ci_0241s.css">
+</head>
+<body>
+<div id="app">
+  <!-- Top HUD Bar -->
+  <div id="hud-top">
+    <div class="hud-left">
+      <div class="brand"><span class="brand-icon">⬢</span><span class="brand-text">NEON COURIER</span><span class="brand-sub">TACTICAL // BO6</span></div>
+      <div class="score-block"><span class="label">SCORE</span><span class="value" id="hud-score">0</span></div>
+      <div class="kills-block"><span class="label">KILLS</span><span class="value" id="hud-kills">0 / 15</span></div>
+    </div>
+    <div class="hud-center">
+      <div id="timer-wrap"><span class="label">TIME</span><span class="value" id="hud-timer">60.0</span></div>
+      <div id="objective"><span id="obj-text">ELIMINATE HOSTILES — 15 TARGETS</span></div>
+    </div>
+    <div class="hud-right">
+      <div id="minimap-wrap"><canvas id="minimap" width="140" height="140"></canvas><span class="minimap-label">MINIMAP</span></div>
+    </div>
+  </div>
+
+  <!-- Crosshair / Hitmarker -->
+  <div id="crosshair">
+    <div class="ch-dot"></div>
+    <div class="ch-line ch-top"></div><div class="ch-line ch-bottom"></div>
+    <div class="ch-line ch-left"></div><div class="ch-line ch-right"></div>
+    <div id="hitmarker" class="hidden"><span></span><span></span><span></span><span></span></div>
+  </div>
+  <div id="hitmarker-kill" class="hidden">✕ KILL</div>
+  <div id="damage-vignette"></div>
+  <div id="blood-overlay"></div>
+
+  <!-- Weapon / Player HUD Bottom -->
+  <div id="hud-bottom">
+    <div class="health-block">
+      <div class="health-bar-bg"><div id="health-bar" style="width:100%"></div><div id="health-bar-damage" style="width:100%"></div></div>
+      <div class="health-text"><span id="hud-health">100</span><span class="health-label"> HEALTH</span></div>
+    </div>
+    <div class="ammo-block">
+      <div class="ammo-main"><span id="hud-ammo">30</span><span class="ammo-sep"> / </span><span id="hud-reserve">90</span></div>
+      <div class="ammo-label">5.56 NATO &nbsp;•&nbsp; <span id="hud-firemode">AUTO</span></div>
+      <div id="reload-bar" class="hidden"><div id="reload-progress"></div></div>
+    </div>
+    <div class="streak-block">
+      <div class="label">STREAK</div>
+      <div id="streak-dots"></div>
+    </div>
+  </div>
+
+  <!-- Kill Feed -->
+  <div id="killfeed"></div>
+
+  <!-- Center Messages -->
+  <div id="center-msg"></div>
+
+  <!-- Game Container -->
+  <div id="game-wrap"></div>
+
+  <!-- Overlays -->
+  <div id="overlay-start" class="overlay">
+    <div class="overlay-inner">
+      <div class="eyebrow">CALL OF DUTY // BLACK OPS 6 — NEON COURIER TACTICAL</div>
+      <h1>ELIMINATION<br><span>URBAN WARFARE</span></h1>
+      <p class="subtitle">Codename <strong>Neon Courier</strong> — 60-second elimination contract. Clear the urban killhouse. Sprint, crouch, and engage hostiles with precision rifle. 15 kills to dominate.</p>
+      <div class="controls-grid">
+        <div><span class="kbd">WASD</span> Move</div>
+        <div><span class="kbd">SHIFT</span> Sprint</div>
+        <div><span class="kbd">CTRL</span> Crouch</div>
+        <div><span class="kbd">SPACE</span> Jump</div>
+        <div><span class="kbd">MOUSE</span> Look</div>
+        <div><span class="kbd">LMB</span> Fire</div>
+        <div><span class="kbd">R</span> Reload</div>
+        <div><span class="kbd">ESC</span> Pause</div>
+      </div>
+      <button id="btn-play" class="btn-primary">⚡ DEPLOY — CLICK TO LOCK</button>
+      <p class="hint">Tip: Headshots deal 2× damage. Watch minimap for red hostile pins. Reload behind cover.</p>
+      <div class="fidelity-note">Inspired by Black Ops 6 multiplayer reveal — PBR weapons, volumetric fog, muzzle physics, hit confirm, minimap & combat HUD.</div>
+    </div>
+  </div>
+
+  <div id="overlay-pause" class="overlay hidden">
+    <div class="overlay-inner">
+      <h2>PAUSED</h2>
+      <p>Pointer unlocked. Click to resume fire.</p>
+      <button id="btn-resume" class="btn-primary">RESUME</button>
+    </div>
+  </div>
+
+  <div id="overlay-end" class="overlay hidden">
+    <div class="overlay-inner">
+      <h2 id="end-title">MISSION COMPLETE</h2>
+      <p id="end-desc"></p>
+      <div class="end-stats">
+        <div><span>KILLS</span><strong id="end-kills">0</strong></div>
+        <div><span>SCORE</span><strong id="end-score">0</strong></div>
+        <div><span>ACCURACY</span><strong id="end-acc">0%</strong></div>
+        <div><span>TIME LEFT</span><strong id="end-time">0.0s</strong></div>
+      </div>
+      <button id="btn-restart" class="btn-primary">RE-DEPLOY — R</button>
+    </div>
+  </div>
+
+  <div id="weapon-info">M4A1 • OPTIC REFLEX • GRIP VERTICAL</div>
+  <div id="compass"><span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span></div>
+</div>
+</body>
+</html>
