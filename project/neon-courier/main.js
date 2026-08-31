@@ -121,26 +121,57 @@ document.getElementById('btn-start').onclick = ()=> startPlaying();
 document.getElementById('btn-resume').onclick = ()=> setState('playing');
 document.getElementById('btn-restart').onclick = ()=> startPlaying();
 
-// Mouse / touch move over canvas
+// Pointer handling — unified mouse + touch, works on canvas wrap and survives leaving canvas
+const wrap = document.getElementById('wrap');
 function canvasToX(clientX){
   const rect = canvas.getBoundingClientRect();
+  if(rect.width===0) return mouseX;
   const sx = W / rect.width;
   return (clientX - rect.left) * sx;
 }
-canvas.addEventListener('mousemove', e=>{
-  mouseX = canvasToX(e.clientX);
-  lantern.targetX = mouseX;
-  // hide overlay hint? keep start overlay unless playing
+function setTargetFromClientX(clientX){
+  mouseX = canvasToX(clientX);
+  lantern.targetX = Math.max(LANTERN_W/2+6, Math.min(W-LANTERN_W/2-6, mouseX));
+}
+// pointermove on canvas + wrap + window while dragging/playing
+canvas.addEventListener('pointermove', e=>{
+  setTargetFromClientX(e.clientX);
+});
+wrap.addEventListener('pointermove', e=>{
+  // wrap may be larger than canvas (padding); still track
+  if(e.target!==canvas) setTargetFromClientX(e.clientX);
+});
+// also track when pointer leaves canvas during play (desktop fast moves)
+window.addEventListener('pointermove', e=>{
+  if(state!=='playing') return;
+  // only track if pointer is near canvas rect vertically
+  const rect = canvas.getBoundingClientRect();
+  if(e.clientY >= rect.top - 40 && e.clientY <= rect.bottom + 40){
+    setTargetFromClientX(e.clientX);
+  }
 });
 canvas.addEventListener('touchmove', e=>{
   e.preventDefault();
-  if(e.touches[0]){
-    mouseX = canvasToX(e.touches[0].clientX);
-    lantern.targetX = mouseX;
-  }
+  if(e.touches[0]) setTargetFromClientX(e.touches[0].clientX);
 },{passive:false});
+wrap.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  if(e.touches[0]) setTargetFromClientX(e.touches[0].clientX);
+},{passive:false});
+canvas.addEventListener('pointerdown', e=>{
+  setTargetFromClientX(e.clientX);
+  if(state==='start' || state==='ended'){ startPlaying(); }
+  // capture pointer so dragging outside still moves lantern on mobile
+  try{ canvas.setPointerCapture(e.pointerId); }catch{}
+});
+wrap.addEventListener('pointerdown', e=>{
+  if(e.target!==canvas){
+    setTargetFromClientX(e.clientX);
+    if(state==='start' || state==='ended') startPlaying();
+  }
+});
 canvas.addEventListener('touchstart', e=>{
-  if(e.touches[0]){ mouseX = canvasToX(e.touches[0].clientX); lantern.targetX=mouseX; }
+  if(e.touches[0]) setTargetFromClientX(e.touches[0].clientX);
   if(state==='start' || state==='ended'){ startPlaying(); }
 },{passive:false});
 canvas.addEventListener('click', ()=>{
@@ -152,13 +183,23 @@ function setState(s){
   overlayStart.classList.toggle('hidden', s!=='start');
   overlayPause.classList.toggle('hidden', s!=='paused');
   overlayEnd.classList.toggle('hidden', s!=='ended');
+  // accessibility: hide inactive overlays from AT
+  overlayStart.setAttribute('aria-hidden', s!=='start' ? 'true' : 'false');
+  overlayPause.setAttribute('aria-hidden', s!=='paused' ? 'true' : 'false');
+  overlayEnd.setAttribute('aria-hidden', s!=='ended' ? 'true' : 'false');
   updateHUD();
   // cursor
   canvas.style.cursor = (s==='playing') ? 'none' : 'auto';
+  // focus management for keyboard users
+  if(s==='start') document.getElementById('btn-start')?.focus({preventScroll:true});
+  else if(s==='paused') document.getElementById('btn-resume')?.focus({preventScroll:true});
+  else if(s==='ended') document.getElementById('btn-restart')?.focus({preventScroll:true});
 }
 function startPlaying(){
   resetGame();
   setState('playing');
+  // ensure immediate HUD repaint (no one-frame lag)
+  updateHUD();
 }
 
 let last=performance.now();
@@ -502,6 +543,17 @@ function render(t){
 resetGame();
 setState('start');
 requestAnimationFrame(loop);
+
+// pause on tab hidden / window blur (prevents timer cheating & respects user)
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && state==='playing') setState('paused');
+});
+window.addEventListener('blur', ()=>{
+  if(state==='playing') setState('paused');
+});
+// prevent context menu / long-press selection on canvas (mobile polish)
+canvas.addEventListener('contextmenu', e=> e.preventDefault());
+wrap.addEventListener('contextmenu', e=> e.preventDefault());
 
 // expose for tests
 window.__game = { resetGame, getState:()=>state, getScore:()=>score, getCaught:()=>caught, getMissed:()=>missed, W,H, GAME_TIME };

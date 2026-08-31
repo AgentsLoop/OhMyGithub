@@ -22,7 +22,7 @@ body{
     radial-gradient(800px 500px at 0% 90%, rgba(255,107,122,0.06), transparent 60%),
     linear-gradient(180deg, #0a0d1f 0%, #0d132e 60%, #0a1020 100%);
   color:var(--text);
-  font-family:'Nunito','Baloo 2',system-ui,sans-serif;
+  font-family:ui-sans-serif,system-ui,-apple-system,'Nunito',sans-serif;
   overflow-x:hidden;
 }
 #app{min-height:100vh;display:flex;flex-direction:column}
@@ -44,8 +44,8 @@ body{
   font-size:20px;
 }
 .brand-text{display:flex;flex-direction:column;line-height:1}
-.title{font-weight:800;letter-spacing:0.13em;font-size:15px}
-.subtitle{font-size:11px;letter-spacing:0.08em;color:var(--muted);font-weight:600}
+.title{font-weight:800;letter-spacing:0.02em;font-size:18px;text-transform:none}
+.subtitle{font-size:11px;letter-spacing:0.04em;color:var(--muted);font-weight:600}
 .hud{display:flex;gap:10px;flex-wrap:wrap}
 .hud-item{
   background:var(--panel);
@@ -56,9 +56,11 @@ body{
   display:flex;flex-direction:column;gap:2px;
   box-shadow:0 4px 18px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
 }
-.hud-label{font-size:10px;letter-spacing:0.14em;color:var(--muted);font-weight:700}
-.hud-value{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px;line-height:1}
-.hud-item.time .hud-value{color:var(--gold)}
+.hud-label{font-size:9px;letter-spacing:0.08em;color:var(--muted);font-weight:700}
+.hud-value{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;line-height:1;color:var(--muted)}
+.hud-item.time .hud-value{color:var(--gold);font-size:22px}
+.hud-item.time{min-width:110px}
+.hud-item:not(.time){opacity:0.92}
 .hud-value.pop{animation:hudPop .28s cubic-bezier(.2,.8,.3,1)}
 @keyframes hudPop{0%{transform:scale(1)}35%{transform:scale(1.18)}100%{transform:scale(1)}}
 .hud-value.urgent{animation:urgentPulse .45s ease-in-out infinite; color:var(--miss) !important; text-shadow:0 0 10px rgba(255,107,122,0.8)}
@@ -84,7 +86,7 @@ body{
   aspect-ratio: 960 / 600;
   max-height: min(70vh, 600px);
 }
-canvas#game{width:100%;height:100%;display:block;cursor:none}
+canvas#game{width:100%;height:100%;display:block;cursor:none;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .overlay{
   position:absolute;inset:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -101,9 +103,9 @@ canvas#game{width:100%;height:100%;display:block;cursor:none}
 }
 .overlay.hidden{display:none}
 .overlay-inner{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:620px;width:100%}
-.overlay h1{font-size:34px;letter-spacing:0.08em;font-weight:800;text-shadow:0 0 20px rgba(255,211,77,0.5)}
+.overlay h1{font-size:40px;letter-spacing:-0.02em;font-weight:800;line-height:0.95;text-shadow:0 0 20px rgba(255,211,77,0.5)}
 .lantern-emoji{filter:drop-shadow(0 0 10px rgba(255,211,77,0.9))}
-.overlay h2{font-size:28px;letter-spacing:0.08em}
+.overlay h2{font-size:28px;letter-spacing:-0.01em}
 .tagline{max-width:560px;color:#c8d0f0;line-height:1.55;font-size:14px}
 .tagline strong{color:var(--gold)}
 .instructions{max-width:560px;width:100%;text-align:left;background:rgba(21,26,51,0.95);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
@@ -143,7 +145,7 @@ canvas#game{width:100%;height:100%;display:block;cursor:none}
   padding:14px 16px;
   box-shadow:0 8px 20px rgba(0,0,0,0.25);
 }
-.card h3{font-size:11px;letter-spacing:0.14em;color:var(--muted);margin-bottom:10px;text-transform:uppercase}
+.card h3{font-size:11px;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px;text-transform:uppercase}
 .card ol{padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:#c8d0f0}
 .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .legend div{display:flex;align-items:center;gap:6px;font-size:12px;color:#aeb8df;background:rgba(255,255,255,0.04);padding:4px 9px;border-radius:999px;border:1px solid rgba(255,255,255,0.07)}
@@ -171,10 +173,12 @@ canvas#game{width:100%;height:100%;display:block;cursor:none}
 @media (max-width: 960px){
   .stage{grid-template-columns:1fr;gap:12px}
   .canvas-wrap{max-height:none;aspect-ratio: 4 / 3; cursor:auto}
-  canvas#game{cursor:auto}
+  canvas#game{cursor:auto; touch-action:none}
   .overlay{justify-content:flex-start; padding-top:16px; padding-bottom:16px}
   .side{order:2}
 }
+.btn:focus-visible, .hud-item:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.canvas-wrap:focus-within{box-shadow:0 16px 40px rgba(0,0,0,0.45), 0 0 0 2px rgba(255,211,77,0.35) inset}
 @media (max-width: 560px){
   .title{font-size:13px}
   .subtitle{display:none}
