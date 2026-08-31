@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lantern Catch — Catch the Fireflies</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@500;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-Dgy1bYqG.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-0sOozJ8O.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">🏮</div>
+      <div class="brand-text">
+        <span class="title">LANTERN CATCH</span>
+        <span class="subtitle">GATHER THE NIGHT LIGHTS</span>
+      </div>
+    </div>
+    <div class="hud" id="hud">
+      <div class="hud-item">
+        <span class="hud-label">SCORE</span>
+        <span class="hud-value" id="score">0</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">CAUGHT</span>
+        <span class="hud-value" id="caught">0</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">MISSED</span>
+        <span class="hud-value" id="missed">0</span>
+      </div>
+      <div class="hud-item time">
+        <span class="hud-label">TIME</span>
+        <span class="hud-value" id="timer">60.0</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="canvas-wrap" id="wrap">
+      <canvas id="game" width="960" height="640"></canvas>
+
+      <div id="overlay-start" class="overlay">
+        <div class="badge">✦ 60 SECOND CHALLENGE ✦</div>
+        <h1><span class="glow">LANTERN</span> CATCH</h1>
+        <p class="tagline">The forest is spilling fireflies. Guide your <strong>lantern</strong> and catch them before they fade. Miss too many and the night stays dark.</p>
+        <div class="instructions">
+          <div class="how">
+            <div class="how-item"><span class="how-icon">🖱️</span><span><strong>Mouse</strong> move to glide</span></div>
+            <div class="how-item"><span class="how-icon">⌨️</span><span><strong>← →</strong> or <strong>A D</strong> to slide</span></div>
+            <div class="how-item"><span class="how-icon">↑</span><span><strong>↑ W</strong> lift slightly</span></div>
+          </div>
+          <ul>
+            <li><i class="dot dot-firefly"></i> Catch <strong>fireflies</strong> = +10 pts (golden ones +25)</li>
+            <li><i class="dot dot-miss"></i> Let them fall = <strong>miss flash</strong> & gentle shake</li>
+            <li><i class="dot dot-lantern"></i> Lantern glow grows with combos</li>
+          </ul>
+        </div>
+        <button id="btn-start" class="btn primary">LIGHT THE LANTERN — SPACE</button>
+        <div class="hint-row">
+          <span><span class="kbd">SPACE</span> start</span>
+          <span><span class="kbd">R</span> restart</span>
+          <span><span class="kbd">P</span> pause</span>
+        </div>
+      </div>
+
+      <div id="overlay-pause" class="overlay hidden">
+        <h2>PAUSED</h2>
+        <p>The fireflies hover, waiting…</p>
+        <button id="btn-resume" class="btn">RESUME — P</button>
+      </div>
+
+      <div id="overlay-end" class="overlay hidden">
+        <div class="badge" id="end-badge">RESULT</div>
+        <h2 id="end-title">NIGHT COMPLETE</h2>
+        <p id="end-msg">You gathered the light.</p>
+        <div class="stats">
+          <div><span>Score</span><strong id="end-score">0</strong></div>
+          <div><span>Caught</span><strong id="end-caught">0</strong></div>
+          <div><span>Missed</span><strong id="end-missed">0</strong></div>
+          <div><span>Accuracy</span><strong id="end-acc">0%</strong></div>
+        </div>
+        <p class="rank" id="end-rank"></p>
+        <button id="btn-restart" class="btn primary">PLAY AGAIN — R</button>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h3>How to Play</h3>
+        <ol>
+          <li>Move lantern with <strong>mouse</strong> or <strong>← →</strong></li>
+          <li>Catch <strong>falling fireflies</strong> in the glow</li>
+          <li>Golden fireflies worth <strong>×2.5</strong></li>
+          <li>Survive <strong>60 seconds</strong></li>
+        </ol>
+        <div class="legend">
+          <div><i class="swatch s-firefly"></i> Firefly +10</div>
+          <div><i class="swatch s-golden"></i> Golden +25</div>
+          <div><i class="swatch s-miss"></i> Missed</div>
+          <div><i class="swatch s-lantern"></i> Lantern</div>
+        </div>
+      </div>
+      <div class="card controls">
+        <h3>Controls</h3>
+        <div class="control-row"><span>Move</span><span>Mouse / ← → / A D</span></div>
+        <div class="control-row"><span>Lift</span><span>↑ / W</span></div>
+        <div class="control-row"><span>Start / Pause</span><span>SPACE / P</span></div>
+        <div class="control-row"><span>Restart</span><span>R</span></div>
+      </div>
+      <div class="card tip">
+        <h3>Tip</h3>
+        <p>Stay near the middle — fireflies drift with the wind. Chain catches to grow your lantern’s glow radius!</p>
+      </div>
+    </aside>
+  </main>
+
+  <div id="touch" class="touch hidden">
+    <button data-dir="left">◀</button>
+    <button data-dir="right">▶</button>
+  </div>
+
+  <footer class="foot">Lantern Catch · Canvas 2D · 60 FPS · Responsive · No trackers</footer>
+</div>
+</body>
+</html>
