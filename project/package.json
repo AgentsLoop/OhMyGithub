@@ -1,0 +1,14 @@
+{
+  "name": "ohmygithub-project",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix neon-courier run dev",
+    "start": "npm --prefix neon-courier run start",
+    "preview": "npm --prefix neon-courier run preview",
+    "build": "npm --prefix neon-courier run build",
+    "test": "npm --prefix neon-courier test",
+    "postinstall": "npm --prefix neon-courier install"
+  }
+}
