@@ -6,15 +6,28 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 ## Trigger
 
-The `OpenCode` issue label is the execution marker. The issue title, body, or
-comment supplies the request text. Bot-authored events are
-ignored, so status comments do not recurse. An issue with the `Goal` label
+The `OpenCode` issue label is the execution marker consumed by the Oh My Github
+App. The App dispatches `.github/workflows/opencode.yml`; the workflow itself
+accepts only `workflow_dispatch` and does not subscribe directly to issue
+events. The issue body, or title when the body is empty, supplies the request
+text. Comments and edits never trigger execution. An issue with the `Goal` label
 uses the installed `opencode-goal-plugin`, configures
 `noInterruptOnUserMessage: true`, and starts the runner with `opencode run
 --command goal`; an issue without `Goal` uses the standard `opencode run`
-path. The `OpenCode` label launches the workflow; add `Goal` to select
+path. The `OpenCode` label asks the App to launch the workflow; add `Goal` to select
 persistent goal mode. This keeps
 one request event mapped to one OpenCode session.
+
+When a human opens an issue without `OpenCode`, the App posts a reminder to add
+the label and stops; it does not dispatch a workflow. Adding `OpenCode` later
+starts the normal App-dispatched flow.
+
+An optional issue-title suffix in the exact form `branch: <existing-branch>`
+selects the checkout and pull-request base. The App removes that suffix from the
+OpenCode request and validates the branch before dispatching the thin workflow
+wrapper.
+Invalid or missing branches receive an issue comment and do not start the build.
+Without the directive, the repository default branch is used.
 
 See the dedicated [Oh My Github App documentation](oh-my-github-app.md) for
 App ownership, installation scope, permissions, events, and webhook details.
@@ -67,6 +80,11 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
 13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
    verification,
    then marks the comment closed and terminates both tunnels.
+
+After PR creation, the workflow also ZIPs `project/dist`, publishes it through
+the token-protected OmGithub API, verifies the permanent wildcard URL, and puts
+the permanent game and install links in the final issue comment. See
+[OmGithub publishing](omgithub.md).
 
 The comment URL opens `/<encoded-worktree>/session/<session-id>` rather than
 the web home page. This matters because the web home page stores its project

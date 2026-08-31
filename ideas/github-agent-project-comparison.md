@@ -9,7 +9,7 @@ aiplay's public-preview and browser-verification pipeline.
 | --- | --- | --- |
 | [Aixgo Code](https://github.com/aixgo-dev/code) | GitHub App identity, `@app` commands, lifecycle labels, same issue-to-PR continuity, narrow permissions, human merge gate, repository quality gate | Its simpler issue-to-PR verification model; aiplay needs runtime and browser proof |
 | [Deep Agent Action](https://github.com/dipjyotimetia/deep-agent-action) | Sticky progress comment, continuation, review/fix modes, fork protection, protected paths, cost/token caps, provider abstraction | Its in-runner agent can remain optional; aiplay's OpenCode session and AgentsWeb experience are core |
-| [OpenCode GitHub integration](https://thdxr.dev.opencode.ai/docs/github/) | `/oc` and `/opencode` workflow integration, issue triage, branch/PR execution, same PR follow-up | A basic workflow-only trigger is insufficient for a multi-repository App |
+| [OpenCode GitHub integration](https://thdxr.dev.opencode.ai/docs/github/) | Comment-command workflow integration, issue triage, branch/PR execution, same PR follow-up | A basic workflow-only trigger is insufficient for a multi-repository App |
 | [Probot](https://github.com/probot/probot) | Webhook handling, signature validation, GitHub App authentication, Octokit integration, webhook test fixtures | Do not put long-running agent execution inside the webhook request |
 
 ## Product features to implement
@@ -28,7 +28,7 @@ Use one installable App and one bot identity, such as `@aiplay`, with modes:
 @aiplay help
 ```
 
-Keep `/oc`, `/opencode`, and `/goal` as compatibility aliases. The App should
+Do not retain comment-command compatibility aliases. The App should
 parse the mode internally rather than creating separate Apps for `@omgweb`,
 `@omgandroid`, and similar names.
 
@@ -117,4 +117,3 @@ and cleanup.
 6. Review and review-and-fix modes.
 7. Repository configuration and cost/runtime limits.
 8. Bootstrap CLI, multi-repository installation UI, and Marketplace readiness.
-

@@ -6,7 +6,7 @@ Add an OMG execution path that generates a native iOS app instead of a browser
 app, using [MobAI-App/ios-builder](https://github.com/MobAI-App/ios-builder) for
 remote macOS builds and IPA artifacts. MobAI simulator/device sharing is
 explicitly out of scope because OMG must not require a `MOBAI_API_KEY`. The
-existing `/omg` issue and `Goal` label semantics remain the
+existing `OpenCode` and `Goal` label semantics remain the
 entry point; this idea changes the project target selected by an explicit iOS
 platform label or request requirement.
 
@@ -21,7 +21,7 @@ only its GitHub Actions build capabilities.
 
 ## Proposed flow
 
-1. Add a synchronized `platform/ios` issue label. An issue containing `/omg`
+1. Add a synchronized `platform/ios` issue label. An issue labeled `OpenCode`
    and `platform/ios` selects the native-app prompt and iOS delivery path.
 2. Ask OpenCode to create a native Swift/SwiftUI app by default, while allowing
    the prompt to request Flutter, React Native, Kotlin Multiplatform, or another
@@ -88,7 +88,7 @@ only its GitHub Actions build capabilities.
 
 ## Acceptance criteria
 
-- A `/omg` issue labeled `platform/ios` produces a buildable iOS project and a
+- An `OpenCode` issue labeled `platform/ios` produces a buildable iOS project and a
   reviewed `ios-build.yml` workflow.
 - `builder ios build` completes on GitHub Actions macOS and yields a non-empty
   IPA artifact, with the run and artifact linked from the issue report.
