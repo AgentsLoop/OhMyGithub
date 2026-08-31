@@ -1,14 +1,16 @@
 ---
 name: game-issue-e2e
-description: Start the issue-triggered game workflow, wait for the OpenCode session link, and return that link without waiting for the workflow to finish.
+description: Start the issue-triggered workflow from the caller's prompt, wait for the OpenCode session link, and return that link without waiting for the workflow to finish.
 ---
 
-# Game issue workflow kickoff
+# Issue workflow kickoff
 
-Use this skill when the user asks to start the issue-triggered game workflow
-with a new game or create a game issue. This skill intentionally ends after the
+Use this skill when the user asks to start the issue-triggered workflow with a
+request or create an issue. Treat the user's next message after invoking this
+skill as the task prompt. Preserve that prompt's intent and details; do not
+invent, replace, summarize, or augment it with a random task. This skill intentionally ends after the
 workflow publishes the OpenCode Web UI session link; it does not watch the
-workflow to completion or claim that the game, PR, or public app is finished.
+workflow to completion or claim that the implementation, PR, or public app is finished.
 
 ## Repository boundary
 
@@ -19,10 +21,9 @@ or an explicitly owned fork confirmed by `gh repo view`. Treat other repository
 URLs as contextual references only, and run the test against
 `GauntletLoop/OhMyGithub`.
 
-If the caller does not provide a game concept or prompt, invent a random,
-small playable browser game and write a brief issue prompt for it. Do not ask
-the caller to supply the missing concept. Apply matching skill labels only when
-the invented game clearly requires them.
+The caller's following message is sufficient as the prompt, even when it is
+short or does not describe a game. Apply matching skill labels only when the
+prompt clearly requires them.
 
 ## Required outcome
 
@@ -88,13 +89,14 @@ OAuth provider.
    path. Omit `Goal` only when the caller explicitly requests the standard
    OpenCode path. Do not add a comment
    because this tests the `issues` trigger.
-   If the caller supplied a game or prompt, preserve its intent. Otherwise,
-   generate a random game concept and a concise playable implementation brief.
-   For any 3D game, also pass `--label skill/load-sketchfab-threejs` when that
-   label exists, and require the issue prompt to use the
+   Use the caller's following message as the complete issue prompt and preserve
+   it verbatim. Do not generate a substitute prompt. If the prompt requests
+   3D content, also pass `--label skill/load-sketchfab-threejs` when that label
+   exists, and require the issue prompt to use the
    `load-sketchfab-threejs` skill for a suitable downloadable GLB asset while
    preserving attribution and verifying geometry, materials, and animations.
-   Do not add this label or requirement to a 2D/canvas-only game.
+   Do not add this label or requirement when the prompt does not request 3D
+   content.
    If multiple skills are needed, pass one `--label` option per matching
    label. Record the issue's final labels and verify them with
    `gh issue view <issue-number> --json labels`.
