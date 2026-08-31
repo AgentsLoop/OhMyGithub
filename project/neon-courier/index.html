@@ -3,108 +3,112 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Neon Courier — Drone Delivery Rush</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<title>NEON COURIER — Black Ops 6 FPS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <div id="app">
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo">◈</span>
-      <span class="title">NEON COURIER</span>
-      <span class="subtitle">DRONE DELIVERY RUSH</span>
+  <!-- Top HUD Bar -->
+  <div id="hud-top">
+    <div class="hud-left">
+      <div class="brand"><span class="brand-icon">⬢</span><span class="brand-text">NEON COURIER</span><span class="brand-sub">TACTICAL // BO6</span></div>
+      <div class="score-block"><span class="label">SCORE</span><span class="value" id="hud-score">0</span></div>
+      <div class="kills-block"><span class="label">KILLS</span><span class="value" id="hud-kills">0 / 15</span></div>
     </div>
-    <div class="hud" id="hud">
-      <div class="hud-item"><span class="hud-label">SCORE</span><span class="hud-value" id="score">0</span></div>
-      <div class="hud-item beacons-hud"><span class="hud-label">BEACONS</span><span class="hud-value" id="beacons">0 / 5</span><div class="beacon-dots" id="beacon-dots" aria-hidden="true"></div></div>
-      <div class="hud-item"><span class="hud-label">TIME</span><span class="hud-value" id="timer">60.0</span></div>
-      <div class="hud-item status" id="status-wrap"><span class="hud-label">STATUS</span><span class="hud-value" id="status">FLY</span></div>
+    <div class="hud-center">
+      <div id="timer-wrap"><span class="label">TIME</span><span class="value" id="hud-timer">60.0</span></div>
+      <div id="objective"><span id="obj-text">ELIMINATE HOSTILES — 15 TARGETS</span></div>
     </div>
-  </header>
-
-  <main class="stage">
-    <div class="canvas-wrap" id="wrap">
-      <canvas id="game" width="960" height="640"></canvas>
-      <!-- Overlays -->
-      <div id="overlay-start" class="overlay">
-        <h1>◈ NEON COURIER</h1>
-        <p class="tagline">Pilot your courier drone through the neon city. Collect all beacons, dodge traffic pulses, reach the <strong>EXIT</strong> before time runs out.</p>
-        <div class="instructions">
-          <div class="keys">
-            <span class="kbd">WASD</span> or <span class="kbd">ARROWS</span> to fly
-            <span class="sep">·</span> <span class="kbd">R</span> restart
-            <span class="sep">·</span> <span class="kbd">P</span> pause
-            <span class="sep">·</span> <span class="kbd">SPACE</span> start
-          </div>
-          <ul>
-            <li><span class="dot beacon-dot"></span> Cyan beacons = +100 pts, needed to open exit</li>
-            <li><span class="dot pulse-dot"></span> Magenta traffic pulses = slow + damage, avoid</li>
-            <li><span class="dot exit-dot"></span> Green exit gate opens after all beacons</li>
-          </ul>
-        </div>
-        <button id="btn-start" class="btn primary">LAUNCH DRONE — SPACE</button>
-        <p class="hint">Tip: pulses are slow but swarm. Use walls to cut LOS.</p>
-      </div>
-
-      <div id="overlay-pause" class="overlay hidden">
-        <h2>PAUSED</h2>
-        <p>Press P or SPACE to resume</p>
-        <button id="btn-resume" class="btn">RESUME</button>
-      </div>
-
-      <div id="overlay-end" class="overlay hidden">
-        <h2 id="end-title">COMPLETE</h2>
-        <p id="end-msg">You delivered all beacons!</p>
-        <div class="stats">
-          <div><span>Score</span><strong id="end-score">0</strong></div>
-          <div><span>Time left</span><strong id="end-time">0.0s</strong></div>
-          <div><span>Beacons</span><strong id="end-beacons">0/5</strong></div>
-        </div>
-        <button id="btn-restart" class="btn primary">RESTART — R</button>
-      </div>
-    </div>
-
-    <aside class="side">
-      <div class="card">
-        <h3>How to Play</h3>
-        <ol>
-          <li>Fly with <strong>WASD / Arrows</strong></li>
-          <li>Collect <strong>5 cyan beacons</strong></li>
-          <li>Avoid <strong>magenta pulses</strong></li>
-          <li>Reach <strong>green EXIT</strong> in <strong>60s</strong></li>
-        </ol>
-        <div class="legend">
-          <div><i class="swatch s-beacon"></i> Beacon</div>
-          <div><i class="swatch s-pulse"></i> Traffic Pulse</div>
-          <div><i class="swatch s-exit"></i> Exit</div>
-          <div><i class="swatch s-drone"></i> You</div>
-        </div>
-      </div>
-      <div class="card controls">
-        <h3>Controls</h3>
-        <div class="control-row"><span>Move</span><span>WASD / ↑←↓→</span></div>
-        <div class="control-row"><span>Restart</span><span>R</span></div>
-        <div class="control-row"><span>Pause</span><span>P</span></div>
-        <div class="control-row"><span>Start</span><span>SPACE</span></div>
-      </div>
-      <div class="card tip">
-        <h3>Responsive</h3>
-        <p>Canvas scales to fit. On mobile use on-screen D-pad (appears below canvas on narrow screens).</p>
-      </div>
-    </aside>
-  </main>
-
-  <div id="touch" class="touch hidden">
-    <button data-dir="up">▲</button>
-    <div class="mid">
-      <button data-dir="left">◀</button>
-      <button data-dir="down">▼</button>
-      <button data-dir="right">▶</button>
+    <div class="hud-right">
+      <div id="minimap-wrap"><canvas id="minimap" width="140" height="140"></canvas><span class="minimap-label">MINIMAP</span></div>
     </div>
   </div>
 
-  <footer class="foot">Neon Courier · Built with Canvas 2D · 60 FPS · No trackers</footer>
+  <!-- Crosshair / Hitmarker -->
+  <div id="crosshair">
+    <div class="ch-dot"></div>
+    <div class="ch-line ch-top"></div><div class="ch-line ch-bottom"></div>
+    <div class="ch-line ch-left"></div><div class="ch-line ch-right"></div>
+    <div id="hitmarker" class="hidden"><span></span><span></span><span></span><span></span></div>
+  </div>
+  <div id="hitmarker-kill" class="hidden">✕ KILL</div>
+  <div id="damage-vignette"></div>
+  <div id="blood-overlay"></div>
+
+  <!-- Weapon / Player HUD Bottom -->
+  <div id="hud-bottom">
+    <div class="health-block">
+      <div class="health-bar-bg"><div id="health-bar" style="width:100%"></div><div id="health-bar-damage" style="width:100%"></div></div>
+      <div class="health-text"><span id="hud-health">100</span><span class="health-label"> HEALTH</span></div>
+    </div>
+    <div class="ammo-block">
+      <div class="ammo-main"><span id="hud-ammo">30</span><span class="ammo-sep"> / </span><span id="hud-reserve">90</span></div>
+      <div class="ammo-label">5.56 NATO &nbsp;•&nbsp; <span id="hud-firemode">AUTO</span></div>
+      <div id="reload-bar" class="hidden"><div id="reload-progress"></div></div>
+    </div>
+    <div class="streak-block">
+      <div class="label">STREAK</div>
+      <div id="streak-dots"></div>
+    </div>
+  </div>
+
+  <!-- Kill Feed -->
+  <div id="killfeed"></div>
+
+  <!-- Center Messages -->
+  <div id="center-msg"></div>
+
+  <!-- Game Container -->
+  <div id="game-wrap"></div>
+
+  <!-- Overlays -->
+  <div id="overlay-start" class="overlay">
+    <div class="overlay-inner">
+      <div class="eyebrow">CALL OF DUTY // BLACK OPS 6 — NEON COURIER TACTICAL</div>
+      <h1>ELIMINATION<br><span>URBAN WARFARE</span></h1>
+      <p class="subtitle">Codename <strong>Neon Courier</strong> — 60-second elimination contract. Clear the urban killhouse. Sprint, crouch, and engage hostiles with precision rifle. 15 kills to dominate.</p>
+      <div class="controls-grid">
+        <div><span class="kbd">WASD</span> Move</div>
+        <div><span class="kbd">SHIFT</span> Sprint</div>
+        <div><span class="kbd">CTRL</span> Crouch</div>
+        <div><span class="kbd">SPACE</span> Jump</div>
+        <div><span class="kbd">MOUSE</span> Look</div>
+        <div><span class="kbd">LMB</span> Fire</div>
+        <div><span class="kbd">R</span> Reload</div>
+        <div><span class="kbd">ESC</span> Pause</div>
+      </div>
+      <button id="btn-play" class="btn-primary">⚡ DEPLOY — CLICK TO LOCK</button>
+      <p class="hint">Tip: Headshots deal 2× damage. Watch minimap for red hostile pins. Reload behind cover.</p>
+      <div class="fidelity-note">Inspired by Black Ops 6 multiplayer reveal — PBR weapons, volumetric fog, muzzle physics, hit confirm, minimap & combat HUD.</div>
+    </div>
+  </div>
+
+  <div id="overlay-pause" class="overlay hidden">
+    <div class="overlay-inner">
+      <h2>PAUSED</h2>
+      <p>Pointer unlocked. Click to resume fire.</p>
+      <button id="btn-resume" class="btn-primary">RESUME</button>
+    </div>
+  </div>
+
+  <div id="overlay-end" class="overlay hidden">
+    <div class="overlay-inner">
+      <h2 id="end-title">MISSION COMPLETE</h2>
+      <p id="end-desc"></p>
+      <div class="end-stats">
+        <div><span>KILLS</span><strong id="end-kills">0</strong></div>
+        <div><span>SCORE</span><strong id="end-score">0</strong></div>
+        <div><span>ACCURACY</span><strong id="end-acc">0%</strong></div>
+        <div><span>TIME LEFT</span><strong id="end-time">0.0s</strong></div>
+      </div>
+      <button id="btn-restart" class="btn-primary">RE-DEPLOY — R</button>
+    </div>
+  </div>
+
+  <div id="weapon-info">M4A1 • OPTIC REFLEX • GRIP VERTICAL</div>
+  <div id="compass"><span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span></div>
 </div>
 <script type="module" src="./main.js"></script>
 </body>
