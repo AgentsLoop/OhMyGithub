@@ -35,7 +35,34 @@ body{
   position:sticky;top:0;z-index:10;
   flex-wrap:wrap;gap:12px;
 }
-.brand{display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.branch-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(255,211,77,0.18);
+  border:1px solid rgba(255,211,77,0.5);
+  color:var(--gold);
+  font-family:'JetBrains Mono',monospace;
+  font-size:14px;font-weight:800;letter-spacing:0.04em;
+  padding:7px 14px;border-radius:999px;
+  box-shadow:0 2px 12px rgba(255,211,77,0.25), 0 0 0 1px rgba(255,211,77,0.08) inset;
+  white-space:nowrap;
+  word-break:break-all;
+}
+.branch-hero{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,211,77,0.14);
+  border:1px solid rgba(255,211,77,0.38);
+  color:var(--gold);
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(13px,2.8vw,16px);font-weight:800;letter-spacing:0.04em;
+  padding:8px 16px;border-radius:999px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.25), 0 0 14px rgba(255,211,77,0.18);
+  word-break:break-all;
+}
+.branch-hero-label{
+  font-size:10px;letter-spacing:0.16em;color:var(--muted);font-weight:700;
+}
+.foot-branch{color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:700}
 .logo{
   width:38px;height:38px;display:grid;place-items:center;
   background:radial-gradient(circle at 35% 30%, #fff6c7 0%, #ffd34d 45%, #ff9a3d 100%);
