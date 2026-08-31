@@ -79,16 +79,45 @@ function setSeed(seedInput){
   }
   rng = mulberry32(currentSeed);
   updateSeedDisplay();
+  syncSeedToURL();
   return currentSeedStr;
 }
 function randomizeSeedAndApply(){
   setSeed(Math.floor(Math.random()*9000000)+1000000);
+}
+function syncSeedToURL(){
+  try{
+    const url = new URL(window.location.href);
+    url.searchParams.set('seed', currentSeedStr);
+    history.replaceState(null,'','?seed='+encodeURIComponent(currentSeedStr));
+  }catch(e){}
+}
+function copySeedLink(){
+  try{
+    const url = window.location.href;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url);
+    } else {
+      const ta=document.createElement('textarea'); ta.value=url; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    spawnFloater(W/2, H/2, 'LINK COPIED!', '#3cff8a');
+    eventAnnouncement={text:'🔗 SEED LINK COPIED', ttl:1.8, color:'#3cff8a'};
+  }catch(e){}
+}
+function tryLoadSeedFromURL(){
+  try{
+    const sp=new URLSearchParams(window.location.search);
+    const s=sp.get('seed');
+    if(s) setSeed(s);
+  }catch(e){}
 }
 function updateSeedDisplay(){
   const el = document.getElementById('seed-value');
   if(el) el.textContent = '#' + currentSeedStr;
   const el2 = document.getElementById('seed-value2');
   if(el2) el2.textContent = '#' + currentSeedStr;
+  const inp=document.getElementById('seed-input');
+  if(inp && document.activeElement!==inp) inp.placeholder=currentSeedStr;
 }
 // daily seed helper (YYYYMMDD)
 function dailySeedStr(){
@@ -108,36 +137,56 @@ function resetGame(){
   hitFlash = 0;
   drone = { x: 80, y: H/2, vx:0, vy:0, angle:0, hitCooldown:0 };
   exit = { x: W-90, y: H/2-50, open:false };
-  // random wall layout from seed
+  // random wall layout from seed (deterministic)
   applyWallsForSeed();
-  // reset random events
+  // reset random events — gameplay RNG uses sRand for determinism (VFX uses rand/Math.random separately)
   eventTimer = 0;
-  nextEventIn = rand(8,12);
+  nextEventIn = sRand(8,12);
   activeEvent = null;
   pulseSpeedBoost = 1;
   beaconSurgeUntil = 0;
   eventAnnouncement = {text:'', ttl:0};
-  // beacons random with wall collision checks (seeded)
+  // beacons random with wall collision checks (seeded) — never place inside walls
   for(let i=0;i<BEACON_COUNT;i++){
-    let x,y,tries=0;
+    let x,y,tries=0, ok=false;
     do{
       x = sRand(160, W-160);
       y = sRand(80, H-80);
       tries++;
-    } while((beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90) || collidesWalls(x,y, BEACON_R+8)) && tries<80);
+      const overlap = beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90);
+      const hitWall = collidesWalls(x,y, BEACON_R+8);
+      ok = !overlap && !hitWall;
+    } while(!ok && tries<80);
+    // if still not ok after 80, try up to 40 extra placements with relaxed distance
+    if(!ok){
+      for(let k=0;k<40 && !ok;k++){
+        x = sRand(160, W-160);
+        y = sRand(80, H-80);
+        if(!collidesWalls(x,y, BEACON_R+8)) ok=true;
+      }
+    }
+    if(!ok) continue; // skip broken placement rather than pushing inside wall
     beacons.push({x,y,collected:false, pulse: rng()*Math.PI*2});
+  }
+  // guarantee at least BEACON_COUNT beacons — fallback scan if some skipped
+  while(beacons.length < BEACON_COUNT){
+    let x = sRand(160,W-160), y=sRand(80,H-80);
+    if(!collidesWalls(x,y,BEACON_R+8) && !beacons.some(b=>Math.hypot(b.x-x,b.y-y)<60)){
+      beacons.push({x,y,collected:false, pulse:rng()*Math.PI*2});
+    }
   }
   // pulses: traffic — seeded positions with wall collision checks
   const laneYs = [110, 190, 290, 380, 460, 520];
   for(let i=0;i<PULSE_COUNT;i++){
     const ang = sRand(0, Math.PI*2);
     const spd = sRand(1.4, 2.2);
-    let px, py, tries=0;
+    let px, py, tries=0, ok=false;
     do{
       px = sRand(220, W-140);
       py = laneYs[i % laneYs.length] + sRand(-10,10);
       tries++;
-    } while(collidesWalls(px,py,PULSE_R+6) && tries<30);
+      ok = !collidesWalls(px,py,PULSE_R+6);
+    } while(!ok && tries<30);
     pulses.push({
       x: px,
       y: py,
@@ -240,6 +289,7 @@ document.getElementById('btn-apply-seed')?.addEventListener('click', ()=>{
   const inp=document.getElementById('seed-input');
   if(inp){ setSeed(inp.value); startPlaying(); }
 });
+document.getElementById('btn-copy-seed')?.addEventListener('click', copySeedLink);
 // allow Enter in seed input
 document.getElementById('seed-input')?.addEventListener('keydown', e=>{
   if(e.key==='Enter'){ e.preventDefault(); setSeed(e.target.value); startPlaying(); }
@@ -280,7 +330,7 @@ function startPlaying(){
   setState('playing');
 }
 
-// walls — 3 preset configurations for seeded random maps
+// walls — 8 preset configurations for seeded random maps + procedural extras
 const OUTER_WALLS = [
   {x:0,y:0,w:W,h:10},
   {x:0,y:H-10,w:W,h:10},
@@ -340,20 +390,106 @@ const WALL_PRESETS = [
     {x:250,y:520,w:90,h:14},
     {x:500,y:500,w:90,h:14},
   ],
+  // 3: Cross — central hub
+  [
+    {x:200,y:130,w:560,h:14},
+    {x:470,y:50,w:14,h:200},
+    {x:180,y:360,w:600,h:14},
+    {x:300,y:460,w:14,h:120},
+    {x:650,y:420,w:14,h:120},
+    {x:120,y:200,w:14,h:160},
+    {x:820,y:140,w:14,h:180},
+    {x:140,y:480,w:200,h:14},
+    {x:500,y:500,w:140,h:14},
+    {x:400,y:260,w:180,h:14},
+  ],
+  // 4: Spiral — winding path
+  [
+    {x:140,y:80,w:680,h:14},
+    {x:810,y:80,w:14,h:400},
+    {x:140,y:470,w:680,h:14},
+    {x:140,y:80,w:14,h:200},
+    {x:280,y:190,w:400,h:14},
+    {x:680,y:190,w:14,h:200},
+    {x:280,y:380,w:400,h:14},
+    {x:280,y:190,w:14,h:190},
+    {x:400,y:270,w:200,h:14},
+  ],
+  // 5: Dense Grid
+  [
+    {x:160,y:90,w:14,h:140},
+    {x:320,y:90,w:14,h:140},
+    {x:480,y:90,w:14,h:140},
+    {x:640,y:90,w:14,h:140},
+    {x:160,y:300,w:14,h:140},
+    {x:320,y:300,w:14,h:140},
+    {x:480,y:300,w:14,h:140},
+    {x:640,y:300,w:14,h:140},
+    {x:120,y:210,w:560,h:14},
+    {x:120,y:420,w:560,h:14},
+    {x:800,y:210,w:14,h:210},
+  ],
+  // 6: Split — two halves
+  [
+    {x:460,y:40,w:14,h:240},
+    {x:460,y:360,w:14,h:240},
+    {x:120,y:140,w:200,h:14},
+    {x:600,y:160,w:180,h:14},
+    {x:150,y:320,w:180,h:14},
+    {x:580,y:300,w:160,h:14},
+    {x:120,y:480,w:200,h:14},
+    {x:620,y:460,w:180,h:14},
+    {x:200,y:220,w:14,h:100},
+    {x:700,y:380,w:14,h:90},
+  ],
+  // 7: Chaos — asymmetric
+  [
+    {x:130,y:110,w:220,h:14},
+    {x:500,y:70,w:14,h:180},
+    {x:620,y:140,w:160,h:14},
+    {x:750,y:200,w:14,h:140},
+    {x:180,y:260,w:14,h:180},
+    {x:300,y:320,w:220,h:14},
+    {x:650,y:280,w:100,h:100},
+    {x:130,y:460,w:140,h:14},
+    {x:420,y:420,w:14,h:120},
+    {x:560,y:480,w:180,h:14},
+    {x:820,y:380,w:14,h:120},
+  ],
 ];
 let walls = [...OUTER_WALLS, ...WALL_PRESETS[0]];
 let currentPresetIdx = 0;
+let proceduralWalls = [];
 function applyWallsForSeed(){
   currentPresetIdx = Math.floor(rng()*WALL_PRESETS.length);
-  walls = [...OUTER_WALLS, ...WALL_PRESETS[currentPresetIdx]];
+  const base = [...WALL_PRESETS[currentPresetIdx]];
+  // procedural extras: 0-3 additional random blocks seeded (deterministic per seed)
+  proceduralWalls = [];
+  const extraCount = Math.floor(sRand(0, 4)); // 0..3
+  for(let i=0;i<extraCount;i++){
+    const w = sRandInt(60, 140);
+    const h = sRandInt(14, 14)===14 ? 14 : sRandInt(60,100); // mostly horizontal bars
+    const x = sRandInt(90, W-90-w);
+    const y = sRandInt(70, H-90-h);
+    // avoid spawn (80,320) and exit (870,320) zones
+    if(Math.hypot(x+ w/2 - 80, y+ h/2 - H/2) < 110) continue;
+    if(Math.hypot(x+ w/2 - (W-50), y+ h/2 - H/2) < 120) continue;
+    // avoid overlapping existing walls too much
+    let overlaps=false;
+    for(const ow of base){ if(!(x+w < ow.x || x > ow.x+ow.w || y+h < ow.y || y > ow.y+ow.h) && !(w===14||h===14)) { /* allow crossing bars */ } }
+    proceduralWalls.push({x,y,w,h});
+    base.push({x,y,w,h});
+  }
+  walls = [...OUTER_WALLS, ...base];
 }
 function collidesWalls(x,y,r){
   return walls.some(w=> rectCollideCircle(w.x,w.y,w.w,w.h, x,y,r));
 }
 
 // ---- Random Events System ----
+// gameplay RNG: use sRand/rng for determinism; VFX (shake/particles) may use rand/Math.random
 let eventTimer = 0;
-let nextEventIn = rand(8,12);
+let nextEventIn = 9; // overwritten seeded in resetGame
 let activeEvent = null; // {type, ttl}
 let pulseSpeedBoost = 1;
 let beaconSurgeUntil = 0;
@@ -471,12 +607,12 @@ function update(dt){
     }
   });
 
-  // random events timer (8-12s)
+  // random events timer (8-12s) — seeded determinism
   eventTimer += dt;
   if(eventTimer >= nextEventIn){
     triggerRandomEvent();
     eventTimer = 0;
-    nextEventIn = rand(8,12);
+    nextEventIn = sRand(8,12);
   }
   if(activeEvent){
     activeEvent.ttl -= dt;
@@ -913,10 +1049,11 @@ function render(t){
   ctx.restore(); // shake restore
 }
 
+tryLoadSeedFromURL();
 updateSeedDisplay();
 resetGame();
 setState('start');
 requestAnimationFrame(loop);
 
 // expose for tests
-window.__game = { resetGame, startPlaying, getState:()=>state, getScore:()=>score, getBeacons:()=>beacons, getSeed:()=>currentSeedStr, setSeed, getWalls:()=>walls, getPreset:()=>currentPresetIdx, triggerRandomEvent, W,H, WALL_PRESETS };
+window.__game = { resetGame, startPlaying, getState:()=>state, getScore:()=>score, getBeacons:()=>beacons, getSeed:()=>currentSeedStr, setSeed, getWalls:()=>walls, getPreset:()=>currentPresetIdx, triggerRandomEvent, copySeedLink, dailySeedStr, W,H, WALL_PRESETS };
