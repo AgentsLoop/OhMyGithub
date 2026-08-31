@@ -1,4 +1,4 @@
-// Neon Courier — 2D Canvas Game
+// Neon Courier — 2D Canvas Game (seeded randomization edition)
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const elScore = document.getElementById('score');
@@ -23,6 +23,50 @@ const GAME_TIME = 60;
 const BEACON_COUNT = 5;
 const PULSE_COUNT = 6;
 
+// --- Seeded randomization system ---
+let currentSeed = (Date.now() & 0xffffffff) >>> 0;
+if (currentSeed === 0) currentSeed = 123456789;
+
+function mulberry32(seed) {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let rng = mulberry32(currentSeed);
+
+function seededRand(a, b) { return rng() * (b - a) + a; }
+function seededRandInt(a, b) { return Math.floor(rng() * (b - a + 1)) + a; }
+
+function generateNewSeed() {
+  // Use Date.now() mixed with Math.random for strong variety
+  const t = Date.now() >>> 0;
+  const r = Math.floor(Math.random() * 0xFFFFFFFF) >>> 0;
+  currentSeed = (t ^ r ^ Math.floor(Math.random() * 1e9)) >>> 0;
+  if (currentSeed === 0) currentSeed = 0x9E3779B9;
+  rng = mulberry32(currentSeed);
+  updateSeedDisplay();
+}
+
+function setSeed(newSeed) {
+  currentSeed = newSeed >>> 0;
+  if (currentSeed === 0) currentSeed = 1;
+  rng = mulberry32(currentSeed);
+  updateSeedDisplay();
+}
+
+function updateSeedDisplay() {
+  const el = document.getElementById('seed-value');
+  if (el) el.textContent = String(currentSeed);
+  const el2 = document.getElementById('seed-value-start');
+  if (el2) el2.textContent = String(currentSeed);
+  const el3 = document.getElementById('seed-card-value');
+  if (el3) el3.textContent = String(currentSeed);
+}
+
+// expose currentSeed globally for debugging/tests
 let state = 'start'; // start, playing, paused, won, lost
 let score = 0;
 let timeLeft = GAME_TIME;
@@ -34,14 +78,124 @@ let trail = []; // drone trail positions
 let shake = 0;
 let hitFlash = 0;
 let exit = { x: W-90, y: H/2-50, open:false };
-let drone = { x: 80, y: H/2, vx:0, vy:0, angle:0, hitCooldown:0 };
+let drone = { x: 80, y: H/2, vx:0, vy:0, angle:0, hitCooldown:0, shieldTime:0 };
 
 const keys = new Set();
 let touchDir = {x:0, y:0};
 
 function rand(a,b){ return Math.random()*(b-a)+a; }
 
+// power-ups: shield (temporary invuln, cyan) and time bonus (+5s, yellow)
+let powerUps = [];
+let powerUpTimer = 0;
+let nextSpawnInterval = 9;
+
+const POWERUP_R = 13;
+
+// walls — multiple layout variants (randomly pick one per game)
+const WALL_VARIANTS = [
+  // Variant 0 — original dense maze
+  [
+    {x:0,y:0,w:W,h:10},
+    {x:0,y:H-10,w:W,h:10},
+    {x:0,y:0,w:10,h:H},
+    {x:W-10,y:0,w:10,h:H},
+    {x:150,y:90,w:180,h:14},
+    {x:420,y:50,w:14,h:130},
+    {x:520,y:120,w:190,h:14},
+    {x:740,y:90,w:14,h:140},
+    {x:100,y:200,w:14,h:120},
+    {x:190,y:300,w:180,h:14},
+    {x:470,y:200,w:14,h:120},
+    {x:390,y:250,w:140,h:14},
+    {x:600,y:290,w:160,h:14},
+    {x:160,y:400,w:14,h:100},
+    {x:120,y:460,w:180,h:14},
+    {x:380,y:400,w:160,h:14},
+    {x:620,y:400,w:14,h:130},
+    {x:420,y:520,w:260,h:14},
+    {x:800,y:380,w:14,h:150},
+    {x:40,y:380,w:90,h:14},
+  ],
+  // Variant 1 — open grid (sparse, faster lanes)
+  [
+    {x:0,y:0,w:W,h:10},
+    {x:0,y:H-10,w:W,h:10},
+    {x:0,y:0,w:10,h:H},
+    {x:W-10,y:0,w:10,h:H},
+    {x:180,y:100,w:220,h:14},
+    {x:550,y:80,w:14,h:180},
+    {x:120,y:280,w:240,h:14},
+    {x:500,y:320,w:240,h:14},
+    {x:200,y:440,w:14,h:120},
+    {x:380,y:480,w:300,h:14},
+    {x:760,y:300,w:14,h:170},
+    {x:60,y:400,w:110,h:14},
+    {x:400,y:170,w:14,h:100},
+    {x:650,y:130,w:140,h:14},
+  ],
+  // Variant 2 — canyon vertical channels
+  [
+    {x:0,y:0,w:W,h:10},
+    {x:0,y:H-10,w:W,h:10},
+    {x:0,y:0,w:10,h:H},
+    {x:W-10,y:0,w:10,h:H},
+    {x:140,y:70,w:14,h:180},
+    {x:140,y:70,w:220,h:14},
+    {x:500,y:50,w:210,h:14},
+    {x:700,y:50,w:14,h:170},
+    {x:100,y:340,w:260,h:14},
+    {x:450,y:260,w:14,h:210},
+    {x:620,y:360,w:210,h:14},
+    {x:620,y:360,w:14,h:170},
+    {x:180,y:500,w:230,h:14},
+    {x:750,y:300,w:14,h:150},
+    {x:360,y:140,w:14,h:90},
+    {x:760,y:200,w:100,h:14},
+  ],
+  // Variant 3 — fragmented blocks (extra variety)
+  [
+    {x:0,y:0,w:W,h:10},
+    {x:0,y:H-10,w:W,h:10},
+    {x:0,y:0,w:10,h:H},
+    {x:W-10,y:0,w:10,h:H},
+    {x:130,y:110,w:160,h:14},
+    {x:360,y:70,w:14,h:150},
+    {x:500,y:90,w:170,h:14},
+    {x:720,y:100,w:14,h:200},
+    {x:110,y:260,w:14,h:110},
+    {x:180,y:340,w:150,h:14},
+    {x:430,y:270,w:180,h:14},
+    {x:620,y:220,w:14,h:120},
+    {x:140,y:430,w:14,h:110},
+    {x:100,y:480,w:200,h:14},
+    {x:400,y:430,w:140,h:14},
+    {x:640,y:430,w:14,h:130},
+    {x:460,y:540,w:220,h:14},
+    {x:800,y:400,w:14,h:120},
+  ],
+];
+
+let walls = WALL_VARIANTS[0].map(w=>({...w}));
+let wallVariantIndex = 0;
+
+function rectCollideCircle(rx,ry,rw,rh, cx,cy, r){
+  const nx = Math.max(rx, Math.min(cx, rx+rw));
+  const ny = Math.max(ry, Math.min(cy, ry+rh));
+  const dx=cx-nx, dy=cy-ny;
+  return dx*dx+dy*dy < r*r;
+}
+
+function beaconOverlapsWalls(x,y){
+  for(const w of walls){
+    if(rectCollideCircle(w.x,w.y,w.w,w.h, x,y, BEACON_R+10)) return true;
+  }
+  return false;
+}
+
 function resetGame(){
+  // deterministic reseed — reproducible per seed
+  rng = mulberry32(currentSeed);
   score = 0;
   timeLeft = GAME_TIME;
   beacons = [];
@@ -51,29 +205,46 @@ function resetGame(){
   trail = [];
   shake = 0;
   hitFlash = 0;
-  drone = { x: 80, y: H/2, vx:0, vy:0, angle:0, hitCooldown:0 };
+  drone = { x: 80, y: H/2, vx:0, vy:0, angle:0, hitCooldown:0, shieldTime:0 };
   exit = { x: W-90, y: H/2-50, open:false };
-  // beacons random but not too close to spawn or exit
+  powerUps = [];
+  powerUpTimer = 0;
+  nextSpawnInterval = seededRand(8,10);
+
+  // wall variant selection (seeded)
+  wallVariantIndex = seededRandInt(0, WALL_VARIANTS.length-1);
+  walls = WALL_VARIANTS[wallVariantIndex].map(w=>({...w}));
+
+  const spawnX = 80, spawnY = H/2;
+  const exitCX = exit.x + EXIT_W/2, exitCY = exit.y + EXIT_H/2;
+
+  // beacons random but not too close to spawn or exit, and avoid wall overlaps — seeded RNG
   for(let i=0;i<BEACON_COUNT;i++){
     let x,y,tries=0;
     do{
-      x = rand(160, W-160);
-      y = rand(80, H-80);
+      x = seededRand(160, W-160);
+      y = seededRand(80, H-80);
       tries++;
-    } while(beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90) && tries<50);
-    beacons.push({x,y,collected:false, pulse: Math.random()*Math.PI*2});
+      const nearOther = beacons.some(b=>Math.hypot(b.x-x,b.y-y)<90);
+      const nearSpawn = Math.hypot(x-spawnX, y-spawnY) < 70;
+      const nearExit = Math.hypot(x-exitCX, y-exitCY) < 80;
+      const onWall = beaconOverlapsWalls(x,y);
+      if(!nearOther && !nearSpawn && !nearExit && !onWall) break;
+      // if wall overlap forced, try again until tries exhausted
+    } while(tries<80);
+    beacons.push({x,y,collected:false, pulse: seededRand(0, Math.PI*2)});
   }
-  // pulses: traffic — now faster with light chase for threat (2.5× speed + steering)
+  // pulses: traffic — use seeded RNG for positions, lanes/speeds
   const laneYs = [110, 190, 290, 380, 460, 520];
   for(let i=0;i<PULSE_COUNT;i++){
-    const ang = rand(0, Math.PI*2);
-    const spd = rand(1.4, 2.2);
+    const ang = seededRand(0, Math.PI*2);
+    const spd = seededRand(1.4, 2.2);
     pulses.push({
-      x: rand(220, W-140),
-      y: laneYs[i % laneYs.length] + rand(-10,10),
+      x: seededRand(220, W-140),
+      y: laneYs[i % laneYs.length] + seededRand(-16,16),
       vx: Math.cos(ang)*spd,
       vy: Math.sin(ang)*spd,
-      phase: Math.random()*Math.PI*2,
+      phase: seededRand(0, Math.PI*2),
       baseX: 0,
       baseY: 0
     });
@@ -81,6 +252,7 @@ function resetGame(){
     pulses[i].baseY = pulses[i].y;
   }
   updateHUD();
+  updateSeedDisplay();
 }
 
 const elBeaconDots = document.getElementById('beacon-dots');
@@ -132,6 +304,7 @@ function updateHUD(){
     elTimer.style.textShadow='';
     elTimer.classList.remove('urgent');
   }
+  updateSeedDisplay();
 }
 
 function spawnParticles(x,y,color,count=10){
@@ -143,6 +316,38 @@ function spawnFloater(x,y,text,color){
   floaters.push({x,y,text,color, life:1, vy:-42});
 }
 
+// --- Power-up helpers ---
+function isPowerUpPosValid(x,y){
+  // avoid walls, spawn, exit
+  for(const w of walls){
+    if(rectCollideCircle(w.x,w.y,w.w,w.h, x,y, POWERUP_R+8)) return false;
+  }
+  if(Math.hypot(x-drone.x, y-drone.y) < 60) return false;
+  if(Math.hypot(x-(exit.x+EXIT_W/2), y-(exit.y+EXIT_H/2)) < 70) return false;
+  if(beacons.some(b=> !b.collected && Math.hypot(b.x-x, b.y-y)< 60)) return false;
+  if(powerUps.some(p=> Math.hypot(p.x-x, p.y-y)< 70)) return false;
+  return true;
+}
+
+function spawnRandomPowerUp(){
+  if(powerUps.length >= 2) return;
+  let x,y,tries=0;
+  do{
+    x = seededRand(140, W-140);
+    y = seededRand(70, H-70);
+    // also use Math.random as fallback for extra variety if seeded loop exhausted
+    if(tries>40){
+      x = rand(140, W-140);
+      y = rand(70, H-70);
+    }
+    tries++;
+  } while(!isPowerUpPosValid(x,y) && tries<80);
+  const type = rng() < 0.5 ? 'shield' : 'time';
+  // ensure at least one of each if only one left? random is fine
+  powerUps.push({x,y, type, phase: seededRand(0, Math.PI*2)});
+  spawnParticles(x,y, type==='shield' ? '#38e6ff' : '#ffd93d', 10);
+}
+
 // Input
 window.addEventListener('keydown', e=>{
   const k=e.key.toLowerCase();
@@ -150,7 +355,7 @@ window.addEventListener('keydown', e=>{
   keys.add(k);
   if(k==='p' && state==='playing'){ setState('paused'); }
   else if(k==='p' && state==='paused'){ setState('playing'); }
-  if(k==='r'){ startPlaying(); }
+  if(k==='r'){ randomizeAndRestart(); }
   if(k===' ' || k==='enter'){
     if(state==='start' || state==='won' || state==='lost') startPlaying();
     else if(state==='paused') setState('playing');
@@ -160,6 +365,16 @@ window.addEventListener('keyup', e=> keys.delete(e.key.toLowerCase()));
 document.getElementById('btn-start').onclick = ()=> startPlaying();
 document.getElementById('btn-resume').onclick = ()=> setState('playing');
 document.getElementById('btn-restart').onclick = ()=> startPlaying();
+
+// randomize button
+const btnRandomize = document.getElementById('btn-randomize');
+if(btnRandomize){
+  btnRandomize.onclick = ()=> randomizeAndRestart();
+}
+const btnRandomizeStart = document.getElementById('btn-randomize-start');
+if(btnRandomizeStart){
+  btnRandomizeStart.onclick = ()=> randomizeAndRestart();
+}
 
 // Touch
 const touchWrap=document.getElementById('touch');
@@ -195,37 +410,10 @@ function startPlaying(){
   resetGame();
   setState('playing');
 }
-
-// walls — neon city blocks (denser maze for Pac-Man routing pressure + Gear Wars enclosure)
-const walls = [
-  {x:0,y:0,w:W,h:10},
-  {x:0,y:H-10,w:W,h:10},
-  {x:0,y:0,w:10,h:H},
-  {x:W-10,y:0,w:10,h:H},
-  // interlocking maze — forces corridors
-  {x:150,y:90,w:180,h:14},
-  {x:420,y:50,w:14,h:130},
-  {x:520,y:120,w:190,h:14},
-  {x:740,y:90,w:14,h:140},
-  {x:100,y:200,w:14,h:120},
-  {x:190,y:300,w:180,h:14},
-  {x:470,y:200,w:14,h:120},
-  {x:390,y:250,w:140,h:14},
-  {x:600,y:290,w:160,h:14},
-  {x:160,y:400,w:14,h:100},
-  {x:120,y:460,w:180,h:14},
-  {x:380,y:400,w:160,h:14},
-  {x:620,y:400,w:14,h:130},
-  {x:420,y:520,w:260,h:14},
-  {x:800,y:380,w:14,h:150},
-  {x:40,y:380,w:90,h:14},
-];
-
-function rectCollideCircle(rx,ry,rw,rh, cx,cy, r){
-  const nx = Math.max(rx, Math.min(cx, rx+rw));
-  const ny = Math.max(ry, Math.min(cy, ry+rh));
-  const dx=cx-nx, dy=cy-ny;
-  return dx*dx+dy*dy < r*r;
+function randomizeAndRestart(){
+  generateNewSeed();
+  resetGame();
+  setState('playing');
 }
 
 let last=performance.now();
@@ -243,6 +431,21 @@ function update(dt){
     timeLeft=0;
     fail('Time expired — signal lost');
     return;
+  }
+  // shield timer
+  if(drone.shieldTime>0){
+    drone.shieldTime -= dt;
+    if(drone.shieldTime<0) drone.shieldTime=0;
+  }
+  // power-up spawning: every ~8-10s if <2 on field
+  powerUpTimer += dt;
+  if(powerUpTimer >= nextSpawnInterval){
+    powerUpTimer = 0;
+    nextSpawnInterval = seededRand(8,10);
+    if(powerUps.length < 2){
+      // 70% chance to spawn when timer elapses to keep randomness
+      if(rng() < 0.85) spawnRandomPowerUp();
+    }
   }
   // input
   let ax=0, ay=0;
@@ -306,6 +509,31 @@ function update(dt){
     }
   });
 
+  // power-up collection
+  powerUps.forEach((p, idx)=>{
+    p.phase += dt*2.2;
+    if(Math.hypot(p.x-drone.x, p.y-drone.y) < POWERUP_R + PLAYER_R){
+      if(p.type==='shield'){
+        drone.shieldTime = 5;
+        score += 50;
+        spawnParticles(p.x,p.y,'#38e6ff',18);
+        spawnFloater(p.x, p.y-18, 'SHIELD +50', '#38e6ff');
+        shake = Math.max(shake,5);
+      } else {
+        timeLeft += 5;
+        // cap to avoid infinite stacking but allow bonus
+        if(timeLeft > GAME_TIME + 15) timeLeft = GAME_TIME + 15;
+        score += 25;
+        spawnParticles(p.x,p.y,'#ffd93d',18);
+        spawnFloater(p.x, p.y-18, '+5s +25', '#ffd93d');
+        shake = Math.max(shake,3);
+      }
+      triggerScorePop();
+      powerUps.splice(idx,1);
+      updateHUD();
+    }
+  });
+
   // pulses movement — faster drift + light chase when near player
   pulses.forEach(p=>{
     // light homing when within 190px (makes them feel alive without being unfair)
@@ -334,12 +562,22 @@ function update(dt){
     }
   });
 
-  // drone vs pulses
+  // drone vs pulses (shield grants invuln)
   if(drone.hitCooldown>0) drone.hitCooldown-=dt;
   if(hitFlash>0) hitFlash-=dt;
+  const isShielded = drone.shieldTime > 0;
   pulses.forEach(p=>{
     if(Math.hypot(p.x-drone.x, p.y-drone.y) < PULSE_R+PLAYER_R -2){
       if(drone.hitCooldown<=0){
+        if(isShielded){
+          // shield blocks damage, just bounce and particles
+          spawnParticles(p.x,p.y,'#38e6ff',10);
+          const ang=Math.atan2(drone.y-p.y, drone.x-p.x);
+          drone.vx+=Math.cos(ang)*180;
+          drone.vy+=Math.sin(ang)*180;
+          drone.hitCooldown=0.35;
+          return;
+        }
         score=Math.max(0, score-50);
         timeLeft=Math.max(0, timeLeft-2);
         spawnParticles(drone.x, drone.y, '#ff2e7a',12);
@@ -544,6 +782,35 @@ function render(t){
     ctx.restore();
   });
 
+  // power-ups
+  powerUps.forEach(p=>{
+    const bob = Math.sin(p.phase)*4;
+    ctx.save();
+    const isShield = p.type==='shield';
+    const col = isShield ? '#38e6ff' : '#ffd93d';
+    const glow = isShield ? 'rgba(56,230,255,0.9)' : 'rgba(255,217,61,0.9)';
+    ctx.shadowColor = glow; ctx.shadowBlur = 18;
+    ctx.fillStyle = isShield ? 'rgba(56,230,255,0.18)' : 'rgba(255,217,61,0.18)';
+    ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R+10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = col;
+    ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,0.95)';
+    ctx.font='700 13px JetBrains Mono,monospace';
+    ctx.textAlign='center';
+    ctx.fillText(isShield ? '◈' : '+', p.x, p.y+bob+4.5);
+    // outer ring pulse
+    ctx.strokeStyle = isShield ? 'rgba(56,230,255,0.55)' : 'rgba(255,217,61,0.55)';
+    ctx.lineWidth=1.7;
+    ctx.beginPath(); ctx.arc(p.x, p.y+bob, POWERUP_R+6+Math.sin(p.phase*1.6)*2,0,Math.PI*2); ctx.stroke();
+    // label tiny
+    ctx.font='600 7px JetBrains Mono,monospace';
+    ctx.fillStyle = isShield ? '#b6f6ff' : '#fff3a0';
+    ctx.fillText(isShield ? 'SHIELD' : '+5S', p.x, p.y+bob+POWERUP_R+12);
+    ctx.restore();
+  });
+
   // pulses — Geometry Wars double-glow for instant hazard read
   pulses.forEach(p=>{
     ctx.save();
@@ -602,9 +869,16 @@ function render(t){
   ctx.save();
   ctx.translate(drone.x, drone.y);
   ctx.rotate(drone.angle);
-  // glow
+  // glow — shield adds cyan halo
+  if(drone.shieldTime>0){
+    ctx.shadowColor='#38e6ff'; ctx.shadowBlur=22;
+    ctx.strokeStyle='rgba(56,230,255,0.85)';
+    ctx.lineWidth=2.2;
+    ctx.beginPath(); ctx.arc(0,0, PLAYER_R+10 + Math.sin(nowTick*0.008)*2,0,Math.PI*2); ctx.stroke();
+    ctx.shadowBlur=0;
+  }
   ctx.shadowColor='#38e6ff'; ctx.shadowBlur=18;
-  ctx.fillStyle= drone.hitCooldown>0 ? 'rgba(255,100,100,0.9)' : '#eaf6ff';
+  ctx.fillStyle= drone.hitCooldown>0 ? 'rgba(255,100,100,0.9)' : (drone.shieldTime>0 ? '#b6f6ff' : '#eaf6ff');
   // body
   ctx.beginPath();
   // drone shape: hexagon + wings
@@ -612,14 +886,17 @@ function render(t){
   ctx.fill();
   ctx.shadowBlur=0;
   // cockpit
-  ctx.fillStyle='#38e6ff';
+  ctx.fillStyle= drone.shieldTime>0 ? '#38e6ff' : '#38e6ff';
   ctx.beginPath(); ctx.arc(6,0,5,0,Math.PI*2); ctx.fill();
+  if(drone.shieldTime>0){
+    ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1; ctx.stroke();
+  }
   // thruster
   const thrust = Math.hypot(drone.vx,drone.vy)/220;
   ctx.fillStyle=`rgba(56,230,255,${0.4+thrust*0.6})`;
   ctx.beginPath(); ctx.moveTo(-16,0); ctx.lineTo(-22- thrust*8, -6); ctx.lineTo(-22- thrust*8, 6); ctx.closePath(); ctx.fill();
   // hit flash
-  if(drone.hitCooldown>0){
+  if(drone.hitCooldown>0 && drone.shieldTime<=0){
     ctx.strokeStyle='rgba(255,46,122,0.9)'; ctx.lineWidth=2; ctx.stroke();
   }
   ctx.restore();
@@ -658,6 +935,15 @@ function render(t){
     ctx.restore();
   }
 
+  // shield vignette subtle
+  if(drone.shieldTime>0){
+    ctx.save();
+    ctx.globalAlpha = 0.06 + Math.sin(nowTick*0.008)*0.03;
+    ctx.strokeStyle='#38e6ff'; ctx.lineWidth=10;
+    ctx.strokeRect(0,0,W,H);
+    ctx.restore();
+  }
+
   // timer bar — urgency pulse
   const pct=Math.max(0, timeLeft/GAME_TIME);
   ctx.fillStyle='rgba(0,0,0,0.55)';
@@ -681,4 +967,5 @@ setState('start');
 requestAnimationFrame(loop);
 
 // expose for tests
-window.__game = { resetGame, getState:()=>state, getScore:()=>score, getBeacons:()=>beacons, W,H };
+window.__game = { resetGame, getState:()=>state, getScore:()=>score, getBeacons:()=>beacons, W,H, getSeed:()=>currentSeed, setSeed, generateNewSeed, getWalls:()=>walls, getWallVariant:()=>wallVariantIndex, getPowerUps:()=>powerUps, WALL_VARIANTS, mulberry32 };
+updateSeedDisplay();

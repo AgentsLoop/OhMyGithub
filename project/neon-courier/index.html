@@ -20,6 +20,7 @@
       <div class="hud-item beacons-hud"><span class="hud-label">BEACONS</span><span class="hud-value" id="beacons">0 / 5</span><div class="beacon-dots" id="beacon-dots" aria-hidden="true"></div></div>
       <div class="hud-item"><span class="hud-label">TIME</span><span class="hud-value" id="timer">60.0</span></div>
       <div class="hud-item status" id="status-wrap"><span class="hud-label">STATUS</span><span class="hud-value" id="status">FLY</span></div>
+      <div class="hud-item seed-hud"><span class="hud-label">SEED</span><span class="hud-value seed-value" id="seed-value">—</span><button id="btn-randomize" class="btn-randomize" title="New random map (R)">RANDOMIZE — R</button></div>
     </div>
   </header>
 
@@ -44,7 +45,8 @@
           </ul>
         </div>
         <button id="btn-start" class="btn primary">LAUNCH DRONE — SPACE</button>
-        <p class="hint">Tip: pulses are slow but swarm. Use walls to cut LOS.</p>
+        <div class="seed-row">SEED <span id="seed-value-start">—</span> <button id="btn-randomize-start" class="btn small">NEW MAP — R</button></div>
+        <p class="hint">Tip: pulses are slow but swarm. Use walls to cut LOS. Press R for new random map.</p>
       </div>
 
       <div id="overlay-pause" class="overlay hidden">
@@ -79,6 +81,11 @@
           <div><i class="swatch s-pulse"></i> Traffic Pulse</div>
           <div><i class="swatch s-exit"></i> Exit</div>
           <div><i class="swatch s-drone"></i> You</div>
+          <div><i class="swatch s-shield"></i> Shield (cyan)</div>
+          <div><i class="swatch s-time"></i> +5s (yellow)</div>
+        </div>
+        <div class="seed-card">
+          <span>Current Seed</span><strong id="seed-card-value">—</strong>
         </div>
       </div>
       <div class="card controls">
