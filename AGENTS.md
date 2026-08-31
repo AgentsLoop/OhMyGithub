@@ -12,6 +12,14 @@
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
 In issue comments and workflow instructions, `oc` means OpenCode.
 
+The local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md) must
+stay aligned with this workflow. Its kickoff procedure creates a fresh issue
+with the `OpenCode` label (and `Goal` by default), does not use `/omg` or
+comments as triggers, and waits only for the initial OpenCode session link.
+Execution is limited to an issue opened with `OpenCode` or the `OpenCode` label
+being added to an existing issue; edits, comments, and unrelated labels must
+not be documented as triggers.
+
 ## Ideas
 
 Store durable implementation ideas as individual Markdown files under
@@ -51,8 +59,9 @@ The issue-triggered workflow uses `opencode/muse-spark-1.2-contributor-free` and
 token. It does not require an `OPENCODE_API_KEY` repository secret. When workflow steps call
 the GitHub API, use the authenticated `GITHUB_TOKEN`; do not rely on unauthenticated API requests.
 
-Trigger it by adding the `OpenCode` label to an issue. If the label is absent,
-the workflow replies asking for it. Add
+Trigger it by opening an issue with the `OpenCode` label or adding that label to
+an existing issue. If the label is absent on a newly opened issue, the workflow
+replies asking for it. Add
 the `Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 
