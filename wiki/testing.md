@@ -45,7 +45,8 @@ runs.
 
 For custom-branch support, create an issue whose first body line is
 `branch: <existing-branch>`. Confirm the App strips the directive from the
-OpenCode request and forwards that branch for checkout and pull-request base.
+OpenCode request and dispatches the workflow from that branch for checkout and
+pull-request base.
 A missing or syntactically invalid branch must receive an issue comment and must
 not start the reusable pipeline. The repository-local workflow must remain
 dispatch-only so the App is the sole issue-event router.

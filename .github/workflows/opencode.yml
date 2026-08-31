@@ -20,9 +20,6 @@ on:
       sender:
         description: GitHub login that submitted the request
         required: true
-      target_ref:
-        description: Target checkout and pull-request base branch
-        required: true
 permissions:
   contents: write
   issues: write
@@ -33,7 +30,6 @@ jobs:
   opencode:
     uses: ./.github/workflows/opencode-reusable.yml
     with:
-      target_ref: ${{ inputs.target_ref }}
       issue_number: ${{ inputs.issue_number }}
       request: ${{ inputs.request }}
       issue_title: ${{ inputs.issue_title }}
