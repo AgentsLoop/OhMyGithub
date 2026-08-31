@@ -9,9 +9,15 @@ description: Start the issue-triggered workflow from the caller's prompt, wait f
 
 GitHub uses the term **label**. The required execution label is exactly
 `OpenCode`. Create the issue with that label, or add it to an existing issue;
-do not use `/omg`, comments, edits, or the word “tag” as a trigger. The
+do not use comments, edits, or the word “tag” as a trigger. The
 workflow executes once for the issue-opened event or once when `OpenCode` is
 added.
+
+When the caller explicitly requests a custom branch, prepend
+`branch: <existing-branch>` and a blank line to the issue body. Treat that line
+as routing metadata rather than part of the caller's implementation prompt.
+Verify the branch exists before creating the issue. Otherwise omit the directive
+and use the repository default branch.
 
 Use this skill when the user asks to start the issue-triggered workflow with a
 request or create an issue. Treat the user's next message after invoking this

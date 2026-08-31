@@ -11,15 +11,16 @@
 ## Main project file
 
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
-In issue comments and workflow instructions, `oc` means OpenCode.
 
 The local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md) must
 stay aligned with this workflow. Its kickoff procedure creates a fresh issue
-with the `OpenCode` label (and `Goal` by default), does not use `/omg` or
-comments as triggers, and waits only for the initial OpenCode session link.
+with the `OpenCode` label (and `Goal` by default), does not use comments as
+triggers, and waits only for the initial OpenCode session link.
 Execution is limited to an issue opened with `OpenCode` or the `OpenCode` label
 being added to an existing issue; edits, comments, and unrelated labels must
 not be documented as triggers.
+An optional first issue-body line `branch: <existing-branch>` selects the target
+checkout and pull-request base; without it, the default branch is used.
 
 ## Ideas
 

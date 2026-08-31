@@ -61,6 +61,22 @@ Requirements:
 
 That is the whole user-facing workflow. GitHub Actions handles the runner, OpenCode handles implementation, and the workflow handles the verification and pull request.
 
+To run against an existing non-default branch, put a `branch: <name>` directive
+on the first line. The directive selects the checkout and pull-request base and
+is removed before the remaining issue body is sent to OpenCode:
+
+```sh
+gh issue create \
+  --repo AgentsLoop/OhMyGithub \
+  --title "Custom branch smoke test" \
+  --body $'branch: codex/omgithub-site\n\nBuild a tiny browser page.' \
+  --label Goal \
+  --label OpenCode
+```
+
+The workflow validates the branch before starting. If the directive is absent,
+the repository default branch remains the target.
+
 ## 🌍 What Can You Build?
 
 | 🎯 Use case | ✨ Example |

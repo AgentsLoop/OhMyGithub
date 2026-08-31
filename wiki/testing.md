@@ -41,6 +41,13 @@ way an issue enters goal mode; arbitrary issue text must not trigger the workflo
 Creating an issue with both `OpenCode` and `Goal` labels must start
 one `issues: opened` run, not separate `opened` and `labeled` runs.
 
+For custom-branch support, create an issue whose first body line is
+`branch: <existing-branch>`. Confirm the resolver strips the directive from the
+OpenCode request, checks out that branch, and uses it as the pull-request base.
+A missing or syntactically invalid branch must receive an issue comment and must
+not start the reusable pipeline. The App must not dispatch a second run when the
+repository-local workflow already subscribes to `issues` events.
+
 For the `omo` issue label, verify that an otherwise normal OpenCode issue causes
 the OpenCode startup step to install `oh-my-openagent` with Bun before starting
 the web server and launches `opencode ... --command goal` with `ulw` in the
