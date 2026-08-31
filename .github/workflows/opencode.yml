@@ -90,8 +90,5 @@ jobs:
       issue_title: ${{ inputs.issue_title || github.event.issue.title }}
       labels_json: ${{ inputs.labels_json || toJSON(github.event.issue.labels.*.name) }}
       sender: ${{ inputs.sender || github.event.sender.login }}
-      # The repository's Actions token cannot create pull requests because the
-      # organization setting blocks GITHUB_TOKEN PR creation. Use the
-      # installation token for issue-triggered runs as well as cross-repo runs.
-      use_app_token: true
+      use_app_token: ${{ inputs.target_repository != '' }}
     secrets: inherit
