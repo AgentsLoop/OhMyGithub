@@ -58,10 +58,6 @@ When mentioning a commit, append its relative age in hours or days.
 
 ## OpenCode GitHub Actions
 
-The issue-triggered workflow uses `opencode/muse-spark-1.2-contributor-free` and the GitHub Actions
-token. It does not require an `OPENCODE_API_KEY` repository secret. When workflow steps call
-the GitHub API, use the authenticated `GITHUB_TOKEN`; do not rely on unauthenticated API requests.
-
 To execute an issue, open it with the `OpenCode` label, or add that label to an
 existing issue. The GitHub App converts that event into one workflow dispatch.
 Edits, comments, and other labels do not execute it. Add
