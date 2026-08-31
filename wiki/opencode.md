@@ -6,13 +6,15 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 ## Trigger
 
-The `OpenCode` issue label is the execution marker. The issue body, or title
-when the body is empty, supplies the request text. Comments and edits never
-trigger execution. An issue with the `Goal` label
+The `OpenCode` issue label is the execution marker consumed by the Oh My Github
+App. The App dispatches `.github/workflows/opencode.yml`; the workflow itself
+accepts only `workflow_dispatch` and does not subscribe directly to issue
+events. The issue body, or title when the body is empty, supplies the request
+text. Comments and edits never trigger execution. An issue with the `Goal` label
 uses the installed `opencode-goal-plugin`, configures
 `noInterruptOnUserMessage: true`, and starts the runner with `opencode run
 --command goal`; an issue without `Goal` uses the standard `opencode run`
-path. The `OpenCode` label launches the workflow; add `Goal` to select
+path. The `OpenCode` label asks the App to launch the workflow; add `Goal` to select
 persistent goal mode. This keeps
 one request event mapped to one OpenCode session.
 

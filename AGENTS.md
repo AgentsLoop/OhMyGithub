@@ -16,9 +16,10 @@ The local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md) must
 stay aligned with this workflow. Its kickoff procedure creates a fresh issue
 with the `OpenCode` label (and `Goal` by default), does not use comments as
 triggers, and waits only for the initial OpenCode session link.
-Execution is limited to an issue opened with `OpenCode` or the `OpenCode` label
-being added to an existing issue; edits, comments, and unrelated labels must
-not be documented as triggers.
+The GitHub App dispatches execution for an issue opened with `OpenCode` or when
+the `OpenCode` label is added to an existing issue. The workflow itself accepts
+only `workflow_dispatch`; edits, comments, and unrelated labels must not be
+documented as triggers.
 An optional first issue-body line `branch: <existing-branch>` selects the target
 checkout and pull-request base; without it, the default branch is used.
 
@@ -62,8 +63,8 @@ token. It does not require an `OPENCODE_API_KEY` repository secret. When workflo
 the GitHub API, use the authenticated `GITHUB_TOKEN`; do not rely on unauthenticated API requests.
 
 To execute an issue, open it with the `OpenCode` label, or add that label to an
-existing issue. If a newly opened issue does not have the label, the workflow
-replies asking for it. Edits, comments, and other labels do not execute it. Add
+existing issue. The GitHub App converts that event into one workflow dispatch.
+Edits, comments, and other labels do not execute it. Add
 the `Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 

@@ -10,8 +10,8 @@ description: Start the issue-triggered workflow from the caller's prompt, wait f
 GitHub uses the term **label**. The required execution label is exactly
 `OpenCode`. Create the issue with that label, or add it to an existing issue;
 do not use comments, edits, or the word “tag” as a trigger. The
-workflow executes once for the issue-opened event or once when `OpenCode` is
-added.
+App dispatches the workflow once when an issue is opened with the label or when
+`OpenCode` is added.
 
 When the caller explicitly requests a custom branch, prepend
 `branch: <existing-branch>` and a blank line to the issue body. Treat that line
@@ -47,9 +47,8 @@ The kickoff is complete when all of these are true:
 
 - A fresh GitHub issue was created with the `OpenCode` label. Add the `Goal`
   label by default; omit it only when the caller explicitly requests a
-  standard-mode workflow test. The workflow runs once for the issue-opened
-  event, or once when `OpenCode` is added to an existing issue.
-- The `issues` event triggered `.github/workflows/opencode.yml`.
+  standard-mode workflow test. The App dispatches the workflow once.
+- The App triggered `.github/workflows/opencode.yml` through `workflow_dispatch`.
 - The initial OpenCode Web UI session link was posted.
 
 Do not wait for `gh run watch`, the verification prompt, the public tunnel, the

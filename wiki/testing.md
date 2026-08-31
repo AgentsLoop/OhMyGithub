@@ -26,8 +26,9 @@ The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
 
-For goal support, confirm the workflow trigger checks the `OpenCode` label, reads the `Goal`
-label without subscribing to `issues: labeled`, installs and configures
+For goal support, confirm the App checks the `OpenCode` label and dispatches the
+workflow once, while the workflow reads the forwarded `Goal` label without any
+native `issues` subscription, installs and configures
 `opencode-goal-plugin`, and branches the
 initial invocation to `opencode run --command goal` only when that label is on
 the issue. An issue without `Goal` must retain the standard `opencode run`
@@ -38,15 +39,16 @@ OpenCode config.
 Verify that label synchronization creates `Goal`, and that `Mark issue in
 progress` preserves the label alongside `in progress`. `Goal` must be the only
 way an issue enters goal mode; arbitrary issue text must not trigger the workflow.
-Creating an issue with both `OpenCode` and `Goal` labels must start
-one `issues: opened` run, not separate `opened` and `labeled` runs.
+Creating an issue with both `OpenCode` and `Goal` labels must start one
+`workflow_dispatch` run through the App, not separate `opened` and `labeled`
+runs.
 
 For custom-branch support, create an issue whose first body line is
 `branch: <existing-branch>`. Confirm the resolver strips the directive from the
 OpenCode request, checks out that branch, and uses it as the pull-request base.
 A missing or syntactically invalid branch must receive an issue comment and must
-not start the reusable pipeline. The App must not dispatch a second run when the
-repository-local workflow already subscribes to `issues` events.
+not start the reusable pipeline. The repository-local workflow must remain
+dispatch-only so the App is the sole issue-event router.
 
 For the `omo` issue label, verify that an otherwise normal OpenCode issue causes
 the OpenCode startup step to install `oh-my-openagent` with Bun before starting
