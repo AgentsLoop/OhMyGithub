@@ -74,7 +74,7 @@ gh issue create \
   --label OpenCode
 ```
 
-The workflow validates the branch before starting. If the directive is absent,
+The GitHub App validates the branch before dispatching. If the directive is absent,
 the repository default branch remains the target.
 
 ## 🌍 What Can You Build?

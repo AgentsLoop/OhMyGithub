@@ -44,8 +44,8 @@ Creating an issue with both `OpenCode` and `Goal` labels must start one
 runs.
 
 For custom-branch support, create an issue whose first body line is
-`branch: <existing-branch>`. Confirm the resolver strips the directive from the
-OpenCode request, checks out that branch, and uses it as the pull-request base.
+`branch: <existing-branch>`. Confirm the App strips the directive from the
+OpenCode request and forwards that branch for checkout and pull-request base.
 A missing or syntactically invalid branch must receive an issue comment and must
 not start the reusable pipeline. The repository-local workflow must remain
 dispatch-only so the App is the sole issue-event router.

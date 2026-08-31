@@ -46,76 +46,15 @@ permissions:
   id-token: write
 
 jobs:
-  resolve-request:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-    outputs:
-      valid: ${{ steps.resolve.outputs.valid }}
-      target_ref: ${{ steps.resolve.outputs.target_ref }}
-      request: ${{ steps.resolve.outputs.request }}
-    steps:
-      - name: Resolve issue request and target branch
-        id: resolve
-        uses: actions/github-script@v7
-        env:
-          DISPATCH_REQUEST: ${{ inputs.request }}
-          DISPATCH_TARGET_REF: ${{ inputs.target_ref }}
-        with:
-          script: |
-            const defaultBranch = context.payload.repository.default_branch;
-            let request = process.env.DISPATCH_REQUEST;
-            let targetRef = process.env.DISPATCH_TARGET_REF;
-            let branchSpecified = Boolean(targetRef);
-            let branchError = '';
-            targetRef ||= defaultBranch;
-            request ||= String(context.payload.inputs?.issue_title ?? '').trim();
-
-            const invalid = !targetRef || targetRef.length > 255 || targetRef === '@' || targetRef.startsWith('-') ||
-              targetRef.startsWith('/') || targetRef.endsWith('/') || targetRef.endsWith('.') || targetRef.endsWith('.lock') ||
-              targetRef.includes('..') || targetRef.includes('@{') || targetRef.includes('//') ||
-              targetRef.split('/').some(part => part.startsWith('.')) || /[\u0000-\u0020\u007f~^:?*[\]\\]/.test(targetRef);
-            if (invalid) branchError = 'Invalid branch directive. Use `branch: <existing-branch>` as the first line of the issue body.';
-
-            if (!branchError && branchSpecified && targetRef !== defaultBranch) {
-              try {
-                await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: targetRef });
-              } catch (error) {
-                if (error.status !== 404) throw error;
-                branchError = `The requested branch \`${targetRef}\` does not exist in \`${context.repo.owner}/${context.repo.repo}\`.`;
-              }
-            }
-
-            if (branchError) {
-              const issueNumber = Number(context.payload.inputs?.issue_number);
-              if (issueNumber) {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  body: `⚠️ **OpenCode did not start.**\n\n${branchError}\n\nUpdate the first issue-body line and remove/re-add the \`OpenCode\` label to retry.`
-                });
-              }
-              core.setOutput('valid', 'false');
-              return;
-            }
-
-            core.setOutput('valid', 'true');
-            core.setOutput('target_ref', targetRef);
-            core.setOutput('request', request);
-
   opencode:
-    needs: resolve-request
-    if: needs.resolve-request.outputs.valid == 'true'
     uses: ./.github/workflows/opencode-reusable.yml
     with:
       target_repository: ${{ inputs.target_repository || github.repository }}
       target_owner: ${{ inputs.target_owner || github.repository_owner }}
       target_repo: ${{ inputs.target_repo || github.event.repository.name }}
-      target_ref: ${{ needs.resolve-request.outputs.target_ref }}
+      target_ref: ${{ inputs.target_ref || github.event.repository.default_branch }}
       issue_number: ${{ inputs.issue_number }}
-      request: ${{ needs.resolve-request.outputs.request }}
+      request: ${{ inputs.request }}
       issue_title: ${{ inputs.issue_title }}
       labels_json: ${{ inputs.labels_json }}
       sender: ${{ inputs.sender }}
