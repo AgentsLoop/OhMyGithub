@@ -56,13 +56,14 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    times. Detects both uncommitted generated files and commits already created
    by OpenCode, then pushes the branch and creates the pull request in YAML.
 11. Gives the verified public URL back to the worker, requests committed final
-    browser screenshots, and embeds immutable screenshot URLs with the game,
-    commit, and PR links in the triggering issue. If screenshots are missing,
-    it sends up to two follow-up prompts to the same OpenCode session before
+    browser screenshots, and appends immutable screenshot URLs with the game,
+    commit, and PR links to the oldest triggering-issue comment containing the
+    `🟡 **OpenCode progress (live)**` marker. If screenshots are missing, it
+    sends up to two follow-up prompts to the same OpenCode session before
     continuing delivery with a warning.
 12. Creates a uniquely tagged GitHub release containing the final OpenCode
-    response JSON and safe runner log files, then adds only the release link
-    to the final issue comment.
+    response JSON and safe runner log files, then appends its link to that same
+    live-progress comment.
 13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
    verification,
    then marks the comment closed and terminates both tunnels.
