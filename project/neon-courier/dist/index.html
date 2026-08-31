@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Courier — Drone Delivery Rush</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-DuNOS-U8.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-vcibR1aH.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◈</span>
+      <span class="title">NEON COURIER</span>
+      <span class="subtitle">DRONE DELIVERY RUSH</span>
+    </div>
+    <div class="hud" id="hud">
+      <div class="hud-item"><span class="hud-label">SCORE</span><span class="hud-value" id="score">0</span></div>
+      <div class="hud-item beacons-hud"><span class="hud-label">BEACONS</span><span class="hud-value" id="beacons">0 / 5</span><div class="beacon-dots" id="beacon-dots" aria-hidden="true"></div></div>
+      <div class="hud-item"><span class="hud-label">TIME</span><span class="hud-value" id="timer">60.0</span></div>
+      <div class="hud-item status" id="status-wrap"><span class="hud-label">STATUS</span><span class="hud-value" id="status">FLY</span></div>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="canvas-wrap" id="wrap">
+      <canvas id="game" width="960" height="640"></canvas>
+      <!-- Overlays -->
+      <div id="overlay-start" class="overlay">
+        <h1>◈ NEON COURIER</h1>
+        <p class="tagline">Pilot your courier drone through the neon city. Collect all beacons, dodge traffic pulses, reach the <strong>EXIT</strong> before time runs out.</p>
+        <div class="instructions">
+          <div class="keys">
+            <span class="kbd">WASD</span> or <span class="kbd">ARROWS</span> to fly
+            <span class="sep">·</span> <span class="kbd">R</span> restart
+            <span class="sep">·</span> <span class="kbd">P</span> pause
+            <span class="sep">·</span> <span class="kbd">SPACE</span> start
+          </div>
+          <ul>
+            <li><span class="dot beacon-dot"></span> Cyan beacons = +100 pts, needed to open exit</li>
+            <li><span class="dot pulse-dot"></span> Magenta traffic pulses = slow + damage, avoid</li>
+            <li><span class="dot exit-dot"></span> Green exit gate opens after all beacons</li>
+          </ul>
+        </div>
+        <button id="btn-start" class="btn primary">LAUNCH DRONE — SPACE</button>
+        <p class="hint">Tip: pulses are slow but swarm. Use walls to cut LOS.</p>
+      </div>
+
+      <div id="overlay-pause" class="overlay hidden">
+        <h2>PAUSED</h2>
+        <p>Press P or SPACE to resume</p>
+        <button id="btn-resume" class="btn">RESUME</button>
+      </div>
+
+      <div id="overlay-end" class="overlay hidden">
+        <h2 id="end-title">COMPLETE</h2>
+        <p id="end-msg">You delivered all beacons!</p>
+        <div class="stats">
+          <div><span>Score</span><strong id="end-score">0</strong></div>
+          <div><span>Time left</span><strong id="end-time">0.0s</strong></div>
+          <div><span>Beacons</span><strong id="end-beacons">0/5</strong></div>
+        </div>
+        <button id="btn-restart" class="btn primary">RESTART — R</button>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h3>How to Play</h3>
+        <ol>
+          <li>Fly with <strong>WASD / Arrows</strong></li>
+          <li>Collect <strong>5 cyan beacons</strong></li>
+          <li>Avoid <strong>magenta pulses</strong></li>
+          <li>Reach <strong>green EXIT</strong> in <strong>60s</strong></li>
+        </ol>
+        <div class="legend">
+          <div><i class="swatch s-beacon"></i> Beacon</div>
+          <div><i class="swatch s-pulse"></i> Traffic Pulse</div>
+          <div><i class="swatch s-exit"></i> Exit</div>
+          <div><i class="swatch s-drone"></i> You</div>
+        </div>
+      </div>
+      <div class="card controls">
+        <h3>Controls</h3>
+        <div class="control-row"><span>Move</span><span>WASD / ↑←↓→</span></div>
+        <div class="control-row"><span>Restart</span><span>R</span></div>
+        <div class="control-row"><span>Pause</span><span>P</span></div>
+        <div class="control-row"><span>Start</span><span>SPACE</span></div>
+      </div>
+      <div class="card tip">
+        <h3>Responsive</h3>
+        <p>Canvas scales to fit. On mobile use on-screen D-pad (appears below canvas on narrow screens).</p>
+      </div>
+    </aside>
+  </main>
+
+  <div id="touch" class="touch hidden">
+    <button data-dir="up">▲</button>
+    <div class="mid">
+      <button data-dir="left">◀</button>
+      <button data-dir="down">▼</button>
+      <button data-dir="right">▶</button>
+    </div>
+  </div>
+
+  <footer class="foot">Neon Courier · Built with Canvas 2D · 60 FPS · No trackers</footer>
+</div>
+</body>
+</html>
