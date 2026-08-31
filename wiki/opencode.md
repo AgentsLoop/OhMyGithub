@@ -18,6 +18,10 @@ path. The `OpenCode` label asks the App to launch the workflow; add `Goal` to se
 persistent goal mode. This keeps
 one request event mapped to one OpenCode session.
 
+When a human opens an issue without `OpenCode`, the App posts a reminder to add
+the label and stops; it does not dispatch a workflow. Adding `OpenCode` later
+starts the normal App-dispatched flow.
+
 An optional issue-title suffix in the exact form `branch: <existing-branch>`
 selects the checkout and pull-request base. The App removes that suffix from the
 OpenCode request and validates the branch before dispatching the thin workflow
