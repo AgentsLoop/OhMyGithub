@@ -11,3 +11,19 @@ captures/
 *.aab
 screenshots/final-*.png
 !screenshots/final-android-*.png
+# opencode runtime / ephemeral CI artifacts (not part of Android release)
+.opencode/
+.opencode-ssh/
+.opencode-web/
+.agentsweb/
+.omgithub-runtime/
+Agents.md
+opencode-agentsweb-id_ed25519
+opencode-agentsweb-id_ed25519.pub
+.agents/README.md
+.agents/third-party-licenses/
+.agents/skills/gauntlet-loop/
+.agents/skills/image-search/
+.agents/skills/load-sketchfab-threejs/
+.agents/skills/mcp-duckgo/
+.agents/skills/opencode-zen-completions/

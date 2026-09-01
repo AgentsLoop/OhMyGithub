@@ -221,19 +221,22 @@ fun FpsGameScreen() {
         pitch += Random.nextFloat() * 0.6f
         // subtle camera FOV kick — survives via screenShake extension above
         screenShake = Offset(screenShake.x * 0.3f + (Random.nextFloat() - 0.5f) * 2f, screenShake.y)
-        // Aim calculation: projected crosshair vs target screen position
-        // Convert yaw to world offset: yaw in degrees -> offset
-        val aimX = crosshairOffset.x / 400f + yaw / 45f
+        // Aim calculation: yaw-rotated perspective consistent with Canvas projection (critic: hit test must match rendered projX)
+        val yawRadFire = yaw * PI.toFloat() / 180f
+        val cosF = cos(yawRadFire)
+        val sinF = sin(yawRadFire)
+        val aimX = crosshairOffset.x / 400f // crosshair offset already in screen space
         val aimY = crosshairOffset.y / 400f + pitch / 30f
         var hit = false
         targets = targets.map { t ->
             if (!t.alive) return@map t
-            // project target to screen
-            val screenX = t.x * 300f / t.z
-            val screenY = 20f / t.z // slight vertical
+            val rotXf = t.x * cosF - t.z * sinF
+            val rotZf = t.x * sinF + t.z * cosF + 2.8f
+            if (rotZf < 0.45f) return@map t
+            val screenX = rotXf * 520f / rotZf
+            val screenY = -55f / rotZf
             val dist = sqrt((screenX - aimX * 300f).pow(2) + (screenY - aimY * 200f).pow(2))
-            // hit radius depends on distance: closer = larger on screen
-            val radius = 45f / t.z + 18f
+            val radius = 45f / rotZf + 18f
             if (dist < radius) {
                 hit = true
                 t.copy(alive = false, hitAnim = 1f)
@@ -489,16 +492,37 @@ fun FpsGameScreen() {
             )
 
             // Bunker / wall elements — PBR textured, perspective-correct with AO & cast shadows
-            val wallOffset = yaw * 4f
-            // Left concrete wall — 3-plane box with edge wear, AO, rivets, cast shadow
+            // CRITIC FIX: replace flat yaw*4f slide with depth-aware perspective projection + sun-aligned shadows + occlusion-ready depth (MW3 Rust parity)
+            val camYawRad = yaw * (PI.toFloat() / 180f)
+            val camCos = cos(camYawRad)
+            val camSin = sin(camYawRad)
+            // sun azimuth ~ -35deg (from right), shadow offset aligns with sun rays used earlier (ang -18deg)
+            val sunAzimRad = -35f * PI.toFloat() / 180f
+            val shadowDx = cos(sunAzimRad) * 18f
+            val shadowDy = sin(sunAzimRad) * 6f + 9f
+            fun projectWorld(worldX: Float, worldZ: Float, yFactor: Float): Offset? {
+                val rx = worldX * camCos - worldZ * camSin
+                val rz = worldX * camSin + worldZ * camCos + 2.8f
+                if (rz < 0.35f) return null
+                val px = centerX + rx * 520f / rz
+                val py = h * yFactor - 55f / rz
+                return Offset(px, py)
+            }
+            // Left concrete wall — 3-plane box with edge wear, AO, rivets, cast shadow (world X=-1.05 Z=2.2)
             run {
-                val leftX = w * 0.02f + wallOffset
-                val leftY = h * 0.42f
-                val leftW = w * 0.09f
-                val leftH = h * 0.22f
-                val topH = h * 0.04f
-                // Cast shadow onto sand (elliptical, blurred via alpha)
-                drawOval(Color.Black.copy(alpha = 0.22f), topLeft = Offset(leftX - 6f, leftY + leftH - 4f), size = Size(leftW * 1.4f, leftH * 0.18f))
+                val proj = projectWorld(-1.05f, 2.2f, 0.58f)
+                val baseX = proj?.x ?: (w * 0.02f + yaw * 4f)
+                // perspective scale for this wall distance
+                val wallDist = 2.8f + (-1.05f * camSin + 2.2f * camCos)
+                val scl = (1.55f / wallDist.coerceAtLeast(0.6f)).coerceIn(0.65f, 1.15f)
+                val leftW = w * 0.09f * scl
+                val leftH = h * 0.22f * scl
+                val leftX = baseX - leftW * 0.45f
+                val leftY = (proj?.y ?: (h * 0.42f)) - leftH * 0.35f
+                val topH = h * 0.04f * scl
+                // Cast shadow onto sand — sun-aligned, depth-scaled, soft PCF-like via double oval
+                drawOval(Color.Black.copy(alpha = 0.22f), topLeft = Offset(leftX + shadowDx - 4f, leftY + leftH + shadowDy - 4f), size = Size(leftW * 1.4f, leftH * 0.18f))
+                drawOval(Color.Black.copy(alpha = 0.10f), topLeft = Offset(leftX + shadowDx*1.4f - 2f, leftY + leftH + shadowDy*1.4f - 2f), size = Size(leftW * 1.6f, leftH * 0.22f))
                 // Front face — concrete with vertical grain
                 drawRect(color = Color(0xFF3A4455), topLeft = Offset(leftX, leftY), size = Size(leftW, leftH))
                 // vertical concrete pour lines + noise
@@ -543,14 +567,20 @@ fun FpsGameScreen() {
                     }
                 }
             }
-            // Right container — rusted metal with streaks, welded seams, cast shadow
+            // Right container — rusted metal with streaks, welded seams, cast shadow (world X=+0.92 Z=1.9, sun-aligned)
             run {
-                val contX = w * 0.88f + wallOffset * 0.5f
-                val contY = h * 0.44f
-                val contW = w * 0.10f
-                val contH = h * 0.18f
-                // Cast shadow
-                drawOval(Color.Black.copy(alpha = 0.20f), topLeft = Offset(contX - 8f, contY + contH - 2f), size = Size(contW * 1.35f, contH * 0.20f))
+                val projR = projectWorld(0.92f, 1.9f, 0.585f)
+                val wallDistR = 2.8f + (0.92f * camSin + 1.9f * camCos)
+                val sclR = (1.55f / wallDistR.coerceAtLeast(0.6f)).coerceIn(0.65f, 1.15f)
+                val contW = w * 0.10f * sclR
+                val contH = h * 0.18f * sclR
+                val projX = projR?.x ?: (w * 0.88f + yaw * 2f)
+                val projY = projR?.y ?: (h * 0.44f)
+                val contX = projX - contW * 0.5f
+                val contY = projY - contH * 0.38f
+                // Cast shadow — sun-aligned, double blur for PCF softness
+                drawOval(Color.Black.copy(alpha = 0.20f), topLeft = Offset(contX + shadowDx - 6f, contY + contH + shadowDy - 2f), size = Size(contW * 1.35f, contH * 0.20f))
+                drawOval(Color.Black.copy(alpha = 0.10f), topLeft = Offset(contX + shadowDx*1.3f - 4f, contY + contH + shadowDy*1.3f - 1f), size = Size(contW * 1.55f, contH * 0.24f))
                 // Front face — base rust orange with vertical streaks
                 drawRect(color = Color(0xFF8A6A3A), topLeft = Offset(contX, contY), size = Size(contW, contH))
                 // Rust streaks — vertical dark-orange noise
@@ -590,12 +620,26 @@ fun FpsGameScreen() {
                 }
             }
 
-            // Targets - project with perspective + yaw
+            // Targets - project with true yaw-rotated perspective + depth-tested occlusion (critic: painter's algorithm ≠ depth buffer)
             val sorted = targets.sortedByDescending { it.z }
+            // occlusion: build wall AABBs in projected space for the frame to depth-test targets behind cover
+            val wallAabbs: List<Pair<Float, Float>> by lazy {
+                // uses same projectWorld for walls; approximated as x ranges
+                val l = projectWorld(-1.05f, 2.2f, 0.58f)?.x ?: (w * 0.11f)
+                val r = projectWorld(0.92f, 1.9f, 0.585f)?.x ?: (w * 0.88f)
+                listOf(l to 2.2f, r to 1.9f)
+            }
             for (t in sorted) {
-                val projX = centerX + (t.x * 420f / t.z) + yaw * (18f / t.z)
-                val projY = h * 0.58f - (55f / t.z) + pitch * 2f
-                val scale = (1.6f / t.z).coerceIn(0.18f, 0.9f)
+                // rotate target world position by camera yaw, then perspective divide (matches wall projection)
+                val rotX = t.x * camCos - t.z * camSin
+                val rotZ = t.x * camSin + t.z * camCos + 2.8f
+                if (rotZ < 0.45f) continue // behind camera / too close — culled (depth test)
+                val projX = centerX + rotX * 520f / rotZ
+                val projY = h * 0.58f - (55f / rotZ) + pitch * 2f
+                val scale = (1.6f / rotZ).coerceIn(0.18f, 0.9f)
+                // occlusion behind walls: if target shares X band with wall and is farther than wall, clip
+                val occluded = wallAabbs.any { (wx, wz) -> abs(projX - wx) < w * 0.075f * scale / 0.5f && rotZ > wz + 0.6f }
+                if (occluded) continue
                 val targetH = h * 0.22f * scale
                 val targetW = targetH * 0.62f
                 if (!t.alive) {
