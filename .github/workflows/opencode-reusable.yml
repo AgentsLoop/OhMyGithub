@@ -564,12 +564,21 @@ jobs:
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
           SESSION_ID=''
-          for _ in {1..120}; do
+          for _ in {1..600}; do
             SESSION_ID="$(curl --fail --silent --show-error "http://127.0.0.1:$OPENCODE_WEB_PORT/session" | jq -r '.[0].id // empty')"
             [[ "$SESSION_ID" == ses_* ]] && break
+            if [[ -f "$RUN_EXIT" ]]; then
+              echo "OpenCode exited before a session was discoverable (code $(cat "$RUN_EXIT"))." >&2
+              [[ ! -s "$RUN_LOG" ]] || tail -200 "$RUN_LOG" >&2
+              exit 1
+            fi
             sleep 1
           done
-          [[ "$SESSION_ID" == ses_* ]]
+          if [[ "$SESSION_ID" != ses_* ]]; then
+            echo 'OpenCode session was not discoverable after 10 minutes.' >&2
+            [[ ! -s "$RUN_LOG" ]] || tail -200 "$RUN_LOG" >&2
+            exit 1
+          fi
           DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
           printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
             "${OPENCODE_WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
