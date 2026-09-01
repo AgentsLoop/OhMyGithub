@@ -69,6 +69,7 @@
       <div class="pill score">Score <b id="score">0</b></div>
       <div class="pill">Best <b id="best">0</b></div>
       <div class="pill lives">♥ <b id="lives">3</b></div>
+      <button class="pill" id="muteBtn" aria-label="Toggle sound" style="cursor:pointer;min-width:56px">🔊</button>
     </div>
   </header>
 
@@ -162,12 +163,26 @@
   let lantern = { x: W/2, y: H-68, w: 86, h: 68, targetX: W/2, vx:0 };
   let fireflies = [];
   let particles = [];
+  let floaters = [];
   let bgParticles = [];
   let spawnTimer = 0, spawnInterval = 900;
   let time = 0;
   let shake = 0;
+  let hitstop = 0;
   let keys = {};
   let pointerDown = false;
+  let muted = localStorage.getItem('lantern-muted')==='1';
+  let audioCtx=null;
+  function ensureAudio(){ try{ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }catch{} }
+  function sfx(freq,dur,type='sine',gain=0.12){
+    if(muted) return;
+    try{ ensureAudio(); if(!audioCtx) return;
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type=type; o.frequency.value=freq; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(gain,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+      o.start(); o.stop(audioCtx.currentTime+dur);
+    }catch{}
+  }
 
   // tuning
   const LANTERN_SPEED = 14; // lerp speed
@@ -176,8 +191,8 @@
   function resetGame(){
     score=0; lives=3; caught=0; wave=1;
     spawnInterval=900;
-    fireflies=[]; particles=[];
-    lantern.x=W/2; lantern.targetX=W/2; lantern.vx=0;
+    fireflies=[]; particles=[]; floaters=[]; hitstop=0; shake=0;
+    lantern.x=W/2; lantern.targetX=W/2; lantern.vx=0; lantern.pulse=0;
     updateHUD();
   }
   function updateHUD(){
@@ -190,6 +205,12 @@
     catchLabel.textContent = `Caught ${caught}`;
     const pct = Math.min(100, ((caught%10)/10)*100 + (wave-1)*8);
     levelBar.style.width = Math.min(100, pct) + '%';
+  }
+  function popScore(rare){
+    try{
+      scoreEl.animate([{transform:'scale(1)',color:'#ffd97a'},{transform:'scale(1.28)',color:rare?'#fff6c0':'#ffd97a'},{transform:'scale(1)'}],{duration:180, easing:'ease-out'});
+      catchLabel.animate([{transform:'scale(1)'},{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:160});
+    }catch{}
   }
 
   // Input
@@ -213,6 +234,7 @@
 
   function startGame(){
     resetGame();
+    ensureAudio();
     state='playing';
     startScreen.style.display='none';
     pauseScreen.style.display='none';
@@ -240,6 +262,10 @@
   }
 
   const shareBtn = document.getElementById('shareBtn');
+  const muteBtn = document.getElementById('muteBtn');
+  function syncMute(){ muteBtn.textContent = muted ? '🔇' : '🔊'; muteBtn.title = muted ? 'Sound off — click to enable' : 'Sound on — click to mute'; }
+  syncMute();
+  muteBtn.onclick = ()=>{ muted=!muted; localStorage.setItem('lantern-muted', muted?'1':'0'); syncMute(); if(!muted) { ensureAudio(); sfx(880,0.08); } };
   document.getElementById('playBtn').onclick = startGame;
   document.getElementById('restartBtn').onclick = startGame;
   document.getElementById('resumeBtn').onclick = resumeGame;
@@ -304,13 +330,14 @@
     });
   }
 
-  // Particles
+  // Particles + floaters
   function addCatchParticles(x,y,rare){
     const n = rare? 18: 12;
     for(let i=0;i<n;i++){
       const a = Math.random()*Math.PI*2, s= 1+Math.random()*(rare?5:3.5);
       particles.push({x,y, vx: Math.cos(a)*s, vy: Math.sin(a)*s - Math.random()*2, life:1, decay:0.04+Math.random()*0.05, r: 2+Math.random()*2, color: rare?'#ffeaa0':'#ffd97a'});
     }
+    floaters.push({x, y: y-10, vy:-1.6 - Math.random()*0.8, life:1, decay:0.032, txt: rare?'+25':'+10', rare});
   }
   function addMissParticles(x,y){
     for(let i=0;i<10;i++){
@@ -321,11 +348,13 @@
   // Background stars / dust
   for(let i=0;i<70;i++) bgParticles.push({x:Math.random()*W, y:Math.random()*(H*0.55), r: Math.random()*1.2+0.3, a: Math.random(), tw: Math.random()*0.02+0.005});
 
-  // Game loop
+  // Game loop with hitstop
   let last=performance.now();
   function loop(now){
     requestAnimationFrame(loop);
-    const dt = Math.min(32, now-last); last=now;
+    const dtRaw = Math.min(32, now-last); last=now;
+    if(hitstop>0){ hitstop -= dtRaw/16.666; render(); return; }
+    const dt = dtRaw;
     time += dt;
     update(dt);
     render();
@@ -392,12 +421,15 @@
         // caught
         const pts = f.rare ? 25 : 10;
         score += pts; caught += 1;
-        updateHUD();
+        updateHUD(); popScore(f.rare);
         addCatchParticles(f.x, f.y, f.rare);
-        // subtle lantern pulse
+        // satisfying feedback: pulse + hitstop + sfx
         lantern.pulse = 1;
+        hitstop = f.rare ? 6 : 3;
+        if(f.rare) sfx(1200,0.12,'triangle',0.14); else sfx(880,0.09,'sine',0.11);
+        if(f.rare) sfx(1500,0.10,'sine',0.08);
         fireflies.splice(i,1);
-        if(navigator.vibrate) navigator.vibrate(18);
+        if(navigator.vibrate) navigator.vibrate(f.rare?28:18);
         continue;
       }
       if(f.y >= GROUND_Y - f.r){
@@ -405,9 +437,12 @@
         fireflies.splice(i,1);
         lives -=1;
         shake = 10;
+        sfx(180,0.16,'square',0.07);
         addMissParticles(f.x, GROUND_Y-6);
+        floaters.push({x:f.x, y:GROUND_Y-18, vy:-0.9, life:1, decay:0.04, txt:'−1 ♥', rare:false, miss:true});
         updateHUD();
         if(lives<=0){
+          sfx(90,0.4,'sawtooth',0.09);
           gameOver();
         }
         continue;
@@ -424,7 +459,14 @@
       p.life -= p.decay * (dt/16.666);
       if(p.life<=0) particles.splice(i,1);
     }
-    if(lantern.pulse) lantern.pulse = Math.max(0, lantern.pulse - 0.08*(dt/16.666));
+    for(let i=floaters.length-1;i>=0;i--){
+      const f=floaters[i];
+      f.y += f.vy * (dt/16.666);
+      f.vy += 0.04 * (dt/16.666);
+      f.life -= f.decay * (dt/16.666);
+      if(f.life<=0) floaters.splice(i,1);
+    }
+    if(lantern.pulse) lantern.pulse = Math.max(0, lantern.pulse - 0.04*(dt/16.666));
     if(shake>0) shake = Math.max(0, shake - 0.7*(dt/16.666));
     // bg twinkle
     for(const b of bgParticles){ b.a += (Math.random()-0.5)*0.02; b.a=Math.max(0.2,Math.min(1,b.a)); }
@@ -582,7 +624,21 @@
       ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
       ctx.shadowBlur=0;
     }
+    // floaters +10 / +25 / miss
+    for(const f of floaters){
+      ctx.globalAlpha = Math.max(0, f.life);
+      ctx.font = f.rare ? '900 22px system-ui' : '800 18px system-ui';
+      ctx.textAlign='center';
+      ctx.fillStyle = f.miss ? 'rgba(255,138,138,0.95)' : (f.rare ? '#ffeaa0' : '#ffd97a');
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth=3;
+      ctx.strokeText(f.txt, f.x, f.y);
+      ctx.fillText(f.txt, f.x, f.y);
+      if(f.rare){
+        ctx.font='700 10px system-ui'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillText('RARE', f.x, f.y-14);
+      }
+    }
     ctx.globalAlpha=1;
+    ctx.textAlign='left';
 
     // vignette
     const vig = ctx.createRadialGradient(W/2,H/2, Math.min(W,H)*0.4, W/2,H/2, Math.max(W,H)*0.9);
