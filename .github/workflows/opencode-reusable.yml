@@ -696,20 +696,23 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
           SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          RESPONSE_COMMENT_ID="$(gh api --method POST \
+            "repos/$REPOSITORY/issues/$ISSUE_NUMBER/comments" \
+            -f body='🟡 **OpenCode progress (live)**' --jq '.id')"
+          [[ -n "$RESPONSE_COMMENT_ID" ]]
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
           install -m 700 "$RUNTIME_DIR/scripts/opencode-progress-tracker.sh" "$TRACKER"
           # The tracker is intentionally independent of the step shell so it can poll
           # while later workflow steps run; cleanup stops it at the end of the job.
           nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
             OPENCODE_WEB_DIR="$OPENCODE_WEB_DIR" SESSION_ID="$SESSION_ID" \
-            COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
+            COMMENT_ID="$RESPONSE_COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
 
