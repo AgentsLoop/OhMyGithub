@@ -70,6 +70,7 @@ jobs:
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
       ANDROID_REQUEST: ${{ contains(inputs.labels_json, '"Android"') }}
+      SSH_ONLY_REQUEST: ${{ contains(inputs.labels_json, '"ssh"') }}
       OMGHITHUB_PUBLISH_ENABLED: ${{ vars.OMGHITHUB_PUBLISH_ENABLED || 'false' }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
@@ -197,6 +198,7 @@ jobs:
               { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
               { name: 'Android', color: '3DDC84', description: 'Build and verify an installable Android APK' },
+              { name: 'ssh', color: '5319E7', description: 'Start an SSH-only debugging session without OpenCode' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',
@@ -327,8 +329,46 @@ jobs:
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
 
+      - name: Post SSH-only access details
+        id: ssh_access_comment
+        if: env.SSH_ONLY_REQUEST == 'true'
+        uses: actions/github-script@v7
+        env:
+          AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
+          SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
+          SSH_HOST: ${{ steps.agentsweb.outputs.host }}
+          SSH_PORT: ${{ steps.agentsweb.outputs.port }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = process.env.AGENTSWEB_SSH_ENABLED === 'true'
+              ? [
+                  '🔐 **SSH-only debugging session is ready.**', '',
+                  `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
+                  'Connect while the job is active:', '', '```sh', process.env.SSH_COMMAND, '```', '',
+                  'This run skips OpenCode and sleeps for five hours for manual Android emulator testing.'
+                ].join('\n')
+              : [
+                  '❌ **SSH-only debugging session could not start.**', '',
+                  `Run: ${run}`, 'The `AGENTSWEB_SSH_PUBLIC_KEY` secret is not configured.'
+                ].join('\n');
+            const comment = await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, body
+            });
+            core.setOutput('comment_id', comment.data.id);
+            if (process.env.AGENTSWEB_SSH_ENABLED !== 'true') core.setFailed('AGENTSWEB SSH is required for the ssh label.');
+
+      - name: Hold SSH-only debugging session
+        if: env.SSH_ONLY_REQUEST == 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
+        shell: bash
+        run: sleep 18000
+
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -452,6 +492,7 @@ jobs:
           printf 'url=%s\n' "$WEB_URL" >> "$GITHUB_OUTPUT"
 
       - name: Verify shared skills are visible to OpenCode
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -465,12 +506,14 @@ jobs:
           [[ "$actual" -ge "$expected" ]]
 
       - name: Configure Git identity
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           git config user.name 'opencode[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
       - name: Create OpenCode branch
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -480,6 +523,7 @@ jobs:
 
       - name: Resolve OpenCode model and skill labels
         id: opencode_labels
+        if: env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -508,6 +552,7 @@ jobs:
 
       - name: Run OpenCode and locate its web session
         id: opencode_run
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
@@ -586,7 +631,7 @@ jobs:
 
       - name: Verify live sessions through SSH
         id: verify_sessions
-        if: env.AGENTSWEB_SSH_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -611,6 +656,7 @@ jobs:
 
       - name: Post temporary access details
         id: access_comment
+        if: env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
         env:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
@@ -646,6 +692,7 @@ jobs:
 
       - name: Start live OpenCode response comment
         id: response_comment
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -667,7 +714,7 @@ jobs:
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
 
       - name: Wait for OpenCode implementation
-        if: env.VALIDATION_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -681,7 +728,7 @@ jobs:
           [[ "$code" == 0 ]]
 
       - name: Verify web app
-        if: env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true'
         id: web_verification
         uses: ./.omgithub-runtime/.github/actions/verify-web
         with:
@@ -689,7 +736,7 @@ jobs:
           model: ${{ steps.opencode_labels.outputs.model }}
 
       - name: Verify Android app
-        if: env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST == 'true'
         id: android_verification
         uses: ./.omgithub-runtime/.github/actions/verify-android
         with:
@@ -697,7 +744,7 @@ jobs:
           model: ${{ steps.opencode_labels.outputs.model }}
 
       - name: Create pull request
-        if: env.VALIDATION_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: delivery
         shell: bash
         run: |
@@ -734,7 +781,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Publish game to OmGithub
-        if: env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true' && env.OMGHITHUB_PUBLISH_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true' && env.OMGHITHUB_PUBLISH_ENABLED == 'true'
         continue-on-error: true
         id: omgithub_publish
         shell: bash
@@ -792,7 +839,7 @@ jobs:
           printf 'url=%s\ninstall_url=%s\n' "$published_url" "$install_url" >> "$GITHUB_OUTPUT"
           echo "Published permanent game URL: $published_url"
       - name: Create OpenCode logs release
-        if: success() && env.VALIDATION_ENABLED == 'true'
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: opencode_release
         shell: bash
         run: |
@@ -842,7 +889,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Post final game report
-        if: success() && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true' && env.APP_URL != ''
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true' && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
           APP_URL: ${{ steps.omgithub_publish.outputs.url || env.APP_URL }}
@@ -900,7 +947,7 @@ jobs:
             });
 
       - name: Post final Android report
-        if: success() && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST == 'true'
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST == 'true'
         uses: actions/github-script@v7
         env:
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
@@ -947,7 +994,7 @@ jobs:
             });
 
       - name: Mark issue complete
-        if: success() && env.VALIDATION_ENABLED == 'true'
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -1013,7 +1060,7 @@ jobs:
           fi
 
       - name: Append SSH session closed
-        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.access_comment.outputs.comment_id != ''
+        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && (steps.access_comment.outputs.comment_id != '' || steps.ssh_access_comment.outputs.comment_id != '')
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
