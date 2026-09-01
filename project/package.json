@@ -1,0 +1,16 @@
+{
+  "name": "moonlit-parcel-dash",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "start": "node server.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

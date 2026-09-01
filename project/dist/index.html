@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="theme-color" content="#0a0e1a"/>
+<title>Moonlit Parcel Dash — Rover Delivery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#070a14;--panel:#111827;--line:#1e2a44;--accent:#7ff0ff;--glow:#ffd84d;--beacon:#ff6b9e;--danger:#ff4d6a;--ok:#42d98b}
+html,body{margin:0;height:100%;background:radial-gradient(1200px 600px at 50% -10%, #1a2a55 0%, #0a0e1a 55%, #05070e 100%);color:#e6eefc;font-family:Outfit,system-ui,sans-serif;overflow:hidden}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:14px 16px 16px;display:flex;flex-direction:column;height:100dvh;gap:10px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7ff0ff,#a78bfa);display:grid;place-items:center;font-weight:800;color:#0a0e1a;box-shadow:0 6px 22px rgba(127,240,255,.35);flex-shrink:0}
+.brand h1{margin:0;font:700 18px "Space Grotesk";letter-spacing:-.02em;line-height:1}
+.brand p{margin:2px 0 0;color:#8da0c8;font-size:12px}
+.hud{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch}
+.chip{background:rgba(17,24,39,.92);border:1px solid #263554;border-radius:999px;padding:8px 14px;display:flex;align-items:center;gap:8px;font:700 12px "JetBrains Mono";backdrop-filter:blur(10px);min-width:0;letter-spacing:.02em;position:relative;overflow:hidden;box-shadow: inset 0 1px 0 rgba(255,255,255,.06)}
+.chip b{color:#7ff0ff;font-size:13px}
+.chip b#parcels{color:#ffd84d}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);flex-shrink:0;animation:dotPulse 1.6s ease-in-out infinite}
+@keyframes dotPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:.85}}
+.chip.timer{padding-right:16px;min-width:114px;justify-content:space-between}
+.chip.timer .time-track{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.08)}
+.chip.timer .time-fill{height:100%;width:100%;background:linear-gradient(90deg,#7ff0ff,#a78bfa);transition:width .2s linear, background .3s}
+.chip.timer.warn .time-fill{background:linear-gradient(90deg,#ffd84d,#ff9f1a)}
+.chip.timer.danger .time-fill{background:linear-gradient(90deg,#ff4d6a,#ff1a4a)}
+.timer.warn{color:#ffd84d;border-color:#6b5d1a;animation:pulse 1s infinite}
+.timer.danger{color:#ff4d6a;border-color:#6b1a2a;animation:pulse .5s infinite}
+@keyframes pulse{50%{transform:scale(1.03)}}
+.chip.parcels-chip{gap:10px}
+.parcel-dots{display:flex;gap:4px;align-items:center}
+.parcel-dot{width:9px;height:9px;border-radius:50%;border:1.5px solid #263554;background:rgba(255,255,255,.08);transition:.25s}
+.parcel-dot.on{background:#ffd84d;border-color:#ffeb8a;box-shadow:0 0 8px rgba(255,216,77,.7);transform:scale(1.05)}
+.chip.status{font-size:11px;letter-spacing:.06em}
+.chip.status .s-dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.stage{position:relative;flex:1;min-height:0;display:grid;grid-template-columns:1fr;gap:10px}
+.canvas-shell{position:relative;background:linear-gradient(180deg,#0a1328 0%, #0a0e1a 40%, #0e1422 100%);border:1px solid #1e2a44;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);display:flex;min-height:0}
+.canvas-shell.shake{animation:shake .35s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes shake{10%,90%{transform:translate3d(-1px,0,0)}20%,80%{transform:translate3d(2px,0,0)}30%,50%,70%{transform:translate3d(-3px,0,0)}40%,60%{transform:translate3d(3px,0,0)}}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+.flash{position:absolute;inset:0;background:radial-gradient(600px 300px at 50% 50%, rgba(255,77,106,.28), transparent 70%);opacity:0;pointer-events:none;transition:opacity .15s}
+.flash.on{opacity:1}
+.flash.stun{background:radial-gradient(700px 400px at 50% 60%, rgba(255,77,106,.32), transparent 72%)}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(800px 500px at 50% 30%, rgba(127,240,255,.08), transparent 60%), linear-gradient(180deg, rgba(5,7,14,.55), rgba(5,7,14,.85));backdrop-filter:blur(3px);padding:20px;text-align:center}
+.card{background:rgba(17,24,39,.94);border:1px solid #2a3a5c;border-radius:20px;padding:22px 20px;max-width:520px;width:100%;box-shadow:0 16px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06)}
+.card h2{margin:0 0 8px;font:700 28px "Space Grotesk";letter-spacing:-.02em}
+.card p{margin:0;color:#9db0d6;line-height:1.6;font-size:14px}
+.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.badge{font:700 11px "JetBrains Mono";letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border-radius:999px;border:1px solid #2a3a5c;background:#0f172a;color:#7ff0ff}
+.btn{appearance:none;border:0;border-radius:999px;padding:13px 22px;font:700 14px Outfit;cursor:pointer;transition:.15s;letter-spacing:.02em}
+.btn-primary{background:linear-gradient(135deg,#7ff0ff,#a78bfa);color:#0a0e1a;box-shadow:0 8px 22px rgba(127,240,255,.35)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(127,240,255,.42)}
+.btn-primary:active{transform:scale(.98)}
+.btn-ghost{background:#1e293b;color:#e6eefc;border:1px solid #334155}
+.btn-ghost:hover{background:#263449}
+.btn-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.btn:focus-visible{outline:2px solid #7ff0ff;outline-offset:2px}
+.kbd{font:600 11px "JetBrains Mono";padding:4px 7px;border-radius:6px;background:#0f172a;border:1px solid #2a3a5c;color:#9db0d6}
+.controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px}
+.mobile-pad{position:absolute;inset:auto 12px 12px 12px;display:none;justify-content:space-between;align-items:end;pointer-events:none;z-index:2}
+.pad-group{display:flex;gap:8px;pointer-events:auto}
+.pad-btn{width:56px;height:56px;border-radius:16px;background:rgba(15,23,42,.78);border:1px solid rgba(255,255,255,.12);color:#e6eefc;display:grid;place-items:center;font-size:20px;backdrop-filter:blur(8px);user-select:none;-webkit-user-select:none;touch-action:none;transition:.12s}
+.pad-btn:active{background:rgba(127,240,255,.28);transform:scale(.97);border-color:rgba(127,240,255,.4)}
+@media(max-width:760px){.mobile-pad{display:flex}.wrap{padding-bottom:6px;gap:8px}.top{gap:8px}.brand h1{font-size:16px}.chip{padding:6px 10px;font-size:11px}.chip.timer{min-width:102px}.brand p{display:none}}
+@media(max-width:420px){.wrap{padding:10px 10px 6px}.hud{gap:6px}.chip b{font-size:12px}}
+.hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.88);border:1px solid #263554;border-radius:999px;padding:6px 12px;font:600 11px "JetBrains Mono";color:#8da0c8;letter-spacing:.06em;pointer-events:none;white-space:nowrap;max-width:calc(100% - 18px);overflow:hidden;text-overflow:ellipsis}
+.hint strong{color:#e6eefc}
+.footer{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#6b7fa8;font-size:11px;flex-wrap:wrap}
+.footer a{text-decoration:underline;text-underline-offset:3px}
+.beacon-ready-hint{position:absolute;top:42px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(255,107,158,.18),rgba(167,139,250,.18));border:1px solid rgba(255,107,158,.45);color:#ffb3cc;font:700 11px "JetBrains Mono";letter-spacing:.08em;padding:6px 12px;border-radius:999px;pointer-events:none;opacity:0;transition:.3s;white-space:nowrap}
+.beacon-ready-hint.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+  <script type="module" crossorigin src="/assets/index-Dq-FzoF9.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">◈</div>
+      <div>
+        <h1>Moonlit Parcel Dash</h1>
+        <p>Pilot the rover · collect parcels · reach the beacon</p>
+      </div>
+    </div>
+    <div class="hud" role="status" aria-live="polite">
+      <div class="chip" title="Score"><span class="dot" aria-hidden="true"></span> SCORE <b id="score">0</b></div>
+      <div class="chip parcels-chip" title="Parcels collected">
+        PARCELS <b id="parcels">0/6</b>
+        <span class="parcel-dots" id="parcelDots" aria-hidden="true"></span>
+      </div>
+      <div class="chip timer" id="timer">⏱ 45.0s <div class="time-track" aria-hidden="true"><div class="time-fill" id="timeFill"></div></div></div>
+      <div class="chip status" id="status"><span class="s-dot" aria-hidden="true"></span><span id="statusText">READY</span></div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="canvas-shell" id="shell">
+      <canvas id="game" width="1000" height="560" aria-label="Moonlit Parcel Dash game canvas"></canvas>
+      <div class="flash" id="flash" aria-hidden="true"></div>
+      <div class="hint">WASD / ARROWS / DRAG · Collect <span style="color:#ffd84d">■ parcels</span> then <span style="color:#ff6b9e">⬢ beacon</span></div>
+      <div class="beacon-ready-hint" id="beaconHint">⬢ BEACON READY — DELIVER NOW!</div>
+      <div class="mobile-pad" id="pad" aria-hidden="true">
+        <div class="pad-group">
+          <button class="pad-btn" data-dir="left" aria-label="Move left">◀</button>
+          <button class="pad-btn" data-dir="right" aria-label="Move right">▶</button>
+        </div>
+        <div class="pad-group">
+          <button class="pad-btn" data-dir="up" aria-label="Move up">▲</button>
+          <button class="pad-btn" data-dir="down" aria-label="Move down">▼</button>
+        </div>
+      </div>
+      <!-- Overlays -->
+      <div class="overlay" id="startOverlay">
+        <div class="card">
+          <div style="font-size:28px" aria-hidden="true">🌙 🚀 📦</div>
+          <h2>Moonlit Parcel Dash</h2>
+          <p>Night has fallen on Luna Outpost. Your tiny rover must dash across the dark dunes, snatch <b style="color:#ffd84d">glowing parcels</b> drifting in the cold, dodge <b style="color:#ff4d6a">tumbling moon rocks</b>, and sprint to the <b style="color:#ff6b9e">delivery beacon</b> before oxygen runs out.</p>
+          <div class="badges"><span class="badge">45s countdown</span><span class="badge">6 parcels</span><span class="badge">rocks = stun</span></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="playBtn">▶ Launch Rover</button>
+            <button class="btn btn-ghost" id="howBtn">How to Play</button>
+          </div>
+          <div class="controls"><span class="kbd">WASD</span><span class="kbd">↑ ← ↓ →</span><span class="kbd">TOUCH DRAG</span><span class="kbd">SPACE brake</span><span class="kbd">R replay</span></div>
+        </div>
+      </div>
+      <div class="overlay" id="howOverlay" style="display:none">
+        <div class="card">
+          <h2>How to Play</h2>
+          <p style="text-align:left">
+            • Move with <b>WASD / Arrows</b> or <b>drag on canvas</b> / mobile pads.<br>
+            • Touch parcels to collect — they pulse gold.<br>
+            • Rocks drift slowly; hitting one <b>stuns</b> you for 0.7 s, flashes red & costs 1.5 s.<br>
+            • Collect <b>all 6</b> parcels, then touch the pink beacon tower to win.<br>
+            • Beat the <b>45-second</b> countdown. Palette bar drains as time passes.<br>
+            • Press <b>R</b> or <b>Play Again</b> to replay instantly.
+          </p>
+          <div class="btn-row"><button class="btn btn-primary" id="backBtn">Got it</button></div>
+        </div>
+      </div>
+      <div class="overlay" id="endOverlay" style="display:none">
+        <div class="card" id="endCard"></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Responsive canvas · 60 FPS · No external assets · Works offline</span>
+    <span><a href="#" id="menuLink">Menu</a> · <span id="bestScore" title="Best score this session">Best —</span></span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="theme-color" content="#0a0e1a"/>
+<title>Moonlit Parcel Dash — Rover Delivery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#070a14;--panel:#111827;--line:#1e2a44;--accent:#7ff0ff;--glow:#ffd84d;--beacon:#ff6b9e;--danger:#ff4d6a;--ok:#42d98b}
+html,body{margin:0;height:100%;background:radial-gradient(1200px 600px at 50% -10%, #1a2a55 0%, #0a0e1a 55%, #05070e 100%);color:#e6eefc;font-family:Outfit,system-ui,sans-serif;overflow:hidden}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:14px 16px 16px;display:flex;flex-direction:column;height:100dvh;gap:10px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7ff0ff,#a78bfa);display:grid;place-items:center;font-weight:800;color:#0a0e1a;box-shadow:0 6px 22px rgba(127,240,255,.35);flex-shrink:0}
+.brand h1{margin:0;font:700 18px "Space Grotesk";letter-spacing:-.02em;line-height:1}
+.brand p{margin:2px 0 0;color:#8da0c8;font-size:12px}
+.hud{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch}
+.chip{background:rgba(17,24,39,.92);border:1px solid #263554;border-radius:999px;padding:8px 14px;display:flex;align-items:center;gap:8px;font:700 12px "JetBrains Mono";backdrop-filter:blur(10px);min-width:0;letter-spacing:.02em;position:relative;overflow:hidden;box-shadow: inset 0 1px 0 rgba(255,255,255,.06)}
+.chip b{color:#7ff0ff;font-size:13px}
+.chip b#parcels{color:#ffd84d}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);flex-shrink:0;animation:dotPulse 1.6s ease-in-out infinite}
+@keyframes dotPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:.85}}
+.chip.timer{padding-right:16px;min-width:114px;justify-content:space-between}
+.chip.timer .time-track{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.08)}
+.chip.timer .time-fill{height:100%;width:100%;background:linear-gradient(90deg,#7ff0ff,#a78bfa);transition:width .2s linear, background .3s}
+.chip.timer.warn .time-fill{background:linear-gradient(90deg,#ffd84d,#ff9f1a)}
+.chip.timer.danger .time-fill{background:linear-gradient(90deg,#ff4d6a,#ff1a4a)}
+.timer.warn{color:#ffd84d;border-color:#6b5d1a;animation:pulse 1s infinite}
+.timer.danger{color:#ff4d6a;border-color:#6b1a2a;animation:pulse .5s infinite}
+@keyframes pulse{50%{transform:scale(1.03)}}
+.chip.parcels-chip{gap:10px}
+.parcel-dots{display:flex;gap:4px;align-items:center}
+.parcel-dot{width:9px;height:9px;border-radius:50%;border:1.5px solid #263554;background:rgba(255,255,255,.08);transition:.25s}
+.parcel-dot.on{background:#ffd84d;border-color:#ffeb8a;box-shadow:0 0 8px rgba(255,216,77,.7);transform:scale(1.05)}
+.chip.status{font-size:11px;letter-spacing:.06em}
+.chip.status .s-dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.stage{position:relative;flex:1;min-height:0;display:grid;grid-template-columns:1fr;gap:10px}
+.canvas-shell{position:relative;background:linear-gradient(180deg,#0a1328 0%, #0a0e1a 40%, #0e1422 100%);border:1px solid #1e2a44;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);display:flex;min-height:0}
+.canvas-shell.shake{animation:shake .35s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes shake{10%,90%{transform:translate3d(-1px,0,0)}20%,80%{transform:translate3d(2px,0,0)}30%,50%,70%{transform:translate3d(-3px,0,0)}40%,60%{transform:translate3d(3px,0,0)}}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+.flash{position:absolute;inset:0;background:radial-gradient(600px 300px at 50% 50%, rgba(255,77,106,.28), transparent 70%);opacity:0;pointer-events:none;transition:opacity .15s}
+.flash.on{opacity:1}
+.flash.stun{background:radial-gradient(700px 400px at 50% 60%, rgba(255,77,106,.32), transparent 72%)}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(800px 500px at 50% 30%, rgba(127,240,255,.08), transparent 60%), linear-gradient(180deg, rgba(5,7,14,.55), rgba(5,7,14,.85));backdrop-filter:blur(3px);padding:20px;text-align:center}
+.card{background:rgba(17,24,39,.94);border:1px solid #2a3a5c;border-radius:20px;padding:22px 20px;max-width:520px;width:100%;box-shadow:0 16px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06)}
+.card h2{margin:0 0 8px;font:700 28px "Space Grotesk";letter-spacing:-.02em}
+.card p{margin:0;color:#9db0d6;line-height:1.6;font-size:14px}
+.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.badge{font:700 11px "JetBrains Mono";letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border-radius:999px;border:1px solid #2a3a5c;background:#0f172a;color:#7ff0ff}
+.btn{appearance:none;border:0;border-radius:999px;padding:13px 22px;font:700 14px Outfit;cursor:pointer;transition:.15s;letter-spacing:.02em}
+.btn-primary{background:linear-gradient(135deg,#7ff0ff,#a78bfa);color:#0a0e1a;box-shadow:0 8px 22px rgba(127,240,255,.35)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(127,240,255,.42)}
+.btn-primary:active{transform:scale(.98)}
+.btn-ghost{background:#1e293b;color:#e6eefc;border:1px solid #334155}
+.btn-ghost:hover{background:#263449}
+.btn-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.btn:focus-visible{outline:2px solid #7ff0ff;outline-offset:2px}
+.kbd{font:600 11px "JetBrains Mono";padding:4px 7px;border-radius:6px;background:#0f172a;border:1px solid #2a3a5c;color:#9db0d6}
+.controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px}
+.mobile-pad{position:absolute;inset:auto 12px 12px 12px;display:none;justify-content:space-between;align-items:end;pointer-events:none;z-index:2}
+.pad-group{display:flex;gap:8px;pointer-events:auto}
+.pad-btn{width:56px;height:56px;border-radius:16px;background:rgba(15,23,42,.78);border:1px solid rgba(255,255,255,.12);color:#e6eefc;display:grid;place-items:center;font-size:20px;backdrop-filter:blur(8px);user-select:none;-webkit-user-select:none;touch-action:none;transition:.12s}
+.pad-btn:active{background:rgba(127,240,255,.28);transform:scale(.97);border-color:rgba(127,240,255,.4)}
+@media(max-width:760px){.mobile-pad{display:flex}.wrap{padding-bottom:6px;gap:8px}.top{gap:8px}.brand h1{font-size:16px}.chip{padding:6px 10px;font-size:11px}.chip.timer{min-width:102px}.brand p{display:none}}
+@media(max-width:420px){.wrap{padding:10px 10px 6px}.hud{gap:6px}.chip b{font-size:12px}}
+.hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.88);border:1px solid #263554;border-radius:999px;padding:6px 12px;font:600 11px "JetBrains Mono";color:#8da0c8;letter-spacing:.06em;pointer-events:none;white-space:nowrap;max-width:calc(100% - 18px);overflow:hidden;text-overflow:ellipsis}
+.hint strong{color:#e6eefc}
+.footer{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#6b7fa8;font-size:11px;flex-wrap:wrap}
+.footer a{text-decoration:underline;text-underline-offset:3px}
+.beacon-ready-hint{position:absolute;top:42px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(255,107,158,.18),rgba(167,139,250,.18));border:1px solid rgba(255,107,158,.45);color:#ffb3cc;font:700 11px "JetBrains Mono";letter-spacing:.08em;padding:6px 12px;border-radius:999px;pointer-events:none;opacity:0;transition:.3s;white-space:nowrap}
+.beacon-ready-hint.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">◈</div>
+      <div>
+        <h1>Moonlit Parcel Dash</h1>
+        <p>Pilot the rover · collect parcels · reach the beacon</p>
+      </div>
+    </div>
+    <div class="hud" role="status" aria-live="polite">
+      <div class="chip" title="Score"><span class="dot" aria-hidden="true"></span> SCORE <b id="score">0</b></div>
+      <div class="chip parcels-chip" title="Parcels collected">
+        PARCELS <b id="parcels">0/6</b>
+        <span class="parcel-dots" id="parcelDots" aria-hidden="true"></span>
+      </div>
+      <div class="chip timer" id="timer">⏱ 45.0s <div class="time-track" aria-hidden="true"><div class="time-fill" id="timeFill"></div></div></div>
+      <div class="chip status" id="status"><span class="s-dot" aria-hidden="true"></span><span id="statusText">READY</span></div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="canvas-shell" id="shell">
+      <canvas id="game" width="1000" height="560" aria-label="Moonlit Parcel Dash game canvas"></canvas>
+      <div class="flash" id="flash" aria-hidden="true"></div>
+      <div class="hint">WASD / ARROWS / DRAG · Collect <span style="color:#ffd84d">■ parcels</span> then <span style="color:#ff6b9e">⬢ beacon</span></div>
+      <div class="beacon-ready-hint" id="beaconHint">⬢ BEACON READY — DELIVER NOW!</div>
+      <div class="mobile-pad" id="pad" aria-hidden="true">
+        <div class="pad-group">
+          <button class="pad-btn" data-dir="left" aria-label="Move left">◀</button>
+          <button class="pad-btn" data-dir="right" aria-label="Move right">▶</button>
+        </div>
+        <div class="pad-group">
+          <button class="pad-btn" data-dir="up" aria-label="Move up">▲</button>
+          <button class="pad-btn" data-dir="down" aria-label="Move down">▼</button>
+        </div>
+      </div>
+      <!-- Overlays -->
+      <div class="overlay" id="startOverlay">
+        <div class="card">
+          <div style="font-size:28px" aria-hidden="true">🌙 🚀 📦</div>
+          <h2>Moonlit Parcel Dash</h2>
+          <p>Night has fallen on Luna Outpost. Your tiny rover must dash across the dark dunes, snatch <b style="color:#ffd84d">glowing parcels</b> drifting in the cold, dodge <b style="color:#ff4d6a">tumbling moon rocks</b>, and sprint to the <b style="color:#ff6b9e">delivery beacon</b> before oxygen runs out.</p>
+          <div class="badges"><span class="badge">45s countdown</span><span class="badge">6 parcels</span><span class="badge">rocks = stun</span></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="playBtn">▶ Launch Rover</button>
+            <button class="btn btn-ghost" id="howBtn">How to Play</button>
+          </div>
+          <div class="controls"><span class="kbd">WASD</span><span class="kbd">↑ ← ↓ →</span><span class="kbd">TOUCH DRAG</span><span class="kbd">SPACE brake</span><span class="kbd">R replay</span></div>
+        </div>
+      </div>
+      <div class="overlay" id="howOverlay" style="display:none">
+        <div class="card">
+          <h2>How to Play</h2>
+          <p style="text-align:left">
+            • Move with <b>WASD / Arrows</b> or <b>drag on canvas</b> / mobile pads.<br>
+            • Touch parcels to collect — they pulse gold.<br>
+            • Rocks drift slowly; hitting one <b>stuns</b> you for 0.7 s, flashes red & costs 1.5 s.<br>
+            • Collect <b>all 6</b> parcels, then touch the pink beacon tower to win.<br>
+            • Beat the <b>45-second</b> countdown. Palette bar drains as time passes.<br>
+            • Press <b>R</b> or <b>Play Again</b> to replay instantly.
+          </p>
+          <div class="btn-row"><button class="btn btn-primary" id="backBtn">Got it</button></div>
+        </div>
+      </div>
+      <div class="overlay" id="endOverlay" style="display:none">
+        <div class="card" id="endCard"></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Responsive canvas · 60 FPS · No external assets · Works offline</span>
+    <span><a href="#" id="menuLink">Menu</a> · <span id="bestScore" title="Best score this session">Best —</span></span>
+  </div>
+</div>
+<script type="module">
+const canvas = document.getElementById('game')
+const ctx = canvas.getContext('2d')
+const scoreEl = document.getElementById('score')
+const parcelsEl = document.getElementById('parcels')
+const timerEl = document.getElementById('timer')
+const timeFill = document.getElementById('timeFill')
+const statusEl = document.getElementById('status')
+const statusText = document.getElementById('statusText')
+const startOverlay = document.getElementById('startOverlay')
+const howOverlay = document.getElementById('howOverlay')
+const endOverlay = document.getElementById('endOverlay')
+const endCard = document.getElementById('endCard')
+const shell = document.getElementById('shell')
+const parcelDots = document.getElementById('parcelDots')
+const beaconHint = document.getElementById('beaconHint')
+const flash = document.getElementById('flash')
+const bestScoreEl = document.getElementById('bestScore')
+
+const W=1000, H=560
+const STATE={menu:'menu',playing:'playing',won:'won',lost:'lost'}
+let state=STATE.menu
+let score=0, collected=0, timeLeft=45, last=0, bestScore=0
+let rover={x:100,y:H/2,w:34,h:18,vx:0,vy:0,angle:0,stun:0}
+let parcels=[], rocks=[], beacon={x:900,y:H/2,r:28, pulse:0}
+let particles=[], floaters=[]
+let keys={}
+let pointer={active:false,x:0,y:0}
+let animId=0
+let shakeTimeout=0, flashTimeout=0
+
+function rand(a,b){return a+Math.random()*(b-a)}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+function buildParcelDots(){
+  parcelDots.innerHTML=''
+  for(let i=0;i<6;i++){
+    const d=document.createElement('span')
+    d.className='parcel-dot'+(i<collected?' on':'')
+    d.setAttribute('aria-hidden','true')
+    parcelDots.appendChild(d)
+  }
+}
+
+function resetLevel(){
+  score=0; collected=0; timeLeft=45; rover={x:120,y:H/2,w:34,h:18,vx:0,vy:0,angle:0,stun:0}
+  parcels=[]
+  for(let i=0;i<6;i++){
+    let x,y,ok
+    let tries=0
+    do{
+      x=rand(220,780); y=rand(80,H-80); ok=true
+      for(const p of parcels) if(Math.hypot(p.x-x,p.y-y)<90) ok=false
+      if(Math.hypot(x-beacon.x,y-beacon.y)<120) ok=false
+      tries++; if(tries>80) break
+    }while(!ok)
+    parcels.push({x,y,r:16, collected:false, bob:rand(0,Math.PI*2)})
+  }
+  rocks=[]
+  for(let i=0;i<7;i++){
+    rocks.push({
+      x:rand(180,860), y:rand(60,H-60), r:rand(18,28),
+      vx:rand(-40,40), vy:rand(-22,22), rot:rand(0,Math.PI*2), vr:rand(-1.2,1.2),
+      poly: Array.from({length:6+Math.floor(rand(0,3))},(_,k)=>{const a=k/6*Math.PI*2+rand(-.2,.2); const rr=rand(.82,1.12); return {a, rr}})
+    })
+  }
+  beacon={x:900,y:H/2,r:30,pulse:0}
+  particles=[]; floaters=[]
+  updateHUD()
+}
+
+function updateHUD(){
+  scoreEl.textContent=score
+  parcelsEl.textContent=`${collected}/6`
+  const tText = `⏱ ${timeLeft.toFixed(1)}s`
+  // keep time-fill element; replace text node
+  timerEl.childNodes[0].textContent = tText + ' '
+  const pct = clamp(timeLeft/45,0,1)*100
+  timeFill.style.width = pct+'%'
+  timerEl.classList.remove('warn','danger')
+  if(timeLeft<15) timerEl.classList.add('danger')
+  else if(timeLeft<25) timerEl.classList.add('warn')
+  // dots
+  buildParcelDots()
+  const isStunned = state===STATE.playing && rover.stun>0
+  const isReady = collected===6 && state===STATE.playing
+  if(isStunned){
+    statusText.textContent='STUNNED'
+    statusEl.style.color='#ff4d6a'
+    statusEl.style.borderColor='#6b1a2a'
+  } else if(state===STATE.playing){
+    statusText.textContent = isReady ? 'BEACON READY' : 'DASHING'
+    statusEl.style.color = isReady ? '#ff6b9e' : '#7ff0ff'
+    statusEl.style.borderColor = isReady ? '#6b2a44' : '#263554'
+  } else if(state===STATE.won){
+    statusText.textContent='DELIVERED'
+    statusEl.style.color='#42d98b'
+    statusEl.style.borderColor='#1a6b4a'
+  } else if(state===STATE.lost){
+    statusText.textContent='SIGNAL LOST'
+    statusEl.style.color='#ff4d6a'
+    statusEl.style.borderColor='#6b1a2a'
+  } else {
+    statusText.textContent='READY'
+    statusEl.style.color='#7ff0ff'
+    statusEl.style.borderColor='#263554'
+  }
+  beaconHint.classList.toggle('on', isReady)
+  if(bestScore>0) bestScoreEl.textContent=`Best ${bestScore}`
+}
+
+function spawnParticles(x,y,color,count=10){
+  for(let i=0;i<count;i++) particles.push({x,y,vx:rand(-180,180),vy:rand(-200,80),life:rand(.4,.9),t:0,color, size:rand(2,5)})
+}
+function spawnFloater(x,y,text,color='#ffd84d'){
+  floaters.push({x,y,text,color, t:0, life:0.9, vy:-42})
+}
+function triggerShake(){
+  shell.classList.remove('shake'); void shell.offsetWidth; shell.classList.add('shake')
+  clearTimeout(shakeTimeout); shakeTimeout=setTimeout(()=> shell.classList.remove('shake'), 400)
+}
+function triggerFlash(cls=''){
+  flash.className='flash on '+(cls||'')
+  flash.style.opacity='1'
+  clearTimeout(flashTimeout)
+  flashTimeout=setTimeout(()=>{ flash.classList.remove('on'); flash.style.opacity='0'}, 260)
+}
+
+function setState(s){
+  state=s; updateHUD()
+  startOverlay.style.display = s===STATE.menu ? 'grid':'none'
+  if(s===STATE.playing){ endOverlay.style.display='none' }
+  // ensure focus not trapped
+  if(s===STATE.menu) document.getElementById('playBtn')?.focus()
+}
+
+function win(){
+  state=STATE.won
+  bestScore=Math.max(bestScore, score)
+  spawnParticles(beacon.x,beacon.y,'#ff6b9e',30)
+  spawnParticles(rover.x,rover.y,'#7ff0ff',18)
+  endCard.innerHTML=`
+    <div style="font-size:36px" aria-hidden="true">✨ 📦 ✨</div>
+    <h2>Mission Accomplished!</h2>
+    <p>You delivered <b style="color:#ffd84d">${collected}/6 parcels</b> in <b>${(45-timeLeft).toFixed(1)}s</b> and reached the beacon. The outpost lights up!</p>
+    <div class="badges"><span class="badge">Score ${score}</span><span class="badge">Time ${(45-timeLeft).toFixed(1)}s</span><span class="badge">Best ${bestScore}</span></div>
+    <div class="btn-row"><button class="btn btn-primary" id="replayWin">↻ Play Again</button><button class="btn btn-ghost" id="menuWin">Menu</button></div>
+    <p style="margin-top:10px;color:#6b7fa8;font-size:11px">Press R to replay instantly</p>`
+  endOverlay.style.display='grid'
+  updateHUD()
+  setTimeout(()=> document.getElementById('replayWin')?.focus(), 50)
+  document.getElementById('replayWin').onclick=()=> window.restartGame()
+  document.getElementById('menuWin').onclick=()=>{ endOverlay.style.display='none'; setState(STATE.menu) }
+}
+function lose(reason){
+  state=STATE.lost
+  bestScore=Math.max(bestScore, score)
+  endCard.innerHTML=`
+    <div style="font-size:36px" aria-hidden="true">🌑 💫</div>
+    <h2>${reason.includes('Time')? 'Time\'s Up':'Signal Lost'}</h2>
+    <p>${reason}<br>Score <b>${score}</b> · Parcels <b>${collected}/6</b> · Best <b>${bestScore||score}</b></p>
+    <div class="btn-row"><button class="btn btn-primary" id="replayLose">↻ Try Again</button><button class="btn btn-ghost" id="menuLose">Menu</button></div>
+    <p style="margin-top:10px;color:#6b7fa8;font-size:11px">Press R to retry</p>`
+  endOverlay.style.display='grid'
+  updateHUD()
+  setTimeout(()=> document.getElementById('replayLose')?.focus(), 50)
+  document.getElementById('replayLose').onclick=()=> window.restartGame()
+  document.getElementById('menuLose').onclick=()=>{ endOverlay.style.display='none'; setState(STATE.menu) }
+}
+window.restartGame=()=>{
+  resetLevel(); setState(STATE.playing); last=performance.now()
+}
+
+// Input
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase()
+  keys[k]=true
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault()
+  if(e.key===' ' && state===STATE.playing) { rover.vx*=0.6; rover.vy*=0.6 }
+  if(k==='r' && (state===STATE.won||state===STATE.lost||state===STATE.menu)){
+    e.preventDefault()
+    if(state===STATE.menu){ resetLevel(); setState(STATE.playing); last=performance.now(); }
+    else window.restartGame()
+  }
+  if(e.key==='Escape'){
+    if(state===STATE.playing) setState(STATE.menu)
+    else if(howOverlay.style.display==='grid'){ howOverlay.style.display='none'; startOverlay.style.display='grid' }
+    else if(endOverlay.style.display==='grid'){ endOverlay.style.display='none'; setState(STATE.menu) }
+  }
+})
+addEventListener('keyup',e=> keys[e.key.toLowerCase()]=false)
+
+function canvasPos(e){
+  const rect=canvas.getBoundingClientRect()
+  const sx=W/rect.width, sy=H/rect.height
+  const t=e.touches? e.touches[0]: e
+  return {x:(t.clientX-rect.left)*sx, y:(t.clientY-rect.top)*sy}
+}
+canvas.addEventListener('pointerdown',e=>{
+  if(state!==STATE.playing) return
+  canvas.setPointerCapture(e.pointerId)
+  pointer.active=true
+  const p=canvasPos(e); pointer.x=p.x; pointer.y=p.y
+})
+canvas.addEventListener('pointermove',e=>{
+  if(!pointer.active || state!==STATE.playing) return
+  const p=canvasPos(e); pointer.x=p.x; pointer.y=p.y
+})
+canvas.addEventListener('pointerup',()=>{pointer.active=false})
+canvas.addEventListener('pointercancel',()=>pointer.active=false)
+
+// touch pads
+document.querySelectorAll('.pad-btn').forEach(b=>{
+  const dir=b.dataset.dir
+  const key='arrow'+dir
+  const activate=()=> keys[key]=true
+  const deactivate=()=> keys[key]=false
+  b.addEventListener('pointerdown',e=>{e.preventDefault(); activate(); try{b.setPointerCapture(e.pointerId)}catch{}})
+  b.addEventListener('pointerup',deactivate); b.addEventListener('pointercancel',deactivate); b.addEventListener('pointerleave',deactivate)
+  b.addEventListener('touchstart',e=>{e.preventDefault(); activate()},{passive:false})
+  b.addEventListener('touchend',deactivate)
+})
+function padKeys(){
+  return {
+    up: keys['arrowup']||keys['w'],
+    down: keys['arrowdown']||keys['s'],
+    left: keys['arrowleft']||keys['a'],
+    right: keys['arrowright']||keys['d']
+  }
+}
+
+// buttons
+document.getElementById('playBtn').onclick=()=>{ resetLevel(); setState(STATE.playing); last=performance.now(); }
+document.getElementById('howBtn').onclick=()=>{ startOverlay.style.display='none'; howOverlay.style.display='grid' }
+document.getElementById('backBtn').onclick=()=>{ howOverlay.style.display='none'; startOverlay.style.display='grid' }
+document.getElementById('menuLink').onclick=(e)=>{ e.preventDefault(); if(state===STATE.playing) setState(STATE.menu); else {endOverlay.style.display='none'; howOverlay.style.display='none'; setState(STATE.menu)} }
+
+function update(dt){
+  if(state!==STATE.playing) return
+  timeLeft-=dt
+  if(timeLeft<=0){ timeLeft=0; updateHUD(); lose("Time expired before you reached the beacon."); return }
+  if(rover.stun>0){ rover.stun-=dt; rover.vx*=0.92; rover.vy*=0.92 }
+  else{
+    const accel=620
+    const friction=0.88
+    let ax=0, ay=0
+    const pk=padKeys()
+    if(pk.left) ax-=1
+    if(pk.right) ax+=1
+    if(pk.up) ay-=1
+    if(pk.down) ay+=1
+    if(pointer.active){
+      const dx=pointer.x-rover.x, dy=pointer.y-rover.y
+      const dist=Math.hypot(dx,dy)
+      if(dist>8){
+        ax+= clamp(dx/90,-1,1)
+        ay+= clamp(dy/90,-1,1)
+      }
+    }
+    const len=Math.hypot(ax,ay)
+    if(len>0){ ax/=len; ay/=len; rover.vx+=ax*accel*dt; rover.vy+=ay*accel*dt }
+    rover.vx*= Math.pow(friction, dt*60)
+    rover.vy*= Math.pow(friction, dt*60)
+    const speed=Math.hypot(rover.vx,rover.vy)
+    const max=260
+    if(speed>max){ rover.vx*=max/speed; rover.vy*=max/speed }
+    if(speed>20) rover.angle = Math.atan2(rover.vy, rover.vx) * 0.18
+    else rover.angle*=0.9
+  }
+  rover.x+=rover.vx*dt
+  rover.y+=rover.vy*dt
+  rover.x=clamp(rover.x,18,W-18)
+  rover.y=clamp(rover.y,18,H-18)
+  if(rover.x<=18||rover.x>=W-18) rover.vx*=-0.4
+  if(rover.y<=18||rover.y>=H-18) rover.vy*=-0.4
+
+  for(const r of rocks){
+    r.x+=r.vx*dt; r.y+=r.vy*dt; r.rot+=r.vr*dt
+    if(r.x<r.r) {r.x=r.r; r.vx*=-1}
+    if(r.x>W-r.r) {r.x=W-r.r; r.vx*=-1}
+    if(r.y<r.r) {r.y=r.r; r.vy*=-1}
+    if(r.y>H-r.r) {r.y=H-r.r; r.vy*=-1}
+    const d=Math.hypot(r.x-rover.x, r.y-rover.y)
+    const minDist=r.r + 16
+    if(d<minDist && rover.stun<=0){
+      const nx=(rover.x-r.x)/d, ny=(rover.y-r.y)/d
+      rover.vx = nx*180 + rand(-40,40)
+      rover.vy = ny*180 + rand(-40,40)
+      rover.stun=0.7
+      timeLeft= Math.max(0,timeLeft-1.5)
+      spawnParticles(rover.x,rover.y,'#ff4d6a',14)
+      spawnFloater(rover.x, rover.y-18, '-1.5s', '#ff4d6a')
+      score=Math.max(0,score-25)
+      triggerShake(); triggerFlash('stun')
+      if(navigator.vibrate) navigator.vibrate([60,40,60])
+    }
+  }
+  for(const p of parcels){
+    if(p.collected) continue
+    p.bob+=dt*2.4
+    const d=Math.hypot(p.x-rover.x,p.y-rover.y)
+    if(d< p.r + 16){
+      p.collected=true; collected++; score+=100
+      spawnParticles(p.x,p.y,'#ffd84d',14)
+      spawnFloater(p.x,p.y-10,'+100','#ffd84d')
+      if(navigator.vibrate) navigator.vibrate(40)
+      if(collected===6){
+        spawnParticles(beacon.x,beacon.y,'#ff6b9e',20)
+        triggerFlash(''); // subtle pulse
+      }
+      updateHUD()
+    }
+  }
+  beacon.pulse+=dt*3
+  if(collected===6){
+    const d=Math.hypot(beacon.x-rover.x, beacon.y-rover.y)
+    if(d< beacon.r + 18){
+      score+= Math.max(0, Math.floor(timeLeft*10)) + 200
+      win(); return
+    }
+  }
+  for(let i=particles.length-1;i>=0;i--){
+    const pt=particles[i]; pt.t+=dt; pt.x+=pt.vx*dt; pt.y+=pt.vy*dt; pt.vy+=220*dt; pt.life-=dt
+    if(pt.t>pt.life || pt.life<=0) particles.splice(i,1)
+  }
+  for(let i=floaters.length-1;i>=0;i--){
+    const f=floaters[i]; f.t+=dt; f.y+=f.vy*dt; f.vy+= 30*dt; f.life-=dt
+    if(f.life<=0) floaters.splice(i,1)
+  }
+  updateHUD()
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H)
+  const g=ctx.createLinearGradient(0,0,0,H)
+  g.addColorStop(0,'#0b1430'); g.addColorStop(.45,'#0a0e1a'); g.addColorStop(1,'#0f1a2e')
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H)
+  ctx.save(); ctx.globalAlpha=.9
+  for(let i=0;i<90;i++){
+    const x=(i*137.5)%W, y=(i*73)% (H*0.62)
+    const s= (Math.sin(i*1.7+beacon.pulse*.5)*.5+.5)*1.2+0.6
+    ctx.fillStyle= i%7===0 ? '#7ff0ff' : '#ffffff'
+    ctx.globalAlpha= i%3===0 ? .9 : .55
+    ctx.beginPath(); ctx.arc(x,y,s,0,Math.PI*2); ctx.fill()
+  }
+  ctx.restore()
+  ctx.fillStyle='#121a2e'
+  ctx.beginPath(); ctx.moveTo(0,H*0.62)
+  for(let x=0;x<=W;x+=40){ ctx.lineTo(x, H*0.62 + Math.sin(x*0.008 + 1)*10 + Math.cos(x*0.015)*8)}
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill()
+  ctx.fillStyle='#0e1426'; ctx.fillRect(0,H*0.72,W,H*0.28)
+  ctx.strokeStyle='rgba(127,240,255,.07)'; ctx.lineWidth=1
+  for(let x=0;x<W;x+=80){ ctx.beginPath(); ctx.moveTo(x,H*0.72); ctx.lineTo(x+18,H); ctx.stroke() }
+  ctx.fillStyle='rgba(255,255,255,.04)'
+  for(let i=0;i<14;i++){
+    const cx=(i* 173)%W, cy= H*0.78 + (i%3)*18
+    ctx.beginPath(); ctx.ellipse(cx,cy, 28+ (i%4)*6, 12+ (i%3)*4, 0,0,Math.PI*2); ctx.fill()
+    ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=2; ctx.stroke()
+  }
+  if(state===STATE.playing){
+    ctx.fillStyle='rgba(127,240,255,.12)'; ctx.beginPath(); ctx.ellipse(rover.x - Math.cos(rover.angle)*10, rover.y, 18,8,0,0,Math.PI*2); ctx.fill()
+  }
+  const bx=beacon.x, by=beacon.y
+  const pulseScale= 1+ Math.sin(beacon.pulse)*.08
+  const needAll = collected<6
+  // outer pulse rings when ready
+  if(!needAll){
+    ctx.save()
+    for(let k=0;k<3;k++){
+      const phase = (beacon.pulse*0.9 + k*2.1) % (Math.PI*2)
+      const rp = (phase/(Math.PI*2))
+      const rr = beacon.r* (1.2 + rp*1.6)
+      ctx.globalAlpha= (1-rp)*0.22
+      ctx.strokeStyle='#ff6b9e'; ctx.lineWidth= 2*(1-rp)+1
+      ctx.beginPath(); ctx.arc(bx,by, rr,0,Math.PI*2); ctx.stroke()
+    }
+    ctx.restore()
+  }
+  ctx.save()
+  ctx.globalAlpha= needAll ? .18 : .45
+  ctx.fillStyle= needAll ? '#44506a' : '#ff6b9e'
+  ctx.shadowColor= needAll ? '#44506a' : '#ff6b9e'; ctx.shadowBlur= 26* pulseScale
+  ctx.beginPath(); ctx.arc(bx,by, beacon.r* (needAll?1.1:1.55)*pulseScale,0,Math.PI*2); ctx.fill()
+  ctx.restore()
+  ctx.fillStyle= needAll ? '#2a344d' : '#ff6b9e'
+  ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=2
+  ctx.beginPath()
+  for(let i=0;i<6;i++){ const a=i/6*Math.PI*2 - Math.PI/6; const r=beacon.r * (needAll? .75: .95); const x=bx+Math.cos(a)*r, y=by+Math.sin(a)*r; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y)} ctx.closePath()
+  ctx.fill(); ctx.stroke()
+  ctx.fillStyle= needAll ? '#1f2a44' : '#ffffff'
+  ctx.globalAlpha= needAll ? .9 : 1
+  ctx.beginPath(); ctx.arc(bx,by,8,0,Math.PI*2); ctx.fill()
+  // beacon inner pulse dot
+  if(!needAll){
+    ctx.fillStyle='#ff6b9e'; ctx.globalAlpha= .9 - Math.sin(beacon.pulse)*.2
+    ctx.beginPath(); ctx.arc(bx,by,4 + Math.sin(beacon.pulse*2)*1.2,0,Math.PI*2); ctx.fill()
+  }
+  ctx.globalAlpha=1
+  if(!needAll){
+    ctx.save(); ctx.globalAlpha=.16; ctx.fillStyle='#ff6b9e'
+    ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx-70,0); ctx.lineTo(bx+70,0); ctx.closePath(); ctx.fill(); ctx.restore()
+    ctx.fillStyle='#ff6b9e'; ctx.font='700 11px JetBrains Mono'; ctx.textAlign='center'; ctx.fillText('DELIVER HERE',bx,by - beacon.r -14)
+    // arrow guide when far
+    const distToBeacon=Math.hypot(bx-rover.x, by-rover.y)
+    if(distToBeacon>160 && state===STATE.playing){
+      const ang=Math.atan2(by-rover.y, bx-rover.x)
+      const ar= 42
+      const ax= rover.x + Math.cos(ang)* (ar+10)
+      const ay= rover.y + Math.sin(ang)* (ar+10)
+      ctx.save(); ctx.translate(ax,ay); ctx.rotate(ang)
+      ctx.fillStyle='rgba(255,107,158,.92)'
+      ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-8,-6); ctx.lineTo(-8,6); ctx.closePath(); ctx.fill()
+      ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=1.2; ctx.stroke()
+      ctx.restore()
+    }
+  } else{
+    ctx.fillStyle='#8da0c8'; ctx.font='600 10px JetBrains Mono'; ctx.textAlign='center'; ctx.fillText(`${6-collected} parcels left`,bx,by - beacon.r -14)
+  }
+  for(const p of parcels){
+    if(p.collected) continue
+    const bobY = Math.sin(p.bob)*6
+    const y=p.y+bobY
+    ctx.save(); ctx.globalAlpha=.5; ctx.fillStyle='#ffd84d'; ctx.shadowColor='#ffd84d'; ctx.shadowBlur=18
+    ctx.beginPath(); ctx.arc(p.x,y, p.r+6,0,Math.PI*2); ctx.fill(); ctx.restore()
+    ctx.save(); ctx.translate(p.x,y); ctx.rotate(Math.sin(p.bob*.7)*.12)
+    ctx.fillStyle='#ffd84d'; ctx.strokeStyle='#fff3b0'; ctx.lineWidth=1.8
+    const s=p.r
+    ctx.fillRect(-s,-s,s*2,s*2)
+    ctx.strokeRect(-s,-s,s*2,s*2)
+    ctx.fillStyle='#ff9f1a'; ctx.fillRect(-s, -3, s*2, 6); ctx.fillRect(-3,-s,6,s*2)
+    ctx.fillStyle='rgba(255,255,255,.65)'; ctx.fillRect(-s+3,-s+3,6,6)
+    ctx.restore()
+    // subtle ground shadow under parcel
+    ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(p.x, p.y+22, 12,4,0,0,Math.PI*2); ctx.fill()
+    ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(p.x-18, y+s+6,36,10)
+    ctx.fillStyle='#ffd84d'; ctx.font='700 7px JetBrains Mono'; ctx.textAlign='center'; ctx.fillText('PARCEL',p.x, y+s+13)
+  }
+  for(const r of rocks){
+    ctx.save(); ctx.translate(r.x,r.y); ctx.rotate(r.rot)
+    ctx.fillStyle='#2a344d'; ctx.strokeStyle='#3a4a6b'; ctx.lineWidth=1.5
+    ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=8; ctx.shadowOffsetY=4
+    ctx.beginPath()
+    r.poly.forEach((pt,i)=>{ const x=Math.cos(pt.a)*r.r*pt.rr, y=Math.sin(pt.a)*r.r*pt.rr; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y)})
+    ctx.closePath(); ctx.fill(); ctx.stroke()
+    ctx.fillStyle='rgba(255,255,255,.08)'; ctx.beginPath(); ctx.ellipse(-r.r*.2,-r.r*.25, r.r*.45, r.r*.28, -.3,0,Math.PI*2); ctx.fill()
+    ctx.fillStyle='rgba(0,0,0,.25)'; for(let k=0;k<3;k++){ ctx.beginPath(); ctx.arc(rand(-r.r*.4,r.r*.4),rand(-r.r*.4,r.r*.4),2,0,Math.PI*2); ctx.fill() }
+    ctx.restore()
+  }
+  ctx.save(); ctx.translate(rover.x,rover.y); ctx.rotate(rover.angle)
+  ctx.fillStyle='rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0,10,18,6,0,0,Math.PI*2); ctx.fill()
+  const stunned = rover.stun>0 && Math.floor(rover.stun*12)%2===0
+  if(stunned){
+    // stun halo
+    ctx.fillStyle='rgba(255,77,106,.22)'; ctx.beginPath(); ctx.arc(0,0,26,0,Math.PI*2); ctx.fill()
+  }
+  ctx.fillStyle= stunned ? '#ff9aa8' : '#e6eefc'
+  ctx.strokeStyle='#0a0e1a'; ctx.lineWidth=1.5
+  ctx.beginPath(); ctx.roundRect(-16,-10,32,18,6); ctx.fill(); ctx.stroke()
+  ctx.fillStyle= stunned ? '#ff6b7a' : '#7ff0ff'
+  ctx.beginPath(); ctx.roundRect(-6,-14,20,12,4); ctx.fill(); ctx.stroke()
+  ctx.fillStyle='#0f172a'; ctx.strokeStyle='#1e293b'
+  ;[-10,10].forEach(dx=>{
+    ctx.beginPath(); ctx.roundRect(dx-7,7,14,5,2); ctx.fill(); ctx.stroke()
+    ctx.fillStyle='#334155'; ctx.beginPath(); ctx.arc(dx,9.5,2,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#0f172a'
+  })
+  ctx.fillStyle= stunned ? '#ff4d6a' : '#ffd84d'; ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur= stunned?18:12
+  ctx.beginPath(); ctx.arc(16,-2,4,0,Math.PI*2); ctx.fill()
+  ctx.shadowBlur=0
+  ctx.strokeStyle='#a78bfa'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo( -4,-14); ctx.lineTo(-4,-20); ctx.stroke()
+  ctx.fillStyle='#a78bfa'; ctx.beginPath(); ctx.arc(-4,-20,3,0,Math.PI*2); ctx.fill()
+  ctx.restore()
+
+  for(const pt of particles){
+    ctx.globalAlpha= 1 - pt.t/pt.life
+    ctx.fillStyle=pt.color
+    ctx.beginPath(); ctx.arc(pt.x,pt.y, pt.size*(1-pt.t/pt.life),0,Math.PI*2); ctx.fill()
+  }
+  ctx.globalAlpha=1
+  // floaters
+  for(const f of floaters){
+    const a= 1 - f.t/f.life
+    ctx.globalAlpha= a
+    ctx.fillStyle= f.color
+    ctx.font='800 13px JetBrains Mono'
+    ctx.textAlign='center'
+    ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=3
+    ctx.strokeText(f.text, f.x, f.y)
+    ctx.fillText(f.text, f.x, f.y)
+  }
+  ctx.globalAlpha=1
+
+  const vg=ctx.createRadialGradient(W/2,H/2, Math.min(W,H)*0.3, W/2,H/2, Math.max(W,H)*0.9)
+  vg.addColorStop(0,'transparent'); vg.addColorStop(1,'rgba(0,0,0,.42)')
+  ctx.fillStyle=vg; ctx.fillRect(0,0,W,H)
+  // stun vignette
+  if(rover.stun>0){
+    const a = clamp(rover.stun/0.7,0,1)*0.22
+    ctx.fillStyle=`rgba(255,77,106,${a})`
+    ctx.fillRect(0,0,W,H)
+  }
+  if(collected===6 && state===STATE.playing){
+    ctx.fillStyle='rgba(255,107,158,.09)'; ctx.fillRect(0,0,W,3)
+  }
+}
+
+function frame(now){
+  if(!last) last=now
+  const dt=Math.min(0.033, (now-last)/1000)
+  last=now
+  update(dt)
+  draw()
+  animId=requestAnimationFrame(frame)
+  if(state===STATE.menu) draw()
+}
+resetLevel(); draw()
+last=performance.now()
+animId=requestAnimationFrame(frame)
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) last=performance.now() })
+</script>
+</body>
+</html>
