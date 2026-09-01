@@ -21,7 +21,7 @@ on:
         default: '[]'
         type: string
       sender:
-        description: GitHub login that submitted the request
+        description: GitHub username that submitted the request
         required: true
         type: string
     secrets:
@@ -69,6 +69,7 @@ jobs:
       COMMENT_BODY: ${{ inputs.request }}
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
+      OMGHITHUB_PUBLISH_ENABLED: ${{ vars.OMGHITHUB_PUBLISH_ENABLED || 'false' }}
     steps:
       - name: Export target token
         shell: bash
@@ -804,6 +805,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Publish game to OmGithub
+        if: env.OMGHITHUB_PUBLISH_ENABLED == 'true'
+        continue-on-error: true
         id: omgithub_publish
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
@@ -908,6 +911,7 @@ jobs:
         env:
           APP_URL: ${{ steps.omgithub_publish.outputs.url || env.APP_URL }}
           OMGITHUB_INSTALL_URL: ${{ steps.omgithub_publish.outputs.install_url }}
+          OMGHITHUB_PUBLISH_ENABLED: ${{ env.OMGHITHUB_PUBLISH_ENABLED }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
@@ -925,8 +929,13 @@ jobs:
             });
             const body = [
               '✅ **Game complete and publicly verified.**', '',
-              `Public game: [${process.env.APP_URL}](${process.env.APP_URL})`,
-              `Install game: [${process.env.OMGHITHUB_INSTALL_URL}](${process.env.OMGHITHUB_INSTALL_URL})`,
+              `Public app: [${process.env.APP_URL}](${process.env.APP_URL})`,
+              ...(process.env.OMGHITHUB_INSTALL_URL ? [
+                `OmGithub publication: [${process.env.APP_URL}](${process.env.APP_URL})`,
+                `Install game: [${process.env.OMGHITHUB_INSTALL_URL}](${process.env.OMGHITHUB_INSTALL_URL})`
+              ] : [process.env.OMGHITHUB_PUBLISH_ENABLED === 'true'
+                ? 'OmGithub publishing: failed, but the workflow continued.'
+                : 'OmGithub publishing: skipped (disabled by repository variable).']),
               `Final commit: [${process.env.FINAL_COMMIT}](${commitUrl})`,
               `Pull request: ${process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.'}`,
               `OpenCode logs release: [${process.env.OPENCODE_RELEASE_URL}](${process.env.OPENCODE_RELEASE_URL})`,
