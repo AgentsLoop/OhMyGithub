@@ -626,15 +626,91 @@ fun FpsGameScreen() {
                     drawCircle(Color(0xFF2A1E12), radius = 2f, center = Offset(rx, ry))
                 }
             }
+            // Critic remediation (dense Rust labyrinth): add mid/center container + far bunker + horizon tower so scene reads as compound, not 2-wall diorama
+            // Mid stacked containers — world X=0.05 Z=3.8 (center, between walls)
+            run {
+                val projM = projectWorld(0.05f, 3.8f, 0.575f)
+                val distM = 2.8f + (0.05f * camSin + 3.8f * camCos)
+                val sclM = (1.55f / distM.coerceAtLeast(0.6f)).coerceIn(0.5f, 0.95f)
+                val cw = w * 0.13f * sclM
+                val ch = h * 0.16f * sclM
+                val cx = (projM?.x ?: (centerX + yaw * 1.2f)) - cw * 0.5f
+                val cy = (projM?.y ?: (h * 0.48f)) - ch * 0.35f
+                // double container stack shadow
+                drawOval(Color.Black.copy(alpha = 0.18f), topLeft = Offset(cx + shadowDx - 4f, cy + ch + shadowDy), size = Size(cw * 1.2f, ch * 0.16f))
+                // lower container
+                drawRect(Color(0xFF6B4A2A), topLeft = Offset(cx, cy + ch * 0.48f), size = Size(cw, ch * 0.52f))
+                for (si in 0 until 6) {
+                    val sx = cx + si * cw * 0.16f + 1f
+                    drawLine(Color(0xFF4A2A0A).copy(alpha = 0.18f), Offset(sx, cy + ch * 0.50f), Offset(sx, cy + ch), strokeWidth = 1.8f)
+                }
+                repeat(2) { idx ->
+                    val ry = cy + ch * (0.60f + idx * 0.22f)
+                    drawLine(Color(0xFF3A1E05), Offset(cx, ry), Offset(cx + cw, ry), strokeWidth = 2f)
+                }
+                // upper container
+                drawRect(Color(0xFF7A5A3A), topLeft = Offset(cx, cy), size = Size(cw, ch * 0.48f))
+                for (si in 0 until 6) {
+                    val sx = cx + si * cw * 0.16f + 1f
+                    drawLine(Color(0xFF5A3A1A).copy(alpha = 0.16f), Offset(sx, cy), Offset(sx, cy + ch * 0.46f), strokeWidth = 1.8f)
+                }
+                repeat(2) { idx ->
+                    val ry = cy + ch * (0.12f + idx * 0.20f)
+                    drawLine(Color(0xFF4A2E12), Offset(cx, ry), Offset(cx + cw, ry), strokeWidth = 2f)
+                }
+                drawRect(Color(0xFF8A6A42), topLeft = Offset(cx, cy), size = Size(cw, ch * 0.07f))
+                drawLine(Color.White.copy(alpha = 0.10f), Offset(cx, cy), Offset(cx + cw, cy), strokeWidth = 1f)
+                drawRect(brush = Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.20f), Color.Transparent), startY = cy + ch - h * 0.02f, endY = cy + ch), topLeft = Offset(cx, cy + ch - h * 0.02f), size = Size(cw, h * 0.02f))
+            }
+            // Far bunker wall — world X=-0.55 Z=5.2 (depth layer, smaller via perspective)
+            run {
+                val projF = projectWorld(-0.55f, 5.2f, 0.565f)
+                val distF = 2.8f + (-0.55f * camSin + 5.2f * camCos)
+                val sclF = (1.55f / distF.coerceAtLeast(0.6f)).coerceIn(0.45f, 0.85f)
+                val fw = w * 0.11f * sclF
+                val fh = h * 0.18f * sclF
+                val fx = (projF?.x ?: (w * 0.32f)) - fw * 0.5f
+                val fy = (projF?.y ?: (h * 0.46f)) - fh * 0.35f
+                drawOval(Color.Black.copy(alpha = 0.14f), topLeft = Offset(fx + shadowDx * 0.6f, fy + fh + shadowDy * 0.6f), size = Size(fw * 1.1f, fh * 0.14f))
+                drawRect(Color(0xFF3A4455), topLeft = Offset(fx, fy), size = Size(fw, fh))
+                for (ri in 0..3) {
+                    val rx = fx + ri * fw * 0.28f
+                    drawLine(Color(0xFF2C3545).copy(alpha = 0.30f), Offset(rx, fy), Offset(rx, fy + fh), strokeWidth = 1f)
+                }
+                drawRect(Color(0xFF4A5568), topLeft = Offset(fx, fy), size = Size(fw, fh * 0.10f))
+                drawRect(brush = Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.18f), Color.Transparent), startY = fy + fh - h * 0.015f, endY = fy + fh), topLeft = Offset(fx, fy + fh - h * 0.015f), size = Size(fw, h * 0.015f))
+            }
+            // Horizon tower silhouette — world X=0.75 Z=7.0 (far, atmospheric fog already desaturates)
+            run {
+                val projT = projectWorld(0.75f, 7.0f, 0.42f)
+                if (projT != null) {
+                    val distT = 2.8f + (0.75f * camSin + 7.0f * camCos)
+                    val sclT = (1.55f / distT.coerceAtLeast(0.6f)).coerceIn(0.35f, 0.75f)
+                    val tw = w * 0.04f * sclT
+                    val th = h * 0.26f * sclT
+                    val tx = projT.x - tw * 0.5f
+                    val ty = projT.y - th * 0.7f
+                    // tower body
+                    drawRect(Color(0xFF1A2535).copy(alpha = 0.85f), topLeft = Offset(tx, ty), size = Size(tw, th))
+                    // antenna
+                    drawLine(Color(0xFF1A2535).copy(alpha = 0.70f), Offset(tx + tw * 0.5f, ty), Offset(tx + tw * 0.5f, ty - th * 0.18f), strokeWidth = 1.2f)
+                    drawCircle(Color(0xFFFF3B30).copy(alpha = 0.55f), radius = 2.2f * sclT, center = Offset(tx + tw * 0.5f, ty - th * 0.16f))
+                    // platform struts
+                    drawLine(Color(0xFF0E1A2E).copy(alpha = 0.55f), Offset(tx - tw * 0.18f, ty + th * 0.35f), Offset(tx + tw * 0.35f, ty + th * 0.28f), strokeWidth = 1f)
+                    drawLine(Color(0xFF0E1A2E).copy(alpha = 0.55f), Offset(tx + tw * 1.18f, ty + th * 0.35f), Offset(tx + tw * 0.65f, ty + th * 0.28f), strokeWidth = 1f)
+                }
+            }
 
             // Targets - project with true yaw-rotated perspective + depth-tested occlusion (critic: painter's algorithm ≠ depth buffer)
             val sorted = targets.sortedByDescending { it.z }
             // occlusion: build wall AABBs in projected space for the frame to depth-test targets behind cover
             val wallAabbs: List<Pair<Float, Float>> by lazy {
-                // uses same projectWorld for walls; approximated as x ranges
+                // uses same projectWorld for walls; approximated as x ranges — now includes mid + far for denser occlusion
                 val l = projectWorld(-1.05f, 2.2f, 0.58f)?.x ?: (w * 0.11f)
                 val r = projectWorld(0.92f, 1.9f, 0.585f)?.x ?: (w * 0.88f)
-                listOf(l to 2.2f, r to 1.9f)
+                val m = projectWorld(0.05f, 3.8f, 0.575f)?.x ?: centerX
+                val f = projectWorld(-0.55f, 5.2f, 0.565f)?.x ?: (w * 0.32f)
+                listOf(l to 2.2f, r to 1.9f, m to 3.8f, f to 5.2f)
             }
             for (t in sorted) {
                 // rotate target world position by camera yaw, then perspective divide (matches wall projection)
