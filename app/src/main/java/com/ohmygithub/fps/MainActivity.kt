@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import com.ohmygithub.fps.ui.theme.AppTheme
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -112,15 +115,9 @@ object TodoLogic {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
-            MaterialTheme(
-                colorScheme = lightColorScheme(
-                    primary = Color(0xFF6750A4),
-                    secondary = Color(0xFF625B71),
-                    background = Color(0xFFFFFBFE),
-                    surface = Color(0xFFFFFBFE)
-                )
-            ) {
+            AppTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     TodoScreen()
                 }
@@ -134,11 +131,13 @@ class MainActivity : ComponentActivity() {
 fun TodoScreen() {
     val context = LocalContext.current
     var todos by remember { mutableStateOf(TodoStorage.load(context)) }
-    var input by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(Filter.ALL) }
-    var editingId by remember { mutableStateOf<Long?>(null) }
-    var editingText by remember { mutableStateOf("") }
-    var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
+    var input by rememberSaveable { mutableStateOf("") }
+    var filterIndex by rememberSaveable { mutableIntStateOf(0) }
+    val filter = Filter.entries[filterIndex.coerceIn(0, Filter.entries.size - 1)]
+    fun setFilter(f: Filter) { filterIndex = f.ordinal }
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editingText by rememberSaveable { mutableStateOf("") }
+    var pendingDeleteId by rememberSaveable { mutableStateOf<Long?>(null) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     // persist whenever todos changes
@@ -167,7 +166,7 @@ fun TodoScreen() {
                 TextButton(onClick = {
                     pendingDeleteId?.let { id -> todos = TodoLogic.delete(todos, id) }
                     pendingDeleteId = null
-                }) { Text("Delete", color = Color(0xFFE53935)) }
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteId = null }) { Text("Cancel") }
@@ -237,7 +236,7 @@ fun TodoScreen() {
                     keyboardActions = KeyboardActions(onDone = { doAdd() }),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color(0xFFE0E0E0)
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
                 Button(
@@ -258,22 +257,22 @@ fun TodoScreen() {
             ) {
                 FilterChip(
                     selected = filter == Filter.ALL,
-                    onClick = { filter = Filter.ALL },
+                    onClick = { setFilter(Filter.ALL) },
                     label = { Text("All (${todos.size})") }
                 )
                 FilterChip(
                     selected = filter == Filter.ACTIVE,
-                    onClick = { filter = Filter.ACTIVE },
+                    onClick = { setFilter(Filter.ACTIVE) },
                     label = { Text("Active ($remaining)") }
                 )
                 FilterChip(
                     selected = filter == Filter.COMPLETED,
-                    onClick = { filter = Filter.COMPLETED },
+                    onClick = { setFilter(Filter.COMPLETED) },
                     label = { Text("Completed ($completedCount)") }
                 )
             }
 
-            HorizontalDivider(color = Color(0xFFE8E8E8), thickness = 1.dp)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
 
             // List
             if (filtered.isEmpty()) {
@@ -289,7 +288,7 @@ fun TodoScreen() {
                                 filter == Filter.ACTIVE -> "No active tasks"
                                 else -> "No tasks"
                             },
-                            fontSize = 18.sp, fontWeight = FontWeight.Medium, color = Color(0xFF8A8A8A)
+                            fontSize = 18.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             when {
@@ -297,7 +296,7 @@ fun TodoScreen() {
                                 filter == Filter.COMPLETED -> "Complete a task to see it here"
                                 else -> "All caught up!"
                             },
-                            fontSize = 14.sp, color = Color(0xFFABABAB)
+                            fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                         if (todos.isEmpty()) {
                             FilledTonalButton(
@@ -361,10 +360,10 @@ fun TodoRow(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (item.completed) Color(0xFFF5F5F5) else Color.White
+            containerColor = if (item.completed) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEFEFEF))
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
@@ -376,7 +375,7 @@ fun TodoRow(
                 onCheckedChange = { onToggle() },
                 colors = CheckboxDefaults.colors(
                     checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = Color(0xFFBDBDBD)
+                    uncheckedColor = MaterialTheme.colorScheme.outline
                 )
             )
 
@@ -392,10 +391,10 @@ fun TodoRow(
                     keyboardActions = KeyboardActions(onDone = { onSaveEdit() })
                 )
                 IconButton(onClick = onSaveEdit) {
-                    Icon(Icons.Filled.Check, contentDescription = "Save", tint = Color(0xFF2E7D32))
+                    Icon(Icons.Filled.Check, contentDescription = "Save", tint = MaterialTheme.colorScheme.primary)
                 }
                 IconButton(onClick = onCancelEdit) {
-                    Icon(Icons.Filled.Close, contentDescription = "Cancel", tint = Color(0xFF757575))
+                    Icon(Icons.Filled.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 Text(
@@ -403,16 +402,16 @@ fun TodoRow(
                     modifier = Modifier.weight(1f),
                     fontSize = 15.sp,
                     fontWeight = if (item.completed) FontWeight.Normal else FontWeight.Medium,
-                    color = if (item.completed) Color(0xFF9E9E9E) else Color(0xFF212121),
+                    color = if (item.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (item.completed) TextDecoration.LineThrough else null,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
                 IconButton(onClick = onStartEdit) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit todo", tint = Color(0xFF757575), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit todo", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete todo", tint = Color(0xFFE53935), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete todo", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                 }
             }
         }

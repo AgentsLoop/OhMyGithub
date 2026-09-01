@@ -5,42 +5,73 @@ import org.junit.Test
 
 class GameLogicTest {
     @Test
-    fun targetCreationIsWithinBounds() {
-        val t = Target(id = 1, x = 0.5f, z = 3f)
-        assertTrue(t.x in -1f..1f)
-        assertTrue(t.z in 1f..10f)
-        assertTrue(t.alive)
+    fun addTodoTrimsAndIgnoresEmpty() {
+        val list = emptyList<TodoItem>()
+        val added = TodoLogic.add(list, "  Buy milk  ")
+        assertEquals(1, added.size)
+        assertEquals("Buy milk", added[0].text)
+        val notAdded = TodoLogic.add(added, "   ")
+        assertEquals(1, notAdded.size)
     }
 
     @Test
-    fun targetHitLogicMarksDead() {
-        val targets = mutableListOf(Target(0, 0f, 2f), Target(1, 0.8f, 5f))
-        val hit = targets[0].copy(alive = false)
-        targets[0] = hit
-        assertFalse(targets[0].alive)
-        assertTrue(targets[1].alive)
+    fun toggleTodoFlipsCompleted() {
+        val item = TodoItem(id = 1, text = "Test", completed = false)
+        val toggled = TodoLogic.toggle(listOf(item), 1)
+        assertTrue(toggled[0].completed)
+        val toggledBack = TodoLogic.toggle(toggled, 1)
+        assertFalse(toggledBack[0].completed)
     }
 
     @Test
-    fun scoreCalculationIsCorrect() {
-        var score = 0
-        val level = 2
-        score += 150 * level
-        assertEquals(300, score)
+    fun deleteTodoRemovesItem() {
+        val a = TodoItem(id = 1, text = "A")
+        val b = TodoItem(id = 2, text = "B")
+        val result = TodoLogic.delete(listOf(a, b), 1)
+        assertEquals(1, result.size)
+        assertEquals(2L, result[0].id)
     }
 
     @Test
-    fun ammoReloadResets() {
-        var ammo = 0
-        val isReloading = true
-        if (isReloading) ammo = 30
-        assertEquals(30, ammo)
+    fun updateTextTrimsAndIgnoresEmpty() {
+        val item = TodoItem(id = 1, text = "Old")
+        val updated = TodoLogic.updateText(listOf(item), 1, "  New text ")
+        assertEquals("New text", updated[0].text)
+        val ignored = TodoLogic.updateText(updated, 1, "   ")
+        assertEquals("New text", ignored[0].text)
     }
 
     @Test
-    fun yawClampingWorks() {
-        var yaw = 50f
-        yaw = yaw.coerceIn(-40f, 40f)
-        assertEquals(40f, yaw, 0.01f)
+    fun clearCompletedRemovesOnlyCompleted() {
+        val items = listOf(
+            TodoItem(id = 1, text = "A", completed = true),
+            TodoItem(id = 2, text = "B", completed = false),
+            TodoItem(id = 3, text = "C", completed = true)
+        )
+        val cleared = TodoLogic.clearCompleted(items)
+        assertEquals(1, cleared.size)
+        assertEquals(2L, cleared[0].id)
+    }
+
+    @Test
+    fun filterWorks() {
+        val items = listOf(
+            TodoItem(id = 1, text = "A", completed = false),
+            TodoItem(id = 2, text = "B", completed = true)
+        )
+        assertEquals(2, TodoLogic.filter(items, Filter.ALL).size)
+        assertEquals(1, TodoLogic.filter(items, Filter.ACTIVE).size)
+        assertEquals(1, TodoLogic.filter(items, Filter.COMPLETED).size)
+        assertEquals("A", TodoLogic.filter(items, Filter.ACTIVE)[0].text)
+    }
+
+    @Test
+    fun remainingCountsActive() {
+        val items = listOf(
+            TodoItem(id = 1, text = "A", completed = false),
+            TodoItem(id = 2, text = "B", completed = true),
+            TodoItem(id = 3, text = "C", completed = false)
+        )
+        assertEquals(2, TodoLogic.remaining(items))
     }
 }
