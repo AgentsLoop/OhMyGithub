@@ -46,6 +46,14 @@ data class HitNumber(
     val born: Long = System.currentTimeMillis()
 )
 
+data class Brass(
+    val id: Int,
+    val born: Long = System.currentTimeMillis(),
+    val vx: Float,
+    val vy: Float,
+    val spin: Float
+)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +93,9 @@ fun FpsGameScreen() {
     var hitNumbers by remember { mutableStateOf(listOf<HitNumber>()) }
     var hitNumberSeq by remember { mutableIntStateOf(0) }
     var frameTick by remember { mutableIntStateOf(0) }
+    // AAA brass ejection particle queue (MW3 shell physics)
+    var brasses by remember { mutableStateOf(listOf<Brass>()) }
+    var brassSeq by remember { mutableIntStateOf(0) }
     var targets by remember {
         mutableStateOf(
             List(5) { i ->
@@ -145,7 +156,7 @@ fun FpsGameScreen() {
             damageFlash = false
         }
     }
-    // ticker drives floating hit-number rise/fade and blood-ring pulse
+    // ticker drives floating hit-number rise/fade, blood-ring pulse, and brass physics
     LaunchedEffect(Unit) {
         while (true) {
             delay(16)
@@ -153,6 +164,9 @@ fun FpsGameScreen() {
             val now = System.currentTimeMillis()
             if (hitNumbers.any { now - it.born > 820 }) {
                 hitNumbers = hitNumbers.filter { now - it.born < 820 }
+            }
+            if (brasses.any { now - it.born > 1100 }) {
+                brasses = brasses.filter { now - it.born < 1100 }
             }
         }
     }
@@ -195,9 +209,18 @@ fun FpsGameScreen() {
         ammo--
         recoil = 16f
         muzzleFlash = true
+        // brass ejection with randomized lateral + upward velocity + spin (Warzone-style)
+        brasses = brasses + Brass(
+            id = brassSeq++,
+            vx = Random.nextFloat() * 2.2f + 1.1f,
+            vy = -(Random.nextFloat() * 3.5f + 2.8f),
+            spin = Random.nextFloat() * 720f - 360f
+        )
         // lightweight recoil variance so it feels analogue, not digital
         yaw += (Random.nextFloat() - 0.5f) * 0.9f
         pitch += Random.nextFloat() * 0.6f
+        // subtle camera FOV kick — survives via screenShake extension above
+        screenShake = Offset(screenShake.x * 0.3f + (Random.nextFloat() - 0.5f) * 2f, screenShake.y)
         // Aim calculation: projected crosshair vs target screen position
         // Convert yaw to world offset: yaw in degrees -> offset
         val aimX = crosshairOffset.x / 400f + yaw / 45f
@@ -399,7 +422,20 @@ fun FpsGameScreen() {
                     drawLine(Color(0xFF2A261E).copy(alpha = 0.06f), Offset(tx - 6f + 9f, ty), Offset(tx + 6f + 9f, ty), strokeWidth = lw * 0.7f)
                 }
             }
-            // Horizon AO contact shadow — wall-ground junction darkening
+            // Sun glint speculars on sand — quartz sparkle near sun azimuth (AAA micro-detail)
+            for (gi in 0 until 28) {
+                val gx = w * (0.12f + (gi * 37 % 88) / 88f * 0.78f)
+                val gz = (gi * 53 % 100) / 100f // 0 near horizon = denser glints
+                val gy = h * (0.60f + gz * 0.36f)
+                // only glint where sun hits with Fresnel-like falloff
+                val sunAlign = 1f - abs(gx - w * 0.62f) / (w * 0.52f) // brighter toward sun side
+                if (sunAlign > 0.18f) {
+                    val ga = (0.11f * sunAlign * (0.6f + gz * 0.4f)) * (0.6f + sin(gi * 1.91f) * 0.4f)
+                    drawCircle(Color.White.copy(alpha = ga.coerceIn(0f, 0.14f)), radius = 1.15f, center = Offset(gx + yaw * gz * 2f, gy))
+                    if (gi % 3 == 0) drawCircle(Color(0xFFFFE8A0).copy(alpha = ga * 0.6f), radius = 0.55f, center = Offset(gx + yaw * gz * 2f + 0.5f, gy - 0.5f))
+                }
+            }
+            // Horizon AO contact shadow — wall-ground junction darkening + depth falloff
             drawRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(Color.Black.copy(alpha = 0.28f), Color.Transparent),
@@ -408,6 +444,16 @@ fun FpsGameScreen() {
                 ),
                 topLeft = Offset(0f, h * 0.54f),
                 size = Size(w, h * 0.06f)
+            )
+            // Subtle depth darkening toward bottom (falloff) — reinforces perspective
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.10f)),
+                    startY = h * 0.78f,
+                    endY = h
+                ),
+                topLeft = Offset(0f, h * 0.78f),
+                size = Size(w, h * 0.22f)
             )
             // Grid lines — reduced to faint sandy hint, not Tron wires (critic: stark white at 0.07)
             for (i in 0..12) {
@@ -584,75 +630,127 @@ fun FpsGameScreen() {
                     drawCircle(Color.White.copy(alpha = 0.10f), radius = targetW * 0.18f, center = Offset(projX + targetW * 0.08f, projY - targetH * 0.18f))
                     continue
                 }
-                // Shadow
+                // Shadow — contact AO soft + stretched with distance
                 drawOval(
-                    color = Color.Black.copy(alpha = 0.35f),
+                    color = Color.Black.copy(alpha = (0.38f - t.z * 0.022f).coerceIn(0.12f, 0.38f)),
                     topLeft = Offset(projX - targetW * 0.55f, h * 0.635f),
                     size = Size(targetW * 1.1f, targetH * 0.12f)
                 )
-                // Body - soldier silhouette simplified
-                // Head
+                // Body - PBR soldier with directional sun light (top-left 45 deg) + rim + micro-fabric
+                val sunDirX = -0.45f // sun from upper-right in world, so shade left side
+                val lightTop = Color(0xFF5E6E4A)
+                val lightMid = Color(0xFF4A5A3A)
+                val shadowSide = Color(0xFF2E3A28)
+                val rimCol = Color(0xFF8AA07A).copy(alpha = 0.22f)
+                // Head — subsurface + shadow
                 drawCircle(
-                    color = Color(0xFF1A1A18),
+                    color = Color(0xFF252218),
                     radius = targetW * 0.18f,
                     center = Offset(projX, projY - targetH * 0.32f)
                 )
-                // Helmet
+                // head light side highlight (sun on right cheek)
+                drawCircle(
+                    color = Color(0xFF3A3528).copy(alpha = 0.55f),
+                    radius = targetW * 0.12f,
+                    center = Offset(projX + targetW * 0.06f, projY - targetH * 0.335f)
+                )
+                // Helmet — brushed olive with top specular (Fresnel-like)
                 drawArc(
-                    color = Color(0xFF3A4A2A),
+                    brush = Brush.verticalGradient(listOf(Color(0xFF4E5E3A), Color(0xFF3A4A2A), Color(0xFF2A3520))),
                     startAngle = 180f,
                     sweepAngle = 180f,
                     useCenter = true,
                     topLeft = Offset(projX - targetW * 0.20f, projY - targetH * 0.44f),
                     size = Size(targetW * 0.40f, targetW * 0.28f)
                 )
-                // Torso
+                // helmet top specular streak (sun glint)
+                drawArc(
+                    color = Color.White.copy(alpha = 0.16f),
+                    startAngle = 200f,
+                    sweepAngle = 42f,
+                    useCenter = false,
+                    topLeft = Offset(projX - targetW * 0.17f, projY - targetH * 0.435f),
+                    size = Size(targetW * 0.34f, targetW * 0.20f),
+                    style = Stroke(width = targetW * 0.032f)
+                )
+                drawCircle(Color.White.copy(alpha = 0.11f), radius = targetW * 0.045f, center = Offset(projX + targetW * 0.08f, projY - targetH * 0.415f))
+                // Torso — camo fabric with directional gradient (light top, shadow bottom + side AO)
                 drawRoundRect(
-                    color = Color(0xFF4A5A3A),
+                    brush = Brush.verticalGradient(listOf(lightTop, lightMid, shadowSide)),
                     topLeft = Offset(projX - targetW * 0.30f, projY - targetH * 0.22f),
                     size = Size(targetW * 0.60f, targetH * 0.48f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
                 )
-                // Vest plate
+                // fabric weave micro lines (subtle)
+                for (fi in 0..3) {
+                    val fy = projY - targetH * 0.18f + fi * targetH * 0.09f
+                    drawLine(Color.Black.copy(alpha = 0.07f), Offset(projX - targetW * 0.26f, fy), Offset(projX + targetW * 0.26f, fy), strokeWidth = 0.6f)
+                }
+                // left side shadow (away from sun)
                 drawRoundRect(
-                    color = Color(0xFF2B3A2B),
+                    color = Color.Black.copy(alpha = 0.18f),
+                    topLeft = Offset(projX - targetW * 0.30f, projY - targetH * 0.22f),
+                    size = Size(targetW * 0.10f, targetH * 0.48f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
+                )
+                // rim light on right edge (sun backscatter)
+                drawLine(rimCol, Offset(projX + targetW * 0.27f, projY - targetH * 0.18f), Offset(projX + targetW * 0.27f, projY + targetH * 0.20f), strokeWidth = targetW * 0.045f)
+                // Vest plate — matte nylon with edge highlight + AO crevice
+                drawRoundRect(
+                    brush = Brush.verticalGradient(listOf(Color(0xFF3A4A38), Color(0xFF2B3A2B), Color(0xFF1E2A1E))),
                     topLeft = Offset(projX - targetW * 0.20f, projY - targetH * 0.15f),
                     size = Size(targetW * 0.40f, targetH * 0.28f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f)
                 )
-                // Arms
+                // vest top edge bevel highlight
+                drawLine(Color.White.copy(alpha = 0.09f), Offset(projX - targetW * 0.18f, projY - targetH * 0.14f), Offset(projX + targetW * 0.18f, projY - targetH * 0.14f), strokeWidth = 1f)
+                // molle webbing horizontal stitches
+                repeat(2) { mi ->
+                    val my = projY - targetH * 0.06f + mi * targetH * 0.08f
+                    drawLine(Color.Black.copy(alpha = 0.22f), Offset(projX - targetW * 0.18f, my), Offset(projX + targetW * 0.18f, my), strokeWidth = 0.9f)
+                }
+                // Arms — fabric with same gradient + shadow
                 drawRoundRect(
-                    color = Color(0xFF4A5A3A),
+                    brush = Brush.horizontalGradient(listOf(shadowSide, lightMid, lightTop)),
                     topLeft = Offset(projX - targetW * 0.42f, projY - targetH * 0.18f),
                     size = Size(targetW * 0.14f, targetH * 0.36f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(7f, 7f)
                 )
                 drawRoundRect(
-                    color = Color(0xFF4A5A3A),
+                    brush = Brush.horizontalGradient(listOf(lightTop, lightMid, shadowSide)),
                     topLeft = Offset(projX + targetW * 0.28f, projY - targetH * 0.18f),
                     size = Size(targetW * 0.14f, targetH * 0.36f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(7f, 7f)
                 )
-                // Legs
+                // arm rim on sun-lit side
+                drawLine(rimCol.copy(alpha = 0.16f), Offset(projX + targetW * 0.40f, projY - targetH * 0.12f), Offset(projX + targetW * 0.40f, projY + targetH * 0.14f), strokeWidth = targetW * 0.03f)
+                // Legs — slightly dustier, desaturated with knee highlight
                 drawRoundRect(
-                    color = Color(0xFF3A3A35),
+                    brush = Brush.verticalGradient(listOf(Color(0xFF4A4338), Color(0xFF3A3A35), Color(0xFF2A2A26))),
                     topLeft = Offset(projX - targetW * 0.24f, projY + targetH * 0.26f),
                     size = Size(targetW * 0.18f, targetH * 0.36f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f, 5f)
                 )
                 drawRoundRect(
-                    color = Color(0xFF3A3A35),
+                    brush = Brush.verticalGradient(listOf(Color(0xFF4A4338), Color(0xFF3A3A35), Color(0xFF2A2A26))),
                     topLeft = Offset(projX + targetW * 0.06f, projY + targetH * 0.26f),
                     size = Size(targetW * 0.18f, targetH * 0.36f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f, 5f)
                 )
-                // Weapon
+                // knee dust highlight (sand)
+                drawOval(Color(0xFFC2B49A).copy(alpha = 0.10f), topLeft = Offset(projX - targetW * 0.20f, projY + targetH * 0.40f), size = Size(targetW * 0.12f, targetH * 0.06f))
+                drawOval(Color(0xFFC2B49A).copy(alpha = 0.10f), topLeft = Offset(projX + targetW * 0.10f, projY + targetH * 0.40f), size = Size(targetW * 0.12f, targetH * 0.06f))
+                // Weapon — blued steel with anisotropic highlight
                 drawRoundRect(
-                    color = Color(0xFF1A1A1A),
+                    brush = Brush.verticalGradient(listOf(Color(0xFF2A2A2A), Color(0xFF141414), Color(0xFF0F0F0F))),
                     topLeft = Offset(projX - targetW * 0.08f, projY - targetH * 0.02f),
                     size = Size(targetW * 0.52f, targetH * 0.08f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
                 )
+                // barrel specular streak (sun)
+                drawLine(Color.White.copy(alpha = 0.14f), Offset(projX + targetW * 0.02f, projY - targetH * 0.005f), Offset(projX + targetW * 0.38f, projY - targetH * 0.005f), strokeWidth = 1f)
+                // magazine polymer highlight
+                drawRoundRect(Color(0xFF1E1E1E), topLeft = Offset(projX - targetW * 0.02f, projY + targetH * 0.02f), size = Size(targetW * 0.12f, targetH * 0.04f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(1f,1f))
                 // Red dot indicator for hostile
                 drawCircle(
                     color = Color(0xFFFF3B30),
@@ -961,16 +1059,49 @@ fun FpsGameScreen() {
                     drawCircle(Color.White.copy(alpha = 0.95f), radius = 3.2f, center = tip)
                 }
             }
-            // ejected brass hint when firing
+        }
+        // AAA brass + smoke overlay — fullscreen physics particles (driven by frameTick)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val tick = frameTick // invalidate each frame
+            @Suppress("UNUSED_VARIABLE") val _t = tick
+            val now = System.currentTimeMillis()
+            // muzzle smoke puff — expands and fades 180ms after each shot
             if (muzzleFlash) {
-                Box(
-                    modifier = Modifier
-                        .offset(x = 28.dp, y = (-8).dp)
-                        .size(7.dp, 4.dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(Color(0xFFFFD67A).copy(alpha = 0.95f))
-                        .border(0.5.dp, Color(0xFFB8860B), RoundedCornerShape(1.dp))
-                ) {}
+                val smokeCenter = Offset(size.width / 2f + 64f, size.height - 92f)
+                drawCircle(Color(0xFF9A9A9A).copy(alpha = 0.18f), radius = 22f, center = smokeCenter)
+                drawCircle(Color.White.copy(alpha = 0.08f), radius = 14f, center = Offset(smokeCenter.x + 4f, smokeCenter.y - 6f))
+            }
+            for (b in brasses) {
+                val age = (now - b.born) / 1000f // seconds
+                if (age > 1.1f) continue
+                val g = 680f // gravity px/s^2
+                // start at ejection port (right side of weapon, ~center+10, bottom-78)
+                val startX = size.width / 2f + 18f
+                val startY = size.height - 78f
+                val vx = b.vx * 42f // px per sec scaled
+                val vy0 = b.vy * 28f
+                val x = startX + vx * age * 14f + b.spin * 0.02f * age
+                val y = startY + vy0 * age * 1.0f + 0.5f * g * age * age * 0.22f
+                val alpha = (1f - age / 1.1f).coerceIn(0f, 1f)
+                // shadow on ground beneath brass
+                if (alpha > 0.15f) {
+                    val groundY = size.height - 28f
+                    val t = ((groundY - y) / (groundY - startY)).coerceIn(0f, 1f)
+                    drawOval(Color.Black.copy(alpha = 0.16f * alpha * t), topLeft = Offset(x - 5f, groundY - 2f), size = Size(10f, 3f))
+                }
+                // brass casing — gold with highlight and spin rotation hint
+                drawRoundRect(
+                    color = Color(0xFFFFD67A).copy(alpha = alpha),
+                    topLeft = Offset(x, y),
+                    size = Size(9f, 5f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.2f, 1.2f)
+                )
+                drawLine(Color.White.copy(alpha = 0.55f * alpha), Offset(x + 1f, y + 0.5f), Offset(x + 7f, y + 0.5f), strokeWidth = 1f)
+                drawLine(Color(0xFFB8860B).copy(alpha = 0.9f * alpha), Offset(x, y + 4f), Offset(x + 9f, y + 4f), strokeWidth = 0.9f)
+                // spin glint
+                if (age < 0.35f) {
+                    drawCircle(Color.White.copy(alpha = 0.35f * (1f - age / 0.35f)), radius = 1.1f, center = Offset(x + 7f, y + 2f))
+                }
             }
         }
 
