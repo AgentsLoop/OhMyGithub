@@ -35,9 +35,10 @@ Use the repository supplied by the caller when one is provided. When no
 repository is supplied, default to `AgentsLoop/PlayGround`. Resolve the full
 `OWNER/REPO` with `gh repo view` and confirm the authenticated account can
 administer it before creating issues or triggering Actions. Do not silently
-substitute a different repository. Verify that the target contains the
-`.github/workflows/opencode.yml` workflow; if it does not, stop and report that
-the E2E workflow is unavailable rather than creating a misleading test issue.
+substitute a different repository. If the target does not contain
+`.github/workflows/opencode.yml`, still create the requested issue, but report
+that the E2E workflow is unavailable and do not claim that an Action or session
+was started.
 
 The caller's following message is sufficient as the prompt when one is
 provided, even when it is short or does not describe a game. If no prompt is
@@ -100,7 +101,9 @@ OAuth provider.
    with uncommitted or unpushed changes.
 2. Confirm `gh auth status`, resolve the target repository (default
    `AgentsLoop/PlayGround`), and inspect it with `gh repo view <owner>/<repo>`.
-   Confirm `.github/workflows/opencode.yml` exists before continuing.
+   Check whether `.github/workflows/opencode.yml` exists. If it is missing,
+   continue through issue creation, then report that no workflow or session
+   could be started and stop without attempting run polling.
 3. Inspect the current labels in the target repository with
    `gh label list --repo <owner>/<repo>`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
