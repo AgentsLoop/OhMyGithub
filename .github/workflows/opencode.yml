@@ -28,9 +28,6 @@ permissions:
 
 jobs:
   opencode:
-    concurrency:
-      group: opencode-${{ github.repository_id }}-issue-${{ inputs.issue_number }}
-      cancel-in-progress: true
     uses: ./.github/workflows/opencode-reusable.yml
     with:
       issue_number: ${{ inputs.issue_number }}

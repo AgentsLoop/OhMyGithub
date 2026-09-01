@@ -12,5 +12,7 @@ and hung attached verification.
   SSH; successful runs skip the five-hour hold.
 - Publish through a checksum-verified draft release transaction.
 - Prefer App-owned PR creation after run/branch/SHA authorization.
-- Deduplicate webhook delivery IDs, detect queued as well as active issue runs,
-  and enforce issue-scoped Actions concurrency.
+- Deduplicate webhook delivery IDs, lease issue dispatches across concurrent
+  opened/labeled deliveries, detect queued as well as active issue runs, and
+  enforce issue-scoped Actions concurrency without double-locking the calling
+  wrapper and reusable job.

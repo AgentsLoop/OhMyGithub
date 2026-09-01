@@ -33,10 +33,10 @@ execute it.` The resulting bot-authored `OpenCode` label event is accepted as
 the execution trigger, using the issue author for authorization. A human adding
 that exact label later follows the same path.
 
-Webhook redelivery of the same delivery ID is ignored. Before dispatch, the App
-also checks queued and in-progress runs for the issue; the wrapper and reusable
-job enforce an issue-scoped concurrency key so a race still leaves only one
-active run.
+Webhook redelivery of the same delivery ID is ignored. A short durable
+per-issue execution lease closes the separate opened/labeled delivery race,
+the App checks queued and in-progress runs, and the reusable job enforces an
+issue-scoped concurrency key as the final guard.
 
 An optional issue-title suffix `branch: <existing-branch>` selects the target
 checkout and pull-request base. The App removes that metadata suffix from the

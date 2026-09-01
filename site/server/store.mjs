@@ -5,9 +5,11 @@ export function createStore(dataDir, firestore = null) {
   mkdirSync(dataDir, { recursive: true })
   const file = join(dataDir, 'projects.json')
   const deliveriesFile = join(dataDir, 'github-deliveries.json')
+  const executionsFile = join(dataDir, 'github-executions.json')
   const read = () => existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : []
   const write = (rows) => writeFileSync(file, JSON.stringify(rows, null, 2))
   const readDeliveries = () => existsSync(deliveriesFile) ? JSON.parse(readFileSync(deliveriesFile, 'utf8')) : {}
+  const readExecutions = () => existsSync(executionsFile) ? JSON.parse(readFileSync(executionsFile, 'utf8')) : {}
   return {
     async all() {
       if (!firestore) return read()
@@ -60,6 +62,33 @@ export function createStore(dataDir, firestore = null) {
       if (!deliveries[deliveryId]) return
       delete deliveries[deliveryId]
       writeFileSync(deliveriesFile, JSON.stringify(deliveries, null, 2))
+    },
+    async claimExecution(executionId, ttlMs = 30000) {
+      const claimedAt = Date.now()
+      if (firestore) {
+        const ref = firestore.collection('omgithub_github_executions').doc(executionId)
+        return firestore.runTransaction(async transaction => {
+          const existing = await transaction.get(ref)
+          if (existing.exists && claimedAt - Number(existing.data()?.claimed_at || 0) < ttlMs) return false
+          transaction.set(ref, { claimed_at: claimedAt })
+          return true
+        })
+      }
+      const executions = readExecutions()
+      if (claimedAt - Number(executions[executionId]?.claimed_at || 0) < ttlMs) return false
+      executions[executionId] = { claimed_at: claimedAt }
+      writeFileSync(executionsFile, JSON.stringify(executions, null, 2))
+      return true
+    },
+    async releaseExecution(executionId) {
+      if (firestore) {
+        await firestore.collection('omgithub_github_executions').doc(executionId).delete()
+        return
+      }
+      const executions = readExecutions()
+      if (!executions[executionId]) return
+      delete executions[executionId]
+      writeFileSync(executionsFile, JSON.stringify(executions, null, 2))
     }
   }
 }

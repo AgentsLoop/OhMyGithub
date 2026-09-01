@@ -3,10 +3,9 @@ import { generateKeyPairSync } from 'node:crypto'
 import test from 'node:test'
 import { activeWorkflowRun, createAppPullRequest, omgRequest, repositoryWorkflow } from './github.mjs'
 
-test('repository workflow serializes one run per issue', () => {
+test('repository workflow delegates concurrency ownership to the reusable job', () => {
   const workflow = repositoryWorkflow('AgentsLoop', 'OhMyGithub', 'feature/android')
-  assert.match(workflow, /group: opencode-\$\{\{ github\.repository_id \}\}-issue-\$\{\{ inputs\.issue_number \}\}/)
-  assert.match(workflow, /cancel-in-progress: true/)
+  assert.doesNotMatch(workflow, /concurrency:/)
   assert.match(workflow, /opencode-reusable\.yml@feature\/android/)
 })
 

@@ -114,11 +114,21 @@ app.post('/api/github/webhooks', express.raw({ type: 'application/json', limit: 
       event: request.deliveryEvent, action: request.deliveryAction
     })
     if (!claimed) return res.status(202).json({ accepted: true, route: 'duplicate-delivery' })
+    const executionId = createHash('sha256')
+      .update(`${request.repository}#${request.issueNumber}`)
+      .digest('hex')
+    const executionClaimed = request.missingOpenCodeLabel
+      ? false
+      : await store.claimExecution(executionId)
+    if (!request.missingOpenCodeLabel && !executionClaimed) {
+      return res.status(202).json({ accepted: true, route: 'duplicate-request' })
+    }
     let dispatched
     try {
       dispatched = await dispatchOmgRequest(request, githubApp)
     } catch (error) {
       await store.releaseDelivery(deliveryId)
+      if (executionClaimed) await store.releaseExecution(executionId)
       throw error
     }
     console.log(`OMG webhook routed ${request.repository}#${request.issueNumber} through ${dispatched.route}`)
