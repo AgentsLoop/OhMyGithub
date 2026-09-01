@@ -9,9 +9,9 @@ description: Start the issue-triggered workflow from the caller's prompt, wait f
 
 GitHub uses the term **label**. The required execution label is exactly
 `OpenCode`. Create the issue with that label, or add it to an existing issue;
-do not use comments, edits, or the word “tag” as a trigger. The
-App dispatches the workflow once when an issue is opened with the label or when
-`OpenCode` is added.
+do not use comments, edits, or the word “tag” as a trigger. The App dispatches
+the workflow once when an issue is opened with the label or when `OpenCode` is
+added, including when the App adds it after issue creation.
 
 When the caller explicitly requests a custom branch, append
 ` branch: <existing-branch>` to the issue title. Treat that suffix as routing
