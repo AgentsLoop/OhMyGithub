@@ -66,7 +66,11 @@ package_name="$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" <<<"$badging" | hea
 launchable_activity="$(sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p" <<<"$badging" | head -n 1)"
 [[ -n "$package_name" && -n "$launchable_activity" ]]
 
-adb install -r "$signed_apk"
+# OpenCode may have installed a debug-signed build of the same package while
+# exercising the app. Remove it first so the ephemeral CI signing key can be
+# used for the release verification install.
+adb uninstall "$package_name" >/dev/null 2>&1 || true
+adb install "$signed_apk"
 adb shell am force-stop "$package_name"
 adb shell am start -W -n "$package_name/$launchable_activity"
 sleep 3
