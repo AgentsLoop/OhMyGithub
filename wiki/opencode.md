@@ -61,10 +61,13 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    Message text, reasoning, prompts, and tool details are
    never rendered in the live comment; full logs are published only in the
    completion release.
-9. Runs a second verification prompt in the same OpenCode session as the build,
-   starts the app, and exposes it through a
-   separate temporary trycloudflare.com tunnel, and verifies the public URL.
-10. Verifies the app through the public tunnel. If verification fails, sends a
+9. Selects a dedicated web or Android composite verifier. Web issues run a
+   second browser-verification prompt, start the app, and expose it through a
+   separate temporary trycloudflare.com tunnel. Issues with the exact `Android`
+   label instead boot an API 35 Google APIs x86_64 emulator, run the Android
+   verification prompt in the same OpenCode session, build `assembleRelease`,
+   install and launch the app, and require a live-emulator screenshot.
+10. Verifies web apps through the public tunnel. If verification fails, sends a
    remediation prompt to the same OpenCode session and retries up to three
    times. Detects both uncommitted generated files and commits already created
    by OpenCode, then pushes the branch and creates the pull request in YAML.
@@ -75,11 +78,14 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
     sends up to two follow-up prompts to the same OpenCode session before
     continuing delivery with a warning.
 12. Creates a uniquely tagged GitHub release containing the final OpenCode
-    response JSON and safe runner log files, then appends its link to that same
-    live-progress comment.
-13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
-   verification,
-   then marks the comment closed and terminates both tunnels.
+    response JSON and safe runner log files. Android runs also include the
+    release APK, signed with a per-run ephemeral CI key so it can be installed
+    and verified without repository signing secrets.
+13. Always keeps SSH, the OpenCode Web UI, and available app state for 5 hours.
+   An Android verification failure holds inside the emulator action so the live
+   device remains available for ADB debugging over SSH instead of being torn
+   down and restarted. The workflow then marks the comment closed and
+   terminates both tunnels.
 
 Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
 defaults to `true`. When set to `off` (or any value other than `true`), the
@@ -193,7 +199,9 @@ tracking; acceptance requires a screenshot while the run is active.
 The reusable workflow uses `ubuntu-latest` (AMD64) by default. Add the exact
 `runner/arm64` label to an issue to select GitHub's `ubuntu-24.04-arm`
 GitHub-hosted runner. The label is passed through `labels_json`, so this works
-for both repository-local workflows and App-generated fallback wrappers.
+for both repository-local workflows and App-generated fallback wrappers. The
+`Android` label takes precedence and selects `ubuntu-latest`, because the
+hardware-accelerated emulator uses KVM and an x86_64 system image.
 
 ## Repository settings
 

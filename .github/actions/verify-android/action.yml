@@ -1,0 +1,74 @@
+name: Verify Android app
+description: Build, run, inspect, and capture an Android app on a live emulator.
+
+inputs:
+  session-id:
+    description: OpenCode session ID to continue.
+    required: true
+  model:
+    description: OpenCode model used by the session.
+    required: true
+  hold-seconds:
+    description: Time to retain the live emulator after a verification failure.
+    required: false
+    default: '18000'
+
+outputs:
+  apk-path:
+    description: Absolute path to the signed release APK.
+    value: ${{ steps.outputs.outputs.apk_path }}
+  apk-name:
+    description: Release APK filename.
+    value: ${{ steps.outputs.outputs.apk_name }}
+  package-name:
+    description: Installed Android application ID.
+    value: ${{ steps.outputs.outputs.package_name }}
+  screenshots-json:
+    description: JSON array of final emulator screenshot filenames.
+    value: ${{ steps.outputs.outputs.screenshots_json }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v5
+
+    - name: Enable KVM
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | \
+          sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    - name: Build and verify on Android emulator
+      uses: reactivecircus/android-emulator-runner@v2
+      env:
+        OPENCODE_SESSION_ID: ${{ inputs.session-id }}
+        OPENCODE_MODEL: ${{ inputs.model }}
+        ANDROID_FAILURE_HOLD_SECONDS: ${{ inputs.hold-seconds }}
+      with:
+        api-level: 35
+        target: google_apis
+        arch: x86_64
+        profile: pixel_7_pro
+        working-directory: ${{ env.PROJECT_DIR }}
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: true
+        script: bash "$RUNTIME_DIR/scripts/verify-android-app.sh"
+
+    - name: Export Android verification outputs
+      id: outputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        outputs_file="$OPENCODE_WEB_DIR/android-verification.outputs"
+        [[ -s "$outputs_file" ]]
+        cat "$outputs_file" >> "$GITHUB_OUTPUT"

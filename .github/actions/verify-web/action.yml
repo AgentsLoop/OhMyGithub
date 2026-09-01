@@ -1,0 +1,145 @@
+name: Verify web app
+description: Verify, expose, and capture evidence for an OpenCode-built web app.
+
+inputs:
+  session-id:
+    description: OpenCode session ID to continue.
+    required: true
+  model:
+    description: OpenCode model used by the session.
+    required: true
+
+outputs:
+  app-url:
+    description: Verified public application URL.
+    value: ${{ steps.verify.outputs.app_url }}
+  screenshots-json:
+    description: JSON array of final screenshot filenames.
+    value: ${{ steps.evidence.outputs.screenshots_json }}
+
+runs:
+  using: composite
+  steps:
+    - name: Ask OpenCode to verify the web app
+      shell: bash
+      working-directory: ${{ env.PROJECT_DIR }}
+      run: |
+        set -euo pipefail
+        "$HOME/.opencode/bin/opencode" run \
+          --auto \
+          --dangerously-skip-permissions \
+          --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+          --session '${{ inputs.session-id }}' \
+          --model '${{ inputs.model }}' \
+          "$(< "$RUNTIME_DIR/.github/prompts/02-verify-web.md")" \
+          > "$OPENCODE_WEB_DIR/verification.log" 2>&1
+
+    - name: Expose and verify the web app
+      id: verify
+      shell: bash
+      working-directory: ${{ env.PROJECT_DIR }}
+      env:
+        OPENCODE_MODEL: ${{ inputs.model }}
+        SESSION_ID: ${{ inputs.session-id }}
+      run: |
+        set -euo pipefail
+        OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+        FIX_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/03-public-app-fix.md")"
+
+        for attempt in 1 2 3; do
+          echo "Starting public app verification attempt $attempt/3."
+          [[ ! -f "$OPENCODE_WEB_DIR/app.pid" ]] || kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
+          [[ ! -f "$OPENCODE_WEB_DIR/app-cloudflared.pid" ]] || kill "$(cat "$OPENCODE_WEB_DIR/app-cloudflared.pid")" 2>/dev/null || true
+          : > "$OPENCODE_WEB_DIR/app.log"
+          : > "$OPENCODE_WEB_DIR/app-cloudflared.log"
+
+          npm run start -- --port "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/app.pid"
+          local_ok=''
+          for _ in {1..30}; do
+            if curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT" >/dev/null; then
+              local_ok='yes'
+              break
+            fi
+            sleep 1
+          done
+
+          APP_URL=''
+          if [[ "$local_ok" == 'yes' ]]; then
+            "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate \
+              --url "http://127.0.0.1:$APP_PORT" \
+              > "$OPENCODE_WEB_DIR/app-cloudflared.log" 2>&1 &
+            echo $! > "$OPENCODE_WEB_DIR/app-cloudflared.pid"
+            for _ in {1..60}; do
+              APP_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' \
+                "$OPENCODE_WEB_DIR/app-cloudflared.log" | head -n 1)"
+              [[ -n "$APP_URL" ]] && break
+              sleep 1
+            done
+            if [[ -n "$APP_URL" ]]; then
+              for _ in {1..60}; do
+                if curl --fail --silent --show-error --max-time 10 "$APP_URL" >/dev/null; then
+                  printf 'APP_URL=%s\n' "$APP_URL" >> "$GITHUB_ENV"
+                  printf 'app_url=%s\n' "$APP_URL" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                sleep 2
+              done
+            fi
+          fi
+
+          echo "Web verification failed on attempt $attempt (${APP_URL:-no public URL})."
+          if [[ "$attempt" -lt 3 ]]; then
+            "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
+              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+              --session "$SESSION_ID" \
+              --model "$OPENCODE_MODEL" \
+              "$FIX_PROMPT" \
+              >> "$OPENCODE_WEB_DIR/verification-fix-$attempt.log" 2>&1
+          fi
+        done
+        exit 1
+
+    - name: Publish web completion report
+      shell: bash
+      working-directory: ${{ env.PROJECT_DIR }}
+      run: |
+        set -euo pipefail
+        completion_prompt="$(< "$RUNTIME_DIR/.github/prompts/04-completion-report.md")"
+        completion_prompt="${completion_prompt//@APP_URL@/$APP_URL}"
+        completion_prompt="${completion_prompt//@TRIGGER_ISSUE_NUMBER@/$TRIGGER_ISSUE_NUMBER}"
+        "$HOME/.opencode/bin/opencode" run --auto --dangerously-skip-permissions \
+          --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+          --session '${{ inputs.session-id }}' \
+          --model '${{ inputs.model }}' \
+          "$completion_prompt" \
+          > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
+        touch "$OPENCODE_WEB_DIR/response-comment.done"
+
+    - name: Verify web screenshot evidence
+      id: evidence
+      shell: bash
+      env:
+        SESSION_ID: ${{ inputs.session-id }}
+        OPENCODE_MODEL: ${{ inputs.model }}
+      run: |
+        set -euo pipefail
+        OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+        SCREENSHOT_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/05-screenshot-evidence.md")"
+        for attempt in 1 2 3; do
+          mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
+            \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
+            -printf '%f\n' 2>/dev/null | sort)
+          if [[ "${#screenshots[@]}" -gt 0 ]]; then
+            printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$attempt" -lt 3 ]]; then
+            "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
+              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+              --session "$SESSION_ID" --model "$OPENCODE_MODEL" \
+              "$SCREENSHOT_PROMPT" > "$OPENCODE_WEB_DIR/screenshot-fix-$attempt.log" 2>&1 || true
+          fi
+        done
+        echo 'Final web screenshots remain missing; continuing delivery.'
+        printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"

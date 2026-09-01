@@ -35,6 +35,16 @@ actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.ym
 git diff --check
 ```
 
+For an `Android`-labeled issue, additionally confirm that `runner/arm64` is
+ignored, KVM and the API 35 emulator start, OpenCode creates a
+`screenshots/final-android-*.png` image from the live device, and deterministic
+post-verification rebuild/sign/install/launch checks pass. The run release must
+contain a non-empty `app-release.apk` whose signature verifies and whose direct
+asset link appears in the final live-progress comment. Force a verifier failure
+to confirm the emulator remains reachable through the posted SSH session for
+the five-hour hold; failures outside Android verification must still execute
+the general five-hour SSH hold before cleanup.
+
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
