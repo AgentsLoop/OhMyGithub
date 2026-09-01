@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>">
+<title>Runway Rift — Sunset Dogfight</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#060a18;font-family: 'Segoe UI', system-ui, sans-serif;}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:14px 16px;z-index:10}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .panel{background:linear-gradient(180deg, rgba(8,14,32,.94), rgba(10,18,38,.96));border:1px solid rgba(96,165,250,.38);backdrop-filter:blur(10px);border-radius:12px;padding:10px 14px;color:#dbeafe;box-shadow:0 8px 32px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.09);min-width:160px}
+  .panel h3{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#93c5fd;margin-bottom:6px}
+  .stat-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;line-height:1.4}
+  .stat-val{font-weight:800;color:#fff;font-variant-numeric:tabular-nums;font-size:14px}
+  .bar{height:10px;background:rgba(255,255,255,.14);border-radius:999px;overflow:hidden;margin-top:6px;border:1px solid rgba(255,255,255,.10)}
+  .bar>div{height:100%;transition:width .15s}
+  #healthFill{background:linear-gradient(90deg,#22c55e,#86efac)}
+  #throttleFill{background:linear-gradient(90deg,#f59e0b,#fde68a)}
+  .center-hud{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+  .reticle{width:60px;height:60px;border:2px solid rgba(255,255,255,.95);border-radius:50%;position:relative;box-shadow:0 0 14px rgba(96,165,250,.7), inset 0 0 14px rgba(96,165,250,.18);transition:transform .12s, border-color .12s, box-shadow .12s}
+  .reticle::before{content:'';position:absolute;left:50%;top:50%;width:10px;height:10px;border:1.5px solid #facc15;border-radius:50%;transform:translate(-50%,-50%);background:rgba(250,204,21,.18)}
+  .reticle::after{content:'';position:absolute;left:50%;top:-8px;width:1px;height:6px;background:rgba(255,255,255,.9);transform:translateX(-50%);box-shadow:0 64px 0 rgba(255,255,255,.9), -28px 32px 0 rgba(255,255,255,.9), 28px 32px 0 rgba(255,255,255,.9)}
+  .reticle.lock{border-color:#f87171;box-shadow:0 0 18px rgba(248,113,113,.85);transform:scale(1.07);border-width:2.5px}
+  .reticle.lock::before{border-color:#f87171;background:rgba(248,113,113,.32)}
+  #lockText{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#f87171;font-weight:800;text-shadow:0 1px 10px rgba(0,0,0,.9), 0 0 8px rgba(248,113,113,.5);opacity:0;transition:opacity .15s, transform .15s;transform:translateY(2px)}
+  #lockText.on{opacity:1;transform:translateY(0)}
+  .bottombar{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+  .controls{font-size:11px;line-height:1.5;color:rgba(219,234,254,.78)}
+  .controls kbd{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-bottom-width:2px;border-radius:4px;padding:1px 5px;font-family:inherit;font-size:11px;color:#fff;margin:0 1px}
+  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(800px 600px at 50% 35%, rgba(251,146,60,.18), transparent 70%), linear-gradient(180deg, rgba(6,10,24,.55), rgba(6,10,24,.88));z-index:20;backdrop-filter:blur(2px)}
+  #overlay.hidden{display:none}
+  .card{background:linear-gradient(180deg, rgba(20,32,62,.96), rgba(12,20,42,.98));border:1px solid rgba(96,165,250,.3);border-radius:20px;padding:28px 28px 22px;max-width:560px;width:92%;color:#e2e8f0;box-shadow:0 24px 64px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);text-align:center}
+  .card h1{font-size:32px;letter-spacing:.02em;color:#fff;text-shadow:0 2px 20px rgba(96,165,250,.5)}
+  .card h1 span{background:linear-gradient(90deg,#f59e0b,#facc15,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .subtitle{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#93c5fd;margin:6px 0 14px}
+  .card p{font-size:13.5px;line-height:1.6;color:#cbd5e1;margin-bottom:14px}
+  .btn{pointer-events:auto;cursor:pointer;background:linear-gradient(180deg,#38bdf8,#0ea5e9);color:#fff;border:none;border-radius:999px;padding:12px 28px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;font-size:13px;box-shadow:0 8px 24px rgba(14,165,233,.4), inset 0 1px 0 rgba(255,255,255,.3);transition:transform .1s, filter .15s}
+  .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn:active{transform:translateY(0) scale(.98)}
+  .btn.secondary{background:rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14)}
+  .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+  #scorePop{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);color:#fde68a;font-weight:800;font-size:22px;text-shadow:0 2px 12px rgba(0,0,0,.8);opacity:0;pointer-events:none;z-index:15;transition:opacity .2s, transform .4s}
+  #hitFlash{position:fixed;inset:0;pointer-events:none;background:radial-gradient(600px 400px at 50% 50%, rgba(248,113,113,.22), transparent 70%);opacity:0;transition:opacity .12s;z-index:12}
+  #hitFlash.on{opacity:1}
+  @media(max-width:700px){
+    .topbar{flex-direction:column}
+    .bottombar{flex-direction:column;align-items:stretch}
+    .panel{min-width:0;width:100%}
+    .controls{font-size:10px;line-height:1.4}
+    .controls kbd{font-size:10px;padding:1px 3px}
+    .center-hud{top:46%}
+    #radar{width:110px!important;height:110px!important}
+    .card{padding:20px 16px}
+    .card h1{font-size:26px}
+  }
+  @media(max-width:400px){
+    #hud{padding:8px}
+    .reticle{width:48px;height:48px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hitFlash"></div>
+<div id="scorePop"></div>
+<div id="hud">
+  <div class="topbar">
+    <div class="panel" style="min-width:210px">
+      <h3>Flight Data</h3>
+      <div class="stat-row"><span>Speed</span><span class="stat-val" id="speedVal">0 kts</span></div>
+      <div class="stat-row"><span>Altitude</span><span class="stat-val" id="altVal">0 ft</span></div>
+      <div class="stat-row"><span>Throttle</span><span class="stat-val" id="thrVal">50%</span></div>
+      <div class="bar"><div id="throttleFill" style="width:50%"></div></div>
+      <div class="stat-row" style="margin-top:6px"><span>Health</span><span class="stat-val" id="hpVal">100%</span></div>
+      <div class="bar"><div id="healthFill" style="width:100%"></div></div>
+    </div>
+    <div class="panel" style="text-align:center;min-width:180px">
+      <h3>Mission</h3>
+      <div style="font-size:22px;font-weight:800;color:#fff" id="scoreVal">0</div>
+      <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#93c5fd">Score</div>
+      <div style="margin-top:8px;display:flex;justify-content:space-between;gap:12px;font-size:12px">
+        <span>Kills <b id="killVal" style="color:#fff">0 / 12</b></span>
+        <span>Time <b id="timeVal" style="color:#fff">02:00</b></span>
+      </div>
+      <div style="margin-top:6px;font-size:11px;color:#cbd5e1">Ammo <b id="ammoVal" style="color:#facc15">4</b> • <span id="enemyCount">5 bandits</span></div>
+    </div>
+  </div>
+  <div class="center-hud">
+    <div class="reticle" id="reticle"></div>
+    <div id="lockText">Lock</div>
+  </div>
+  <div class="bottombar">
+    <div class="panel controls">
+      <div><kbd>W</kbd><kbd>S</kbd> Pitch &nbsp; <kbd>A</kbd><kbd>D</kbd> Roll &nbsp; <kbd>Q</kbd><kbd>E</kbd> Yaw &nbsp; <kbd>SHIFT</kbd>/<kbd>CTRL</kbd> Throttle</div>
+      <div><kbd>SPACE</kbd> Guns &nbsp; <kbd>M</kbd> Missile &nbsp; <kbd>R</kbd> Restart &nbsp; <kbd>P</kbd> Pause</div>
+    </div>
+    <div class="panel" style="text-align:right;min-width:160px">
+      <h3>Bandit Radar</h3>
+      <canvas id="radar" width="140" height="140" style="width:140px;height:140px;border-radius:8px;background:radial-gradient(70px 70px at 50% 50%, rgba(14,165,233,.18), rgba(6,10,24,.9));border:1px solid rgba(96,165,250,.2)"></canvas>
+    </div>
+  </div>
+</div>
+<div id="overlay">
+  <div class="card" id="menuCard">
+    <h1>RUNWAY <span>RIFT</span></h1>
+    <div class="subtitle">Sunset Dogfight • Cinematic Runway</div>
+    <p id="menuText">Bandits swarm the rift over the burning sunset. Hold the runway corridor, stay fast, and splash 12 bogeys before fuel runs out. Watch your altitude — the deck is hard.</p>
+    <div class="row">
+      <button class="btn" id="playBtn">Launch • Press Space</button>
+    </div>
+    <div style="margin-top:14px;font-size:11px;color:#64748b">No downloads • Keyboard only • Best in Chrome/Firefox • Use WASD + Space</div>
+    <div id="statusLine" style="margin-top:10px;font-size:12px;color:#facc15"></div>
+  </div>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
