@@ -891,6 +891,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: Stop live OpenCode response tracker
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pid_file="$OPENCODE_WEB_DIR/response-comment-tracker.pid"
+          if [[ -s "$pid_file" ]]; then
+            kill "$(cat "$pid_file")" 2>/dev/null || true
+          fi
+
       - name: Post final game report
         if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true' && env.APP_URL != ''
         uses: actions/github-script@v7

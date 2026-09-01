@@ -40,6 +40,10 @@ vision_calls() {
 }
 
 while :; do
+  # The completion reporter owns the comment after verification. Check before
+  # fetching or patching so a final report cannot be overwritten by a stale
+  # progress snapshot during the handoff.
+  [[ -f "$OPENCODE_WEB_DIR/response-comment.done" ]] && break
   payload="$(curl --fail --silent --show-error \
     -H "x-opencode-directory: $PROJECT_DIR" \
     "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" 2>/dev/null || true)"
