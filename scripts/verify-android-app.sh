@@ -77,13 +77,14 @@ sleep 3
 adb shell pidof "$package_name"
 adb shell dumpsys activity activities | grep -F "$package_name"
 
-mapfile -t screenshots < <(find screenshots -maxdepth 1 -type f -name 'final-android-*.png' -printf '%f\n' | sort)
-if ((${#screenshots[@]} == 0)); then
-  fallback='screenshots/final-android-workflow.png'
-  adb exec-out screencap -p > "$fallback"
-  screenshots+=("$(basename "$fallback")")
-  echo "Captured deterministic fallback screenshot: $fallback"
-fi
+# Always capture a fresh frame after installing and launching this run's APK.
+# Existing screenshots can belong to an earlier issue/app and must not be the
+# only evidence reported for the current package.
+fresh_screenshot='screenshots/final-android-workflow.png'
+adb exec-out screencap -p > "$fresh_screenshot"
+[[ -s "$fresh_screenshot" ]]
+screenshots=("$(basename "$fresh_screenshot")")
+echo "Captured current-run screenshot: $fresh_screenshot"
 
 screenshots_json="$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
 {

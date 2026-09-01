@@ -35,3 +35,11 @@ If OpenCode does not create a `final-android-*.png`, capture the running
 emulator with `adb exec-out screencap -p` so the release report always contains
 machine-verifiable visual evidence. The fallback is implemented in the
 Android verifier and exercised by the end-to-end issue run.
+
+## 5. Make screenshot evidence current-run specific — executed
+
+An issue checkout can contain screenshots committed by an earlier app. Always
+capture `screenshots/final-android-workflow.png` after installing and launching
+the APK, and make that fresh frame the canonical report evidence. Implemented
+in `scripts/verify-android-app.sh` after the todo-list run exposed stale FPS
+screenshots in an otherwise successful report.

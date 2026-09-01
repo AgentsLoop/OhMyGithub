@@ -36,3 +36,5 @@
   with `timeout` and continue deterministic checks for timeout exits.
 - Keep the SSH access comment separate from the live progress comment so the
   tracker cannot hide the debugging command.
+- Existing screenshot files can come from an earlier app/run; always capture a
+  fresh post-install frame and report that current-run file.
