@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
@@ -246,6 +249,8 @@ fun TodoApp() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .imePadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.Top
         ) {
@@ -357,7 +362,8 @@ fun TodoApp() {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 4.dp),
+                        .padding(top = 4.dp)
+                        .navigationBarsPadding(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredTodos, key = { it.id }) { todo ->
