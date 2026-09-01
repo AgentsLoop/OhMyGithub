@@ -5,42 +5,72 @@ import org.junit.Test
 
 class GameLogicTest {
     @Test
-    fun targetCreationIsWithinBounds() {
-        val t = Target(id = 1, x = 0.5f, z = 3f)
-        assertTrue(t.x in -1f..1f)
-        assertTrue(t.z in 1f..10f)
-        assertTrue(t.alive)
+    fun todoCreationDefaultsNotCompleted() {
+        val t = TodoItem(id = 1, text = "Buy milk")
+        assertEquals("Buy milk", t.text)
+        assertFalse(t.completed)
     }
 
     @Test
-    fun targetHitLogicMarksDead() {
-        val targets = mutableListOf(Target(0, 0f, 2f), Target(1, 0.8f, 5f))
-        val hit = targets[0].copy(alive = false)
-        targets[0] = hit
-        assertFalse(targets[0].alive)
-        assertTrue(targets[1].alive)
+    fun todoToggleCompleted() {
+        val todo = TodoItem(id = 1, text = "Task", completed = false)
+        val toggled = todo.copy(completed = !todo.completed)
+        assertTrue(toggled.completed)
+        val toggledBack = toggled.copy(completed = !toggled.completed)
+        assertFalse(toggledBack.completed)
     }
 
     @Test
-    fun scoreCalculationIsCorrect() {
-        var score = 0
-        val level = 2
-        score += 150 * level
-        assertEquals(300, score)
+    fun todoFilteringActiveCompleted() {
+        val todos = listOf(
+            TodoItem(1, "A", false),
+            TodoItem(2, "B", true),
+            TodoItem(3, "C", false)
+        )
+        val active = todos.filter { !it.completed }
+        val completed = todos.filter { it.completed }
+        assertEquals(2, active.size)
+        assertEquals(1, completed.size)
     }
 
     @Test
-    fun ammoReloadResets() {
-        var ammo = 0
-        val isReloading = true
-        if (isReloading) ammo = 30
-        assertEquals(30, ammo)
+    fun todoJsonRoundTrip() {
+        val todos = listOf(TodoItem(1, "Hello", false), TodoItem(2, "World", true))
+        val json = todosToJson(todos)
+        val decoded = jsonToTodos(json)
+        assertEquals(2, decoded.size)
+        assertEquals("Hello", decoded[0].text)
+        assertFalse(decoded[0].completed)
+        assertTrue(decoded[1].completed)
     }
 
     @Test
-    fun yawClampingWorks() {
-        var yaw = 50f
-        yaw = yaw.coerceIn(-40f, 40f)
-        assertEquals(40f, yaw, 0.01f)
+    fun todoJsonEmptyList() {
+        val json = todosToJson(emptyList())
+        val decoded = jsonToTodos(json)
+        assertTrue(decoded.isEmpty())
+    }
+
+    @Test
+    fun todoAddTrimsAndIgnoresEmpty() {
+        val text = "  test  ".trim()
+        assertEquals("test", text)
+        assertTrue("   ".trim().isEmpty())
+    }
+
+    @Test
+    fun todoDeleteById() {
+        val todos = mutableListOf(TodoItem(1, "A"), TodoItem(2, "B"))
+        val filtered = todos.filterNot { it.id == 1L }
+        assertEquals(1, filtered.size)
+        assertEquals(2L, filtered[0].id)
+    }
+
+    @Test
+    fun todoUpdateText() {
+        val todo = TodoItem(1, "Old", false)
+        val updated = todo.copy(text = "New")
+        assertEquals("New", updated.text)
+        assertEquals(1L, updated.id)
     }
 }
