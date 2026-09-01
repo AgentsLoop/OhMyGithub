@@ -271,7 +271,7 @@ fun FpsGameScreen() {
                 ),
                 size = Size(w, h * 0.55f)
             )
-            // Sun / haze
+            // Sun / haze + volumetric shafts
             drawCircle(
                 color = Color(0xFFFFD67A).copy(alpha = 0.9f),
                 radius = h * 0.08f,
@@ -282,6 +282,29 @@ fun FpsGameScreen() {
                 radius = h * 0.18f,
                 center = Offset(w * 0.78f, h * 0.18f)
             )
+            // Sun shaft rays (subtle)
+            for (ri in -2..2) {
+                val ang = -18f + ri * 6f
+                val rad = ang * PI.toFloat() / 180f
+                val len = h * 0.55f
+                val sx = w * 0.78f
+                val sy = h * 0.18f
+                drawLine(
+                    Color(0xFFFFD67A).copy(alpha = 0.035f - abs(ri) * 0.007f),
+                    Offset(sx, sy),
+                    Offset(sx + cos(rad) * len, sy + sin(rad) * len),
+                    strokeWidth = 22f + abs(ri) * 6f
+                )
+            }
+            // Cloud wisps — breakup sky gradient
+            for (ci in 0 until 7) {
+                val cx = w * (0.08f + ci * 0.14f) + sin(ci * 1.7f) * w * 0.02f
+                val cy = h * (0.12f + (ci % 3) * 0.055f)
+                val cw = w * (0.09f + (ci % 2) * 0.04f)
+                val ch = h * 0.025f
+                drawOval(Color.White.copy(alpha = 0.08f - ci * 0.006f), topLeft = Offset(cx - cw / 2f, cy - ch / 2f), size = Size(cw, ch))
+                drawOval(Color.White.copy(alpha = 0.05f), topLeft = Offset(cx - cw * 0.35f, cy - ch * 0.3f), size = Size(cw * 0.7f, ch * 0.55f))
+            }
             // Distant mountains silhouette
             val mountainPath = Path().apply {
                 moveTo(0f, h * 0.38f)
@@ -311,7 +334,7 @@ fun FpsGameScreen() {
             }
             drawPath(ridge, Color(0xFF16263F))
 
-            // Ground plane with perspective grid
+            // Ground plane with perspective grid — textured sand + AO
             drawRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(Color(0xFF2B3A2A), Color(0xFF3F4A2E), Color(0xFF5A4A2A)),
@@ -320,6 +343,39 @@ fun FpsGameScreen() {
                 ),
                 topLeft = Offset(0f, h * 0.55f),
                 size = Size(w, h * 0.45f)
+            )
+            // Sand micro-detail breakup — perlin-like speckles (COD Rust sand texture)
+            val sandSeed = 1337
+            for (i in 0 until 900) {
+                val sx = ((i * 73 + sandSeed) % 997) / 997f
+                val sy = ((i * 97 + sandSeed * 3) % 953) / 953f
+                val wx = sx * w
+                val wy = h * (0.56f + sy * 0.42f)
+                val isPebble = i % 11 == 0
+                val dotR = if (isPebble) 1.8f else 0.9f
+                val dotAlpha = if (isPebble) 0.18f else 0.07f * (0.5f + sy * 0.5f)
+                val dotCol = if (i % 3 == 0) Color(0xFF8A7A5A) else if (i % 3 == 1) Color(0xFF5A4A30) else Color(0xFFC2B49A)
+                drawCircle(dotCol.copy(alpha = dotAlpha), radius = dotR, center = Offset(wx + yaw * sy * 2f, wy))
+            }
+            // Tire tracks / roughness strokes
+            for (track in 0..1) {
+                val tx = centerX + (if (track == 0) -w * 0.08f else w * 0.12f) + yaw * 3f
+                for (k in 0..18) {
+                    val ty = h * (0.58f + k * 0.022f)
+                    val lw = (1.5f + sin(k * 0.9f) * 0.6f)
+                    drawLine(Color(0xFF2A261E).copy(alpha = 0.09f), Offset(tx - 6f, ty), Offset(tx + 6f, ty), strokeWidth = lw)
+                    drawLine(Color(0xFF2A261E).copy(alpha = 0.06f), Offset(tx - 6f + 9f, ty), Offset(tx + 6f + 9f, ty), strokeWidth = lw * 0.7f)
+                }
+            }
+            // Horizon AO contact shadow — wall-ground junction darkening
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Black.copy(alpha = 0.28f), Color.Transparent),
+                    startY = h * 0.54f,
+                    endY = h * 0.60f
+                ),
+                topLeft = Offset(0f, h * 0.54f),
+                size = Size(w, h * 0.06f)
             )
             // Grid lines perspective
             for (i in 0..12) {
@@ -343,32 +399,117 @@ fun FpsGameScreen() {
                 )
             }
 
-            // Bunker / wall elements parallax by yaw
+            // Distance fog over far ridge — aerial perspective desaturation
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF1B2742).copy(alpha = 0.0f), Color(0xFF1B2742).copy(alpha = 0.32f)),
+                    startY = h * 0.30f,
+                    endY = h * 0.55f
+                ),
+                topLeft = Offset(0f, h * 0.30f),
+                size = Size(w, h * 0.25f)
+            )
+
+            // Bunker / wall elements — PBR textured, perspective-correct with AO & cast shadows
             val wallOffset = yaw * 4f
-            // Left concrete wall
-            drawRect(
-                color = Color(0xFF3A4455),
-                topLeft = Offset(w * 0.02f + wallOffset, h * 0.42f),
-                size = Size(w * 0.09f, h * 0.22f)
-            )
-            drawRect(
-                color = Color(0xFF2A3445),
-                topLeft = Offset(w * 0.02f + wallOffset, h * 0.42f),
-                size = Size(w * 0.09f, h * 0.04f)
-            )
-            // Right container
-            drawRect(
-                color = Color(0xFF8A6A3A),
-                topLeft = Offset(w * 0.88f + wallOffset * 0.5f, h * 0.44f),
-                size = Size(w * 0.10f, h * 0.18f)
-            )
-            repeat(3) { idx ->
-                drawLine(
-                    color = Color(0xFF5A3A1A),
-                    start = Offset(w * 0.88f + wallOffset * 0.5f, h * (0.47f + idx * 0.05f)),
-                    end = Offset(w * 0.98f + wallOffset * 0.5f, h * (0.47f + idx * 0.05f)),
-                    strokeWidth = 2f
+            // Left concrete wall — 3-plane box with edge wear, AO, rivets, cast shadow
+            run {
+                val leftX = w * 0.02f + wallOffset
+                val leftY = h * 0.42f
+                val leftW = w * 0.09f
+                val leftH = h * 0.22f
+                val topH = h * 0.04f
+                // Cast shadow onto sand (elliptical, blurred via alpha)
+                drawOval(Color.Black.copy(alpha = 0.22f), topLeft = Offset(leftX - 6f, leftY + leftH - 4f), size = Size(leftW * 1.4f, leftH * 0.18f))
+                // Front face — concrete with vertical grain
+                drawRect(color = Color(0xFF3A4455), topLeft = Offset(leftX, leftY), size = Size(leftW, leftH))
+                // vertical concrete pour lines + noise
+                for (ri in 0..4) {
+                    val rx = leftX + ri * leftW * 0.22f
+                    drawLine(Color(0xFF2C3545).copy(alpha = 0.35f), Offset(rx, leftY), Offset(rx, leftY + leftH), strokeWidth = 1f)
+                }
+                for (ci in 0 until 22) {
+                    val cx = leftX + (ci * 13 % leftW.toInt())
+                    val cy = leftY + (ci * 19 % leftH.toInt())
+                    drawCircle(Color.White.copy(alpha = 0.04f), radius = 1.1f, center = Offset(cx, cy))
+                }
+                // Top face — sun-lit
+                drawRect(color = Color(0xFF4A5568), topLeft = Offset(leftX, leftY), size = Size(leftW, topH))
+                drawLine(Color.White.copy(alpha = 0.10f), Offset(leftX, leftY), Offset(leftX + leftW, leftY), strokeWidth = 1.5f)
+                // Side face — slight perspective thickness
+                val sideW = leftW * 0.18f
+                val sidePath = Path().apply {
+                    moveTo(leftX + leftW, leftY)
+                    lineTo(leftX + leftW + sideW, leftY + topH * 0.6f)
+                    lineTo(leftX + leftW + sideW, leftY + leftH + topH * 0.6f)
+                    lineTo(leftX + leftW, leftY + leftH)
+                    close()
+                }
+                drawPath(sidePath, Color(0xFF2A3445))
+                // Edge wear highlight on top-left
+                drawLine(Color.White.copy(alpha = 0.12f), Offset(leftX + 1f, leftY + 1f), Offset(leftX + leftW - 1f, leftY + 1f), strokeWidth = 1f)
+                drawLine(Color.White.copy(alpha = 0.08f), Offset(leftX + 1f, leftY + 1f), Offset(leftX + 1f, leftY + leftH - 1f), strokeWidth = 1f)
+                // AO where wall meets ground
+                drawRect(
+                    brush = Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.28f), Color.Transparent), startY = leftY + leftH - h * 0.04f, endY = leftY + leftH),
+                    topLeft = Offset(leftX - 2f, leftY + leftH - h * 0.04f),
+                    size = Size(leftW + sideW + 4f, h * 0.04f)
                 )
+                // Rivets
+                for (ri in 0..2) {
+                    for (ci in 0..1) {
+                        val rx = leftX + leftW * (0.22f + ci * 0.55f)
+                        val ry = leftY + leftH * (0.18f + ri * 0.28f)
+                        drawCircle(Color(0xFF1A1E26), radius = 2.2f, center = Offset(rx, ry))
+                        drawCircle(Color(0xFF6A7A90).copy(alpha = 0.55f), radius = 1f, center = Offset(rx - 0.5f, ry - 0.5f))
+                    }
+                }
+            }
+            // Right container — rusted metal with streaks, welded seams, cast shadow
+            run {
+                val contX = w * 0.88f + wallOffset * 0.5f
+                val contY = h * 0.44f
+                val contW = w * 0.10f
+                val contH = h * 0.18f
+                // Cast shadow
+                drawOval(Color.Black.copy(alpha = 0.20f), topLeft = Offset(contX - 8f, contY + contH - 2f), size = Size(contW * 1.35f, contH * 0.20f))
+                // Front face — base rust orange with vertical streaks
+                drawRect(color = Color(0xFF8A6A3A), topLeft = Offset(contX, contY), size = Size(contW, contH))
+                // Rust streaks — vertical dark-orange noise
+                for (si in 0 until 8) {
+                    val sx = contX + si * contW * 0.12f + 2f
+                    val streakCol = if (si % 2 == 0) Color(0xFF5A3A1A).copy(alpha = 0.22f) else Color(0xFF7A4A1A).copy(alpha = 0.16f)
+                    drawLine(streakCol, Offset(sx, contY), Offset(sx + 1.5f, contY + contH), strokeWidth = (2.5f + si % 3))
+                }
+                // Corrugation ribs — with bevel highlight/shadow
+                repeat(3) { idx ->
+                    val ry = contY + contH * (0.14f + idx * 0.28f)
+                    drawLine(Color(0xFF5A3A1A), Offset(contX, ry), Offset(contX + contW, ry), strokeWidth = 2.5f)
+                    drawLine(Color.White.copy(alpha = 0.07f), Offset(contX, ry - 1f), Offset(contX + contW, ry - 1f), strokeWidth = 1f)
+                    drawLine(Color.Black.copy(alpha = 0.18f), Offset(contX, ry + 1.2f), Offset(contX + contW, ry + 1.2f), strokeWidth = 1f)
+                }
+                // Top face — sun highlight
+                drawRect(Color(0xFFA07A3A), topLeft = Offset(contX, contY), size = Size(contW, contH * 0.16f))
+                // Edge wear — bright edge on top/left
+                drawLine(Color.White.copy(alpha = 0.13f), Offset(contX, contY), Offset(contX + contW, contY), strokeWidth = 1.2f)
+                drawLine(Color.White.copy(alpha = 0.09f), Offset(contX, contY), Offset(contX, contY + contH), strokeWidth = 1f)
+                // AO at bottom
+                drawRect(
+                    brush = Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.24f), Color.Transparent), startY = contY + contH - h * 0.035f, endY = contY + contH),
+                    topLeft = Offset(contX, contY + contH - h * 0.035f),
+                    size = Size(contW, h * 0.035f)
+                )
+                // Rivets along seams
+                for (ri in 0..3) {
+                    val rx = contX + 3f
+                    val ry = contY + contH * (0.08f + ri * 0.26f)
+                    drawCircle(Color(0xFF2A1E12), radius = 2f, center = Offset(rx, ry))
+                }
+                for (ri in 0..3) {
+                    val rx = contX + contW - 3f
+                    val ry = contY + contH * (0.08f + ri * 0.26f)
+                    drawCircle(Color(0xFF2A1E12), radius = 2f, center = Offset(rx, ry))
+                }
             }
 
             // Targets - project with perspective + yaw
