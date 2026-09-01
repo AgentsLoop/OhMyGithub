@@ -393,9 +393,13 @@ function update(dt) {
     }
   }
 
-  // gate check - must be near gate center
+  // gate check - require all fireflies collected (Pac-Man clear-the-board loop)
   if (Math.hypot(player.x - gatePos.x, player.y - gatePos.y) < 34) {
-    win()
+    if (collected.value >= totalFireflies) win()
+    else {
+      // nudge hint — gate is locked
+      if (player.invuln <= 0) player.invuln = 300
+    }
   }
 }
 
@@ -528,17 +532,33 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(gx + i, gy - 22); ctx.lineTo(gx + i, gy + 26); ctx.stroke()
   }
   ctx.beginPath(); ctx.moveTo(gx - 22, gy + 2); ctx.lineTo(gx + 22, gy + 2); ctx.stroke()
-  // glow if near
+  // glow if near — green when open, amber locked when fireflies remain
+  const allCollected = collected.value >= totalFireflies
   const nearGate = Math.hypot(player.x - gx, player.y - gy) < 120
   if (nearGate) {
-    ctx.fillStyle = `rgba(120,220,140,${0.18 + Math.sin(pulse) * 0.07})`
+    ctx.fillStyle = allCollected ? `rgba(120,220,140,${0.18 + Math.sin(pulse) * 0.07})` : `rgba(255,180,60,${0.16 + Math.sin(pulse) * 0.06})`
     ctx.beginPath(); ctx.arc(gx, gy, 42, 0, Math.PI * 2); ctx.fill()
   }
-  // label
-  ctx.fillStyle = '#f3e9cc'
-  ctx.font = '700 11px "DM Sans"'
-  ctx.textAlign = 'center'
-  ctx.fillText('GATE', gx, gy + 42)
+  // lock overlay when not all collected
+  if (!allCollected) {
+    ctx.fillStyle = 'rgba(0,0,0,0.38)'
+    ctx.fillRect(gx - 18, gy - 18, 36, 36)
+    ctx.fillStyle = '#ffbe3a'
+    ctx.font = '700 18px "DM Sans"'
+    ctx.textAlign = 'center'
+    ctx.fillText('🔒', gx, gy + 6)
+    ctx.fillStyle = '#ffbe3a'
+    ctx.font = '700 9px "DM Sans"'
+    ctx.fillText(`${collected.value}/${totalFireflies}`, gx, gy + 42)
+  } else {
+    ctx.fillStyle = '#7be68a'
+    ctx.font = '700 18px "DM Sans"'
+    ctx.textAlign = 'center'
+    ctx.fillText('✦', gx, gy + 6)
+    ctx.fillStyle = '#f3e9cc'
+    ctx.font = '700 11px "DM Sans"'
+    ctx.fillText('GATE OPEN', gx, gy + 42)
+  }
 
   // fireflies
   fireflies.forEach(f => {
