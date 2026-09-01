@@ -1,5 +1,12 @@
 # Testing and verification
 
+Project acceptance testing is live production testing. Manually create a real
+GitHub issue with the required labels and prompt, then verify the resulting
+workflow dispatch, exactly one runner/session, and the completed production
+outcome. Do not use unit tests as the testing strategy; local checks such as
+`actionlint` and `git diff --check` are only static safeguards before the live
+test.
+
 For an issue-triggered run with `AGENTSWEB_SSH_PUBLIC_KEY` configured, verify
 these checkpoints in order:
 
