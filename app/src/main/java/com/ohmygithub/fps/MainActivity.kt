@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
@@ -136,27 +139,19 @@ fun TodoApp() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
 
-    var todos by remember { mutableStateOf<List<TodoItem>>(emptyList()) }
+    // Synchronous load to avoid empty-state flash on rotation / cold start (critic gap)
+    var todos by remember {
+        val json = prefs.getString(KEY_TODOS_JSON, null)
+        mutableStateOf(if (json != null) jsonToTodos(json) else emptyList())
+    }
     var inputText by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(TodoFilter.All) }
-    var loaded by remember { mutableStateOf(false) }
     var editingTodo by remember { mutableStateOf<TodoItem?>(null) }
     var editText by remember { mutableStateOf("") }
 
-    // Load on launch
-    LaunchedEffect(Unit) {
-        val json = prefs.getString(KEY_TODOS_JSON, null)
-        if (json != null) {
-            todos = jsonToTodos(json)
-        }
-        loaded = true
-    }
-
-    // Save on every change (after initial load)
-    LaunchedEffect(todos, loaded) {
-        if (loaded) {
-            prefs.edit().putString(KEY_TODOS_JSON, todosToJson(todos)).apply()
-        }
+    // Persist synchronously on every change (apply is async but we don't gate on loaded flag)
+    LaunchedEffect(todos) {
+        prefs.edit().putString(KEY_TODOS_JSON, todosToJson(todos)).apply()
     }
 
     val filteredTodos = when (filter) {
@@ -240,13 +235,16 @@ fun TodoApp() {
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        }
+        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .imePadding()
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.Top
         ) {
             // Input row: TextField with placeholder + Add button
