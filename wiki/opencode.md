@@ -87,6 +87,12 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    down and restarted. The workflow then marks the comment closed and
    terminates both tunnels.
 
+An issue with the exact `ssh` label is a debugging-only mode: it starts the
+temporary AgentsWeb SSH session, posts the connection command, skips OpenCode,
+verification, release delivery, and reporting, then keeps the runner alive for
+five hours. Reuse one temporary `known_hosts` file for every SSH/scp command in
+that session and delete it after the session ends.
+
 Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
 defaults to `true`. When set to `off` (or any value other than `true`), the
 workflow stops after the initial OpenCode prompt and temporary OpenCode Web

@@ -45,6 +45,12 @@ to confirm the emulator remains reachable through the posted SSH session for
 the five-hour hold; failures outside Android verification must still execute
 the general five-hour SSH hold before cleanup.
 
+For a manual runner check, add the exact `ssh` label. This intentionally skips
+OpenCode and verification while leaving the runner available for debugging.
+Reuse one temporary file such as
+`-o UserKnownHostsFile=/tmp/agentsweb-<run>-known_hosts` for all SSH/scp commands,
+then remove it after the runner session closes.
+
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.

@@ -43,10 +43,16 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        sudo groupadd --force kvm
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | \
           sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
+        # A newly-added supplementary group is not inherited by this shell.
+        # Make the device directly usable by the emulator process as well.
+        if [[ -e /dev/kvm ]]; then
+          sudo chmod 0666 /dev/kvm
+        fi
 
     - name: Build and verify on Android emulator
       uses: reactivecircus/android-emulator-runner@v2
