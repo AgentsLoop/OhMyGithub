@@ -67,6 +67,37 @@ Edits, comments, and other labels do not execute it. Add
 the `Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 
+### SSH debugging workflow
+
+Use the exact `ssh` label for a debugging-only run. It starts the temporary
+AgentsWeb session, posts the connection command, skips OpenCode, verification,
+release delivery, and reporting, and holds the runner for five hours. Add
+`Android` as well when the run should exercise Android tooling. A title suffix
+`branch: <existing-branch>` selects the target branch; the centralized runtime
+checks out that same triggering branch rather than `main`. All jobs use
+`ubuntu-latest`.
+
+When the issue comment provides the host and port, create one temporary
+known-hosts file for the entire runner session and reuse it for every SSH/scp
+command:
+
+```sh
+KNOWN_HOSTS=/tmp/agentsweb-<issue>-<run>_known_hosts
+SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile="$KNOWN_HOSTS" \
+  -i ~/.ssh/aiplay-agentsweb -p <port>)
+ssh "${SSH_OPTS[@]}" runner@<run-name>.agentsweb.space 'command'
+scp "${SSH_OPTS[@]}" runner@<run-name>.agentsweb.space:/path/to/file /tmp/
+```
+
+The host-key warning should occur only on the first connection. For manual
+Android checks, use the SSH session to install the API 35 emulator/system image,
+create an AVD, launch it with `sg kvm -c`, then run `adb devices`,
+`./gradlew --no-daemon assembleDebug`, `adb install -r`, `adb shell monkey`, and
+`adb exec-out screencap -p > screenshots/final-android-manual.png`. Verify the
+foreground activity and inspect the pulled PNG before ending the run. Cancel
+the run when debugging is complete and remove the temporary known-hosts file;
+the runner and its emulator disappear with the session.
+
 When monitoring a triggered run, use `gh run watch <run-id> --repo AgentsLoop/OhMyGithub --exit-status` for overall job status.
 Do not use `gh run view --log` to read logs from a running task: GitHub reports that
 logs are unavailable until completion. Use `bash scripts/ssh-run-log.sh <run-id>`
