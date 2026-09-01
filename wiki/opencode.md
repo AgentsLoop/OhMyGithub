@@ -188,6 +188,13 @@ to the encoded worktree/session route, so the browser opens the live run
 directly. A loaded Web UI or healthy tunnel alone does not prove session
 tracking; acceptance requires a screenshot while the run is active.
 
+## Runner selection
+
+The reusable workflow uses `ubuntu-latest` (AMD64) by default. Add the exact
+`runner/arm64` label to an issue to select GitHub's `ubuntu-24.04-arm`
+GitHub-hosted runner. The label is passed through `labels_json`, so this works
+for both repository-local workflows and App-generated fallback wrappers.
+
 ## Repository settings
 
 - Actions must be allowed to create and approve pull requests.
