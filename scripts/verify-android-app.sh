@@ -94,7 +94,9 @@ if [[ "${ANDROID_OPENCODE_VERIFY_ENABLED:-true}" == true ]]; then
       --auto \
       --dangerously-skip-permissions \
       --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+      --dir "$PROJECT_DIR" \
       --model "$OPENCODE_MODEL" \
+      --command build \
       "$(< "$RUNTIME_DIR/.github/prompts/02-verify-android.md")" \
       > "$evidence_dir/logs/opencode-android-verification.log" 2>&1
   opencode_code=$?

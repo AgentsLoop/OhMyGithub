@@ -8,6 +8,9 @@ and hung attached verification.
   evidence directory.
 - Let OpenCode remediate, but make deterministic build/sign/install/launch/UI,
   persistence, crash, and screenshot states the release gate.
+- Run emulator remediation as a fresh attached `build` command pinned to the
+  project directory. Continuing a completed Goal session, or opening an
+  unqualified attached session, can remain idle until timeout.
 - Retry emulator provisioning once and retain the second failed emulator over
   SSH; successful runs skip the five-hour hold.
 - Publish through a checksum-verified draft release transaction.
