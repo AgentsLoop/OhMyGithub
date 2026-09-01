@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0b0b0f">
+<title>VOID DODGE — Tiny Arcade</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#07080c;color:#e9f0ff;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden;overscroll-behavior:none}
+.wrap{min-height:100%;display:grid;place-items:center;padding:12px 16px;background:radial-gradient(900px 600px at 50% -10%,#1a2a55 0%,#0d1020 45%,#07080c 100%)}
+.card{width:min(420px,100vw - 24px);background:rgba(15,18,30,.92);border:1px solid rgba(120,140,255,.22);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06);overflow:hidden;backdrop-filter:blur(8px)}
+.head{padding:12px 14px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06)}
+.brand{font-weight:800;letter-spacing:.12em;font-size:13px}
+.brand b{color:#7aa0ff}
+.stats{display:flex;gap:14px;font-size:12px;opacity:.9}
+.stats span{opacity:.6}
+.stats strong{font-size:13px}
+.stage{position:relative;width:100%;touch-action:none;user-select:none;-webkit-user-select:none;overscroll-behavior:none}
+canvas{display:block;width:100%;height:auto;background:linear-gradient(#0a0e1e,#070a16);touch-action:none;outline:none}
+canvas:focus-visible{box-shadow:inset 0 0 0 2px #7aa0ff}
+.hud{display:flex;gap:8px;padding:10px 12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#0c0f1f;border-top:1px solid rgba(255,255,255,.06)}
+.btn{appearance:none;border:1px solid rgba(120,140,255,.35);background:#1a2344;color:#e9f0ff;padding:8px 14px;border-radius:999px;font:700 12px/1 ui-monospace,monospace;cursor:pointer;letter-spacing:.06em;touch-action:manipulation;user-select:none}
+.btn:focus-visible{outline:2px solid #7aa0ff;outline-offset:2px}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:#2f5bff;border-color:#2f5bff}
+.btn:disabled{opacity:.45;cursor:default}
+.hint{font-size:11px;opacity:.65;line-height:1.4;max-width:240px}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(5,7,14,.72);backdrop-filter:blur(2px);text-align:center;padding:20px}
+.panel{background:#0f1228;border:1px solid rgba(120,140,255,.2);border-radius:14px;padding:18px 16px;max-width:320px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.panel h2{font-size:18px;letter-spacing:.08em;margin-bottom:6px}
+.panel p{font-size:12px;opacity:.75;line-height:1.5;margin-bottom:12px}
+.kbd{display:inline-block;border:1px solid rgba(255,255,255,.2);border-bottom-width:2px;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:6px;font-size:11px;margin:0 2px}
+.topline{height:2px;background:linear-gradient(90deg,#2f5bff,#7af0ff,#ff5a7a);opacity:.9}
+.foot{padding:8px 12px;text-align:center;font-size:10px;opacity:.45;letter-spacing:.08em}
+/* touch fallback controls */
+.touch-ctrl{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:space-between;padding:0 10px;gap:10px;pointer-events:none}
+.touch-ctrl button{pointer-events:auto;width:84px;height:54px;border-radius:14px;border:1px solid rgba(120,140,255,.35);background:rgba(20,30,70,.55);color:#e9f0ff;font:800 22px/1 ui-monospace,monospace;backdrop-filter:blur(6px);touch-action:none;user-select:none;-webkit-user-select:none}
+.touch-ctrl button:active{background:rgba(47,91,255,.85);transform:scale(.98)}
+.touch-ctrl button:focus-visible{outline:2px solid #7af0ff}
+@media(hover:hover) and (pointer:fine){
+  .touch-ctrl{opacity:.9}
+}
+@media(hover:none) and (pointer:coarse){
+  .touch-ctrl button{width:92px;height:62px}
+}
+/* visual feedback */
+.flash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .12s}
+.flash.hit{background:radial-gradient(600px 300px at 50% 80%,rgba(255,60,90,.45),transparent 70%),rgba(255,40,60,.22)}
+.flash.level{background:radial-gradient(500px 220px at 50% 20%,rgba(122,240,255,.32),transparent 70%),rgba(47,91,255,.14)}
+.pop{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);pointer-events:none;font:800 22px/1 ui-monospace,monospace;letter-spacing:.08em;text-shadow:0 2px 12px rgba(0,0,0,.6);opacity:0}
+.hud-live{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="card">
+    <div class="topline" aria-hidden="true"></div>
+    <div class="head">
+      <div class="brand" aria-label="Void Dodge"><b>VOID</b> DODGE</div>
+      <div class="stats" aria-live="polite" aria-atomic="true">
+        <div><span>SCORE</span> <strong id="score">0</strong></div>
+        <div><span>BEST</span> <strong id="best">0</strong></div>
+        <div><span>LVL</span> <strong id="lvl">1</strong></div>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="c" width="420" height="560" tabindex="0" role="img" aria-label="Void Dodge game canvas — dodge falling debris with arrow keys, A D, drag or swipe, or on-screen buttons. Press Space to start, P to pause, R to restart."></canvas>
+      <div class="flash" id="hitFlash" aria-hidden="true"></div>
+      <div class="flash" id="levelFlash" aria-hidden="true"></div>
+      <div class="pop" id="popEl" aria-hidden="true"></div>
+      <!-- fallback touch buttons -->
+      <div class="touch-ctrl" aria-label="Touch movement controls">
+        <button type="button" id="leftBtn" aria-label="Move left — hold to move" title="Hold to move left">‹</button>
+        <button type="button" id="rightBtn" aria-label="Move right — hold to move" title="Hold to move right">›</button>
+      </div>
+      <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+        <div class="panel">
+          <h2 id="ovTitle">VOID DODGE</h2>
+          <p id="ovMsg">Dodge the debris. Survive as long as you can.<br>Move with <span class="kbd">←</span><span class="kbd">→</span> or <span class="kbd">A</span><span class="kbd">D</span> · Drag / Swipe on mobile.</p>
+          <button class="btn primary" id="startBtn" aria-label="Start game" autofocus>PLAY — SPACE</button>
+          <p style="margin-top:10px;opacity:.6">Press <span class="kbd">P</span> to pause · <span class="kbd">R</span> restart · <span class="kbd">Space</span> start</p>
+        </div>
+      </div>
+      <div class="hud-live" aria-live="polite" id="live"></div>
+    </div>
+    <div class="hud">
+      <div style="display:flex;gap:8px">
+        <button class="btn primary" id="playBtn" type="button" aria-label="Play, pause or retry">PLAY</button>
+        <button class="btn" id="pauseBtn" type="button" aria-label="Pause or resume game">PAUSE</button>
+        <button class="btn" id="restartBtn" type="button" aria-label="Restart game">RESTART</button>
+      </div>
+      <div class="hint" id="hint">Goal: stay alive. Level up every 10 pts — debris gets faster.</div>
+    </div>
+    <div class="foot">SELF-CONTAINED · NO ASSETS · OFFLINE READY · /void-dodge.html</div>
+  </div>
+</div>
+<script>
+(() => {
+  const c = document.getElementById('c');
+  const ctx = c.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const lvlEl = document.getElementById('lvl');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ovTitle');
+  const ovMsg = document.getElementById('ovMsg');
+  const startBtn = document.getElementById('startBtn');
+  const playBtn = document.getElementById('playBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+  const hitFlash = document.getElementById('hitFlash');
+  const levelFlash = document.getElementById('levelFlash');
+  const popEl = document.getElementById('popEl');
+  const live = document.getElementById('live');
+  const stage = document.getElementById('stage');
+
+  const W = 420, H = 560;
+  let score = 0, best = 0, level = 1;
+  try{ best = +(localStorage.getItem('void-best')||0) || 0; }catch{ best=0; }
+  bestEl.textContent = best;
+  lvlEl.textContent = level;
+  let running = false, paused = false, gameOver = false, t = 0, spawnTimer = 0, speedMul = 1;
+  let player = { x: W/2, y: H-48, w: 28, h: 18, vx: 0, targetX: W/2 };
+  let debris = [];
+  let keys = {};
+  let pointerDown = false;
+  let holdDir = 0; // -1 left, 1 right from touch buttons
+  let popTimer = 0, hitTimer = 0, lvlFlashTimer = 0;
+
+  let ac;
+  function beep(freq=440, dur=0.07, type='square', gain=0.08){
+    try{
+      if(!ac) ac = new (window.AudioContext||window.webkitAudioContext)();
+      if(ac.state==='suspended') ac.resume();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type=type; o.frequency.value=freq; g.gain.value=gain;
+      o.connect(g).connect(ac.destination);
+      o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+dur); o.stop(ac.currentTime+dur);
+    }catch{}
+  }
+
+  function saveBest(){
+    try{ localStorage.setItem('void-best', String(best)); }catch{}
+  }
+  function announce(msg){ live.textContent = msg; }
+
+  function triggerPop(text, color){
+    popEl.textContent = text;
+    popEl.style.color = color || '#7af0ff';
+    popEl.style.opacity = '1';
+    popEl.style.transform = 'translate(-50%,-50%) scale(1.08)';
+    popEl.style.transition = 'none';
+    // force reflow
+    void popEl.offsetWidth;
+    popEl.style.transition = 'opacity 420ms ease, transform 420ms ease';
+    popEl.style.opacity = '0';
+    popEl.style.transform = 'translate(-50%,-70%) scale(1)';
+    popTimer = 420;
+  }
+  function triggerHit(){
+    hitFlash.style.opacity = '1';
+    hitTimer = 220;
+  }
+  function triggerLevelFlash(lv){
+    levelFlash.style.opacity = '1';
+    lvlFlashTimer = 420;
+    triggerPop('LEVEL '+lv, '#ffd86b');
+    beep(880,0.12,'sine',0.12); setTimeout(()=>beep(1100,0.12,'sine',0.11),90);
+  }
+
+  function reset(){
+    score=0; level=1; speedMul=1; t=0; spawnTimer=0;
+    debris.length=0;
+    player.x=W/2; player.targetX=W/2; player.vx=0;
+    gameOver=false; paused=false; running=true;
+    overlay.style.display='none';
+    playBtn.textContent='PAUSE';
+    pauseBtn.textContent='PAUSE';
+    pauseBtn.disabled=false;
+    scoreEl.textContent='0';
+    lvlEl.textContent='1';
+    announce('Game started');
+    try{ c.focus({preventScroll:true}); }catch{ c.focus(); }
+    beep(600,0.08,'square',0.09);
+  }
+  function endGame(){
+    if(gameOver) return;
+    gameOver=true; running=false;
+    triggerHit();
+    if(score>best){ best=score; saveBest(); bestEl.textContent=best; }
+    ovTitle.textContent = score>=30 ? 'STAR PILOT!' : score>=15 ? 'NICE DODGE' : 'WRECKED';
+    ovMsg.innerHTML = `Score <b>${score}</b> · Best <b>${best}</b> · Level <b>${level}</b><br>Press <span class="kbd">Space</span> or PLAY to try again.`;
+    overlay.style.display='grid';
+    playBtn.textContent='RETRY';
+    pauseBtn.textContent='PAUSE';
+    pauseBtn.disabled=true;
+    announce('Game over, score '+score+', best '+best);
+    beep(120,0.3,'sawtooth',0.12); setTimeout(()=>beep(80,0.4,'square',0.08),90);
+    try{ startBtn.focus({preventScroll:true}); }catch{ startBtn.focus(); }
+  }
+  function showPause(){
+    if(gameOver || !running) return;
+    if(paused) return;
+    paused=true; overlay.style.display='grid';
+    ovTitle.textContent='PAUSED'; ovMsg.textContent='Press P or PLAY to resume. Press R to restart.';
+    pauseBtn.textContent='RESUME';
+    playBtn.textContent='RESUME';
+    announce('Paused');
+  }
+  function resume(){
+    if(gameOver || !running) return;
+    if(!paused) return;
+    paused=false; overlay.style.display='none';
+    pauseBtn.textContent='PAUSE';
+    playBtn.textContent='PAUSE';
+    announce('Resumed');
+    try{ c.focus({preventScroll:true}); }catch{ c.focus(); }
+  }
+  function togglePause(){
+    if(!running || gameOver) return;
+    if(paused) resume(); else showPause();
+  }
+
+  function spawn(){
+    const w = 22 + Math.random()*28;
+    const h = 12 + Math.random()*18;
+    debris.push({ x: Math.random()*(W-w-8)+4, y: -h-10, w, h, vy: (2.2 + Math.random()*1.8 + level*0.35)*speedMul, rot: Math.random()*Math.PI, vr:(Math.random()-0.5)*0.12 });
+    if(Math.random()<0.12){ const d=debris[debris.length-1]; d.w*=1.4; d.h*=1.3; }
+  }
+
+  let lastLevel = 1;
+  function update(dt){
+    if(hitTimer>0){ hitTimer-=dt; if(hitTimer<=0) hitFlash.style.opacity='0'; }
+    if(lvlFlashTimer>0){ lvlFlashTimer-=dt; if(lvlFlashTimer<=0) levelFlash.style.opacity='0'; }
+    if(!running||paused||gameOver) return;
+    t+=dt;
+    level = 1 + Math.floor(score/10);
+    if(level!==lastLevel){
+      lvlEl.textContent=level;
+      triggerLevelFlash(level);
+      lastLevel=level;
+    }
+    lvlEl.textContent=level;
+    speedMul = 1 + level*0.07;
+    spawnTimer -= dt;
+    if(spawnTimer<=0){ spawn(); spawnTimer = Math.max(110, 520 - level*35 - score*4); }
+    let dir = 0;
+    if(keys['arrowleft']||keys['a']) dir-=1;
+    if(keys['arrowright']||keys['d']) dir+=1;
+    if(holdDir!==0) dir+=holdDir;
+    if(dir!==0) player.targetX += dir * 300 * dt/1000;
+    player.targetX = Math.max(player.w/2, Math.min(W-player.w/2, player.targetX));
+    const dx = player.targetX - player.x;
+    player.vx = dx * 0.22;
+    player.x += player.vx * dt/16;
+    player.x = Math.max(player.w/2, Math.min(W-player.w/2, player.x));
+    for(let d of debris){ d.y += d.vy * dt/16; d.rot += d.vr * dt/16; }
+    for(let i=debris.length-1;i>=0;i--){
+      if(debris[i].y > H+30){
+        debris.splice(i,1);
+        score+=1;
+        scoreEl.textContent=score;
+        if(score>best){ best=score; bestEl.textContent=best; saveBest(); }
+        // score pop
+        if(score%10===0){
+          // level handled above, but also pop
+        } else {
+          triggerPop('+1', score%5===0 ? '#8aff9a' : '#7af0ff');
+          beep(520+Math.min(score*5,220),0.05,'square',0.04);
+        }
+        if(score%10===0) beep(720,0.08,'sine',0.09);
+      }
+    }
+    const px1 = player.x - player.w/2, px2 = player.x + player.w/2, py1 = player.y - player.h/2, py2 = player.y + player.h/2;
+    for(let d of debris){
+      if(px2>d.x && px1<d.x+d.w && py2>d.y && py1<d.y+d.h){ triggerHit(); endGame(); break; }
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#070a16'; ctx.fillRect(0,0,W,H);
+    // stars parallax
+    ctx.fillStyle='rgba(120,140,255,0.09)';
+    for(let i=0;i<56;i++){
+      const x=(Math.sin(i*12.991+t*0.00022+i)*W+W)%W;
+      const y=(i*43 + t*0.06 + Math.cos(i)*20)%H;
+      const s=(i%3===0)?1.6:1;
+      ctx.fillRect(x,y,s,s);
+    }
+    // subtle grid
+    ctx.strokeStyle='rgba(120,140,255,0.05)'; ctx.lineWidth=1;
+    for(let x=0;x<W;x+=42){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    ctx.strokeStyle='rgba(120,140,255,0.03)';
+    for(let y=0;y<H;y+=56){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    // debris
+    for(let d of debris){
+      ctx.save(); ctx.translate(d.x+d.w/2,d.y+d.h/2); ctx.rotate(d.rot);
+      const grad = ctx.createLinearGradient(-d.w/2,-d.h/2,d.w/2,d.h/2);
+      grad.addColorStop(0,'#ff5a7a'); grad.addColorStop(1,'#ff9a3d');
+      ctx.fillStyle=grad; ctx.fillRect(-d.w/2,-d.h/2,d.w,d.h);
+      ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=1; ctx.strokeRect(-d.w/2,-d.h/2,d.w,d.h);
+      ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.fillRect(-d.w/2+4,-d.h/2+4,d.w-8,3);
+      // notch
+      ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(-d.w/2+6,d.h/2-4,d.w-12,2);
+      ctx.restore();
+    }
+    // player ship with slight tilt by velocity
+    const tilt = Math.max(-0.28, Math.min(0.28, player.vx*0.08));
+    ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(tilt);
+    ctx.fillStyle='#7af0ff';
+    ctx.shadowColor='#2f5bff'; ctx.shadowBlur=14;
+    ctx.beginPath();
+    ctx.moveTo(0,-player.h/2-7); ctx.lineTo(player.w/2, player.h/2); ctx.lineTo(2, player.h/2-4); ctx.lineTo(-2, player.h/2-4); ctx.lineTo(-player.w/2, player.h/2); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#e9f0ff'; ctx.beginPath(); ctx.arc(0,-2,3.2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(-0.8,-2.6,1,0,Math.PI*2); ctx.fill();
+    if(running && !paused && !gameOver){
+      ctx.fillStyle='rgba(255,90,122,0.95)'; ctx.beginPath(); ctx.moveTo(-6,player.h/2-2); ctx.lineTo(0,player.h/2+9+Math.random()*5); ctx.lineTo(6,player.h/2-2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='rgba(255,200,80,0.9)'; ctx.beginPath(); ctx.moveTo(-3,player.h/2-1); ctx.lineTo(0,player.h/2+5+Math.random()*3); ctx.lineTo(3,player.h/2-1); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    // HUD text in canvas for redundancy
+    ctx.fillStyle='rgba(233,240,255,0.72)'; ctx.font='700 11px ui-monospace, monospace';
+    ctx.fillText('LVL '+level,10,16);
+    ctx.textAlign='right'; ctx.fillText(Math.floor(t/1000)+'s',W-10,16); ctx.textAlign='left';
+    // score pop is DOM, also draw floating +1 near top for extra feedback
+  }
+
+  let last=0;
+  function loop(now){
+    requestAnimationFrame(loop);
+    if(!last) last=now;
+    const dt=Math.min(34, now-last); last=now;
+    update(dt); draw();
+  }
+  requestAnimationFrame(loop);
+
+  // centralized input resolution to avoid duplicate handling
+  function handleAction(key){
+    if(key===' '){
+      if(gameOver||!running) reset();
+      else togglePause();
+      return true;
+    }
+    if(key==='p'){ togglePause(); return true; }
+    if(key==='r'){ reset(); return true; }
+    return false;
+  }
+
+  window.addEventListener('keydown', e=>{
+    const k=e.key.toLowerCase();
+    // prevent scrolling for game keys
+    if([' ','arrowleft','arrowright','a','d','p','r'].includes(k)) {
+      // only prevent if canvas or body focused and game relevant
+      if(k===' ' || k==='arrowleft' || k==='arrowright') e.preventDefault();
+    }
+    keys[k]=true;
+    if(k===' ' || k==='p' || k==='r'){
+      // handle once, avoid repeat spam for pause
+      if(e.repeat) return;
+      if(handleAction(k)) e.preventDefault();
+    }
+    if(k==='arrowleft'||k==='arrowright'||k==='a'||k==='d') e.preventDefault();
+  });
+  window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+
+  // visibility -> auto pause
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden && running && !paused && !gameOver) showPause();
+  });
+
+  // pointer / touch
+  function posFromEvent(e){
+    const rect=c.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : (e.clientX ?? 0);
+    const scale = W / rect.width;
+    return (cx - rect.left)*scale;
+  }
+  function onPointerDown(e){
+    pointerDown=true;
+    player.targetX=posFromEvent(e);
+    if(!running||gameOver) reset();
+    else if(paused) resume();
+    try{ c.setPointerCapture(e.pointerId); }catch{}
+    e.preventDefault();
+  }
+  function onPointerMove(e){
+    if(pointerDown){
+      player.targetX=posFromEvent(e);
+      e.preventDefault();
+    }
+  }
+  function onPointerUp(e){
+    pointerDown=false;
+    try{ c.releasePointerCapture(e.pointerId); }catch{}
+  }
+  c.addEventListener('pointerdown', onPointerDown, {passive:false});
+  c.addEventListener('pointermove', onPointerMove, {passive:false});
+  window.addEventListener('pointerup', onPointerUp);
+  c.addEventListener('touchstart', e=>{ pointerDown=true; player.targetX=posFromEvent(e); if(!running||gameOver) reset(); e.preventDefault(); }, {passive:false});
+  c.addEventListener('touchmove', e=>{ if(pointerDown) player.targetX=posFromEvent(e); e.preventDefault(); }, {passive:false});
+  window.addEventListener('touchend', ()=> pointerDown=false, {passive:true});
+  // also mouse drag fallback
+  c.addEventListener('mousedown', e=>{ pointerDown=true; player.targetX=posFromEvent(e); });
+  window.addEventListener('mouseup', ()=> pointerDown=false);
+  c.addEventListener('mousemove', e=>{ if(pointerDown) player.targetX=posFromEvent(e); });
+
+  // helper for hold buttons (touch fallback)
+  function bindHold(btn, dir){
+    let active=false;
+    const start=(e)=>{
+      e.preventDefault();
+      holdDir=dir; active=true;
+      try{ btn.setPointerCapture(e.pointerId); }catch{}
+      if(!running||gameOver) reset();
+      else if(paused) resume();
+    };
+    const end=(e)=>{
+      if(active && holdDir===dir) holdDir=0;
+      active=false;
+      try{ if(e.pointerId) btn.releasePointerCapture(e.pointerId); }catch{}
+    };
+    btn.addEventListener('pointerdown', start, {passive:false});
+    btn.addEventListener('pointerup', end);
+    btn.addEventListener('pointercancel', end);
+    btn.addEventListener('pointerleave', ()=>{ if(active) holdDir=0; });
+    btn.addEventListener('touchstart', e=>{ holdDir=dir; e.preventDefault(); if(!running||gameOver) reset(); }, {passive:false});
+    btn.addEventListener('touchend', e=>{ holdDir=0; e.preventDefault(); }, {passive:false});
+    // keyboard accessibility: space/enter hold via keydown on button
+    btn.addEventListener('keydown', e=>{
+      if(e.key===' '||e.key==='Enter'){ holdDir=dir; e.preventDefault(); }
+    });
+    btn.addEventListener('keyup', e=>{
+      if(e.key===' '||e.key==='Enter'){ holdDir=0; e.preventDefault(); }
+    });
+    // prevent context menu / scrolling
+    btn.addEventListener('contextmenu', e=>e.preventDefault());
+  }
+  bindHold(leftBtn,-1);
+  bindHold(rightBtn,1);
+
+  // prevent scrolling on stage
+  stage.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+  stage.addEventListener('wheel', e=>{ if(running) e.preventDefault(); }, {passive:false});
+
+  startBtn.addEventListener('click', ()=>{ reset(); });
+  playBtn.addEventListener('click', ()=>{
+    if(gameOver||!running) reset();
+    else togglePause();
+    beep(600,0.06,'square',0.08);
+  });
+  pauseBtn.addEventListener('click', ()=>{
+    if(!running){ reset(); return; }
+    if(gameOver) return;
+    togglePause();
+    beep(500,0.05,'sine',0.07);
+  });
+  restartBtn.addEventListener('click', ()=>{ reset(); beep(500,0.07,'square',0.08); });
+
+  // focus management: allow Space on focused canvas to start
+  c.addEventListener('keydown', e=>{
+    const k=e.key.toLowerCase();
+    if(k===' '||k==='enter'){ e.preventDefault(); if(gameOver||!running) reset(); else togglePause(); }
+  });
+
+  // initial draw + best display
+  draw();
+  pauseBtn.disabled=true; // until game starts
+  // expose for verifier / e2e
+  window.__VOID_DODGE__ = { getState:()=>({score,best,level,running,paused,gameOver,debris:debris.length, holdDir, pointerDown}), reset, c, triggerPop, triggerHit };
+})();
+</script>
+</body>
+</html>
