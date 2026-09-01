@@ -54,6 +54,21 @@ data class Brass(
     val spin: Float
 )
 
+data class Tracer(
+    val id: Int,
+    val born: Long = System.currentTimeMillis(),
+    val start: Offset,
+    val end: Offset
+)
+
+data class ImpactDecal(
+    val id: Int,
+    val born: Long = System.currentTimeMillis(),
+    val x: Float,
+    val y: Float,
+    val kind: String // "sand" | "wall"
+)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,6 +111,11 @@ fun FpsGameScreen() {
     // AAA brass ejection particle queue (MW3 shell physics)
     var brasses by remember { mutableStateOf(listOf<Brass>()) }
     var brassSeq by remember { mutableIntStateOf(0) }
+    // AAA ballistics VFX — tracer streaks + persistent impact decals (MW3 Rust wall/ground hits)
+    var tracers by remember { mutableStateOf(listOf<Tracer>()) }
+    var tracerSeq by remember { mutableIntStateOf(0) }
+    var impacts by remember { mutableStateOf(listOf<ImpactDecal>()) }
+    var impactSeq by remember { mutableIntStateOf(0) }
     var targets by remember {
         mutableStateOf(
             List(5) { i ->
@@ -168,6 +188,12 @@ fun FpsGameScreen() {
             if (brasses.any { now - it.born > 1100 }) {
                 brasses = brasses.filter { now - it.born < 1100 }
             }
+            if (tracers.any { now - it.born > 135 }) {
+                tracers = tracers.filter { now - it.born < 135 }
+            }
+            if (impacts.any { now - it.born > 2600 }) {
+                impacts = impacts.filter { now - it.born < 2600 }
+            }
         }
     }
 
@@ -209,6 +235,14 @@ fun FpsGameScreen() {
         ammo--
         recoil = 16f
         muzzleFlash = true
+        // MW3 tracer — warm streak from ejection port to aim point with slight spread (AAA ballistics)
+        val spreadX = (Random.nextFloat() - 0.5f) * 0.22f
+        val spreadY = (Random.nextFloat() - 0.5f) * 0.18f
+        tracers = tracers + Tracer(
+            id = tracerSeq++,
+            start = Offset(0.56f, 0.88f), // normalized weapon tip
+            end = Offset(0.5f + spreadX, 0.46f + spreadY)
+        )
         // brass ejection with randomized lateral + upward velocity + spin (Warzone-style)
         brasses = brasses + Brass(
             id = brassSeq++,
@@ -263,6 +297,12 @@ fun FpsGameScreen() {
             }
         } else {
             gameMessage = if (Random.nextFloat() < 0.15f) "SUPPRESSING FIRE" else "ELIMINATE HOSTILES"
+            // miss impact decal — MW3 bullet hole + dust puff (alternates sand/wall based on aim height)
+            val kind = if (aimY > 0.22f) "sand" else if (Random.nextFloat() < 0.45f) "wall" else "sand"
+            // project aim point into horizon-relative screen Y so decals appear where bullet actually lands
+            val impactX = 0.5f + aimX * 0.48f + (Random.nextFloat() - 0.5f) * 0.05f
+            val impactY = 0.50f + aimY * 0.42f + (if (kind == "sand") 0.14f else 0.02f)
+            impacts = impacts + ImpactDecal(id = impactSeq++, x = impactX.coerceIn(0.05f, 0.95f), y = impactY.coerceIn(0.32f, 0.84f), kind = kind)
             // subtle miss feedback — light vignette pulse
             if (Random.nextFloat() < 0.18f) {
                 damageFlash = true
@@ -1104,11 +1144,101 @@ fun FpsGameScreen() {
                 }
             }
         }
-        // AAA brass + smoke overlay — fullscreen physics particles (driven by frameTick)
+        // AAA muzzle bloom — full-screen warm exposure + lens flare (MW3 HDR flash, 55ms window driven by muzzleFlash)
+        if (muzzleFlash) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val bloomCenter = Offset(size.width * 0.58f, size.height * 0.86f)
+                // radial warm exposure from muzzle tip washing lower screen
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFFFD67A).copy(alpha = 0.18f), Color(0xFFFF8A2A).copy(alpha = 0.08f), Color.Transparent),
+                        center = bloomCenter,
+                        radius = size.width * 0.55f
+                    ),
+                    size = size
+                )
+                // subtle top vignette lift
+                drawRect(Color(0xFFFFE8A0).copy(alpha = 0.035f), size = size)
+                // anamorphic lens streak
+                drawLine(Color.White.copy(alpha = 0.10f), Offset(bloomCenter.x - size.width * 0.35f, bloomCenter.y), Offset(bloomCenter.x + size.width * 0.35f, bloomCenter.y), strokeWidth = 2.5f)
+                drawCircle(Color.White.copy(alpha = 0.14f), radius = 18f, center = bloomCenter)
+                // secondary flare ghost
+                drawCircle(Color(0xFFFFA62A).copy(alpha = 0.09f), radius = 42f, center = Offset(bloomCenter.x - 18f, bloomCenter.y - 22f))
+            }
+        }
+        // AAA ballistics overlay — tracers + impact decals + brass + smoke (driven by frameTick)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val tick = frameTick // invalidate each frame
             @Suppress("UNUSED_VARIABLE") val _t = tick
             val now = System.currentTimeMillis()
+            // impact decals — persistent bullet holes with dust/spark (MW3 Rust wall & sand)
+            for (dec in impacts) {
+                val age = (now - dec.born).toFloat()
+                val fade = (1f - age / 2600f).coerceIn(0f, 1f)
+                val px = dec.x * size.width
+                val py = dec.y * size.height
+                if (dec.kind == "wall") {
+                    // concrete chip — dark crater + light rim + radial crack
+                    drawCircle(Color.Black.copy(alpha = 0.42f * fade), radius = 7.5f, center = Offset(px, py))
+                    drawCircle(Color(0xFF4A4455).copy(alpha = 0.55f * fade), radius = 5.2f, center = Offset(px, py))
+                    drawCircle(Color(0xFFD8C9A8).copy(alpha = 0.18f * fade), radius = 6.8f, center = Offset(px, py), style = Stroke(width = 1f))
+                    // micro cracks
+                    for (ci in 0 until 3) {
+                        val ang = ci * 120f * PI.toFloat() / 180f + dec.id * 0.7f
+                        drawLine(Color.Black.copy(alpha = 0.28f * fade), Offset(px, py), Offset(px + cos(ang) * 9f, py + sin(ang) * 6f), strokeWidth = 0.9f)
+                    }
+                    // fresh spark residue fades fast
+                    if (age < 220f) {
+                        val spA = (1f - age / 220f)
+                        drawCircle(Color(0xFFFFD67A).copy(alpha = 0.55f * spA), radius = 4f * spA, center = Offset(px, py))
+                        drawCircle(Color.White.copy(alpha = 0.7f * spA), radius = 1.8f, center = Offset(px + 1f, py - 1f))
+                    }
+                } else {
+                    // sand puff — crater shadow + kicked dust ring
+                    drawOval(Color.Black.copy(alpha = 0.22f * fade), topLeft = Offset(px - 8f, py - 2f), size = Size(16f, 5f))
+                    drawCircle(Color(0xFF5A4A2A).copy(alpha = 0.45f * fade), radius = 5.8f, center = Offset(px, py))
+                    drawCircle(Color(0xFF8A7A5A).copy(alpha = 0.30f * fade), radius = 4f, center = Offset(px, py))
+                    drawCircle(Color(0xFF3A2A1A).copy(alpha = 0.35f * fade), radius = 6.5f, center = Offset(px, py), style = Stroke(width = 0.9f))
+                    if (age < 300f) {
+                        val dA = (1f - age / 300f)
+                        drawCircle(Color(0xFFC2B49A).copy(alpha = 0.22f * dA), radius = 9f + dA * 11f, center = Offset(px, py - 2f))
+                        drawCircle(Color.White.copy(alpha = 0.10f * dA), radius = 5f + dA * 7f, center = Offset(px + 3f, py - 5f))
+                        // ejecta specks
+                        for (ei in 0 until 4) {
+                            val ang = ei * 90f * PI.toFloat() / 180f + dec.id * 0.9f
+                            val dist = dA * 12f
+                            drawCircle(Color(0xFF8A7A5A).copy(alpha = 0.28f * dA), radius = 1.1f, center = Offset(px + cos(ang) * dist, py + sin(ang) * dist * 0.6f))
+                        }
+                    }
+                }
+            }
+            // tracers — additive streaks, streak length shrinks as it fades (135ms)
+            for (tr in tracers) {
+                val age = (now - tr.born).toFloat()
+                if (age > 135f) continue
+                val t = (age / 135f).coerceIn(0f, 1f)
+                val alpha = (1f - t)
+                val w = size.width
+                val h = size.height
+                val sx = tr.start.x * w
+                val sy = tr.start.y * h
+                val ex = tr.end.x * w
+                val ey = tr.end.y * h
+                // travel interpolation — head moves toward end, tail follows
+                val headT = (t * 1.9f).coerceIn(0f, 1f)
+                val tailT = ((t - 0.08f) * 1.9f).coerceIn(0f, 1f)
+                val hx = sx + (ex - sx) * headT
+                val hy = sy + (ey - sy) * headT
+                val tx = sx + (ex - sx) * tailT
+                val ty = sy + (ey - sy) * tailT
+                // outer glow
+                drawLine(Color(0xFFFFE8A0).copy(alpha = 0.42f * alpha), Offset(tx, ty), Offset(hx, hy), strokeWidth = 5.5f)
+                // hot core
+                drawLine(Color.White.copy(alpha = 0.92f * alpha), Offset(tx, ty), Offset(hx, hy), strokeWidth = 1.9f)
+                // head spark
+                drawCircle(Color.White.copy(alpha = 0.85f * alpha), radius = 3.2f * alpha, center = Offset(hx, hy))
+                drawCircle(Color(0xFFFFD67A).copy(alpha = 0.6f * alpha), radius = 6f * alpha, center = Offset(hx, hy))
+            }
             // muzzle smoke puff — expands and fades 180ms after each shot
             if (muzzleFlash) {
                 val smokeCenter = Offset(size.width / 2f + 64f, size.height - 92f)
