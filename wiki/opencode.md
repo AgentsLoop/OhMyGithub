@@ -81,10 +81,13 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    verification,
    then marks the comment closed and terminates both tunnels.
 
-After PR creation, the workflow also ZIPs `project/dist`, publishes it through
-the token-protected OmGithub API, verifies the permanent wildcard URL, and puts
-the permanent game and install links in the final issue comment. See
-[OmGithub publishing](omgithub.md).
+After PR creation, OmGithub publishing is opt-in. Set the repository variable
+`OMGHITHUB_PUBLISH_ENABLED` to `true` and provide the
+`OMGHITHUB_PUBLISH_TOKEN` Actions secret to ZIP `project/dist`, publish it
+through the token-protected API, verify the permanent wildcard URL, and include
+the permanent game and install links in the final issue comment. The variable
+defaults to `false`; if publishing is enabled but fails, the workflow continues
+and reports that publication was unsuccessful. See [OmGithub publishing](omgithub.md).
 
 The comment URL opens `/<encoded-worktree>/session/<session-id>` rather than
 the web home page. This matters because the web home page stores its project
