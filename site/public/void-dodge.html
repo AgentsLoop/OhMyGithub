@@ -30,6 +30,7 @@ canvas:focus-visible{box-shadow:inset 0 0 0 2px #7aa0ff}
 .panel{background:#0f1228;border:1px solid rgba(120,140,255,.2);border-radius:14px;padding:18px 16px;max-width:320px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
 .panel h2{font-size:18px;letter-spacing:.08em;margin-bottom:6px}
 .panel p{font-size:12px;opacity:.75;line-height:1.5;margin-bottom:12px}
+.panel .btn.primary#startBtn{width:100%;min-height:48px;font-size:14px;letter-spacing:.08em;padding:12px 16px;margin-top:2px}
 .kbd{display:inline-block;border:1px solid rgba(255,255,255,.2);border-bottom-width:2px;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:6px;font-size:11px;margin:0 2px}
 .topline{height:2px;background:linear-gradient(90deg,#2f5bff,#7af0ff,#ff5a7a);opacity:.9}
 .foot{padding:8px 12px;text-align:center;font-size:10px;opacity:.45;letter-spacing:.08em}
@@ -442,6 +443,43 @@ canvas:focus-visible{box-shadow:inset 0 0 0 2px #7aa0ff}
   }
   bindHold(leftBtn,-1);
   bindHold(rightBtn,1);
+
+  // CRITIC FIX: tap anywhere to retry when gameOver — one-thumb instant restart (Flappy/Crossy)
+  overlay.addEventListener('click', e=>{
+    // click on backdrop (outside panel) retries; panel clicks handled by button
+    if(e.target===overlay && (gameOver||!running)){
+      reset(); beep(600,0.08,'square',0.09);
+    }
+  });
+  // also allow tap on stage/canvas when gameOver to retry (anywhere)
+  stage.addEventListener('pointerdown', e=>{
+    if((gameOver||!running) && e.target!==startBtn && !e.target.closest('button')){
+      // don't double-trigger if startBtn; let button handle. Otherwise instant retry.
+      reset(); beep(600,0.08,'square',0.09);
+      e.preventDefault();
+    }
+  }, {capture:true});
+
+  // hide touch controls while overlay visible to avoid covering ship at y=H-48 (critic fix)
+  const touchCtrl = document.querySelector('.touch-ctrl');
+  const mo = new MutationObserver(()=>{
+    if(touchCtrl) touchCtrl.style.visibility = (overlay.style.display!=='none' && overlay.style.display!=='') ? 'hidden' : 'visible';
+  });
+  mo.observe(overlay, {attributes:true, attributeFilter:['style']});
+
+  // enlarge label when gameOver for thumb target
+  const origStartLabel = startBtn.textContent;
+  function updateStartLabel(){
+    if(gameOver) startBtn.textContent='TAP TO RETRY — SPACE';
+    else if(!running) startBtn.textContent='PLAY — SPACE';
+    else startBtn.textContent=origStartLabel;
+  }
+  // patch reset/endGame/showPause/resume to update label
+  const _reset = reset, _endGame = endGame, _showPause = showPause, _resume = resume;
+  reset = function(){ _reset(); updateStartLabel(); };
+  endGame = function(){ _endGame(); updateStartLabel(); };
+  showPause = function(){ _showPause(); startBtn.textContent='RESUME — SPACE'; };
+  resume = function(){ _resume(); updateStartLabel(); };
 
   // prevent scrolling on stage
   stage.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
