@@ -206,6 +206,12 @@ The reusable workflow always uses GitHub's `ubuntu-latest` runner. Runner
 selection labels are ignored; this keeps web and Android verification on one
 consistent KVM-capable runner image.
 
+The centralized runtime checkout follows the triggering branch
+(`github.ref_name`) rather than hard-coding `main`. A title suffix of
+`branch: <existing-branch>` therefore keeps workflow scripts, prompts, and app
+source on the same branch under test; the branch must exist in the repository
+before the issue is opened.
+
 ## Repository settings
 
 - Actions must be allowed to create and approve pull requests.

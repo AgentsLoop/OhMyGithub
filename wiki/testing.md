@@ -51,6 +51,52 @@ Reuse one temporary file such as
 `-o UserKnownHostsFile=/tmp/agentsweb-<run>-known_hosts` for all SSH/scp commands,
 then remove it after the runner session closes.
 
+## Android runner success path
+
+The manual SSH smoke test succeeded entirely on the Ubuntu runner: it installed
+the API 35 emulator and Google APIs image, created an AVD, built `app-debug.apk`,
+installed it with ADB, launched the app, interacted with it, and captured launch
+and interaction PNGs with `adb exec-out screencap -p`. Durable evidence is the
+[launch screenshot](../screenshots/final-android-manual-launch.png),
+[interaction screenshot](../screenshots/final-android-manual-interaction.png),
+and commit `a40d95c`.
+
+The repeatable command sequence is:
+
+```sh
+export ANDROID_AVD_HOME="$HOME/.config/.android/avd"
+yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+  emulator "system-images;android-35;google_apis;x86_64"
+echo no | avdmanager create avd -n manual-test \
+  -k "system-images;android-35;google_apis;x86_64" --force
+nohup sg kvm -c 'emulator @manual-test -no-snapshot -no-window \
+  -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none' \
+  > "$HOME/manual-emulator.log" 2>&1 &
+adb wait-for-device
+./gradlew --no-daemon assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell monkey -p <application-id> 1
+adb exec-out screencap -p > screenshots/final-android-manual.png
+```
+
+## Android and SSH gotchas
+
+- `/dev/kvm` can exist while the runner process still lacks the `kvm` group.
+  Reload the udev rule and make the device readable/writable (`chmod 0666`) in
+  the current job; adding the group alone does not refresh the current shell.
+- `avdmanager` may create the AVD under `$HOME/.config/.android/avd`, while
+  `emulator` searches another default. Export `ANDROID_AVD_HOME` for every
+  emulator and ADB command.
+- Use `sg kvm -c` when launching manually so the emulator receives the group
+  immediately. The workflow's KVM step handles the equivalent device access.
+- A long Gradle build can outlive the local SSH client's command timeout. Start
+  it remotely with `nohup` when needed, then poll the process and APK path over
+  the same SSH session.
+- Keep one known-hosts file for the whole session. The first connection may
+  print the host-key warning; subsequent `ssh` and `scp` commands should pass
+  the same `UserKnownHostsFile`. Delete it only after canceling/finishing the
+  runner session.
+
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
