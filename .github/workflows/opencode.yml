@@ -18,7 +18,7 @@ on:
         required: false
         default: '[]'
       sender:
-        description: GitHub login that submitted the request
+        description: GitHub username that submitted the request
         required: true
 permissions:
   contents: write
