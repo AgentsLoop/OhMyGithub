@@ -199,6 +199,13 @@ fun FpsGameScreen() {
             gameMessage = "ELIMINATE HOSTILES"
         }
     }
+    // AAA polish: level-up banner auto-dismiss after 1.5s so it never sticks
+    LaunchedEffect(gameMessage) {
+        if (gameMessage.startsWith("LEVEL")) {
+            delay(1500)
+            if (gameMessage.startsWith("LEVEL")) gameMessage = "ELIMINATE HOSTILES"
+        }
+    }
 
     fun fire() {
         if (isReloading) return
@@ -1265,10 +1272,15 @@ fun FpsGameScreen() {
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         if (isReloading) "--" else "$ammo",
-                        color = if (ammo < 8) Color(0xFFFF3B30) else Color.White,
+                        color = if (!isReloading && ammo < 8) Color(0xFFFF3B30) else Color.White,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Black,
-                        lineHeight = 22.sp
+                        lineHeight = 22.sp,
+                        modifier = Modifier.graphicsLayer(
+                            scaleX = if (!isReloading && ammo < 8) pulse else 1f,
+                            scaleY = if (!isReloading && ammo < 8) pulse else 1f,
+                            alpha = if (!isReloading && ammo < 8) 1f else 1f
+                        )
                     )
                     Text("/ 30", color = Color(0xFF8A9BB5), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     if (isReloading) {
