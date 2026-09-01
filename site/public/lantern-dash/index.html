@@ -26,18 +26,28 @@
   .combo-badge.on{display:flex;animation:pop 0.2s}
   @keyframes pop{0%{transform:scale(0.8)}100%{transform:scale(1)}}
   .wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:14px 14px 18px;background:
-    radial-gradient(ellipse 900px 600px at 50% -10%, rgba(255,180,90,0.12), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 90% 100%, rgba(64,120,255,0.08), transparent 60%),
-    linear-gradient(180deg,#0a1430 0%,#0d1d38 35%,#0f2740 100%);
+    radial-gradient(ellipse 900px 520px at 50% -8%, rgba(255,190,100,0.14), transparent 62%),
+    radial-gradient(ellipse 700px 520px at 88% 102%, rgba(80,140,255,0.07), transparent 60%),
+    linear-gradient(180deg,#0b1630 0%, #11244a 38%, #1a3442 76%, #1f3d2b 100%);
     position:relative;overflow:hidden}
   .wrap::before{content:"";position:absolute;inset:0;background:
-    radial-gradient(1.5px 1.5px at 20% 15%, rgba(255,255,255,0.9) 50%, transparent 51%),
-    radial-gradient(1px 1px at 55% 8%, rgba(255,255,255,0.7) 50%, transparent 51%),
-    radial-gradient(1.2px 1.2px at 78% 22%, rgba(255,255,255,0.6) 50%, transparent 51%),
-    radial-gradient(1px 1px at 35% 12%, rgba(255,255,255,0.5) 50%, transparent 51%),
-    radial-gradient(1.3px 1.3px at 88% 35%, rgba(255,255,255,0.4) 50%, transparent 51%);
-    opacity:0.9;pointer-events:none}
-  .stage{position:relative;width:min(860px,100%);aspect-ratio:860/560;background:linear-gradient(180deg,rgba(12,22,45,0.95) 0%,rgba(16,32,61,0.95) 55%,rgba(14,28,48,0.98) 100%);border:1px solid rgba(255,255,255,0.12);border-radius:22px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);display:flex;flex-direction:column}
+    radial-gradient(1.6px 1.6px at 18% 14%, rgba(255,255,255,0.92) 50%, transparent 51%),
+    radial-gradient(1.1px 1.1px at 53% 7%, rgba(255,255,255,0.78) 50%, transparent 51%),
+    radial-gradient(1.3px 1.3px at 76% 21%, rgba(255,255,255,0.66) 50%, transparent 51%),
+    radial-gradient(1px 1px at 33% 11%, rgba(255,255,255,0.58) 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 86% 33%, rgba(255,255,255,0.50) 50%, transparent 51%),
+    radial-gradient(1px 1px at 12% 28%, rgba(255,255,255,0.40) 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 68% 9%, rgba(255,255,255,0.45) 50%, transparent 51%),
+    radial-gradient(1px 1px at 44% 18%, rgba(255,255,255,0.35) 50%, transparent 51%);
+    opacity:0.95;pointer-events:none}
+  .wrap::after{content:"";position:absolute;inset:0;background:
+    radial-gradient(3px 3px at 25% 62%, rgba(255,200,120,0.08) 50%, transparent 51%),
+    radial-gradient(2.5px 2.5px at 61% 68%, rgba(180,220,255,0.06) 50%, transparent 51%),
+    radial-gradient(2px 2px at 82% 58%, rgba(255,180,90,0.07) 50%, transparent 51%),
+    radial-gradient(3.5px 3.5px at 14% 52%, rgba(255,210,140,0.05) 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 47% 74%, rgba(160,255,180,0.05) 50%, transparent 51%);
+    filter:blur(0.3px);opacity:0.9;pointer-events:none}
+  .stage{position:relative;width:min(860px,100%);aspect-ratio:860/560;background:linear-gradient(180deg,rgba(12,22,45,0.97) 0%,rgba(16,32,61,0.97) 52%,rgba(18,42,46,0.99) 100%);border:1px solid rgba(255,255,255,0.12);border-radius:22px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);display:flex;flex-direction:column}
   canvas{width:100%;height:100%;display:block;touch-action:none;cursor:none}
   .overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(5,10,22,0.58);backdrop-filter:blur(7px);padding:20px;text-align:center;transition:opacity 0.25s, visibility 0.25s;overflow-y:auto}
   .overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
@@ -63,7 +73,8 @@
   .level-toast{position:absolute;top:72px;left:50%;transform:translateX(-50%) translateY(-10px);background:linear-gradient(180deg,#ffd08a,#ff8c42);color:#1a0f00;font-family:"Space Grotesk",sans-serif;font-weight:800;font-size:15px;letter-spacing:0.06em;padding:8px 18px;border-radius:999px;box-shadow:0 8px 24px rgba(255,140,66,0.5);opacity:0;pointer-events:none;transition:opacity 0.2s, transform 0.2s}
   .level-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   @media (max-width:700px){
-    .stage{aspect-ratio: 9/13;border-radius:18px}
+    .stage{aspect-ratio:860/560;max-height:min(62vh,520px);border-radius:18px}
+    .stage canvas{object-fit:contain}
     .touch-zones{display:grid;grid-template-columns:1fr 1fr}
     .touch-btns{display:flex}
     canvas{cursor:auto}
@@ -71,9 +82,10 @@
     .hud{gap:8px;font-size:11px}
     .hud b{font-size:15px}
     .hud .hs{display:none}
-    .panel h1{font-size:34px}
-    .panel{padding:22px 18px}
+    .panel h1{font-size:32px}
+    .panel{padding:20px 16px}
     .topbar{height:52px;padding:0 10px}
+    .wrap{padding:10px 10px 14px}
   }
   .sr-only{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 </style>
@@ -183,10 +195,16 @@ let spawnTimer = 0, spawnInterval = 900; // ms
 let baseSpeed = 1.15;
 let shake = 0, combo = 0, comboTimer=0;
 let lastTime = 0;
-let bgStars = Array.from({length:60},()=>({x:Math.random()*W,y:Math.random()*H*0.55,r:Math.random()*1.2+0.3,tw:Math.random()*Math.PI*2,sp:0.3+Math.random()*1.2}));
-let trees = [
-  {x:0,w:160,h:140},{x:120,w:200,h:165},{x:300,w:180,h:150},{x:500,w:220,h:170},{x:680,w:180,h:145}
+let bgStars = Array.from({length:78},()=>({x:Math.random()*W,y:Math.random()*H*0.52,r:Math.random()*1.3+0.25,tw:Math.random()*Math.PI*2,sp:0.35+Math.random()*1.15, flick:0.4+Math.random()*0.6}));
+// 3-layer forest: far (misty), mid, near (detailed)
+let farTrees = Array.from({length:14},(_,i)=>({x: (i*62)-10 + Math.random()*18, w: 78+Math.random()*34, h: 76+Math.random()*28, jitter: Math.random()*6}));
+let midTrees = [
+  {x:-8,w:148,h:132},{x:82,w:172,h:152},{x:210,w:162,h:142},{x:338,w:176,h:148},{x:468,w:188,h:158},{x:608,w:168,h:138},{x:728,w:142,h:124}
 ];
+let nearTrees = [
+  {x:0,w:112,h:98},{x:148,w:126,h:108},{x:302,w:118,h:102},{x:452,w:132,h:112},{x:612,w:122,h:100},{x:738,w:104,h:92}
+];
+let grassClumps = Array.from({length:42},()=>({x: Math.random()*W, h: 7+Math.random()*9, w: 2.5+Math.random()*2, sway: Math.random()*Math.PI*2, swaySpeed: 0.012+Math.random()*0.012}));
 
 function resetGame(){
   score=0; lives=3; level=1; time=0; fireflies=[]; particles=[]; floatTexts=[]; spawnTimer=0; spawnInterval=900; baseSpeed=1.15; combo=0; comboTimer=0; shake=0;
@@ -464,71 +482,185 @@ function draw(dt){
   }
   ctx.clearRect(-10,-10,W+20,H+20);
 
+  // warm twilight sky
   const grad = ctx.createLinearGradient(0,0,0,H);
   grad.addColorStop(0,'#070d1e');
-  grad.addColorStop(0.5,'#0f2040');
-  grad.addColorStop(1,'#13294b');
+  grad.addColorStop(0.38,'#0f2146');
+  grad.addColorStop(0.62,'#14304a');
+  grad.addColorStop(0.82,'#1b3d2e');
+  grad.addColorStop(1,'#132a22');
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,W,H);
+  // subtle aurora / dusk band
+  const band = ctx.createLinearGradient(0,H*0.42,0,H*0.58);
+  band.addColorStop(0,'rgba(0,0,0,0)');
+  band.addColorStop(0.5,'rgba(255,180,90,0.06)');
+  band.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=band; ctx.fillRect(0,H*0.42,W,H*0.16);
 
   for(const s of bgStars){
     s.tw += 0.015 * (dt/16.6) * s.sp;
-    const a = 0.45 + Math.sin(s.tw)*0.35;
+    const a = (0.42 + Math.sin(s.tw)*0.28) * s.flick;
     ctx.globalAlpha = a;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
     ctx.fill();
-    if(s.r>1){
-      ctx.globalAlpha = a*0.15;
-      ctx.beginPath(); ctx.arc(s.x,s.y,s.r*2.2,0,Math.PI*2); ctx.fill();
+    if(s.r>0.9){
+      ctx.globalAlpha = a*0.16;
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r*2.6,0,Math.PI*2); ctx.fill();
+    }
+    // occasional larger bokeh star
+    if(s.r>1.15 && Math.sin(s.tw*0.7)>0.6){
+      ctx.globalAlpha = a*0.08;
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r*4.5,0,Math.PI*2); ctx.fill();
     }
   }
   ctx.globalAlpha=1;
 
+  // moon with soft halo
   ctx.save();
-  ctx.globalAlpha=0.9;
-  const moonX = W-110, moonY=78, moonR=34;
+  ctx.globalAlpha=0.92;
+  const moonX = W-112, moonY=74, moonR=32;
+  // halo
+  const moonHalo = ctx.createRadialGradient(moonX,moonY,moonR,moonX,moonY,moonR+44);
+  moonHalo.addColorStop(0,'rgba(255,240,180,0.18)');
+  moonHalo.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=moonHalo; ctx.beginPath(); ctx.arc(moonX,moonY,moonR+44,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#fff3d0';
   ctx.beginPath(); ctx.arc(moonX,moonY,moonR,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='rgba(0,0,0,0.08)';
-  ctx.beginPath(); ctx.arc(moonX+8,moonY-6,7,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(moonX-9,moonY+10,5,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='rgba(255,240,180,0.12)';
-  ctx.beginPath(); ctx.arc(moonX,moonY,moonR+18,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(moonX+7,moonY-5,6.5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(moonX-8,moonY+9,4.5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(moonX+2,moonY+12,2.8,0,Math.PI*2); ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle='#0a1428';
+  // distant misty hills — layered
+  // far hill (desaturated blue)
+  ctx.fillStyle='#0a1730';
   ctx.beginPath();
-  ctx.moveTo(0, H*0.52);
-  ctx.bezierCurveTo(W*0.22, H*0.44, W*0.45, H*0.50, W*0.70, H*0.46);
-  ctx.bezierCurveTo(W*0.82, H*0.44, W*0.92, H*0.48, W, H*0.50);
+  ctx.moveTo(0, H*0.50);
+  ctx.bezierCurveTo(W*0.18, H*0.43, W*0.38, H*0.48, W*0.58, H*0.44);
+  ctx.bezierCurveTo(W*0.74, H*0.42, W*0.88, H*0.46, W, H*0.49);
+  ctx.lineTo(W, H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+  // mid hill warmer
+  ctx.fillStyle='#0c1d36';
+  ctx.beginPath();
+  ctx.moveTo(0, H*0.54);
+  ctx.bezierCurveTo(W*0.24, H*0.47, W*0.46, H*0.53, W*0.69, H*0.49);
+  ctx.bezierCurveTo(W*0.82, H*0.47, W*0.93, H*0.51, W, H*0.54);
   ctx.lineTo(W, H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
 
-  ctx.fillStyle='#07101f';
-  for(const t of trees){
+  // far trees — pale, low contrast, catches lantern scatter faintly
+  ctx.globalAlpha=0.58;
+  for(const t of farTrees){
+    const yBase = H - 28;
+    const h = t.h*0.92;
+    ctx.fillStyle='#0e2244';
+    // cluster: 3 pines per bunch
+    for(let k=0;k<3;k++){
+      const ox = t.x + k*14 - 14;
+      const w = t.w*0.28, hh = h - k*6;
+      ctx.beginPath();
+      ctx.moveTo(ox, yBase);
+      ctx.lineTo(ox + w*0.32, yBase - hh*0.95);
+      ctx.lineTo(ox + w*0.5, yBase - hh*0.78);
+      ctx.lineTo(ox + w*0.68, yBase - hh*0.96);
+      ctx.lineTo(ox + w, yBase);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  ctx.globalAlpha=1;
+  // mid trees — richer, with lantern rim when nearby
+  for(const t of midTrees){
+    const distToLantern = Math.abs((t.x + t.w/2) - lantern.x);
+    const rim = Math.max(0, 1 - distToLantern/180) * 0.22 * (0.5 + Math.min(combo*0.08,0.4));
+    ctx.fillStyle='#08162e';
+    // shadow base
     ctx.beginPath();
     ctx.moveTo(t.x, H-28);
-    ctx.lineTo(t.x + t.w*0.3, H - t.h - 6);
-    ctx.lineTo(t.x + t.w*0.5, H - t.h*0.85);
-    ctx.lineTo(t.x + t.w*0.7, H - t.h -10);
+    ctx.lineTo(t.x + t.w*0.30, H - t.h - 6);
+    ctx.lineTo(t.x + t.w*0.5, H - t.h*0.86);
+    ctx.lineTo(t.x + t.w*0.70, H - t.h -10);
     ctx.lineTo(t.x + t.w, H-28);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.03)';
-    ctx.fillRect(t.x + t.w*0.45, H-28, 6, 18);
-    ctx.fillStyle='#07101f';
+    if(rim>0.01){
+      ctx.fillStyle=`rgba(255,190,110,${rim})`;
+      ctx.beginPath();
+      // left edge highlight
+      ctx.moveTo(t.x + t.w*0.30, H - t.h - 6);
+      ctx.lineTo(t.x + t.w*0.33, H - t.h - 6);
+      ctx.lineTo(t.x + t.w*0.50, H - t.h*0.86);
+      ctx.lineTo(t.x + t.w*0.47, H - t.h*0.86);
+      ctx.closePath(); ctx.fill();
+    }
+    // trunk hint
+    ctx.fillStyle='rgba(255,255,255,0.04)';
+    ctx.fillRect(t.x + t.w*0.46, H-28, 5, 16);
+    // canopy dots for texture
+    ctx.fillStyle='rgba(20,40,70,0.9)';
+    ctx.beginPath(); ctx.arc(t.x + t.w*0.5, H - t.h*0.62, 9, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(t.x + t.w*0.38, H - t.h*0.48, 7, 0, Math.PI*2); ctx.fill();
+  }
+  // fog layer between mid and ground
+  const fogGrad = ctx.createLinearGradient(0,H*0.48,0,H*0.72);
+  fogGrad.addColorStop(0,'rgba(180,210,240,0)');
+  fogGrad.addColorStop(0.45,'rgba(160,190,220,0.07)');
+  fogGrad.addColorStop(0.75,'rgba(140,170,200,0.10)');
+  fogGrad.addColorStop(1,'rgba(120,150,180,0.0)');
+  ctx.fillStyle=fogGrad; ctx.fillRect(0,H*0.48,W,H*0.24);
+  // floating mist puffs
+  ctx.globalAlpha=0.22;
+  ctx.fillStyle='rgba(190,220,240,0.9)';
+  for(let i=0;i<4;i++){
+    const mx = ( (time*0.006 + i*200) % (W+120) ) -60;
+    const my = H*0.54 + Math.sin(time*0.0007+i)*6 + i*7;
+    ctx.beginPath(); ctx.ellipse(mx, my, 42, 10, 0,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // near trees — darkest, foreground
+  for(const t of nearTrees){
+    ctx.fillStyle='#060f1e';
+    ctx.beginPath();
+    ctx.moveTo(t.x, H-28);
+    ctx.lineTo(t.x + t.w*0.32, H - t.h - 4);
+    ctx.lineTo(t.x + t.w*0.50, H - t.h*0.82);
+    ctx.lineTo(t.x + t.w*0.68, H - t.h -6);
+    ctx.lineTo(t.x + t.w, H-28);
+    ctx.closePath(); ctx.fill();
+    // foliage blob
+    ctx.fillStyle='#071a2e';
+    ctx.beginPath(); ctx.arc(t.x + t.w*0.5, H - t.h*0.58, 10, 0, Math.PI*2); ctx.fill();
   }
 
   const groundY = H-28;
-  ctx.fillStyle='#0f2a1a';
+  // ground with vertical gradient + rim light from lantern
+  const gGrad = ctx.createLinearGradient(0,groundY,0,H);
+  gGrad.addColorStop(0,'#143d2a');
+  gGrad.addColorStop(0.55,'#102a1e');
+  gGrad.addColorStop(1,'#0d2218');
+  ctx.fillStyle=gGrad;
   ctx.fillRect(0, groundY, W, 28);
-  ctx.strokeStyle='rgba(80,150,90,0.35)';
-  ctx.lineWidth=1;
-  for(let x=0;x<W;x+=14){
-    const h = 6 + Math.sin(x*0.07 + time*0.001)*3;
-    ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x+4, groundY - h); ctx.stroke();
+  // grass clumps with sway
+  for(const c of grassClumps){
+    c.sway += c.swaySpeed;
+    const swayX = Math.sin(c.sway)*1.8;
+    const h = c.h + Math.sin(time*0.001 + c.x*0.02)*1.5;
+    const alpha = 0.32 + 0.12*Math.sin(c.sway*1.3);
+    ctx.strokeStyle=`rgba(${78+Math.round(alpha*18)},${150+Math.round(alpha*10)},${92},${alpha})`;
+    ctx.lineWidth=c.w*0.55;
+    ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(c.x, groundY); ctx.lineTo(c.x+swayX, groundY - h); ctx.stroke();
+    // backlit rim near lantern
+    const dl = Math.abs(c.x - lantern.x);
+    if(dl<70){
+      ctx.strokeStyle=`rgba(255,210,130,${0.18*(1-dl/70)})`;
+      ctx.lineWidth=c.w*0.35;
+      ctx.beginPath(); ctx.moveTo(c.x, groundY); ctx.lineTo(c.x+swayX*0.6, groundY - h*0.85); ctx.stroke();
+    }
   }
-  ctx.fillStyle='rgba(255,255,255,0.04)';
+  ctx.fillStyle='rgba(255,255,255,0.05)';
   ctx.fillRect(0, groundY, W, 1);
 
   const glowIntensity = 0.28 + Math.min(combo*0.04,0.18);
