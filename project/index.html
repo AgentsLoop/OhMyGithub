@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Tidepool Tangle — Crab Adventure</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge" aria-hidden="true">🦀</div>
+      <div>
+        <h1>Tidepool Tangle</h1>
+        <p>Collect 5 shells • dodge waves &amp; starfish • reach the safe rock in 60s</p>
+      </div>
+    </div>
+    <div class="hud" aria-live="polite">
+      <div class="hud-pill" id="hud-score"><span class="icon">🐚</span> <span id="score-text">0 / 5 shells</span></div>
+      <div class="hud-pill timer" id="hud-timer"><span class="icon">⏱</span> <span id="timer-text">60.0s</span></div>
+      <div class="hud-pill" id="hud-status"><span class="icon">🪨</span> <span id="status-text">Find the safe rock</span></div>
+      <div class="hud-pill wave-pill" id="hud-wave"><span class="icon">🌊</span> <span id="wave-text">Calm</span><div class="wave-bar"><div class="wave-bar-fill" id="wave-bar-fill"></div></div></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="canvas-shell" id="canvas-shell">
+      <canvas id="game" width="920" height="540" aria-label="Tidepool Tangle game canvas"></canvas>
+
+      <!-- Start overlay -->
+      <div class="overlay" id="overlay-start">
+        <div class="card">
+          <h2><span class="accent">Tidepool Tangle</span> 🦀</h2>
+          <p>You’re a tiny crab on a sunny tidepool beach. The tide is rising! Grab <b>5 shiny shells</b>, outwit <b>2 wandering starfish</b>, surf past <b>rising waves</b>, and climb the <b>safe rock</b> before time runs out.</p>
+          <div class="legend">
+            <div>🦀<span><b>Crab</b> — arrow keys / WASD</span></div>
+            <div>🐚<span><b>Shells (×5)</b> — collect for points</span></div>
+            <div>⭐<span><b>Starfish (×2)</b> — don’t touch</span></div>
+            <div>🌊<span><b>Waves</b> — rising from the sea</span></div>
+          </div>
+          <div class="kbd-row"><span class="kbd">↑ W</span><span class="kbd">← A</span><span class="kbd">↓ S</span><span class="kbd">→ D</span><span class="kbd">SPACE / ENTER to start</span></div>
+          <button class="btn" id="btn-start">Start Adventure — Go Crab Go!</button>
+          <div class="hint">Tip: Collect all shells, then dash to the big rock at the top-right. Watch the foam line — waves sweep every few seconds!</div>
+        </div>
+      </div>
+
+      <!-- Win overlay -->
+      <div class="overlay hidden" id="overlay-win">
+        <div class="card">
+          <h2>Victory! 🎉🪨</h2>
+          <p id="win-text">You reached the safe rock with all 5 shells!</p>
+          <p style="font-size:13px"><span id="win-stats"></span></p>
+          <div class="btn-row"><button class="btn" id="btn-again-win">Play Again</button><button class="btn secondary" id="btn-share-win">Share</button></div>
+        </div>
+      </div>
+
+      <!-- Lose overlay -->
+      <div class="overlay hidden" id="overlay-lose">
+        <div class="card">
+          <h2 id="lose-title">Swept Away 🌊</h2>
+          <p id="lose-text">The wave caught you!</p>
+          <p id="lose-stats" style="font-size:13px;opacity:.8"></p>
+          <button class="btn" id="btn-again-lose">Try Again</button>
+          <div class="hint" id="lose-hint"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="controls-left">
+        <span><span class="dot" style="background:#ff6b35"></span> Crab</span>
+        <span><span class="dot" style="background:#ffd166"></span> Shells</span>
+        <span><span class="dot" style="background:#ff7a6b"></span> Starfish</span>
+        <span><span class="dot" style="background:#4fc3d8"></span> Tidepool</span>
+        <span><span class="dot" style="background:#8a7a6a"></span> Safe Rock</span>
+      </div>
+      <div class="dpad" aria-label="Touch controls">
+        <button class="up" data-dir="up" aria-label="Up">▲</button>
+        <button class="left" data-dir="left" aria-label="Left">◀</button>
+        <button class="down" data-dir="down" aria-label="Down">▼</button>
+        <button class="right" data-dir="right" aria-label="Right">▶</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="footer">Made for the beach — no external services, works offline. <span id="footer-timer-help">60 seconds to win.</span></div>
+  <span class="sr-only" id="a11y-status" aria-live="assertive"></span>
+<script type="module" src="game.js"></script>
+</body>
+</html>

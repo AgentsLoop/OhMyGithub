@@ -1,0 +1,9 @@
+{
+  "name": "tidepool-tangle",
+  "version": "1.0.0",
+  "description": "Tidepool Tangle — guide the tiny crab, collect shells, dodge waves and starfish, reach the safe rock!",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs --port 3000"
+  }
+}
