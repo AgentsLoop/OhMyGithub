@@ -69,6 +69,7 @@ jobs:
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
       OMGHITHUB_PUBLISH_ENABLED: ${{ vars.OMGHITHUB_PUBLISH_ENABLED || 'false' }}
+      VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
       - name: Export target token
         shell: bash
@@ -642,6 +643,7 @@ jobs:
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
 
       - name: Verify app with second OpenCode prompt
+        if: env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -665,6 +667,7 @@ jobs:
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
       - name: Expose verified app
+        if: env.VALIDATION_ENABLED == 'true'
         id: app_tunnel
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
@@ -741,6 +744,7 @@ jobs:
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
 
       - name: Publish worker completion report
+        if: env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -758,6 +762,7 @@ jobs:
           touch "$OPENCODE_WEB_DIR/response-comment.done"
 
       - name: Request and verify final screenshots
+        if: env.VALIDATION_ENABLED == 'true'
         id: final_evidence
         shell: bash
         run: |
@@ -796,6 +801,7 @@ jobs:
           printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
 
       - name: Create pull request
+        if: env.VALIDATION_ENABLED == 'true'
         id: delivery
         shell: bash
         run: |
@@ -830,7 +836,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Publish game to OmGithub
-        if: env.OMGHITHUB_PUBLISH_ENABLED == 'true'
+        if: env.VALIDATION_ENABLED == 'true' && env.OMGHITHUB_PUBLISH_ENABLED == 'true'
         continue-on-error: true
         id: omgithub_publish
         shell: bash
@@ -888,7 +894,7 @@ jobs:
           printf 'url=%s\ninstall_url=%s\n' "$published_url" "$install_url" >> "$GITHUB_OUTPUT"
           echo "Published permanent game URL: $published_url"
       - name: Create OpenCode logs release
-        if: success()
+        if: success() && env.VALIDATION_ENABLED == 'true'
         id: opencode_release
         shell: bash
         run: |
@@ -932,7 +938,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Post final game report
-        if: success() && env.APP_URL != ''
+        if: success() && env.VALIDATION_ENABLED == 'true' && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
           APP_URL: ${{ steps.omgithub_publish.outputs.url || env.APP_URL }}
@@ -990,7 +996,7 @@ jobs:
             });
 
       - name: Mark issue complete
-        if: success()
+        if: success() && env.VALIDATION_ENABLED == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}

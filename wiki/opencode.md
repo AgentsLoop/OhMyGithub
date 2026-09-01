@@ -81,6 +81,14 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    verification,
    then marks the comment closed and terminates both tunnels.
 
+Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
+defaults to `true`. When set to `off` (or any value other than `true`), the
+workflow stops after the initial OpenCode prompt and temporary OpenCode Web
+trycloudflare exposure; app verification/remediation, completion and screenshot
+prompts, Git delivery, OmGithub publication, release/report generation, and the
+complete label are skipped. The temporary access session still sleeps for five
+hours before cleanup.
+
 After PR creation, OmGithub publishing is opt-in. Set the repository variable
 `OMGHITHUB_PUBLISH_ENABLED` to `true` to ZIP `$PROJECT_DIR/dist`, publish it through
 the token-protected API using GitHub's automatically generated repository token,
