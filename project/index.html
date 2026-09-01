@@ -66,8 +66,14 @@ canvas{width:100%;height:100%;display:block;touch-action:none}
 .pad-group{display:flex;gap:8px;pointer-events:auto}
 .pad-btn{width:56px;height:56px;border-radius:16px;background:rgba(15,23,42,.78);border:1px solid rgba(255,255,255,.12);color:#e6eefc;display:grid;place-items:center;font-size:20px;backdrop-filter:blur(8px);user-select:none;-webkit-user-select:none;touch-action:none;transition:.12s}
 .pad-btn:active{background:rgba(127,240,255,.28);transform:scale(.97);border-color:rgba(127,240,255,.4)}
-@media(max-width:760px){.mobile-pad{display:flex}.wrap{padding-bottom:6px;gap:8px}.top{gap:8px}.brand h1{font-size:16px}.chip{padding:6px 10px;font-size:11px}.chip.timer{min-width:102px}.brand p{display:none}}
-@media(max-width:420px){.wrap{padding:10px 10px 6px}.hud{gap:6px}.chip b{font-size:12px}}
+.joystick{width:110px;height:110px;border-radius:50%;background:rgba(15,23,42,.62);border:1px solid rgba(255,255,255,.14);position:relative;pointer-events:auto;touch-action:none;backdrop-filter:blur(10px);box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.4)}
+.joystick::after{content:'';position:absolute;inset:22px;border-radius:50%;border:1px dashed rgba(127,240,255,.18);pointer-events:none}
+.joy-stick{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:linear-gradient(135deg,#7ff0ff,#a78bfa);box-shadow:0 6px 16px rgba(127,240,255,.45), inset 0 1px 0 rgba(255,255,255,.7);display:grid;place-items:center;color:#0a0e1a;font-weight:800;font-size:14px;transition:transform .06s}
+.brake-btn{width:78px;height:78px;border-radius:22px;background:rgba(255,77,106,.18);border:1px solid rgba(255,77,106,.35);color:#ffb3cc;display:grid;place-items:center;font:800 12px "JetBrains Mono";letter-spacing:.08em;backdrop-filter:blur(10px);pointer-events:auto;touch-action:none;user-select:none}
+.brake-btn:active{background:rgba(255,77,106,.32);transform:scale(.97)}
+.brake-btn span{font-size:22px;line-height:1}
+@media(max-width:760px){.mobile-pad{display:flex;gap:12px;inset:auto 10px 10px 10px}.wrap{padding-bottom:6px;gap:8px}.top{gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.top::-webkit-scrollbar{display:none}.brand h1{font-size:16px}.chip{padding:6px 10px;font-size:11px;flex-shrink:0}.chip.timer{min-width:100px}.brand p{display:none}.stage{grid-template-rows:minmax(0,1fr) auto;gap:8px}.canvas-shell{aspect-ratio:16/9;max-height:62dvh;min-height:260px}}
+@media(max-width:420px){.wrap{padding:10px 10px 6px}.hud{gap:6px}.chip b{font-size:12px}.joystick{width:100px;height:100px}.joy-stick{width:50px;height:50px;margin:-25px 0 0 -25px}.brake-btn{width:70px;height:70px}}
 .hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.88);border:1px solid #263554;border-radius:999px;padding:6px 12px;font:600 11px "JetBrains Mono";color:#8da0c8;letter-spacing:.06em;pointer-events:none;white-space:nowrap;max-width:calc(100% - 18px);overflow:hidden;text-overflow:ellipsis}
 .hint strong{color:#e6eefc}
 .footer{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#6b7fa8;font-size:11px;flex-wrap:wrap}
@@ -104,14 +110,8 @@ canvas{width:100%;height:100%;display:block;touch-action:none}
       <div class="hint">WASD / ARROWS / DRAG · Collect <span style="color:#ffd84d">■ parcels</span> then <span style="color:#ff6b9e">⬢ beacon</span></div>
       <div class="beacon-ready-hint" id="beaconHint">⬢ BEACON READY — DELIVER NOW!</div>
       <div class="mobile-pad" id="pad" aria-hidden="true">
-        <div class="pad-group">
-          <button class="pad-btn" data-dir="left" aria-label="Move left">◀</button>
-          <button class="pad-btn" data-dir="right" aria-label="Move right">▶</button>
-        </div>
-        <div class="pad-group">
-          <button class="pad-btn" data-dir="up" aria-label="Move up">▲</button>
-          <button class="pad-btn" data-dir="down" aria-label="Move down">▼</button>
-        </div>
+        <div class="joystick" id="joystick" aria-label="Move joystick"><div class="joy-stick" id="joyStick">◈</div></div>
+        <button class="brake-btn" id="brakeBtn" aria-label="Brake"><span>⏹</span>BRAKE</button>
       </div>
       <!-- Overlays -->
       <div class="overlay" id="startOverlay">
@@ -179,6 +179,8 @@ let parcels=[], rocks=[], beacon={x:900,y:H/2,r:28, pulse:0}
 let particles=[], floaters=[]
 let keys={}
 let pointer={active:false,x:0,y:0}
+let joy={active:false,x:0,y:0, mag:0}
+let brakeHeld=false
 let animId=0
 let shakeTimeout=0, flashTimeout=0
 
@@ -350,29 +352,69 @@ function canvasPos(e){
   return {x:(t.clientX-rect.left)*sx, y:(t.clientY-rect.top)*sy}
 }
 canvas.addEventListener('pointerdown',e=>{
+  if(e.target.closest('#joystick') || e.target.closest('#brakeBtn')) return
   if(state!==STATE.playing) return
   canvas.setPointerCapture(e.pointerId)
   pointer.active=true
   const p=canvasPos(e); pointer.x=p.x; pointer.y=p.y
 })
 canvas.addEventListener('pointermove',e=>{
+  if(e.target.closest('#joystick') || e.target.closest('#brakeBtn')) return
   if(!pointer.active || state!==STATE.playing) return
   const p=canvasPos(e); pointer.x=p.x; pointer.y=p.y
 })
 canvas.addEventListener('pointerup',()=>{pointer.active=false})
 canvas.addEventListener('pointercancel',()=>pointer.active=false)
 
-// touch pads
-document.querySelectorAll('.pad-btn').forEach(b=>{
-  const dir=b.dataset.dir
-  const key='arrow'+dir
-  const activate=()=> keys[key]=true
-  const deactivate=()=> keys[key]=false
-  b.addEventListener('pointerdown',e=>{e.preventDefault(); activate(); try{b.setPointerCapture(e.pointerId)}catch{}})
-  b.addEventListener('pointerup',deactivate); b.addEventListener('pointercancel',deactivate); b.addEventListener('pointerleave',deactivate)
-  b.addEventListener('touchstart',e=>{e.preventDefault(); activate()},{passive:false})
-  b.addEventListener('touchend',deactivate)
+// joystick + brake
+const joystick=document.getElementById('joystick')
+const joyStick=document.getElementById('joyStick')
+const brakeBtn=document.getElementById('brakeBtn')
+let joyOrigin=null
+function updateJoyStick(){
+  const max=34
+  joyStick.style.transform=`translate(${joy.x*max}px, ${joy.y*max}px)`
+}
+function setJoyFromDelta(dx,dy){
+  const dist=Math.hypot(dx,dy)
+  const dead=8
+  if(dist<dead){ joy.x=0; joy.y=0; joy.mag=0; updateJoyStick(); return}
+  const max=44
+  const clamped=Math.min(dist,max)
+  const ang=Math.atan2(dy,dx)
+  joy.x=Math.cos(ang)*clamped/max
+  joy.y=Math.sin(ang)*clamped/max
+  joy.mag=clamped/max
+  updateJoyStick()
+}
+joystick.addEventListener('pointerdown',e=>{
+  e.preventDefault()
+  joy.active=true
+  joyOrigin={x:e.clientX,y:e.clientY}
+  joystick.setPointerCapture(e.pointerId)
+  setJoyFromDelta(0,0)
 })
+joystick.addEventListener('pointermove',e=>{
+  if(!joy.active) return
+  const dx=e.clientX - joyOrigin.x
+  const dy=e.clientY - joyOrigin.y
+  setJoyFromDelta(dx,dy)
+})
+function endJoy(e){
+  joy.active=false; joy.x=0; joy.y=0; joy.mag=0; updateJoyStick()
+}
+joystick.addEventListener('pointerup',endJoy)
+joystick.addEventListener('pointercancel',endJoy)
+joystick.addEventListener('pointerleave',endJoy)
+// prevent canvas drag when interacting with joystick/brake
+joystick.addEventListener('touchstart',e=>e.preventDefault(),{passive:false})
+brakeBtn.addEventListener('pointerdown',e=>{ e.preventDefault(); brakeHeld=true; brakeBtn.setPointerCapture(e.pointerId)})
+brakeBtn.addEventListener('pointerup',()=> brakeHeld=false)
+brakeBtn.addEventListener('pointercancel',()=> brakeHeld=false)
+brakeBtn.addEventListener('pointerleave',()=> brakeHeld=false)
+brakeBtn.addEventListener('touchstart',e=>{e.preventDefault(); brakeHeld=true},{passive:false})
+brakeBtn.addEventListener('touchend',()=> brakeHeld=false)
+
 function padKeys(){
   return {
     up: keys['arrowup']||keys['w'],
@@ -394,15 +436,20 @@ function update(dt){
   if(timeLeft<=0){ timeLeft=0; updateHUD(); lose("Time expired before you reached the beacon."); return }
   if(rover.stun>0){ rover.stun-=dt; rover.vx*=0.92; rover.vy*=0.92 }
   else{
-    const accel=620
-    const friction=0.88
+    if(brakeHeld){ rover.vx*= Math.pow(0.78, dt*60); rover.vy*= Math.pow(0.78, dt*60) }
+    const hasJoy = joy.active && joy.mag>0.05
+    const accel= hasJoy ? 700 : 620
+    const friction= hasJoy ? 0.92 : 0.84
     let ax=0, ay=0
     const pk=padKeys()
     if(pk.left) ax-=1
     if(pk.right) ax+=1
     if(pk.up) ay-=1
     if(pk.down) ay+=1
-    if(pointer.active){
+    if(joy.active && joy.mag>0.05){
+      ax+= joy.x
+      ay+= joy.y
+    } else if(pointer.active){
       const dx=pointer.x-rover.x, dy=pointer.y-rover.y
       const dist=Math.hypot(dx,dy)
       if(dist>8){
@@ -411,7 +458,7 @@ function update(dt){
       }
     }
     const len=Math.hypot(ax,ay)
-    if(len>0){ ax/=len; ay/=len; rover.vx+=ax*accel*dt; rover.vy+=ay*accel*dt }
+    if(len>0){ ax/=len; ay/=len; const mag = joy.active ? joy.mag : 1; rover.vx+=ax*accel*mag*dt; rover.vy+=ay*accel*mag*dt }
     rover.vx*= Math.pow(friction, dt*60)
     rover.vy*= Math.pow(friction, dt*60)
     const speed=Math.hypot(rover.vx,rover.vy)

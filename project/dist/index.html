@@ -66,8 +66,14 @@ canvas{width:100%;height:100%;display:block;touch-action:none}
 .pad-group{display:flex;gap:8px;pointer-events:auto}
 .pad-btn{width:56px;height:56px;border-radius:16px;background:rgba(15,23,42,.78);border:1px solid rgba(255,255,255,.12);color:#e6eefc;display:grid;place-items:center;font-size:20px;backdrop-filter:blur(8px);user-select:none;-webkit-user-select:none;touch-action:none;transition:.12s}
 .pad-btn:active{background:rgba(127,240,255,.28);transform:scale(.97);border-color:rgba(127,240,255,.4)}
-@media(max-width:760px){.mobile-pad{display:flex}.wrap{padding-bottom:6px;gap:8px}.top{gap:8px}.brand h1{font-size:16px}.chip{padding:6px 10px;font-size:11px}.chip.timer{min-width:102px}.brand p{display:none}}
-@media(max-width:420px){.wrap{padding:10px 10px 6px}.hud{gap:6px}.chip b{font-size:12px}}
+.joystick{width:110px;height:110px;border-radius:50%;background:rgba(15,23,42,.62);border:1px solid rgba(255,255,255,.14);position:relative;pointer-events:auto;touch-action:none;backdrop-filter:blur(10px);box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.4)}
+.joystick::after{content:'';position:absolute;inset:22px;border-radius:50%;border:1px dashed rgba(127,240,255,.18);pointer-events:none}
+.joy-stick{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:linear-gradient(135deg,#7ff0ff,#a78bfa);box-shadow:0 6px 16px rgba(127,240,255,.45), inset 0 1px 0 rgba(255,255,255,.7);display:grid;place-items:center;color:#0a0e1a;font-weight:800;font-size:14px;transition:transform .06s}
+.brake-btn{width:78px;height:78px;border-radius:22px;background:rgba(255,77,106,.18);border:1px solid rgba(255,77,106,.35);color:#ffb3cc;display:grid;place-items:center;font:800 12px "JetBrains Mono";letter-spacing:.08em;backdrop-filter:blur(10px);pointer-events:auto;touch-action:none;user-select:none}
+.brake-btn:active{background:rgba(255,77,106,.32);transform:scale(.97)}
+.brake-btn span{font-size:22px;line-height:1}
+@media(max-width:760px){.mobile-pad{display:flex;gap:12px;inset:auto 10px 10px 10px}.wrap{padding-bottom:6px;gap:8px}.top{gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.top::-webkit-scrollbar{display:none}.brand h1{font-size:16px}.chip{padding:6px 10px;font-size:11px;flex-shrink:0}.chip.timer{min-width:100px}.brand p{display:none}.stage{grid-template-rows:minmax(0,1fr) auto;gap:8px}.canvas-shell{aspect-ratio:16/9;max-height:62dvh;min-height:260px}}
+@media(max-width:420px){.wrap{padding:10px 10px 6px}.hud{gap:6px}.chip b{font-size:12px}.joystick{width:100px;height:100px}.joy-stick{width:50px;height:50px;margin:-25px 0 0 -25px}.brake-btn{width:70px;height:70px}}
 .hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.88);border:1px solid #263554;border-radius:999px;padding:6px 12px;font:600 11px "JetBrains Mono";color:#8da0c8;letter-spacing:.06em;pointer-events:none;white-space:nowrap;max-width:calc(100% - 18px);overflow:hidden;text-overflow:ellipsis}
 .hint strong{color:#e6eefc}
 .footer{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#6b7fa8;font-size:11px;flex-wrap:wrap}
@@ -75,7 +81,7 @@ canvas{width:100%;height:100%;display:block;touch-action:none}
 .beacon-ready-hint{position:absolute;top:42px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(255,107,158,.18),rgba(167,139,250,.18));border:1px solid rgba(255,107,158,.45);color:#ffb3cc;font:700 11px "JetBrains Mono";letter-spacing:.08em;padding:6px 12px;border-radius:999px;pointer-events:none;opacity:0;transition:.3s;white-space:nowrap}
 .beacon-ready-hint.on{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
-  <script type="module" crossorigin src="/assets/index-Dq-FzoF9.js"></script>
+  <script type="module" crossorigin src="/assets/index-YE1VtM1U.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -105,14 +111,8 @@ canvas{width:100%;height:100%;display:block;touch-action:none}
       <div class="hint">WASD / ARROWS / DRAG · Collect <span style="color:#ffd84d">■ parcels</span> then <span style="color:#ff6b9e">⬢ beacon</span></div>
       <div class="beacon-ready-hint" id="beaconHint">⬢ BEACON READY — DELIVER NOW!</div>
       <div class="mobile-pad" id="pad" aria-hidden="true">
-        <div class="pad-group">
-          <button class="pad-btn" data-dir="left" aria-label="Move left">◀</button>
-          <button class="pad-btn" data-dir="right" aria-label="Move right">▶</button>
-        </div>
-        <div class="pad-group">
-          <button class="pad-btn" data-dir="up" aria-label="Move up">▲</button>
-          <button class="pad-btn" data-dir="down" aria-label="Move down">▼</button>
-        </div>
+        <div class="joystick" id="joystick" aria-label="Move joystick"><div class="joy-stick" id="joyStick">◈</div></div>
+        <button class="brake-btn" id="brakeBtn" aria-label="Brake"><span>⏹</span>BRAKE</button>
       </div>
       <!-- Overlays -->
       <div class="overlay" id="startOverlay">
