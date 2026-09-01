@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 // ----- Pure logic for testing -----
 
 data class TodoItem(
@@ -200,6 +201,8 @@ fun TodoScreen() {
     var filter by remember { mutableStateOf(TodoFilter.ALL) }
     var editingId by remember { mutableStateOf<Long?>(null) }
     var editingText by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Persist on change
     LaunchedEffect(todos) { saveTodos(prefs, todos) }
@@ -234,6 +237,7 @@ fun TodoScreen() {
                 )
             )
         },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         containerColor = Color(0xFFF6F8FB)
     ) { padding ->
         Column(
@@ -299,7 +303,22 @@ fun TodoScreen() {
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 if (completedCount > 0) {
-                    TextButton(onClick = { todos = TodoLogic.clearCompleted(todos) }) {
+                    TextButton(onClick = {
+                        val toRemove = todos.filter { it.done }
+                        val count = toRemove.size
+                        todos = TodoLogic.clearCompleted(todos)
+                        scope.launch {
+                            val res = snackbarHostState.showSnackbar(
+                                message = "Cleared $count done",
+                                actionLabel = "Undo",
+                                withDismissAction = true,
+                                duration = SnackbarDuration.Short
+                            )
+                            if (res == SnackbarResult.ActionPerformed) {
+                                todos = (todos + toRemove).sortedBy { it.createdAt }
+                            }
+                        }
+                    }) {
                         Text("Clear done", color = Color(0xFFCC1A00), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
@@ -410,7 +429,23 @@ fun TodoScreen() {
                                         editingId = item.id
                                         editingText = item.text
                                     }) { Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = Color(0xFF6A7A95), modifier = Modifier.size(18.dp)) }
-                                    IconButton(onClick = { todos = TodoLogic.delete(todos, item.id) }) {
+                                    IconButton(onClick = {
+                                        val deleted = todos.firstOrNull { it.id == item.id }
+                                        todos = TodoLogic.delete(todos, item.id)
+                                        if (deleted != null) {
+                                            scope.launch {
+                                                val res = snackbarHostState.showSnackbar(
+                                                    message = "Deleted \"${deleted.text.take(20)}\"",
+                                                    actionLabel = "Undo",
+                                                    withDismissAction = true,
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                                if (res == SnackbarResult.ActionPerformed) {
+                                                    todos = (todos + deleted).sortedBy { it.createdAt }
+                                                }
+                                            }
+                                        }
+                                    }) {
                                         Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color(0xFFFF3B30), modifier = Modifier.size(18.dp))
                                     }
                                 }
