@@ -64,6 +64,7 @@ jobs:
       RUNTIME_DIR: ${{ github.workspace }}/.omgithub-runtime
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
+      AGENTSWEB_SSH_ENABLED: ${{ secrets.AGENTSWEB_SSH_PUBLIC_KEY != '' }}
       TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number }}
       COMMENT_BODY: ${{ inputs.request }}
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
@@ -280,6 +281,7 @@ jobs:
 
       - name: Start AgentsWeb SSH session
         id: agentsweb
+        if: env.AGENTSWEB_SSH_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -569,6 +571,7 @@ jobs:
 
       - name: Verify live sessions through SSH
         id: verify_sessions
+        if: env.AGENTSWEB_SSH_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -595,6 +598,7 @@ jobs:
         id: access_comment
         uses: actions/github-script@v7
         env:
+          AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
           SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
@@ -606,19 +610,24 @@ jobs:
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const command = process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode';
-            const body = [
-              '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
-              `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
-              'Run this command while the job is active:', '',
-              '```sh', process.env.SSH_COMMAND, '```', '',
+            const body = [];
+            if (process.env.AGENTSWEB_SSH_ENABLED === 'true') {
+              body.push(
+                '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
+                `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
+                'Run this command while the job is active:', '',
+                '```sh', process.env.SSH_COMMAND, '```', ''
+              );
+            }
+            body.push(
               '🌐 **Live OpenCode web session is ready.**', '',
               `URL: ${process.env.OPENCODE_WEB_URL}`, '',
               `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
-            ].join('\n');
-            const result = await github.rest.issues.createComment({
-              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO, issue_number: number, body
+            );
+            const comment = await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO, issue_number: number, body: body.join('\n')
             });
-            core.setOutput('comment_id', result.data.id);
+            core.setOutput('comment_id', comment.data.id);
 
       - name: Start live OpenCode response comment
         id: response_comment
@@ -1057,7 +1066,7 @@ jobs:
         run: sleep 18000
 
       - name: Append SSH session closed
-        if: always() && steps.access_comment.outputs.comment_id != ''
+        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.access_comment.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -1068,7 +1077,7 @@ jobs:
               body: `🔒 **AgentsWeb SSH session closed.**\n\nTemporary access for [run #${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) has expired.`
             });
 
-      - name: Clean up AgentsWeb SSH session
+      - name: Clean up OpenCode session
         if: always()
         shell: bash
         run: |

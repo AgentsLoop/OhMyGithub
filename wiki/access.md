@@ -8,6 +8,10 @@ only on the Mac at:
 ~/.ssh/aiplay-agentsweb
 ```
 
+This SSH path is optional. If the repository secret is missing, the workflow
+skips AgentsWeb SSH setup and SSH-based session verification while keeping the
+OpenCode Web session available through its browser URL.
+
 When a run is active, the workflow posts a command like this to the triggering
 issue:
 

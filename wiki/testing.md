@@ -1,6 +1,7 @@
 # Testing and verification
 
-For an issue-triggered run, verify these checkpoints in order:
+For an issue-triggered run with `AGENTSWEB_SSH_PUBLIC_KEY` configured, verify
+these checkpoints in order:
 
 1. `Start AgentsWeb SSH session` succeeds.
 2. `Post temporary SSH connection command` succeeds.
@@ -8,6 +9,11 @@ For an issue-triggered run, verify these checkpoints in order:
 4. `Run OpenCode` succeeds.
 5. `Mark SSH session closed` and `Clean up AgentsWeb SSH session` succeed.
 6. The expected branch and pull request exist.
+
+When `AGENTSWEB_SSH_PUBLIC_KEY` is missing, the SSH session and SSH-based
+verification steps must be skipped. OpenCode Web, the Cloudflare session URL,
+and the browser-based workflow path must still run; the access comment should
+omit SSH instructions and cleanup must not report an SSH session closure.
 
 The AgentsWeb public port must be derived from `GITHUB_RUN_ID`, not
 `GITHUB_RUN_NUMBER`. Run numbers restart at `1` for each repository, which made
