@@ -68,8 +68,10 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    verification prompt in the same OpenCode session, then independently run
    tests and `assembleRelease`, sign/install/launch the app, probe a todo-style
    input and persistence flow when present, scan for crashes, and capture a
-   live-emulator screenshot. Deterministic checks, rather than the attached
-   OpenCode CLI, are the success authority.
+   live-emulator screenshot. A fresh attached OpenCode verifier session may
+   repair and exercise the app on that emulator; deterministic checks remain
+   the success authority. The manifest records the generated checkout commit,
+   not the centralized workflow runtime commit.
 10. Verifies web apps through the public tunnel. If verification fails, sends a
    remediation prompt to the same OpenCode session and retries up to three
    times. Detects both uncommitted generated files and commits already created

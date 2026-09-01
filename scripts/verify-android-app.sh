@@ -14,12 +14,15 @@ rm -rf -- "$evidence_dir"
 install -d "$evidence_dir/screenshots" "$evidence_dir/logs" "$RUNNER_TEMP/opencode-android" screenshots
 verification_json="$evidence_dir/verification.json"
 current_phase=initialization
+source_commit="$(git rev-parse HEAD 2>/dev/null || printf '%s' "${GITHUB_SHA:-unknown}")"
+source_ref="$(git branch --show-current 2>/dev/null || true)"
+source_ref="${source_ref:-${GITHUB_REF_NAME:-unknown}}"
 
 jq -n \
   --arg run_id "$run_id" \
   --arg repository "${GITHUB_REPOSITORY:-local}" \
-  --arg source_commit "${GITHUB_SHA:-unknown}" \
-  --arg source_ref "${GITHUB_REF_NAME:-unknown}" \
+  --arg source_commit "$source_commit" \
+  --arg source_ref "$source_ref" \
   '{schema:1, status:"running", run_id:$run_id, repository:$repository,
     source:{commit:$source_commit, ref:$source_ref}, states:{}, retries:{}}' \
   > "$verification_json"
@@ -78,9 +81,10 @@ record_state preflight passed
 update_json '.environment = {api:35, profile:"pixel_7_pro", available_disk_kb:$disk, available_memory_kb:$memory}' \
   --argjson disk "$available_kb" --argjson memory "$memory_kb"
 
-# OpenCode may exercise and repair the app, but deterministic workflow checks
-# below are the sole success authority. A stuck or failed attached CLI is
-# recorded and cannot prevent a healthy app from being delivered.
+# Start a fresh verifier session on the existing OpenCode server and emulator.
+# Resuming the completed implementation Goal session can leave the CLI idle.
+# Deterministic checks below remain the sole success authority, so a stuck or
+# failed verifier is recorded and cannot block a healthy app from delivery.
 current_phase=opencode_remediation
 opencode_code=0
 if [[ "${ANDROID_OPENCODE_VERIFY_ENABLED:-true}" == true ]]; then
@@ -90,7 +94,6 @@ if [[ "${ANDROID_OPENCODE_VERIFY_ENABLED:-true}" == true ]]; then
       --auto \
       --dangerously-skip-permissions \
       --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-      --session "$OPENCODE_SESSION_ID" \
       --model "$OPENCODE_MODEL" \
       "$(< "$RUNTIME_DIR/.github/prompts/02-verify-android.md")" \
       > "$evidence_dir/logs/opencode-android-verification.log" 2>&1
