@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="theme-color" content="#0b1220"/>
+<title>Lantern Dash — Catch the Fireflies</title>
+<style>
+  :root{--bg1:#070d1a;--bg2:#132033;--accent:#ffb84d;--accent2:#ffd97a;--glass:rgba(255,255,255,.08);--border:rgba(255,255,255,.12);--text:#eef2ff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:radial-gradient(1200px 800px at 70% 10%,#1a2e55 0%,#0b1220 40%,#060a14 100%);color:var(--text);font-family: ui-sans-system,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+  body{display:flex;flex-direction:column;align-items:center;min-height:100dvh;padding:12px 12px 18px}
+  .wrap{width:min(920px,100%);display:flex;flex-direction:column;gap:12px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:rgba(255,255,255,.06);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:16px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:36px;height:36px;border-radius:10px;background:radial-gradient(circle at 35% 30%,#fff7d0 0%,#ffb84d 45%,#ff7a18 75%);box-shadow:0 0 18px rgba(255,184,77,.7),0 6px 16px rgba(0,0,0,.4);display:grid;place-items:center;font-size:18px}
+  .brand h1{font-size:17px;letter-spacing:.02em;line-height:1}
+  .brand p{font-size:11px;opacity:.7;letter-spacing:.12em;text-transform:uppercase}
+  .stats{display:flex;gap:8px;flex-wrap:wrap}
+  .pill{background:var(--glass);border:1px solid var(--border);padding:8px 12px;border-radius:999px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;min-width:92px;justify-content:center}
+  .pill b{color:var(--accent)}
+  .pill.lives{color:#ff8a8a}
+  .pill.score b{color:#ffd97a}
+  .stage{position:relative;background:linear-gradient(180deg,#0a1430 0%,#0f2347 35%,#0d1a2e 65%,#0a160e 100%);border:1px solid rgba(255,255,255,.14);border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);aspect-ratio: 920 / 560;max-height: min(62vh,560px)}
+  canvas{width:100%;height:100%;display:block}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;padding:18px;background:radial-gradient(600px 400px at 50% 30%,rgba(255,184,77,.12),transparent 60%), linear-gradient(180deg,rgba(7,13,26,.55),rgba(7,13,26,.78));backdrop-filter: blur(2px)}
+  .card{width:min(420px,100%);background:rgba(14,22,40,.88);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:22px 18px 16px;box-shadow:0 16px 40px rgba(0,0,0,.5);text-align:center}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#ffd97a;background:rgba(255,184,77,.14);border:1px solid rgba(255,184,77,.28);padding:6px 10px;border-radius:999px;margin-bottom:10px}
+  .card h2{font-size:28px;line-height:1.1;margin:2px 0 8px;letter-spacing:-.02em}
+  .card p{font-size:13.5px;line-height:1.5;opacity:.82;margin-bottom:14px}
+  .btn{appearance:none;border:0;background:linear-gradient(180deg,#ffd97a,#ffb84d);color:#1a1200;font-weight:800;font-size:15px;padding:12px 18px;border-radius:999px;width:100%;cursor:pointer;box-shadow:0 8px 18px rgba(255,184,77,.35), inset 0 1px 0 rgba(255,255,255,.7);transition:transform .08s}
+  .btn:active{transform:scale(.98)}
+  .btn.secondary{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);box-shadow:none}
+  .row{display:flex;gap:10px;margin-top:10px}
+  .row .btn{flex:1}
+  .controls{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .key{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;padding:6px 9px;border-radius:8px;font-size:12px;font-weight:600}
+  .key kbd{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.15);padding:2px 6px;border-radius:6px;font-size:11px}
+  .hudbar{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-size:12px;font-weight:700;letter-spacing:.04em}
+  .hudbar span{background:rgba(0,0,0,.35);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.12);padding:6px 10px;border-radius:999px}
+  .touch{position:absolute;bottom:10px;left:10px;right:10px;display:none;justify-content:space-between;gap:12px;z-index:2}
+  .touch button{flex:1;max-width:160px;background:rgba(255,255,255,.1);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:22px;padding:14px;border-radius:14px;touch-action:none;user-select:none;-webkit-user-select:none}
+  .touch button:active{background:rgba(255,184,77,.25)}
+  .foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:14px;padding:10px 12px;font-size:12px}
+  .foot b{color:var(--accent2)}
+  .level{height:6px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;flex:1;max-width:220px;min-width:120px}
+  .level i{display:block;height:100%;background:linear-gradient(90deg,#ffb84d,#ffd97a);width:0%;transition:width .3s}
+  @media (max-width:640px){
+    header{flex-direction:column;align-items:stretch}
+    .stats{justify-content:space-between}
+    .pill{min-width:0;flex:1}
+    .stage{aspect-ratio: 9 / 11;max-height: 64vh}
+    .touch{display:flex}
+    .card h2{font-size:24px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">🏮</div>
+      <div>
+        <h1>Lantern Dash</h1>
+        <p>Glow • Catch • Survive</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="pill score">Score <b id="score">0</b></div>
+      <div class="pill">Best <b id="best">0</b></div>
+      <div class="pill lives">♥ <b id="lives">3</b></div>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="c" width="920" height="560" aria-label="Lantern Dash game canvas"></canvas>
+    <div class="hudbar"><span id="levelLabel">Wave 1</span><span id="catchLabel">Caught 0</span></div>
+    <div class="touch" id="touch">
+      <button id="btnLeft" aria-label="Move left">◀</button>
+      <button id="btnRight" aria-label="Move right">▶</button>
+    </div>
+
+    <!-- Start -->
+    <div class="overlay" id="startScreen">
+      <div class="card">
+        <div class="badge">✦ Night Forest • Flicker Hunt</div>
+        <h2>Light the night.<br>Catch the fireflies.</h2>
+        <p>Move your lantern left and right to catch falling fireflies before they hit the damp forest floor. Miss three and the light fades. Every 10 catches the night gets wilder.</p>
+        <button class="btn" id="playBtn">▶ Play — Light the Lantern</button>
+        <div class="controls">
+          <span class="key"><kbd>◀</kbd><kbd>▶</kbd> or <kbd>A</kbd><kbd>D</kbd> move</span>
+          <span class="key"><kbd>Space</kbd> start / catch glow</span>
+          <span class="key"><kbd>P</kbd> pause</span>
+        </div>
+        <p style="margin-top:10px;font-size:11px;opacity:.6">Tip: On mobile, drag across the forest floor or use the ◀ ▶ pads. Fireflies flicker — trust the glow.</p>
+      </div>
+    </div>
+
+    <!-- Pause -->
+    <div class="overlay" id="pauseScreen" style="display:none">
+      <div class="card">
+        <div class="badge">Paused • The forest holds its breath</div>
+        <h2>Paused</h2>
+        <p>Press <b>P</b> or Resume to continue. Your lantern is still warm.</p>
+        <div class="row">
+          <button class="btn" id="resumeBtn">Resume</button>
+          <button class="btn secondary" id="restartFromPause">Restart</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over -->
+    <div class="overlay" id="overScreen" style="display:none">
+      <div class="card">
+        <div class="badge">Game Over • The light dimmed</div>
+        <h2 id="overTitle">Lantern faded</h2>
+        <p id="overMsg">You caught <b>0</b> fireflies. The forest is dark again.</p>
+        <div class="row">
+          <button class="btn" id="restartBtn">↻ Play Again</button>
+          <button class="btn secondary" id="shareBtn">Share Score</button>
+        </div>
+        <p style="margin-top:10px;font-size:11px;opacity:.6">Press <kbd>R</kbd> to restart instantly</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div><b>How to play:</b> Catch = +10 • Miss = −1 ♥ • Every 10 catches → faster fall & denser swarm</div>
+    <div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end;min-width:160px">
+      <span style="font-size:11px;opacity:.7">Difficulty</span>
+      <div class="level"><i id="levelBar"></i></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const livesEl = document.getElementById('lives');
+  const levelLabel = document.getElementById('levelLabel');
+  const catchLabel = document.getElementById('catchLabel');
+  const levelBar = document.getElementById('levelBar');
+  const startScreen = document.getElementById('startScreen');
+  const pauseScreen = document.getElementById('pauseScreen');
+  const overScreen = document.getElementById('overScreen');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg = document.getElementById('overMsg');
+
+  const W = 920, H = 560;
+  let dpr = Math.min(2, window.devicePixelRatio || 1);
+
+  // Game state
+  let state = 'start'; // start, playing, paused, over
+  let score = 0, lives = 3, caught = 0, wave = 1;
+  let best = Number(localStorage.getItem('lantern-best')||0);
+  if(Number.isNaN(best)) best=0;
+  bestEl.textContent = best;
+  let lantern = { x: W/2, y: H-68, w: 86, h: 68, targetX: W/2, vx:0 };
+  let fireflies = [];
+  let particles = [];
+  let bgParticles = [];
+  let spawnTimer = 0, spawnInterval = 900;
+  let time = 0;
+  let shake = 0;
+  let keys = {};
+  let pointerDown = false;
+
+  // tuning
+  const LANTERN_SPEED = 14; // lerp speed
+  const GROUND_Y = H - 26;
+
+  function resetGame(){
+    score=0; lives=3; caught=0; wave=1;
+    spawnInterval=900;
+    fireflies=[]; particles=[];
+    lantern.x=W/2; lantern.targetX=W/2; lantern.vx=0;
+    updateHUD();
+  }
+  function updateHUD(){
+    scoreEl.textContent = score;
+    livesEl.textContent = '♥'.repeat(lives) || '—';
+    livesEl.style.opacity = lives===1 ? '1' : '';
+    if(lives===1) livesEl.animate([{transform:'scale(1)'},{transform:'scale(1.12)'},{transform:'scale(1)'}],{duration:400});
+    bestEl.textContent = best;
+    levelLabel.textContent = `Wave ${wave}`;
+    catchLabel.textContent = `Caught ${caught}`;
+    const pct = Math.min(100, ((caught%10)/10)*100 + (wave-1)*8);
+    levelBar.style.width = Math.min(100, pct) + '%';
+  }
+
+  // Input
+  addEventListener('keydown', e=>{
+    const k=e.key.toLowerCase();
+    keys[k]=true;
+    if(k===' '){
+      if(state==='start' || state==='over') startGame();
+      else if(state==='paused') resumeGame();
+      else if(state==='playing') pauseGame();
+    }
+    if(k==='p' && state==='playing'){ pauseGame(); }
+    else if(k==='p' && state==='paused'){ resumeGame(); }
+    if(k==='r'){
+      if(state==='over' || state==='paused' || state==='start') startGame();
+    }
+    if(k==='escape' && state==='paused'){ resumeGame(); }
+    if(['arrowleft','arrowright','a','d',' '].includes(k) || k===' ') e.preventDefault();
+  });
+  addEventListener('keyup', e=> keys[e.key.toLowerCase()]=false );
+
+  function startGame(){
+    resetGame();
+    state='playing';
+    startScreen.style.display='none';
+    pauseScreen.style.display='none';
+    overScreen.style.display='none';
+  }
+  function pauseGame(){
+    if(state!=='playing') return;
+    state='paused';
+    pauseScreen.style.display='grid';
+  }
+  function resumeGame(){
+    if(state!=='paused') return;
+    state='playing';
+    pauseScreen.style.display='none';
+  }
+  function gameOver(){
+    state='over';
+    if(score>best){ best=score; localStorage.setItem('lantern-best', best); }
+    updateHUD();
+    overScreen.style.display='grid';
+    if(score>=80) overTitle.textContent='Forest Guardian';
+    else if(score>=40) overTitle.textContent='Lantern Keeper';
+    else overTitle.textContent='Lantern faded';
+    overMsg.innerHTML = `You caught <b>${caught}</b> fireflies • Score <b>${score}</b> • Wave <b>${wave}</b>.<br>${score===best && score>0 ? '★ New best! The forest remembers.' : 'The night waits for your return.'}`;
+  }
+
+  const shareBtn = document.getElementById('shareBtn');
+  document.getElementById('playBtn').onclick = startGame;
+  document.getElementById('restartBtn').onclick = startGame;
+  document.getElementById('resumeBtn').onclick = resumeGame;
+  document.getElementById('restartFromPause').onclick = startGame;
+  shareBtn.onclick = async ()=>{
+    const txt = `I caught ${caught} fireflies in Lantern Dash! Score ${score} — Wave ${wave}. Can you beat it?`;
+    try{ await navigator.clipboard.writeText(txt); shareBtn.textContent='Copied!'; setTimeout(()=>shareBtn.textContent='Share Score',1200);}catch{ alert(txt); }
+  };
+
+  // Pointer/touch controls
+  function setTargetFromClientX(clientX){
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) / rect.width * W;
+    lantern.targetX = Math.max(lantern.w/2, Math.min(W - lantern.w/2, x));
+  }
+  canvas.addEventListener('pointerdown', e=>{
+    pointerDown=true; canvas.setPointerCapture(e.pointerId);
+    setTargetFromClientX(e.clientX);
+    if(state==='start') startGame();
+  });
+  canvas.addEventListener('pointermove', e=>{
+    if(pointerDown) setTargetFromClientX(e.clientX);
+    // hover glow even without drag when playing on desktop
+    if(!pointerDown && state==='playing' && e.pointerType==='mouse'){
+      // subtle attraction: only if near bottom
+      if(e.clientY > canvas.getBoundingClientRect().top + canvas.getBoundingClientRect().height*0.55){
+        setTargetFromClientX(e.clientX);
+      }
+    }
+  });
+  addEventListener('pointerup', ()=> pointerDown=false );
+  canvas.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+
+  // Touch buttons
+  const btnL=document.getElementById('btnLeft'), btnR=document.getElementById('btnRight');
+  let holdL=false, holdR=false;
+  function bindHold(btn, on){
+    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); on(true); btn.setPointerCapture(e.pointerId); });
+    btn.addEventListener('pointerup', ()=> on(false));
+    btn.addEventListener('pointerleave', ()=> on(false));
+    btn.addEventListener('pointercancel', ()=> on(false));
+  }
+  bindHold(btnL, v=> holdL=v);
+  bindHold(btnR, v=> holdR=v);
+
+  // Spawn
+  function spawnFirefly(){
+    const rare = Math.random()<0.12; // golden firefly
+    const x = 24 + Math.random()*(W-48);
+    const baseSpeed = 1.6 + wave*0.35 + Math.random()*0.9;
+    const swayAmp = 18 + Math.random()*22;
+    const swayFreq = 0.002 + Math.random()*0.003;
+    fireflies.push({
+      x, y: -18,
+      r: rare? 11: 7 + Math.random()*3,
+      vy: baseSpeed,
+      vx: (Math.random()-0.5)*0.8,
+      swayAmp, swayFreq, phase: Math.random()*Math.PI*2,
+      flicker: Math.random()*Math.PI*2,
+      rare,
+      rot: Math.random()*Math.PI
+    });
+  }
+
+  // Particles
+  function addCatchParticles(x,y,rare){
+    const n = rare? 18: 12;
+    for(let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2, s= 1+Math.random()*(rare?5:3.5);
+      particles.push({x,y, vx: Math.cos(a)*s, vy: Math.sin(a)*s - Math.random()*2, life:1, decay:0.04+Math.random()*0.05, r: 2+Math.random()*2, color: rare?'#ffeaa0':'#ffd97a'});
+    }
+  }
+  function addMissParticles(x,y){
+    for(let i=0;i<10;i++){
+      particles.push({x,y, vx:(Math.random()-0.5)*3, vy: -Math.random()*3 -1, life:1, decay:0.06, r:1.5, color:'#ff8a5c'});
+    }
+  }
+
+  // Background stars / dust
+  for(let i=0;i<70;i++) bgParticles.push({x:Math.random()*W, y:Math.random()*(H*0.55), r: Math.random()*1.2+0.3, a: Math.random(), tw: Math.random()*0.02+0.005});
+
+  // Game loop
+  let last=performance.now();
+  function loop(now){
+    requestAnimationFrame(loop);
+    const dt = Math.min(32, now-last); last=now;
+    time += dt;
+    update(dt);
+    render();
+  }
+
+  function update(dt){
+    // lantern movement from keys
+    let dir=0;
+    if(keys['arrowleft']||keys['a']||holdL) dir-=1;
+    if(keys['arrowright']||keys['d']||holdR) dir+=1;
+    if(dir!==0){
+      lantern.targetX += dir * 9 * (dt/16.666);
+      lantern.targetX = Math.max(lantern.w/2, Math.min(W-lantern.w/2, lantern.targetX));
+    }
+    // lerp lantern
+    const dx = lantern.targetX - lantern.x;
+    lantern.vx = dx * 0.18;
+    lantern.x += lantern.vx * (dt/16.666);
+    // clamp
+    lantern.x = Math.max(lantern.w/2, Math.min(W - lantern.w/2, lantern.x));
+
+    if(state!=='playing') return;
+
+    // difficulty ramp: every 10 catches wave up
+    const newWave = 1 + Math.floor(caught/10);
+    if(newWave!==wave){
+      wave=newWave;
+      spawnInterval = Math.max(360, 900 - (wave-1)*70);
+      updateHUD();
+    }
+
+    // spawn
+    spawnTimer += dt;
+    // also increase spawn chance with score
+    const effectiveInterval = spawnInterval - Math.min(220, score*0.6);
+    if(spawnTimer > effectiveInterval){
+      spawnTimer=0;
+      spawnFirefly();
+      if(Math.random()< 0.18 + wave*0.04) spawnFirefly(); // burst
+    }
+
+    // update fireflies
+    for(let i=fireflies.length-1;i>=0;i--){
+      const f=fireflies[i];
+      f.y += f.vy * (dt/16.666);
+      f.x += Math.sin(time * f.swayFreq + f.phase) * 0.6 * (dt/16.666);
+      f.x += f.vx * (dt/16.666);
+      f.flicker += 0.22 * (dt/16.666);
+      f.rot += 0.01* (dt/16.666);
+      // wall bounce
+      if(f.x<12){f.x=12; f.vx*=-0.6}
+      if(f.x>W-12){f.x=W-12; f.vx*=-0.6}
+      // catch check: lantern catch box
+      const lx = lantern.x, ly = lantern.y;
+      // lantern opening: top edge ~ ly - h/2 +12 ?
+      const catchW = lantern.w * 0.72, catchH = 18;
+      const catchX = lx - catchW/2, catchY = ly - lantern.h/2 + 6;
+      const inCatch = f.x > catchX && f.x < catchX+catchW && f.y > catchY && f.y < catchY+ catchH+16 && f.y < ly+10;
+      // also glow radius catch (generous)
+      const glowDist = Math.hypot(f.x - lx, f.y - (ly-6));
+      const glowCatch = glowDist < 56 && f.y > catchY - 8 && f.y < ly+6;
+
+      if(inCatch || glowCatch){
+        // caught
+        const pts = f.rare ? 25 : 10;
+        score += pts; caught += 1;
+        updateHUD();
+        addCatchParticles(f.x, f.y, f.rare);
+        // subtle lantern pulse
+        lantern.pulse = 1;
+        fireflies.splice(i,1);
+        if(navigator.vibrate) navigator.vibrate(18);
+        continue;
+      }
+      if(f.y >= GROUND_Y - f.r){
+        // missed
+        fireflies.splice(i,1);
+        lives -=1;
+        shake = 10;
+        addMissParticles(f.x, GROUND_Y-6);
+        updateHUD();
+        if(lives<=0){
+          gameOver();
+        }
+        continue;
+      }
+    }
+
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.x += p.vx * (dt/16.666);
+      p.y += p.vy * (dt/16.666);
+      p.vy += 0.12 * (dt/16.666);
+      p.vx *= 0.985;
+      p.life -= p.decay * (dt/16.666);
+      if(p.life<=0) particles.splice(i,1);
+    }
+    if(lantern.pulse) lantern.pulse = Math.max(0, lantern.pulse - 0.08*(dt/16.666));
+    if(shake>0) shake = Math.max(0, shake - 0.7*(dt/16.666));
+    // bg twinkle
+    for(const b of bgParticles){ b.a += (Math.random()-0.5)*0.02; b.a=Math.max(0.2,Math.min(1,b.a)); }
+  }
+
+  function render(){
+    ctx.save();
+    if(shake>0){
+      ctx.translate( (Math.random()-0.5)*shake, (Math.random()-0.5)*shake );
+    }
+    // clear
+    ctx.clearRect(0,0,W,H);
+
+    // sky gradient
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0b1e3a');
+    g.addColorStop(0.35,'#132a55');
+    g.addColorStop(0.62,'#0e1f2f');
+    g.addColorStop(0.78,'#0c1a14');
+    g.addColorStop(1,'#0a160e');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    // moon + glow
+    ctx.save();
+    ctx.globalAlpha=0.95;
+    const mx = W-110, my=78;
+    const moonGrad = ctx.createRadialGradient(mx,my,10,mx,my,54);
+    moonGrad.addColorStop(0,'#fff7d0'); moonGrad.addColorStop(0.4,'#ffe8a0'); moonGrad.addColorStop(1,'rgba(255,232,160,0)');
+    ctx.fillStyle=moonGrad; ctx.beginPath(); ctx.arc(mx,my,54,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff3b8'; ctx.beginPath(); ctx.arc(mx,my,22,0,Math.PI*2); ctx.fill();
+    // craters
+    ctx.fillStyle='rgba(0,0,0,.08)'; ctx.beginPath(); ctx.arc(mx+6,my-4,5,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(mx-7,my+7,3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    // stars / dust
+    for(const b of bgParticles){
+      ctx.globalAlpha = b.a*0.9;
+      ctx.fillStyle = b.r>1 ? '#dbe7ff' : '#9fb8ff';
+      ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    // distant treeline silhouette
+    ctx.fillStyle='#060c18';
+    ctx.beginPath(); ctx.moveTo(0, H*0.58);
+    for(let x=0;x<=W;x+=18){
+      const h = 34 + Math.sin(x*0.015 + 1)*12 + Math.cos(x*0.008)*10 + (x%42?0:14);
+      ctx.lineTo(x, H*0.58 - h);
+    }
+    ctx.lineTo(W, H*0.58); ctx.closePath(); ctx.fill();
+    // nearer trees
+    ctx.fillStyle='#0a1424';
+    ctx.beginPath(); ctx.moveTo(0, H*0.62);
+    for(let x=0;x<=W;x+=28){
+      const h = 52 + Math.sin(x*0.012)*18 + Math.random()*6;
+      ctx.lineTo(x, H*0.62 - h);
+    }
+    ctx.lineTo(W, H*0.62); ctx.closePath(); ctx.fill();
+
+    // ground
+    ctx.fillStyle='#0f1f14'; ctx.fillRect(0,GROUND_Y,W,H-GROUND_Y);
+    // ground texture
+    ctx.fillStyle='rgba(255,255,255,.04)';
+    for(let i=0;i<40;i++){
+      const x=(time*0.02 + i*73)%W;
+      ctx.fillRect(x, GROUND_Y+ 8 + (i%3)*6, 38, 1);
+    }
+    // grass fringe
+    ctx.fillStyle='#1a2e1a';
+    ctx.beginPath(); ctx.moveTo(0,GROUND_Y);
+    for(let x=0;x<=W;x+=10){
+      const y = GROUND_Y - (Math.sin(x*0.08 + time*0.002)*4 + Math.random()*3);
+      ctx.lineTo(x,y);
+    }
+    ctx.lineTo(W,GROUND_Y+10); ctx.lineTo(0,GROUND_Y+10); ctx.closePath(); ctx.fill();
+
+    // fireflies
+    for(const f of fireflies){
+      ctx.save();
+      ctx.translate(f.x,f.y);
+      ctx.rotate(Math.sin(f.flicker*0.5)*0.12);
+      const flick = 0.65 + Math.sin(f.flicker)*0.35;
+      // outer glow
+      const col = f.rare ? '255,234,160' : '255,232,120';
+      const glow = ctx.createRadialGradient(0,0,2,0,0, f.r*5);
+      glow.addColorStop(0, `rgba(${col},${0.85*flick})`);
+      glow.addColorStop(0.35, `rgba(${col},${0.22*flick})`);
+      glow.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,f.r*5,0,Math.PI*2); ctx.fill();
+      // body
+      ctx.fillStyle = f.rare ? '#fff6c9' : '#fff8a8';
+      ctx.shadowColor = `rgba(${col},.9)`; ctx.shadowBlur=10;
+      ctx.beginPath(); ctx.ellipse(0,0,f.r*0.9,f.r*0.65,0,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+      // wings
+      ctx.fillStyle='rgba(255,255,255,.55)';
+      ctx.beginPath(); ctx.ellipse(-f.r*0.45,-1,f.r*0.55,f.r*0.32,-0.55,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(f.r*0.45,-1,f.r*0.55,f.r*0.32,0.55,0,Math.PI*2); ctx.fill();
+      // tail light
+      ctx.fillStyle= f.rare ? '#ffd84d' : '#ffe55c';
+      ctx.globalAlpha= 0.9*flick;
+      ctx.beginPath(); ctx.ellipse(0, f.r*0.28, f.r*0.42, f.r*0.3,0,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.restore();
+    }
+
+    // lantern
+    const lx=lantern.x, ly=lantern.y, lw=lantern.w, lh=lantern.h;
+    const pulse = lantern.pulse||0;
+    // outer glow
+    const lg = ctx.createRadialGradient(lx,ly-6,10,lx,ly-6,110 + pulse*24);
+    lg.addColorStop(0,'rgba(255,184,77,.55)'); lg.addColorStop(0.28,'rgba(255,184,77,.18)'); lg.addColorStop(1,'rgba(255,184,77,0)');
+    ctx.fillStyle=lg; ctx.beginPath(); ctx.arc(lx,ly-6,110 + pulse*24,0,Math.PI*2); ctx.fill();
+    // beam
+    ctx.fillStyle='rgba(255,214,120,.07)';
+    ctx.beginPath(); ctx.moveTo(lx-lw*0.28, ly-lh/2+12); ctx.lineTo(lx+lw*0.28, ly-lh/2+12); ctx.lineTo(lx+lw*0.5, ly+18); ctx.lineTo(lx-lw*0.5, ly+18); ctx.closePath(); ctx.fill();
+
+    ctx.save();
+    ctx.translate(lx,ly);
+    // handle
+    ctx.strokeStyle='#8a6b3a'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(-18,-lh/2-6); ctx.quadraticCurveTo(0,-lh/2-16,18,-lh/2-6); ctx.stroke();
+    // top cap
+    ctx.fillStyle='#2b1f0f'; ctx.fillRect(-lw*0.22, -lh/2, lw*0.44, 10);
+    ctx.fillStyle='#3d2b12'; ctx.fillRect(-lw*0.18, -lh/2-2, lw*0.36, 4);
+    // glass
+    ctx.fillStyle='rgba(255,246,200,.92)'; ctx.strokeStyle='rgba(90,60,10,.9)'; ctx.lineWidth=2;
+    // glass shape
+    ctx.beginPath();
+    ctx.moveTo(-lw*0.36, -lh/2+10); ctx.lineTo(lw*0.36, -lh/2+10); ctx.lineTo(lw*0.3, lh/2-10); ctx.lineTo(-lw*0.3, lh/2-10); ctx.closePath();
+    // glass fill with inner glow
+    const gg = ctx.createLinearGradient(0,-lh/2,0,lh/2);
+    gg.addColorStop(0,'#fff8d0'); gg.addColorStop(0.5,'#ffdf8a'); gg.addColorStop(1,'#ffb84d');
+    ctx.fillStyle=gg; ctx.fill(); ctx.stroke();
+    // vertical bars
+    ctx.strokeStyle='rgba(60,40,10,.85)'; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.moveTo(-lw*0.12, -lh/2+10); ctx.lineTo(-lw*0.09, lh/2-10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lw*0.12, -lh/2+10); ctx.lineTo(lw*0.09, lh/2-10); ctx.stroke();
+    // flame
+    const flameFlick = Math.sin(time*0.012)*0.12 + Math.cos(time*0.007)*0.06;
+    ctx.save(); ctx.translate(flameFlick*2, 0);
+    ctx.fillStyle='#fff6c0'; ctx.beginPath(); ctx.ellipse(0, -2, 10+ pulse*3, 14+ pulse*4, 0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ff9d1a'; ctx.beginPath(); ctx.ellipse(0, 2, 5,7,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // bottom cap
+    ctx.fillStyle='#2b1f0f'; ctx.fillRect(-lw*0.3, lh/2-10, lw*0.6, 10);
+    ctx.fillStyle='#ffcf6a'; ctx.globalAlpha=0.18+ pulse*0.12; ctx.fillRect(-lw*0.3, lh/2-10, lw*0.6, 10); ctx.globalAlpha=1;
+    ctx.restore();
+
+    // particles
+    for(const p of particles){
+      ctx.globalAlpha = Math.max(0,p.life);
+      ctx.fillStyle=p.color;
+      ctx.shadowColor=p.color; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+    }
+    ctx.globalAlpha=1;
+
+    // vignette
+    const vig = ctx.createRadialGradient(W/2,H/2, Math.min(W,H)*0.4, W/2,H/2, Math.max(W,H)*0.9);
+    vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,.42)');
+    ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+    // ground danger pulse when low lives
+    if(lives===1 && state==='playing'){
+      ctx.fillStyle=`rgba(255,80,80,${0.08 + Math.sin(time*0.01)*0.04})`;
+      ctx.fillRect(0,GROUND_Y,W,4);
+    }
+
+    ctx.restore();
+  }
+
+  // responsive canvas DPR handling
+  function fit(){
+    const rect = stage.getBoundingClientRect();
+    // canvas logical size already W x H, we just keep CSS scaling; ensure sharpness via backing store? Already fixed.
+    dpr = Math.min(2, window.devicePixelRatio||1);
+  }
+  addEventListener('resize', fit); fit();
+
+  // expose for tests
+  window.__lantern = { get state(){return state}, get score(){return score}, lantern, fireflies, resetGame, startGame, pauseGame, resumeGame, gameOver };
+
+  loop(performance.now());
+})();
+</script>
+</body>
+</html>
