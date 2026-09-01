@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Tidepool Tangle — Crab Adventure</title>
+<meta name="description" content="Help the tiny crab collect 5 shells and reach the safe rock before the tide rises!">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap');
+  :root{ --sand:#f5e6c2; --sand-dark:#e8c99a; --water:#3fb5d6; --water-deep:#0e4a62; --sky:#87d1f0; --rock:#7a6e60; --orange:#ff7a3d; --crab:#e64e2a; --star:#ff5a2e; --seafoam:#ffffffcc; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0e2a38;color:#1a1a1a;font-family:'Nunito',system-ui,sans-serif;overflow:hidden}
+  body{display:flex;flex-direction:column}
+  .topbar{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#0f2f44;color:#fff;gap:12px;flex-wrap:wrap}
+  .brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:22px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+  .brand i{width:34px;height:34px;display:grid;place-items:center;background:var(--orange);color:#fff;border-radius:10px;font-style:normal;font-size:20px;transform:rotate(-3deg)}
+  .topbar small{opacity:.75;font-size:12px;display:none}
+  @media(min-width:700px){.topbar small{display:block}}
+  .game-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:radial-gradient(1200px 600px at 50% -10%, #a8e2f5 0%, #5bb8db 18%, #0e4a62 75%, #071e2a 100%);position:relative;overflow:hidden}
+  .frame{position:relative;width:min(920px,100%);aspect-ratio:920/580;background:linear-gradient(180deg,#fef9e8 0%, #f5e6c2 22%, #efdb9e 40%, #7ec8e3 40.2%, #3fb5d6 62%, #11506a 100%);border-radius:18px;overflow:hidden;box-shadow:0 18px 60px #0008, 0 0 0 1px #ffffff22 inset;border:3px solid #fff3}
+  canvas{display:block;width:100%;height:100%}
+  .hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:12px}
+  .hud-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+  .pill{background:#ffffffee;border:1px solid #fff;backdrop-filter:blur(6px);border-radius:14px;padding:8px 14px;display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px #0002;font-weight:800;font-size:14px;color:#1a2a33}
+  .pill b{font-family:'Fredoka',sans-serif;font-size:18px;color:var(--orange)}
+  .timer-pill{flex-direction:column;align-items:flex-start;gap:4px;min-width:140px}
+  .timer-row{display:flex;align-items:center;gap:8px;width:100%}
+  .timer-bar{height:8px;flex:1;background:#0001;border-radius:999px;overflow:hidden;position:relative}
+  .timer-fill{height:100%;background:linear-gradient(90deg,#2dd4bf,#0ea5e9 60%, #f59e0b);border-radius:999px;transition:width .25s linear}
+  .timer-fill.warn{background:linear-gradient(90deg,#f59e0b,#ef4444)}
+  .shells{display:flex;gap:6px;align-items:center}
+  .shell-dot{width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid #e8d5a3;display:grid;place-items:center;font-size:12px;opacity:.9;transition:.3s}
+  .shell-dot.got{background:linear-gradient(180deg,#fff8d6,#f5c86e);border-color:#f59e0b;transform:scale(1.12);box-shadow:0 2px 8px #f59e0b66}
+  .controls-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:#0f2f44e6;color:#fff;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em;display:flex;gap:8px;align-items:center;backdrop-filter:blur(6px)}
+  .controls-hint kbd{background:#fff;color:#0f2f44;padding:2px 6px;border-radius:6px;font-family:monospace;font-size:11px;border-bottom:2px solid #0002}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(180deg,#0e2a38e0 0%, #0e2a38a8 100%);backdrop-filter:blur(4px);padding:20px;text-align:center;color:#fff;transition:.35s}
+  .overlay.hidden{opacity:0;pointer-events:none;transform:scale(1.02)}
+  .card{background:#fff;color:#1e293b;border-radius:20px;padding:26px 22px;max-width:520px;width:100%;box-shadow:0 20px 60px #0005;border:1px solid #fff;position:relative;overflow:hidden}
+  .card:before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,#38bdf8,#f59e0b,#ef4444)}
+  .card h1{font-family:'Fredoka',sans-serif;font-size:34px;margin:6px 0 8px;letter-spacing:-.02em;color:#0f2f44;line-height:1}
+  .card h1 span{color:var(--orange)}
+  .card p{color:#475569;font-size:15px;line-height:1.6;margin:8px 0}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:14px 0}
+  .badge{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;color:#334155;display:flex;gap:6px;align-items:center}
+  .btn{appearance:none;border:0;background:linear-gradient(180deg,#ff7a3d,#e85a1a);color:#fff;font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px;padding:14px 28px;border-radius:14px;cursor:pointer;box-shadow:0 8px 20px #e85a1a55, 0 1px 0 #fff4 inset;transition:.15s;display:inline-flex;align-items:center;gap:8px;justify-content:center;width:100%;margin-top:10px}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 12px 28px #e85a1a66}
+  .btn:active{transform:translateY(1px)}
+  .btn.secondary{background:#f1f5f9;color:#0f2f44;box-shadow:0 4px 12px #0001}
+  .btn-row{display:flex;gap:10px;margin-top:10px}
+  .btn-row .btn{flex:1}
+  .wave-warning{position:absolute;top:84px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:8px 16px;border-radius:999px;font-weight:800;font-size:13px;letter-spacing:.04em;box-shadow:0 6px 20px #ef444488;display:flex;align-items:center;gap:8px;animation:shake .4s infinite alternate;pointer-events:none;opacity:0;transition:.2s}
+  .wave-warning.show{opacity:1}
+  @keyframes shake{from{transform:translateX(-50%) translateY(0)} to{transform:translateX(-50%) translateY(-2px)}}
+  .touch-pad{position:absolute;bottom:16px;left:16px;display:none;gap:6px;pointer-events:auto;grid-template-columns:48px 48px 48px;grid-template-areas:". up ." "left down right";justify-items:center}
+  .touch-pad button{width:48px;height:48px;border-radius:14px;border:2px solid #fff;background:#ffffffd0;backdrop-filter:blur(6px);font-size:20px;box-shadow:0 4px 12px #0003;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+  .touch-pad button[data-dir="up"]{grid-area:up}
+  .touch-pad button[data-dir="left"]{grid-area:left}
+  .touch-pad button[data-dir="down"]{grid-area:down}
+  .touch-pad button[data-dir="right"]{grid-area:right}
+  .touch-pad button:active{background:#fff;transform:scale(.96)}
+  .touch-right{left:auto;right:16px}
+  @media(max-width:720px){ .touch-pad{display:grid} .controls-hint{display:none} .frame{aspect-ratio:4/3} }
+  .score-pop{position:absolute;transform:translate(-50%,-50%);font-family:'Fredoka',sans-serif;font-weight:800;color:#f59e0b;text-shadow:0 2px 0 #fff, 0 4px 12px #0003;pointer-events:none;animation:pop .7s ease-out forwards}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.6);opacity:1}100%{transform:translate(-50%,-80px) scale(1.1);opacity:0}}
+  .sr-only{position:absolute;left:-9999px}
+</style>
+  <script type="module" crossorigin src="/assets/index-DIY3IxIe.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><i>🦀</i> Tidepool <span style="color:#ff7a3d">Tangle</span> <small>— collect 5 shells, dodge waves, reach the rock</small></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button id="muteBtn" aria-label="Toggle sound" style="background:#ffffff18;border:1px solid #fff3;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:700">🔊 Sound</button>
+  </div>
+</header>
+<div class="game-wrap">
+  <div class="frame" id="frame">
+    <canvas id="c" width="920" height="580" aria-label="Tidepool Tangle game canvas"></canvas>
+    <div class="hud">
+      <div class="hud-top">
+        <div class="pill" id="scorePill"><span>🐚</span> <b id="score">0</b> &nbsp; <span class="shells" id="shellDots"></span></div>
+        <div class="pill timer-pill">
+          <div class="timer-row"><span>⏱</span> <b id="timerText">60.0</b>s <span id="timerState" style="font-size:11px;font-weight:800;color:#64748b"></span></div>
+          <div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
+        </div>
+      </div>
+      <div class="controls-hint"><kbd>WASD</kbd> or <kbd>↑←↓→</kbd> to scuttle <span style="opacity:.6">•</span> Collect 5 shells → reach the glowing rock</div>
+    </div>
+    <div class="wave-warning" id="waveWarn">🌊 WAVE INCOMING!</div>
+    <!-- Touch controls -->
+    <div class="touch-pad" id="touchLeft" aria-hidden="false">
+      <button data-dir="up">↑</button><button data-dir="left">←</button><button data-dir="down">↓</button><button data-dir="right">→</button>
+    </div>
+
+    <!-- Overlays -->
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <div style="font-size:44px">🦀 🏖️ 🐚</div>
+        <h1>Tidepool <span>Tangle</span></h1>
+        <p><b>Scuttle, collect, escape!</b> You’re a tiny crab in a sun-warmed tidepool. Grab <b>5 shiny shells</b>, dodge <b>2 spiky starfish</b> and the <b>rising surf</b>, then dash to the <b>safe rock</b> before <b>60 seconds</b> run out.</p>
+        <div class="badges">
+          <span class="badge">🎮 WASD / Arrows</span><span class="badge">🐚 5 shells to win</span><span class="badge">⭐ Avoid starfish</span><span class="badge">🌊 Watch the waves</span>
+        </div>
+        <button class="btn" id="startBtn">▶ Start Scuttling</button>
+        <p style="font-size:12px;color:#94a3b8;margin-top:10px">Tip: On mobile, use the on-screen arrows. Grab shells → rock glows → sprint to it!</p>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="winOverlay">
+      <div class="card">
+        <div style="font-size:48px">🎉 🪨 ✨</div>
+        <h1>You made it!</h1>
+        <p id="winText">You rescued 5 shells and reached the safe rock with time to spare. The tidepool cheers!</p>
+        <div class="badges" id="winStats"></div>
+        <div class="btn-row"><button class="btn" id="winRestart">↻ Play Again</button></div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="loseOverlay">
+      <div class="card">
+        <div style="font-size:48px" id="loseIcon">🌊 😵</div>
+        <h1 id="loseTitle">Washed away…</h1>
+        <p id="loseText">The tide caught you. Try a quicker route and watch the wave timing!</p>
+        <div class="btn-row"><button class="btn secondary" id="loseRestart">↻ Try Again</button><button class="btn" id="loseStartOver">Start Over</button></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<span class="sr-only" id="a11yStatus" aria-live="polite"></span>
+
+</body>
+</html>

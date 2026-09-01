@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Tidepool Tangle — Crab Adventure</title>
+<meta name="description" content="Help the tiny crab collect 5 shells and reach the safe rock before the tide rises!">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap');
+  :root{ --sand:#f5e6c2; --sand-dark:#e8c99a; --water:#3fb5d6; --water-deep:#0e4a62; --sky:#87d1f0; --rock:#7a6e60; --orange:#ff7a3d; --crab:#e64e2a; --star:#ff5a2e; --seafoam:#ffffffcc; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0e2a38;color:#1a1a1a;font-family:'Nunito',system-ui,sans-serif;overflow:hidden}
+  body{display:flex;flex-direction:column}
+  .topbar{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#0f2f44;color:#fff;gap:12px;flex-wrap:wrap}
+  .brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:22px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+  .brand i{width:34px;height:34px;display:grid;place-items:center;background:var(--orange);color:#fff;border-radius:10px;font-style:normal;font-size:20px;transform:rotate(-3deg)}
+  .topbar small{opacity:.75;font-size:12px;display:none}
+  @media(min-width:700px){.topbar small{display:block}}
+  .game-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:radial-gradient(1200px 600px at 50% -10%, #a8e2f5 0%, #5bb8db 18%, #0e4a62 75%, #071e2a 100%);position:relative;overflow:hidden}
+  .frame{position:relative;width:min(920px,100%);aspect-ratio:920/580;background:linear-gradient(180deg,#fef9e8 0%, #f5e6c2 22%, #efdb9e 40%, #7ec8e3 40.2%, #3fb5d6 62%, #11506a 100%);border-radius:18px;overflow:hidden;box-shadow:0 18px 60px #0008, 0 0 0 1px #ffffff22 inset;border:3px solid #fff3}
+  canvas{display:block;width:100%;height:100%}
+  .hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:12px}
+  .hud-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+  .pill{background:#ffffffee;border:1px solid #fff;backdrop-filter:blur(6px);border-radius:14px;padding:8px 14px;display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px #0002;font-weight:800;font-size:14px;color:#1a2a33}
+  .pill b{font-family:'Fredoka',sans-serif;font-size:18px;color:var(--orange)}
+  .timer-pill{flex-direction:column;align-items:flex-start;gap:4px;min-width:140px}
+  .timer-row{display:flex;align-items:center;gap:8px;width:100%}
+  .timer-bar{height:8px;flex:1;background:#0001;border-radius:999px;overflow:hidden;position:relative}
+  .timer-fill{height:100%;background:linear-gradient(90deg,#2dd4bf,#0ea5e9 60%, #f59e0b);border-radius:999px;transition:width .25s linear}
+  .timer-fill.warn{background:linear-gradient(90deg,#f59e0b,#ef4444)}
+  .shells{display:flex;gap:6px;align-items:center}
+  .shell-dot{width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid #e8d5a3;display:grid;place-items:center;font-size:12px;opacity:.9;transition:.3s}
+  .shell-dot.got{background:linear-gradient(180deg,#fff8d6,#f5c86e);border-color:#f59e0b;transform:scale(1.12);box-shadow:0 2px 8px #f59e0b66}
+  .controls-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:#0f2f44e6;color:#fff;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em;display:flex;gap:8px;align-items:center;backdrop-filter:blur(6px)}
+  .controls-hint kbd{background:#fff;color:#0f2f44;padding:2px 6px;border-radius:6px;font-family:monospace;font-size:11px;border-bottom:2px solid #0002}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(180deg,#0e2a38e0 0%, #0e2a38a8 100%);backdrop-filter:blur(4px);padding:20px;text-align:center;color:#fff;transition:.35s}
+  .overlay.hidden{opacity:0;pointer-events:none;transform:scale(1.02)}
+  .card{background:#fff;color:#1e293b;border-radius:20px;padding:26px 22px;max-width:520px;width:100%;box-shadow:0 20px 60px #0005;border:1px solid #fff;position:relative;overflow:hidden}
+  .card:before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,#38bdf8,#f59e0b,#ef4444)}
+  .card h1{font-family:'Fredoka',sans-serif;font-size:34px;margin:6px 0 8px;letter-spacing:-.02em;color:#0f2f44;line-height:1}
+  .card h1 span{color:var(--orange)}
+  .card p{color:#475569;font-size:15px;line-height:1.6;margin:8px 0}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:14px 0}
+  .badge{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;color:#334155;display:flex;gap:6px;align-items:center}
+  .btn{appearance:none;border:0;background:linear-gradient(180deg,#ff7a3d,#e85a1a);color:#fff;font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px;padding:14px 28px;border-radius:14px;cursor:pointer;box-shadow:0 8px 20px #e85a1a55, 0 1px 0 #fff4 inset;transition:.15s;display:inline-flex;align-items:center;gap:8px;justify-content:center;width:100%;margin-top:10px}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 12px 28px #e85a1a66}
+  .btn:active{transform:translateY(1px)}
+  .btn.secondary{background:#f1f5f9;color:#0f2f44;box-shadow:0 4px 12px #0001}
+  .btn-row{display:flex;gap:10px;margin-top:10px}
+  .btn-row .btn{flex:1}
+  .wave-warning{position:absolute;top:84px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:8px 16px;border-radius:999px;font-weight:800;font-size:13px;letter-spacing:.04em;box-shadow:0 6px 20px #ef444488;display:flex;align-items:center;gap:8px;animation:shake .4s infinite alternate;pointer-events:none;opacity:0;transition:.2s}
+  .wave-warning.show{opacity:1}
+  @keyframes shake{from{transform:translateX(-50%) translateY(0)} to{transform:translateX(-50%) translateY(-2px)}}
+  .touch-pad{position:absolute;bottom:16px;left:16px;display:none;gap:6px;pointer-events:auto;grid-template-columns:48px 48px 48px;grid-template-areas:". up ." "left down right";justify-items:center}
+  .touch-pad button{width:48px;height:48px;border-radius:14px;border:2px solid #fff;background:#ffffffd0;backdrop-filter:blur(6px);font-size:20px;box-shadow:0 4px 12px #0003;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+  .touch-pad button[data-dir="up"]{grid-area:up}
+  .touch-pad button[data-dir="left"]{grid-area:left}
+  .touch-pad button[data-dir="down"]{grid-area:down}
+  .touch-pad button[data-dir="right"]{grid-area:right}
+  .touch-pad button:active{background:#fff;transform:scale(.96)}
+  .touch-right{left:auto;right:16px}
+  @media(max-width:720px){ .touch-pad{display:grid} .controls-hint{display:none} .frame{aspect-ratio:4/3} }
+  .score-pop{position:absolute;transform:translate(-50%,-50%);font-family:'Fredoka',sans-serif;font-weight:800;color:#f59e0b;text-shadow:0 2px 0 #fff, 0 4px 12px #0003;pointer-events:none;animation:pop .7s ease-out forwards}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.6);opacity:1}100%{transform:translate(-50%,-80px) scale(1.1);opacity:0}}
+  .sr-only{position:absolute;left:-9999px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><i>🦀</i> Tidepool <span style="color:#ff7a3d">Tangle</span> <small>— collect 5 shells, dodge waves, reach the rock</small></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button id="muteBtn" aria-label="Toggle sound" style="background:#ffffff18;border:1px solid #fff3;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:700">🔊 Sound</button>
+  </div>
+</header>
+<div class="game-wrap">
+  <div class="frame" id="frame">
+    <canvas id="c" width="920" height="580" aria-label="Tidepool Tangle game canvas"></canvas>
+    <div class="hud">
+      <div class="hud-top">
+        <div class="pill" id="scorePill"><span>🐚</span> <b id="score">0</b> &nbsp; <span class="shells" id="shellDots"></span></div>
+        <div class="pill timer-pill">
+          <div class="timer-row"><span>⏱</span> <b id="timerText">60.0</b>s <span id="timerState" style="font-size:11px;font-weight:800;color:#64748b"></span></div>
+          <div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
+        </div>
+      </div>
+      <div class="controls-hint"><kbd>WASD</kbd> or <kbd>↑←↓→</kbd> to scuttle <span style="opacity:.6">•</span> Collect 5 shells → reach the glowing rock</div>
+    </div>
+    <div class="wave-warning" id="waveWarn">🌊 WAVE INCOMING!</div>
+    <!-- Touch controls -->
+    <div class="touch-pad" id="touchLeft" aria-hidden="false">
+      <button data-dir="up">↑</button><button data-dir="left">←</button><button data-dir="down">↓</button><button data-dir="right">→</button>
+    </div>
+
+    <!-- Overlays -->
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <div style="font-size:44px">🦀 🏖️ 🐚</div>
+        <h1>Tidepool <span>Tangle</span></h1>
+        <p><b>Scuttle, collect, escape!</b> You’re a tiny crab in a sun-warmed tidepool. Grab <b>5 shiny shells</b>, dodge <b>2 spiky starfish</b> and the <b>rising surf</b>, then dash to the <b>safe rock</b> before <b>60 seconds</b> run out.</p>
+        <div class="badges">
+          <span class="badge">🎮 WASD / Arrows</span><span class="badge">🐚 5 shells to win</span><span class="badge">⭐ Avoid starfish</span><span class="badge">🌊 Watch the waves</span>
+        </div>
+        <button class="btn" id="startBtn">▶ Start Scuttling</button>
+        <p style="font-size:12px;color:#94a3b8;margin-top:10px">Tip: On mobile, use the on-screen arrows. Grab shells → rock glows → sprint to it!</p>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="winOverlay">
+      <div class="card">
+        <div style="font-size:48px">🎉 🪨 ✨</div>
+        <h1>You made it!</h1>
+        <p id="winText">You rescued 5 shells and reached the safe rock with time to spare. The tidepool cheers!</p>
+        <div class="badges" id="winStats"></div>
+        <div class="btn-row"><button class="btn" id="winRestart">↻ Play Again</button></div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="loseOverlay">
+      <div class="card">
+        <div style="font-size:48px" id="loseIcon">🌊 😵</div>
+        <h1 id="loseTitle">Washed away…</h1>
+        <p id="loseText">The tide caught you. Try a quicker route and watch the wave timing!</p>
+        <div class="btn-row"><button class="btn secondary" id="loseRestart">↻ Try Again</button><button class="btn" id="loseStartOver">Start Over</button></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<span class="sr-only" id="a11yStatus" aria-live="polite"></span>
+
+<script type="module">
+const canvas = document.getElementById('c')
+const ctx = canvas.getContext('2d')
+const frame = document.getElementById('frame')
+const startOverlay = document.getElementById('startOverlay')
+const winOverlay = document.getElementById('winOverlay')
+const loseOverlay = document.getElementById('loseOverlay')
+const scoreEl = document.getElementById('score')
+const shellDots = document.getElementById('shellDots')
+const timerText = document.getElementById('timerText')
+const timerFill = document.getElementById('timerFill')
+const waveWarn = document.getElementById('waveWarn')
+const a11yStatus = document.getElementById('a11yStatus')
+
+// Audio (tiny Web Audio blips, no external files)
+let audioCtx = null, muted = false
+function ensureAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume() }
+function tone(freq, dur=0.12, type='sine', gain=0.18, slideTo){
+  if(muted||!audioCtx) return
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain()
+  o.type=type; o.frequency.value=freq; o.connect(g); g.connect(audioCtx.destination)
+  g.gain.value=gain
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur)
+  if(slideTo){ o.frequency.exponentialRampToValueAtTime(slideTo, audioCtx.currentTime+dur) }
+  o.start(); o.stop(audioCtx.currentTime+dur)
+}
+function sfxCollect(){ tone(620,0.12,'sine',0.22, 880); setTimeout(()=>tone(880,0.15,'sine',0.16),90) }
+function sfxHit(){ tone(180,0.3,'square',0.18, 90) }
+function sfxWave(){ tone(90,0.6,'sawtooth',0.14, 60); setTimeout(()=>tone(120,0.4,'triangle',0.12),200) }
+function sfxWin(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,0.3,'sine',0.18), i*120)) }
+function sfxLose(){ [220,180,140].forEach((f,i)=>setTimeout(()=>tone(f,0.35,'triangle',0.15), i*180)) }
+
+document.getElementById('muteBtn').addEventListener('click', e=>{
+  muted=!muted; e.currentTarget.textContent = muted ? '🔇 Muted' : '🔊 Sound'
+})
+
+// Shell dots HUD
+function renderShellDots(n){
+  shellDots.innerHTML=''
+  for(let i=0;i<5;i++){
+    const d=document.createElement('span')
+    d.className='shell-dot'+(i<n?' got':'')
+    d.textContent=i<n?'🐚':'·'
+    shellDots.appendChild(d)
+  }
+}
+renderShellDots(0)
+
+// Game state
+const W=920, H=580
+let state='start' // start|playing|won|lost
+let score=0, collected=0, timeLeft=60, elapsed=0
+let keys={}
+let crab={x:120,y:460,r:18,vx:0,vy:0,invuln:0, facing:1}
+let shells=[]
+let stars=[]
+let rock={x: W-140, y:28, w:125, h:88}
+let wave={active:false, y:H+40, speed:0, cooldown:3, timer:0, interval:7, thickness:44}
+let particles=[] // splash
+let lastTime=0, shake=0, waveCount=0, hits=0
+
+function rand(a,b){return a+Math.random()*(b-a)}
+function dist(ax,ay,bx,by){return Math.hypot(ax-bx,ay-by)}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+function resetLevel(){
+  score=0; collected=0; timeLeft=60; elapsed=0; waveCount=0; hits=0
+  crab.x=120; crab.y=460; crab.vx=0; crab.vy=0; crab.invuln=0
+  wave.active=false; wave.y=H+60; wave.timer=0; wave.cooldown=3; shake=0; particles=[]
+  shells = [
+    {x:240,y:220,r:16,got:false,type:0,bob:rand(0,Math.PI*2)},
+    {x:520,y:150,r:15,got:false,type:1,bob:rand(0,Math.PI*2)},
+    {x:720,y:300,r:17,got:false,type:2,bob:rand(0,Math.PI*2)},
+    {x:380,y:380,r:16,got:false,type:1,bob:rand(0,Math.PI*2)},
+    {x:680,y:420,r:15,got:false,type:0,bob:rand(0,Math.PI*2)},
+  ]
+  // two starfish obstacles - ensure not overlapping shells
+  stars = [
+    {x:340,y:300,r:30,ang:0},
+    {x:610,y:260,r:34,ang:0.6},
+  ]
+  renderShellDots(0)
+  scoreEl.textContent='0'
+}
+
+function startGame(){
+  ensureAudio()
+  resetLevel()
+  state='playing'
+  startOverlay.classList.add('hidden')
+  winOverlay.classList.add('hidden')
+  loseOverlay.classList.add('hidden')
+  a11yStatus.textContent='Game started. Collect 5 shells and reach the rock.'
+  lastTime=performance.now()
+  requestAnimationFrame(loop)
+}
+function winGame(){
+  state='won'
+  sfxWin()
+  document.getElementById('winStats').innerHTML=`<span class="badge">🐚 ${collected}/5 shells</span><span class="badge">⏱ ${(60-timeLeft).toFixed(1)}s used</span><span class="badge">🌊 ${waveCount} waves dodged</span>`
+  winOverlay.classList.remove('hidden')
+  a11yStatus.textContent='You won! Reached the safe rock.'
+}
+function loseGame(reason){
+  state='lost'
+  sfxLose()
+  const t = reason==='time' ? ['⏰ Time’s up!','The tide rose too fast. Grab shells quicker next time!'] : ['🌊 Splashed!','A wave swept you. Watch the surf timing and hug the high ground.']
+  document.getElementById('loseTitle').textContent=t[0]
+  document.getElementById('loseText').textContent=t[1]
+  loseOverlay.classList.remove('hidden')
+  a11yStatus.textContent='Game over. '+t[0]
+}
+
+// Input
+const keyMap={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',a:'left',s:'down',d:'right',W:'up',A:'left',S:'down',D:'right'}
+window.addEventListener('keydown',e=>{
+  const k = keyMap[e.key] ?? (e.key.length===1? keyMap[e.key.toLowerCase()] : null)
+  if(k){ keys[k]=true; if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault() }
+  if(e.key===' ' && state!=='playing'){ e.preventDefault(); if(state==='start') startGame(); else if(state==='won'||state==='lost') startGame(); }
+  if(e.key==='r' && (state==='won'||state==='lost')) startGame()
+})
+window.addEventListener('keyup',e=>{
+  const k = keyMap[e.key] ?? (e.key.length===1? keyMap[e.key.toLowerCase()] : null)
+  if(k) keys[k]=false
+})
+// touch pad
+document.querySelectorAll('.touch-pad button').forEach(btn=>{
+  const dir=btn.dataset.dir
+  const set=v=>keys[dir]=v
+  btn.addEventListener('touchstart',e=>{e.preventDefault(); set(true); ensureAudio()},{passive:false})
+  btn.addEventListener('touchend',e=>{e.preventDefault(); set(false)})
+  btn.addEventListener('mousedown',()=>set(true))
+  btn.addEventListener('mouseup',()=>set(false))
+  btn.addEventListener('mouseleave',()=>set(false))
+})
+// canvas drag touch to move (only when playing; clamp to bounds)
+let dragActive=false, dragX=0, dragY=0
+canvas.addEventListener('touchstart',e=>{
+  if(state!=='playing') return
+  const t=e.touches[0]; const rect=canvas.getBoundingClientRect(); dragActive=true; dragX=(t.clientX-rect.left)/rect.width*W; dragY=(t.clientY-rect.top)/rect.height*H; ensureAudio(); e.preventDefault()
+},{passive:false})
+canvas.addEventListener('touchmove',e=>{
+  if(!dragActive||state!=='playing') return; const t=e.touches[0]; const rect=canvas.getBoundingClientRect(); const x=(t.clientX-rect.left)/rect.width*W; const y=(t.clientY-rect.top)/rect.height*H; crab.x = clamp(crab.x + (x-crab.x)*0.2, crab.r+8, W-crab.r-8); crab.y = clamp(crab.y + (y-crab.y)*0.2, crab.r+12, H-crab.r-10); e.preventDefault()
+},{passive:false})
+canvas.addEventListener('touchend',()=>dragActive=false)
+canvas.addEventListener('mousedown',e=>{
+  if(state!=='playing') return
+  dragActive=true; const rect=canvas.getBoundingClientRect(); dragX=(e.clientX-rect.left)/rect.width*W; dragY=(e.clientY-rect.top)/rect.height*H; ensureAudio()
+})
+window.addEventListener('mousemove',e=>{
+  if(!dragActive||state!=='playing') return; const rect=canvas.getBoundingClientRect(); const x=(e.clientX-rect.left)/rect.width*W; const y=(e.clientY-rect.top)/rect.height*H; crab.x = clamp(crab.x + (x-crab.x)*0.18, crab.r+8, W-crab.r-8); crab.y = clamp(crab.y + (y-crab.y)*0.18, crab.r+12, H-crab.r-10)
+})
+window.addEventListener('mouseup',()=>dragActive=false)
+
+document.getElementById('startBtn').addEventListener('click', startGame)
+document.getElementById('winRestart').addEventListener('click', startGame)
+document.getElementById('loseRestart').addEventListener('click', startGame)
+document.getElementById('loseStartOver').addEventListener('click', ()=>{ loseOverlay.classList.add('hidden'); startOverlay.classList.remove('hidden'); state='start' })
+
+// Particles
+function spawnSplash(x,y,color='#fff', n=10){
+  for(let i=0;i<n;i++) particles.push({x,y, vx:rand(-120,120), vy:rand(-180,-20), life: rand(0.4,0.7), t:0, r:rand(2,5), color})
+}
+function spawnScorePop(x,y,txt){
+  const el=document.createElement('div'); el.className='score-pop'; el.textContent=txt; el.style.left=x/ W*100+'%'; el.style.top=y/ H*100+'%'; el.style.fontSize='18px'; frame.appendChild(el); setTimeout(()=>el.remove(),800)
+}
+
+// Collision helpers
+function rectCircleCollide(cx,cy,cr, rx,ry,rw,rh){
+  const closestX=clamp(cx, rx, rx+rw), closestY=clamp(cy, ry, ry+rh)
+  return dist(cx,cy,closestX,closestY) < cr
+}
+
+function update(dt){
+  if(state!=='playing') return
+  elapsed+=dt; timeLeft-=dt
+  if(timeLeft<=0){ timeLeft=0; loseGame('time'); return }
+
+  // wave logic
+  wave.timer+=dt
+  if(!wave.active){
+    if(wave.timer>wave.interval){
+      wave.active=true; wave.y=H+30; wave.speed=180+ Math.min(60, elapsed*2); waveWarn.classList.add('show'); sfxWave(); waveCount++
+    } else if(wave.timer>wave.interval-1.5){
+      waveWarn.classList.add('show')
+    } else {
+      waveWarn.classList.remove('show')
+    }
+  } else {
+    wave.y -= wave.speed*dt
+    if(wave.y < -80){
+      wave.active=false; wave.timer=0; waveWarn.classList.remove('show')
+    }
+    // hit test: if crab is below wave (in surf zone) -> penalize
+    const inWave = crab.y + crab.r > wave.y && crab.y - crab.r < wave.y + wave.thickness
+    if(inWave && crab.invuln<=0){
+      hits++; crab.invuln=1.0; shake=14; sfxHit()
+      // knock toward sand (downward) a bit and lose a little progress
+      crab.y = Math.min(H-22, crab.y+34)
+      crab.vx *= -0.4
+      spawnSplash(crab.x, wave.y+12, '#7ec8e3', 14)
+      // brief freeze could cost time, but not instant lose
+    }
+  }
+
+  // input -> velocity
+  let ix=0, iy=0
+  if(keys.left) ix-=1
+  if(keys.right) ix+=1
+  if(keys.up) iy-=1
+  if(keys.down) iy+=1
+  if(ix||iy){
+    const len=Math.hypot(ix,iy); ix/=len; iy/=len
+    crab.facing = ix!==0 ? Math.sign(ix) : crab.facing
+  }
+  const speed = 230 // px/s
+  crab.vx = ix*speed
+  crab.vy = iy*speed
+  crab.x += crab.vx*dt
+  crab.y += crab.vy*dt
+  // bounds: keep inside tidepool; top 0- H, left/right
+  crab.x=clamp(crab.x, crab.r+8, W-crab.r-8)
+  crab.y=clamp(crab.y, crab.r+12, H-crab.r-10)
+
+  // damping shake
+  shake *= 0.82
+  if(crab.invuln>0) crab.invuln-=dt
+
+  // starfish collision
+  for(const s of stars){
+    s.ang += dt*0.6
+    const d=dist(crab.x,crab.y,s.x,s.y)
+    if(d < crab.r + s.r*0.78 && crab.invuln<=0){
+      hits++; crab.invuln=0.9; shake=12; sfxHit()
+      // push out
+      const ang=Math.atan2(crab.y-s.y, crab.x-s.x)
+      crab.x = s.x + Math.cos(ang)*(crab.r + s.r*0.78+6)
+      crab.y = s.y + Math.sin(ang)*(crab.r + s.r*0.78+6)
+      spawnSplash(crab.x,crab.y,'#ffb3a0',10)
+    }
+  }
+
+  // shells
+  for(const sh of shells){
+    if(sh.got) continue
+    sh.bob+=dt*2.2
+    if(dist(crab.x,crab.y,sh.x,sh.y) < crab.r+sh.r){
+      sh.got=true; collected++; score+=100; renderShellDots(collected); scoreEl.textContent=String(score)
+      sfxCollect(); spawnSplash(sh.x,sh.y,'#ffe8a0',12); spawnScorePop(sh.x,sh.y,'+100')
+      // small time bonus on last? no
+      if(collected===5){
+        a11yStatus.textContent='All shells collected! Reach the glowing rock!'
+        // pulse rock
+      }
+    }
+  }
+
+  // rock win
+  const onRock = rectCircleCollide(crab.x,crab.y,crab.r, rock.x, rock.y, rock.w, rock.h)
+  if(onRock){
+    if(collected>=5){
+      winGame()
+    } else {
+      // hint: bounce
+      if(crab.invuln<=0){ /* nudge */ }
+    }
+  }
+
+  // particles update
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i]; p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=420*dt // gravity
+    p.life-=dt; if(p.life<=0) particles.splice(i,1)
+  }
+
+  // HUD
+  timerText.textContent=timeLeft.toFixed(1)
+  timerFill.style.width= (timeLeft/60*100)+'%'
+  timerFill.classList.toggle('warn', timeLeft<12)
+  document.getElementById('timerState').textContent = collected>=5 ? '→ to rock!' : `${collected}/5`
+}
+
+function draw(){
+  ctx.save()
+  if(shake>0.5){ ctx.translate(rand(-shake,shake), rand(-shake,shake)) }
+  // clear
+  ctx.clearRect(0,0,W,H)
+
+  // subtle vignette
+  // Sand texture
+  // Sky/sand split already via frame bg, but draw details
+  // Horizontal bands
+  // Beach sand with footprints / speckles
+  ctx.fillStyle='#f5e6c2'
+  ctx.fillRect(0,0,W, H*0.41)
+  // sand speckles
+  ctx.fillStyle='#e8c99a'
+  for(let i=0;i<120;i++){
+    const x=(i*137.5)%W, y=(i*47)%(H*0.39)
+    ctx.globalAlpha=0.35; ctx.beginPath(); ctx.arc(x,y, rand(0.6,1.8),0,Math.PI*2); ctx.fill()
+  }
+  ctx.globalAlpha=1
+  // shallow tidepool water edge - wavy line
+  ctx.strokeStyle='#ffffffaa'; ctx.lineWidth=2; ctx.beginPath()
+  for(let x=0;x<=W;x+=8){
+    const y= H*0.41 + Math.sin(x*0.015 + elapsed*1.2)*4 + Math.cos(x*0.008 - elapsed*0.7)*3
+    if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y)
+  }
+  ctx.stroke()
+  // water gradient
+  const grad=ctx.createLinearGradient(0,H*0.41,0,H)
+  grad.addColorStop(0,'#aee4f5'); grad.addColorStop(0.18,'#7ec8e3'); grad.addColorStop(0.45,'#3da9d6'); grad.addColorStop(1,'#0f3d55')
+  ctx.fillStyle=grad; ctx.fillRect(0,H*0.41,W,H*0.59)
+
+  // underwater sand ripples
+  ctx.strokeStyle='#ffffff22'; ctx.lineWidth=1
+  for(let i=0;i<4;i++){
+    const y=H*0.52 + i*34 + Math.sin(elapsed*0.6+i)*6
+    ctx.beginPath(); for(let x=0;x<W;x+=12){ const yy=y+Math.sin(x*0.02+ i*1.3 + elapsed*0.8)*5; if(x===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy)} ctx.stroke()
+  }
+
+  // rock (safe zone) - draw before other objects but with depth
+  const rockGlow = collected>=5 ? (0.6 + Math.sin(elapsed*3)*0.4) : 0
+  if(rockGlow>0){
+    ctx.shadowColor='#ffd86e'; ctx.shadowBlur=22*rockGlow; ctx.fillStyle='#ffd86e44'; 
+    // glow ellipse
+    ctx.beginPath(); ctx.ellipse(rock.x+rock.w/2, rock.y+rock.h/2, rock.w*0.62, rock.h*0.62,0,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0
+  }
+  // rock base shadow
+  ctx.fillStyle='#00000022'; ctx.beginPath(); ctx.ellipse(rock.x+rock.w/2, rock.y+rock.h+10, rock.w*0.45, 14,0,0,Math.PI*2); ctx.fill()
+  // rock body
+  ctx.fillStyle='#8a7f72'; ctx.strokeStyle='#5d564e'; ctx.lineWidth=3
+  ctx.beginPath(); roundRect(rock.x, rock.y, rock.w, rock.h, 18); ctx.fill(); ctx.stroke()
+  // rock texture
+  ctx.fillStyle='#a99a89'; ctx.beginPath(); ctx.ellipse(rock.x+28,rock.y+20,18,12, -0.3,0,Math.PI*2); ctx.fill()
+  ctx.fillStyle='#6e6356'; ctx.beginPath(); ctx.arc(rock.x+ rock.w-28, rock.y+32,10,0,Math.PI*2); ctx.fill()
+  ctx.fillStyle='#c2b3a0'; ctx.font='700 11px Nunito'; ctx.textAlign='center'; ctx.fillText(collected>=5 ? '★ SAFE ROCK ★' : 'SAFE ROCK', rock.x+rock.w/2, rock.y+rock.h/2+4)
+  if(collected<5){ ctx.fillStyle='#fff8'; ctx.font='700 10px Nunito'; ctx.fillText(`${collected}/5 shells needed`, rock.x+rock.w/2, rock.y+rock.h/2+16) }
+  else { ctx.fillStyle='#7a5a00'; ctx.font='800 10px Nunito'; ctx.fillText('♪ GO! GO! GO! ♪', rock.x+rock.w/2, rock.y+rock.h/2+16) }
+
+  // tide line
+  ctx.fillStyle='#f5d7a155'; ctx.fillRect(0,H*0.41,W,10)
+
+  // starfish
+  for(const s of stars){
+    ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.ang)
+    // shadow
+    ctx.fillStyle='#0003'; ctx.beginPath(); ctx.ellipse(2,12, s.r*0.7, s.r*0.38,0,0,Math.PI*2); ctx.fill()
+    // star shape
+    ctx.fillStyle='#ff6b3d'; ctx.strokeStyle='#c43a12'; ctx.lineWidth=2.5
+    starPath(s.r*0.95); ctx.fill(); ctx.stroke()
+    // center + dots
+    ctx.fillStyle='#fff6'; ctx.beginPath(); ctx.arc(0,0, s.r*0.22,0,Math.PI*2); ctx.fill()
+    ctx.fillStyle='#ffd6c2'; for(let i=0;i<5;i++){ const a=i*Math.PI*2/5; ctx.beginPath(); ctx.arc(Math.cos(a)*s.r*0.42, Math.sin(a)*s.r*0.42, 3,0,Math.PI*2); ctx.fill()}
+    ctx.restore()
+  }
+
+  // shells (uncollected)
+  for(const sh of shells){
+    if(sh.got) continue
+    const bob = Math.sin(sh.bob)*4
+    ctx.save(); ctx.translate(sh.x, sh.y+bob)
+    // shadow
+    ctx.fillStyle='#0002'; ctx.beginPath(); ctx.ellipse(0,10, sh.r*0.8, 5,0,0,Math.PI*2); ctx.fill()
+    // shell types
+    if(sh.type===0){ // spiral conch
+      ctx.fillStyle='#fff8e1'; ctx.strokeStyle='#e8b86a'; ctx.lineWidth=2
+      ctx.beginPath(); ctx.arc(0,0, sh.r, 0, Math.PI*2); ctx.fill(); ctx.stroke()
+      ctx.strokeStyle='#f5c97a'; ctx.lineWidth=1.4; ctx.beginPath(); for(let r=4;r<sh.r;r+=3){ ctx.arc(0,0,r, -0.6, 1.1)} ctx.stroke()
+      ctx.fillStyle='#ff9a5c'; ctx.beginPath(); ctx.arc(4,-5,3,0,Math.PI*2); ctx.fill()
+    } else if(sh.type===1){ // scallop
+      ctx.fillStyle='#fff'; ctx.strokeStyle='#d9c7a5'; ctx.lineWidth=2
+      ctx.beginPath(); ctx.ellipse(0,0, sh.r, sh.r*0.85,0,0,Math.PI*2); ctx.fill(); ctx.stroke()
+      ctx.strokeStyle='#f0d8b0'; ctx.lineWidth=1.2; for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(i*4, -sh.r*0.6); ctx.lineTo(i*3, sh.r*0.6); ctx.stroke()}
+      ctx.fillStyle='#ffd86e'; ctx.beginPath(); ctx.arc(0,-2,2.5,0,Math.PI*2); ctx.fill()
+    } else { // clam
+      ctx.fillStyle='#e8f0ff'; ctx.strokeStyle='#9ab3d6'; ctx.lineWidth=2
+      ctx.beginPath(); ctx.ellipse(0,1, sh.r, sh.r*0.72,0,0,Math.PI*2); ctx.fill(); ctx.stroke()
+      ctx.strokeStyle='#b8cce6'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(-sh.r*0.9,1); ctx.lineTo(sh.r*0.9,1); ctx.stroke()
+      ctx.fillStyle='#ff8fa0'; ctx.beginPath(); ctx.ellipse(0,2, sh.r*0.45, 3,0,0,Math.PI*2); ctx.fill()
+    }
+    // shine
+    ctx.fillStyle='#ffffffcc'; ctx.beginPath(); ctx.arc(-4,-5,3,0,Math.PI*2); ctx.fill()
+    // floating pointer if far? not needed
+    ctx.restore()
+  }
+
+  // collected shells burst still shown as sparkle where collected? optional
+
+  // crab
+  ctx.save(); ctx.translate(crab.x, crab.y)
+  const invBlink = crab.invuln>0 && Math.floor(crab.invuln*12)%2===0
+  if(invBlink) ctx.globalAlpha=0.45
+  // shadow
+  ctx.fillStyle='#0003'; ctx.beginPath(); ctx.ellipse(0,12, crab.r*1.0, 6,0,0,Math.PI*2); ctx.fill()
+  // legs
+  ctx.strokeStyle='#b93a1a'; ctx.lineWidth=3; ctx.lineCap='round'
+  for(let side=-1; side<=1; side+=2){
+    for(let i=-1;i<=1;i++){
+      const lx = side*(crab.r*0.9 + Math.abs(i)*2)
+      const ly = i*6
+      ctx.beginPath(); ctx.moveTo(lx*0.5, 4); ctx.lineTo(lx, ly+4); ctx.stroke()
+    }
+  }
+  // body
+  ctx.fillStyle='#e64e2a'; ctx.strokeStyle='#8a1f0a'; ctx.lineWidth=2
+  ctx.beginPath(); ctx.ellipse(0,2, crab.r*1.05, crab.r*0.85,0,0,Math.PI*2); ctx.fill(); ctx.stroke()
+  // belly highlight
+  ctx.fillStyle='#ff8a65'; ctx.beginPath(); ctx.ellipse(0,5, crab.r*0.6, crab.r*0.4,0,0,Math.PI*2); ctx.fill()
+  // claws
+  ctx.fillStyle='#ff6b3d'; ctx.strokeStyle='#8a1f0a'; ctx.lineWidth=1.8
+  const clawY=-4
+  // left claw
+  ctx.save(); ctx.translate(-crab.r*0.9* crab.facing, clawY); ctx.rotate(crab.facing*0.2 + Math.sin(elapsed*8)*0.08)
+  ctx.beginPath(); ctx.ellipse(0,0, 10, 7, -0.4,0,Math.PI*2); ctx.fill(); ctx.stroke()
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(3,2,2,0,Math.PI*2); ctx.fill()
+  ctx.restore()
+  ctx.fillStyle='#ff6b3d'; ctx.strokeStyle='#8a1f0a'
+  ctx.save(); ctx.translate(crab.r*0.9* crab.facing, clawY); ctx.rotate(-crab.facing*0.2 - Math.sin(elapsed*8+1)*0.08)
+  ctx.beginPath(); ctx.ellipse(0,0, 10, 7, 0.4,0,Math.PI*2); ctx.fill(); ctx.stroke()
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-3,2,2,0,Math.PI*2); ctx.fill()
+  ctx.restore()
+  // eyes
+  ctx.fillStyle='#fff'; ctx.strokeStyle='#8a1f0a'; ctx.lineWidth=1.4
+  ctx.beginPath(); ctx.arc(-6,-10,6,0,Math.PI*2); ctx.fill(); ctx.stroke()
+  ctx.beginPath(); ctx.arc(6,-10,6,0,Math.PI*2); ctx.fill(); ctx.stroke()
+  ctx.fillStyle='#0f2f44'; ctx.beginPath(); ctx.arc(-6 + crab.facing*1.5, -10, 2.8,0,Math.PI*2); ctx.fill()
+  ctx.beginPath(); ctx.arc(6 + crab.facing*1.5, -10, 2.8,0,Math.PI*2); ctx.fill()
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-5,-12,1.4,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(7,-12,1.4,0,Math.PI*2); ctx.fill()
+  // smile if won? not
+  ctx.restore()
+
+  // wave overlay
+  if(wave.active){
+    const wy=wave.y
+    // gradient wave body
+    const g=ctx.createLinearGradient(0,wy,0,wy+wave.thickness+60)
+    g.addColorStop(0,'#ffffff00'); g.addColorStop(0.15,'#ffffffcc'); g.addColorStop(0.35,'#7ec8e3ee'); g.addColorStop(1,'#3fb5d6cc')
+    ctx.fillStyle=g; ctx.fillRect(0,wy, W, wave.thickness+60)
+    // crest foam
+    ctx.fillStyle='#ffffffee'; ctx.beginPath()
+    for(let x=0;x<=W;x+=10){
+      const yy= wy + Math.sin(x*0.03 + elapsed*6)*4 + Math.cos(x*0.015 - elapsed*4)*3
+      if(x===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy)
+    }
+    ctx.lineTo(W, wy-6); ctx.lineTo(0, wy-6); ctx.closePath(); ctx.fill()
+    // second foam line
+    ctx.strokeStyle='#ffffff88'; ctx.lineWidth=1.5; ctx.beginPath()
+    for(let x=0;x<=W;x+=10){
+      const yy= wy+wave.thickness*0.6 + Math.sin(x*0.025 + elapsed*5)*3
+      if(x===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy)
+    }
+    ctx.stroke()
+  }
+
+  // particles
+  for(const p of particles){
+    ctx.globalAlpha = Math.max(0, 1 - p.t*1.4) * 0.9
+    ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill()
+  }
+  ctx.globalAlpha=1
+
+  // vignette
+  const vg=ctx.createRadialGradient(W/2,H/2, W*0.35, W/2,H/2, W*0.9)
+  vg.addColorStop(0,'#00000000'); vg.addColorStop(1,'#00000018'); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H)
+
+  ctx.restore()
+
+  // debug subtle border
+}
+
+function roundRect(x,y,w,h,r){ ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath() }
+function starPath(R){
+  ctx.beginPath()
+  for(let i=0;i<5;i++){
+    const a= -Math.PI/2 + i*Math.PI*2/5
+    const ax=Math.cos(a)*R, ay=Math.sin(a)*R
+    const bx=Math.cos(a+Math.PI/5)*R*0.42, by=Math.sin(a+Math.PI/5)*R*0.42
+    if(i===0) ctx.moveTo(ax,ay); else ctx.lineTo(ax,ay)
+    ctx.lineTo(bx,by)
+  }
+  ctx.closePath()
+}
+
+function loop(now){
+  if(!lastTime) lastTime=now
+  const dt=Math.min(0.033, (now-lastTime)/1000); lastTime=now
+  update(dt); draw()
+  if(state==='playing') requestAnimationFrame(loop)
+  else draw() // final frame
+}
+
+// initial draw
+resetLevel(); draw()
+renderShellDots(0)
+
+// handle visibility: pause?
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) lastTime=0; else lastTime=performance.now() })
+
+// keyboard focus hint
+canvas.tabIndex=0
+canvas.addEventListener('focus',()=>ensureAudio())
+
+// Resize observer not needed canvas fixed internal, CSS scales
+
+// Expose for testing
+window.__game = { getState:()=>state, getScore:()=>score, getCollected:()=>collected, getTime:()=>timeLeft, startGame, resetLevel, crab, shells, stars, rock, wave }
+
+</script>
+</body>
+</html>
