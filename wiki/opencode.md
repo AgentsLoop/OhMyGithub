@@ -188,8 +188,10 @@ to the encoded worktree/session route, so the browser opens the live run
 directly. A loaded Web UI or healthy tunnel alone does not prove session
 tracking; acceptance requires a screenshot while the run is active.
 
-## Required repository settings
+## Repository settings
 
 - Actions must be allowed to create and approve pull requests.
-- The `AGENTSWEB_SSH_PUBLIC_KEY` Actions secret must contain the public key
-  matching the Mac private key described in [access.md](access.md).
+- For runner-side SSH access and verification, configure the
+  `AGENTSWEB_SSH_PUBLIC_KEY` Actions secret with the public key matching the Mac
+  private key described in [access.md](access.md). Without it, the workflow
+  skips SSH setup and verification but still exposes the OpenCode Web session.
