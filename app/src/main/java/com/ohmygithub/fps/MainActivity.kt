@@ -39,6 +39,13 @@ data class Target(
     var hitAnim: Float = 0f
 )
 
+data class HitNumber(
+    val id: Int,
+    val offsetX: Float,
+    val value: Int,
+    val born: Long = System.currentTimeMillis()
+)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +81,10 @@ fun FpsGameScreen() {
     var hitMarkerScale by remember { mutableStateOf(0f) }
     var damageFlash by remember { mutableStateOf(false) }
     var screenShake by remember { mutableStateOf(Offset.Zero) }
+    // AAA hit-feedback: floating combat text + frame ticker for smooth rise/fade
+    var hitNumbers by remember { mutableStateOf(listOf<HitNumber>()) }
+    var hitNumberSeq by remember { mutableIntStateOf(0) }
+    var frameTick by remember { mutableIntStateOf(0) }
     var targets by remember {
         mutableStateOf(
             List(5) { i ->
@@ -103,6 +114,11 @@ fun FpsGameScreen() {
         animationSpec = spring(dampingRatio = 0.38f, stiffness = 420f),
         label = "recoilSpring"
     )
+    val hitMarkerScaleSpring by animateFloatAsState(
+        targetValue = hitMarkerScale,
+        animationSpec = spring(dampingRatio = 0.42f, stiffness = 820f),
+        label = "hitMarkerSpring"
+    )
     LaunchedEffect(recoil) {
         if (recoil != 0f) {
             // sharp kick then recovery is handled by spring; just reset after peak
@@ -127,6 +143,17 @@ fun FpsGameScreen() {
         if (damageFlash) {
             delay(140)
             damageFlash = false
+        }
+    }
+    // ticker drives floating hit-number rise/fade and blood-ring pulse
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16)
+            frameTick++
+            val now = System.currentTimeMillis()
+            if (hitNumbers.any { now - it.born > 820 }) {
+                hitNumbers = hitNumbers.filter { now - it.born < 820 }
+            }
         }
     }
 
@@ -195,6 +222,11 @@ fun FpsGameScreen() {
             gameMessage = "HIT! +${150 * level}"
             hitMarkerVisible = true
             hitMarkerScale = 1.35f
+            // floating combat text — COD damage number pop near crosshair with jitter
+            val jitter = (Random.nextFloat() - 0.5f) * 44f
+            hitNumbers = hitNumbers + HitNumber(id = hitNumberSeq++, offsetX = jitter, value = 150 * level)
+            // stronger punch on screen for confirmed hit
+            screenShake = Offset(Random.nextFloat() * 8f - 4f, Random.nextFloat() * 5f - 2.5f)
             if (kills % 5 == 0) {
                 level++
                 gameMessage = "LEVEL $level - ADVANCE"
@@ -271,16 +303,16 @@ fun FpsGameScreen() {
                 ),
                 size = Size(w, h * 0.55f)
             )
-            // Sun / haze + volumetric shafts
+            // Sun — scaled down (critic: giant flat disc at 0.08h covered 25% sky)
             drawCircle(
-                color = Color(0xFFFFD67A).copy(alpha = 0.9f),
-                radius = h * 0.08f,
-                center = Offset(w * 0.78f, h * 0.18f)
+                color = Color(0xFFFFD67A).copy(alpha = 0.92f),
+                radius = h * 0.032f,
+                center = Offset(w * 0.78f, h * 0.16f)
             )
             drawCircle(
-                color = Color(0xFFFFD67A).copy(alpha = 0.15f),
-                radius = h * 0.18f,
-                center = Offset(w * 0.78f, h * 0.18f)
+                color = Color(0xFFFFD67A).copy(alpha = 0.13f),
+                radius = h * 0.075f,
+                center = Offset(w * 0.78f, h * 0.16f)
             )
             // Sun shaft rays (subtle)
             for (ri in -2..2) {
@@ -377,25 +409,25 @@ fun FpsGameScreen() {
                 topLeft = Offset(0f, h * 0.54f),
                 size = Size(w, h * 0.06f)
             )
-            // Grid lines perspective
+            // Grid lines — reduced to faint sandy hint, not Tron wires (critic: stark white at 0.07)
             for (i in 0..12) {
                 val t = i / 12f
                 val y = h * (0.55f + t * 0.45f)
                 val perspective = 1f - t * 0.75f
                 drawLine(
-                    color = Color.White.copy(alpha = 0.07f * (1f - t)),
+                    color = Color(0xFFD8C9A8).copy(alpha = 0.028f * (1f - t)),
                     start = Offset(centerX - w * 0.5f * perspective + yaw * 6f * t, y),
                     end = Offset(centerX + w * 0.5f * perspective + yaw * 6f * t, y),
-                    strokeWidth = 1f
+                    strokeWidth = 0.8f
                 )
             }
             for (i in -6..6) {
                 val xOff = i * w * 0.08f
                 drawLine(
-                    color = Color.White.copy(alpha = 0.05f),
+                    color = Color(0xFFD8C9A8).copy(alpha = 0.018f),
                     start = Offset(centerX + xOff * 0.2f + yaw * 2f, h * 0.55f),
                     end = Offset(centerX + xOff + yaw * 8f, h),
-                    strokeWidth = 1f
+                    strokeWidth = 0.8f
                 )
             }
 
@@ -521,13 +553,35 @@ fun FpsGameScreen() {
                 val targetH = h * 0.22f * scale
                 val targetW = targetH * 0.62f
                 if (!t.alive) {
-                    // hit effect - expanding ring
-                    drawCircle(
-                        color = Color(0xFFFF3B30).copy(alpha = 0.25f),
-                        radius = targetW * 0.9f,
-                        center = Offset(projX, projY),
-                        style = Stroke(width = 3f)
+                    // AAA hit effect — double ring + blood mist + ground blood pool (lingers)
+                    val pulseR = 0.85f + (frameTick % 14) * 0.015f
+                    // blood pool decal on sand contact point
+                    drawOval(
+                        color = Color(0xFF8A1A1A).copy(alpha = 0.42f),
+                        topLeft = Offset(projX - targetW * 0.62f, h * 0.635f - targetH * 0.05f),
+                        size = Size(targetW * 1.35f, targetH * 0.22f)
                     )
+                    drawOval(
+                        color = Color(0xFFCC2222).copy(alpha = 0.22f),
+                        topLeft = Offset(projX - targetW * 0.42f, h * 0.635f - targetH * 0.02f),
+                        size = Size(targetW * 0.85f, targetH * 0.14f)
+                    )
+                    // expanding double ring — outer red, inner white
+                    drawCircle(
+                        color = Color(0xFFFF3B30).copy(alpha = 0.30f * (1f - (frameTick % 16) / 18f)),
+                        radius = targetW * (0.78f + pulseR * 0.22f),
+                        center = Offset(projX, projY - targetH * 0.08f),
+                        style = Stroke(width = 3.2f)
+                    )
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.55f * (1f - (frameTick % 16) / 18f)),
+                        radius = targetW * (0.55f + pulseR * 0.18f),
+                        center = Offset(projX, projY - targetH * 0.08f),
+                        style = Stroke(width = 1.8f)
+                    )
+                    // blood mist puff at torso center
+                    drawCircle(Color(0xFFFF3B30).copy(alpha = 0.18f), radius = targetW * 0.42f * pulseR, center = Offset(projX, projY - targetH * 0.08f))
+                    drawCircle(Color.White.copy(alpha = 0.10f), radius = targetW * 0.18f, center = Offset(projX + targetW * 0.08f, projY - targetH * 0.18f))
                     continue
                 }
                 // Shadow
@@ -626,6 +680,49 @@ fun FpsGameScreen() {
                 ),
                 size = size
             )
+            // Floating hitNumbers drawn in-canvas — rise + fade (driven by frameTick)
+            run {
+                // use frameTick to invalidate canvas each frame while hitNumbers present
+                val tick = frameTick
+                val now = System.currentTimeMillis()
+                for (hn in hitNumbers) {
+                    val age = ((now - hn.born).toFloat() / 820f).coerceIn(0f, 1f)
+                    if (age >= 1f) continue
+                    @Suppress("UNUSED_VARIABLE") val _tick = tick
+                    val alpha = (1f - age)
+                    val yRise = age * 58f
+                    val cx = centerX + hn.offsetX * 3.2f
+                    val cy = centerY - 28f - yRise
+                    val scaleTxt = 1.1f - age * 0.18f
+                    // shadow / outline for crisp HUD legibility
+                    drawContext.canvas.nativeCanvas.apply {
+                        val paintShadow = android.graphics.Paint().apply {
+                            color = android.graphics.Color.argb((alpha * 180).toInt(), 0, 0, 0)
+                            textSize = 30f * scaleTxt
+                            isAntiAlias = true
+                            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT_BOLD, android.graphics.Typeface.BOLD)
+                            setShadowLayer(6f, 0f, 2f, android.graphics.Color.argb((alpha * 200).toInt(), 0, 0, 0))
+                        }
+                        drawText("+${hn.value}", cx + 1.5f, cy + 1.5f, paintShadow)
+                        val paint = android.graphics.Paint().apply {
+                            color = android.graphics.Color.argb((alpha * 255).toInt(), 255, 220, 50)
+                            textSize = 30f * scaleTxt
+                            isAntiAlias = true
+                            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT_BOLD, android.graphics.Typeface.BOLD)
+                        }
+                        drawText("+${hn.value}", cx, cy, paint)
+                        // tiny crit sparkle at peak
+                        if (age < 0.35f) {
+                            val sparkA = (1f - age / 0.35f)
+                            val sp = android.graphics.Paint().apply {
+                                color = android.graphics.Color.argb((sparkA * 200).toInt(), 255, 255, 255)
+                                isAntiAlias = true
+                            }
+                            drawCircle(cx + 18f, cy - 10f, 2.2f * sparkA, sp)
+                        }
+                    }
+                }
+            }
         }
 
         // Top HUD Bar - COD style
@@ -787,10 +884,10 @@ fun FpsGameScreen() {
                     drawCircle(Color(0xFFFFD67A).copy(alpha = 0.92f), radius = 9f, center = Offset(cx, cy))
                     drawCircle(Color.White.copy(alpha = 0.55f), radius = 4.5f, center = Offset(cx, cy))
                 }
-                // AAA hit-marker — diagonal X, pops on hit (CoD style)
+                // AAA hit-marker — diagonal X, pops on hit (CoD style) — spring-driven punch
                 if (hitMarkerVisible) {
-                    val s = 10f * hitMarkerScale
-                    val a = 0.95f
+                    val s = 10f * hitMarkerScaleSpring
+                    val a = (0.98f - (1.35f - hitMarkerScaleSpring) * 0.25f).coerceIn(0.7f, 1f)
                     val hitCol = Color.White.copy(alpha = a)
                     val hitShadow = Color.Black.copy(alpha = 0.85f)
                     val d = s
@@ -809,13 +906,14 @@ fun FpsGameScreen() {
         }
 
         // Weapon view-model — M4A1 silhouette with spring kick & muzzle flash (AAA polish)
+        // Critic fix: raise weapon above AIM pad / control bar (was clipped behind AIM at 72dp)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 72.dp)
+                .padding(bottom = 108.dp)
                 .offset(y = (recoilAnim * 0.65f).dp)
         ) {
-            Canvas(modifier = Modifier.size(220.dp, 78.dp)) {
+            Canvas(modifier = Modifier.size(260.dp, 88.dp)) {
                 val kick = recoilAnim
                 val scaleKick = 1f + kick * 0.012f
                 // vertical kick: weapon lifts, apply translate via draw scope offset simulation
