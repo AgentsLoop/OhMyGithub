@@ -47,7 +47,8 @@ jobs:
       OPENCODE_WEB_PORT: 4096
       OPENCODE_PROXY_PORT: 4097
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
-      PROJECT_DIR: ${{ github.workspace }}/project
+      PROJECT_PATH: ${{ vars.PROJECT_DIR || './' }}
+      PROJECT_DIR: ${{ github.workspace }}/${{ vars.PROJECT_DIR || './' }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       OPENCODE_AUTH_CONTENT: ${{ secrets.OPENCODE_AUTH_JSON }}
       OPENCODE_EXPERIMENTAL: "true"
@@ -101,17 +102,43 @@ jobs:
             lolgames_tunnel
           persist-credentials: false
 
+      - name: Resolve project directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PROJECT_PATH" = /* || "$PROJECT_PATH" =~ (^|/)\.\.(/|$) ]]; then
+            echo "PROJECT_DIR must be a path inside the repository: $PROJECT_PATH" >&2
+            exit 1
+          fi
+          project_path="${PROJECT_PATH#./}"
+          project_path="${project_path%/}"
+          project_path="${project_path:-.}"
+          printf 'PROJECT_PATH=%s\n' "$project_path" >> "$GITHUB_ENV"
+          printf 'PROJECT_DIR=%s\n' "$GITHUB_WORKSPACE/${project_path#./}" >> "$GITHUB_ENV"
+
       - name: Checkout shared OpenCode skills
         uses: actions/checkout@v6
         with:
           repository: agents-dev/skills
-          path: project/.agents
+          path: ${{ vars.PROJECT_DIR || './' }}/.agents
           fetch-depth: 1
           persist-credentials: false
 
       - name: Exclude shared skills from generated changes
         shell: bash
-        run: echo '/project/.agents/' >> .git/info/exclude
+        run: |
+          set -euo pipefail
+          project_path="${PROJECT_PATH#./}"
+          project_path="${project_path%/}"
+          skills_path="${project_path:+/$project_path}/.agents/"
+          grep -qxF "$skills_path" .git/info/exclude || echo "$skills_path" >> .git/info/exclude
+
+          if [[ -z "$project_path" ]]; then
+            for runtime_path in '/.agentsweb/' '/.omgithub-runtime/' '/.opencode-ssh/' '/.opencode-web/' \
+              '/opencode-agentsweb-id_ed25519' '/opencode-agentsweb-id_ed25519.pub'; do
+              grep -qxF "$runtime_path" .git/info/exclude || echo "$runtime_path" >> .git/info/exclude
+            done
+          fi
 
       - name: Install worker instructions
         shell: bash
@@ -750,7 +777,7 @@ jobs:
               exit 0
             fi
 
-            echo "No final screenshots found under project/screenshots/ (attempt $attempt/3)."
+            echo "No final screenshots found under $PROJECT_PATH/screenshots/ (attempt $attempt/3)."
             if [[ "$attempt" -lt 3 ]]; then
               echo "Sending OpenCode screenshot remediation prompt before retry $((attempt + 1))/3."
               if ! "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
@@ -778,11 +805,11 @@ jobs:
           touch "$PROJECT_DIR/.gitignore"
           grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
             printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
-          git add -A -- project
+          git add -A -- "$PROJECT_PATH"
           if ! git diff --cached --quiet; then
             git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
           fi
-          if git diff --quiet "origin/$BASE_BRANCH..HEAD" -- project; then
+          if git diff --quiet "origin/$BASE_BRANCH..HEAD" -- "$PROJECT_PATH"; then
             echo 'OpenCode made no changes; no pull request will be created.'
             exit 0
           fi
@@ -830,8 +857,10 @@ jobs:
           game_name="$(sed -E 's/[^[:alnum:]]+/-/g; s/^-+|-+$//g' <<<"$game_name" | tr '[:upper:]' '[:lower:]')"
           [[ -n "$game_name" ]] || game_name="game-$TRIGGER_ISSUE_NUMBER"
 
-          screenshots="$(jq -c --arg repository "$TARGET_REPOSITORY" --arg commit "$FINAL_COMMIT" '
-            map("https://raw.githubusercontent.com/\($repository)/\($commit)/project/screenshots/\(.)")
+          project_path="${PROJECT_PATH#./}"
+          project_path="${project_path%/}"
+          screenshots="$(jq -c --arg repository "$TARGET_REPOSITORY" --arg commit "$FINAL_COMMIT" --arg project_path "$project_path" '
+            map("https://raw.githubusercontent.com/\($repository)/\($commit)/\($project_path | if length > 0 then . + "/" else "" end)screenshots/\(.)")
           ' <<<"${SCREENSHOTS_JSON:-[]}")"
           archive="$RUNNER_TEMP/omgithub-dist.zip"
           (cd dist && zip -q -r "$archive" .)
@@ -912,6 +941,7 @@ jobs:
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
+          PROJECT_PATH: ${{ env.PROJECT_PATH }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
         with:
           github-token: ${{ github.token }}
@@ -919,8 +949,9 @@ jobs:
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
+            const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
             const images = screenshots.map((name) => {
-              const path = `project/screenshots/${name}`.split('/').map(encodeURIComponent).join('/');
+              const path = [projectPath, 'screenshots', name].filter(Boolean).join('/').split('/').map(encodeURIComponent).join('/');
               const url = `https://raw.githubusercontent.com/${process.env.TARGET_REPOSITORY}/${process.env.FINAL_COMMIT}/${path}`;
               return `![Final game screenshot: ${name}](${url})`;
             });
