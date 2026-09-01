@@ -42,7 +42,7 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
 ## What the job does
 
 1. Checks out the repository with persisted `GITHUB_TOKEN` credentials.
-2. Copies `agents.template.md` to `project/Agents.md` so the worker receives
+2. Copies `agents.template.md` to `$PROJECT_DIR/Agents.md` so the worker receives
    issue-update, screenshot, and completion-report requirements.
 3. Starts an ephemeral AgentsWeb SSH tunnel.
 4. Starts the OpenCode web UI and publishes it through a temporary public
@@ -82,7 +82,7 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    then marks the comment closed and terminates both tunnels.
 
 After PR creation, OmGithub publishing is opt-in. Set the repository variable
-`OMGHITHUB_PUBLISH_ENABLED` to `true` to ZIP `project/dist`, publish it through
+`OMGHITHUB_PUBLISH_ENABLED` to `true` to ZIP `$PROJECT_DIR/dist`, publish it through
 the token-protected API using GitHub's automatically generated repository token,
 verify the permanent wildcard URL, and include the permanent game and install
 links in the final issue comment. The variable defaults to `false`; if
@@ -129,8 +129,8 @@ command, and later human messages steer the running goal instead of
 pausing it.
 
 Before starting OpenCode, the workflow checks out `agents-dev/skills` into
-`project/.agents`. OpenCode discovers project skills from
-`project/.agents/skills/**/SKILL.md`.
+`$PROJECT_DIR/.agents`. OpenCode discovers project skills from
+`$PROJECT_DIR/.agents/skills/**/SKILL.md`.
 The workflow excludes this nested skills checkout through `.git/info/exclude`
 so it cannot be included in the generated app commit.
 The workflow verifies the discovered skill list through OpenCode's `/skill`
@@ -148,9 +148,11 @@ For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 `model/opencode/muse-spark-1.2-contributor-free` label; if that label is
 unavailable, the skill records that it used the workflow default instead.
 
-The workflow starts OpenCode Web from `$GITHUB_WORKSPACE/project` and uses the
-same directory for OpenCode runs, so both browser-created sessions and generated
-app files stay under the repository's `project/` directory. OpenCode's server
+The workflow reads the repository variable `PROJECT_DIR` as a repository-relative
+project home. It defaults to `./`, while this repository sets it to `./project/`.
+Absolute paths and parent-directory traversal are rejected. OpenCode Web and all
+OpenCode runs use the resolved directory, and skill checkout, Git delivery,
+publishing, and screenshot links use the same project home. OpenCode's server
 also loads project instances per request using the `x-opencode-directory` header.
 A tunneled browser request does not know the runner's `$GITHUB_WORKSPACE`, so
 the UI can appear empty even while `opencode github run` is actively working.
