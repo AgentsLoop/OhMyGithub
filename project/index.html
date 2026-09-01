@@ -16,8 +16,8 @@
   .brand i{width:34px;height:34px;display:grid;place-items:center;background:var(--orange);color:#fff;border-radius:10px;font-style:normal;font-size:20px;transform:rotate(-3deg)}
   .topbar small{opacity:.75;font-size:12px;display:none}
   @media(min-width:700px){.topbar small{display:block}}
-  .game-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:radial-gradient(1200px 600px at 50% -10%, #a8e2f5 0%, #5bb8db 18%, #0e4a62 75%, #071e2a 100%);position:relative;overflow:hidden}
-  .frame{position:relative;width:min(920px,100%);aspect-ratio:920/580;background:linear-gradient(180deg,#fef9e8 0%, #f5e6c2 22%, #efdb9e 40%, #7ec8e3 40.2%, #3fb5d6 62%, #11506a 100%);border-radius:18px;overflow:hidden;box-shadow:0 18px 60px #0008, 0 0 0 1px #ffffff22 inset;border:3px solid #fff3}
+  .game-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:radial-gradient(900px 520px at 50% -8%, #fffdf0 0%, #fef3c7 14%, #a7e8f7 42%, #5ec1e6 68%, #0ea5e9 88%, #fef9c3 100%);position:relative;overflow:hidden}
+  .frame{position:relative;width:min(920px,100%);aspect-ratio:920/580;background:linear-gradient(180deg,#fffcf0 0%, #fef9c3 18%, #fde68a 32%, #f5e6c2 36%, #fde68a 38%, #fffbeb 41%, #d6f0fa 42%, #7ec8e3 55%, #38bdf8 72%, #0ea5e9 100%);border-radius:18px;overflow:hidden;box-shadow:0 18px 60px #00000018, 0 0 0 1px #ffffffcc inset, 0 0 40px #fff8 inset;border:3px solid #fff}
   canvas{display:block;width:100%;height:100%}
   .hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:12px}
   .hud-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
@@ -419,33 +419,94 @@ function draw(){
   // Sand texture
   // Sky/sand split already via frame bg, but draw details
   // Horizontal bands
-  // Beach sand with footprints / speckles
-  ctx.fillStyle='#f5e6c2'
+  // Beach sand — soft pastel with varied texture (addresses critic: flat-shaded placeholder)
+  // base
+  ctx.fillStyle='#fffbeb'
   ctx.fillRect(0,0,W, H*0.41)
-  // sand speckles
-  ctx.fillStyle='#e8c99a'
-  for(let i=0;i<120;i++){
-    const x=(i*137.5)%W, y=(i*47)%(H*0.39)
-    ctx.globalAlpha=0.35; ctx.beginPath(); ctx.arc(x,y, rand(0.6,1.8),0,Math.PI*2); ctx.fill()
+  // warm sand gradient band
+  const sandGrad=ctx.createLinearGradient(0,0,0,H*0.41)
+  sandGrad.addColorStop(0,'#fffef7'); sandGrad.addColorStop(0.35,'#fef3c7'); sandGrad.addColorStop(0.7,'#fde68a'); sandGrad.addColorStop(0.85,'#f5d7a1'); sandGrad.addColorStop(1,'#e8c9a6')
+  ctx.fillStyle=sandGrad; ctx.fillRect(0,0,W, H*0.41)
+  // varied speckles + tiny shell fragments + pebbles
+  for(let i=0;i<160;i++){
+    const x=(i*137.5 + (i%3)*19)%W, y=(i*51 + (i%7)*13)%(H*0.38)
+    const s= (i%5===0? rand(1.2,2.6) : rand(0.7,1.7))
+    ctx.globalAlpha= i%9===0?0.45 : 0.22
+    ctx.fillStyle= i%11===0 ? '#d6b48a' : i%13===0 ? '#fff' : '#d8a97a'
+    ctx.beginPath(); ctx.arc(x,y, s,0,Math.PI*2); ctx.fill()
+  }
+  // subtle footprints / crab tracks
+  ctx.globalAlpha=1; ctx.strokeStyle='#e8c9a6'; ctx.lineWidth=1.1; ctx.globalAlpha=0.28
+  for(let k=0;k<3;k++){
+    const bx=80+k*260 + Math.sin(elapsed*0.2+k)*4, by= H*0.22 + k*28
+    for(let t=0;t<4;t++){
+      ctx.beginPath(); ctx.ellipse(bx+t*14, by+Math.sin(t*0.9)*3, 5,3, 0.2,0,Math.PI*2); ctx.stroke()
+      ctx.beginPath(); ctx.ellipse(bx+t*14+6, by+Math.sin(t*0.9)*3+7, 5,3, 0.2,0,Math.PI*2); ctx.stroke()
+    }
   }
   ctx.globalAlpha=1
-  // shallow tidepool water edge - wavy line
-  ctx.strokeStyle='#ffffffaa'; ctx.lineWidth=2; ctx.beginPath()
-  for(let x=0;x<=W;x+=8){
-    const y= H*0.41 + Math.sin(x*0.015 + elapsed*1.2)*4 + Math.cos(x*0.008 - elapsed*0.7)*3
+  // feathered wet-sand transition band (soft volumetric, not hard cut)
+  const wetGrad=ctx.createLinearGradient(0,H*0.34,0,H*0.45)
+  wetGrad.addColorStop(0,'#ffffff00'); wetGrad.addColorStop(0.28,'#fde68a88'); wetGrad.addColorStop(0.55,'#f5d7a1cc'); wetGrad.addColorStop(0.75,'#c9b896aa'); wetGrad.addColorStop(1,'#a7e8f744')
+  ctx.fillStyle=wetGrad; ctx.fillRect(0,H*0.34,W, H*0.11)
+  // lace foam — multi-layer feathered soft edge (replaces aliased 2px sinusoid)
+  // layer 1: broad feather
+  ctx.fillStyle='#ffffffcc'
+  ctx.beginPath()
+  for(let x=0;x<=W;x+=6){
+    const y= H*0.41 + Math.sin(x*0.012 + elapsed*0.9)*5 + Math.sin(x*0.028 - elapsed*0.6)*3 + Math.cos(x*0.045 + elapsed*1.4)*2
     if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y)
   }
-  ctx.stroke()
-  // water gradient
+  for(let x=W;x>=0;x-=6){
+    const y= H*0.41 + 10 + Math.sin(x*0.012 + elapsed*0.9)*3
+    if(x===W) ctx.lineTo(x,y); else ctx.lineTo(x,y)
+  }
+  ctx.closePath(); ctx.fill()
+  // layer 2: crisp lace crest
+  ctx.fillStyle='#ffffff'
+  ctx.beginPath()
+  for(let x=0;x<=W;x+=5){
+    const y= H*0.41 + Math.sin(x*0.018 + elapsed*1.2)*3.5 + Math.sin(x*0.032 - elapsed*0.8)*2.2
+    if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y)
+  }
+  for(let x=W;x>=0;x-=5){
+    const y= H*0.41 + 5 + Math.sin(x*0.02 + elapsed*1.1)*1.5
+    if(x===W) ctx.lineTo(x,y); else ctx.lineTo(x,y)
+  }
+  ctx.closePath(); ctx.globalAlpha=0.92; ctx.fill(); ctx.globalAlpha=1
+  // layer 3: bubble foam dots along edge
+  for(let x=12;x<W;x+=18){
+    const y= H*0.41 + Math.sin(x*0.015 + elapsed*0.9)*4 + rand(-1.5,1.5)
+    const r= rand(1.2,2.8) + Math.sin(x*0.08 + elapsed*2)*0.6
+    ctx.fillStyle='#ffffffee'; ctx.globalAlpha=0.75
+    ctx.beginPath(); ctx.arc(x,y, r,0,Math.PI*2); ctx.fill()
+  }
+  ctx.globalAlpha=1
+  // water gradient — soft daylight pastel, not deep navy
   const grad=ctx.createLinearGradient(0,H*0.41,0,H)
-  grad.addColorStop(0,'#aee4f5'); grad.addColorStop(0.18,'#7ec8e3'); grad.addColorStop(0.45,'#3da9d6'); grad.addColorStop(1,'#0f3d55')
+  grad.addColorStop(0,'#e0f6ff'); grad.addColorStop(0.12,'#c7edfa'); grad.addColorStop(0.28,'#8ed0ea'); grad.addColorStop(0.52,'#3fb5d6'); grad.addColorStop(0.82,'#1e7fae'); grad.addColorStop(1,'#155a7a')
   ctx.fillStyle=grad; ctx.fillRect(0,H*0.41,W,H*0.59)
 
-  // underwater sand ripples
-  ctx.strokeStyle='#ffffff22'; ctx.lineWidth=1
+  // light caustics sparkles
+  for(let i=0;i<32;i++){
+    const x=(i*97 + elapsed*14)%W
+    const y=H*0.48 + (i*61)%(H*0.46) + Math.sin(i*1.7+ elapsed*1.2)*4
+    const a=0.12 + Math.sin(i*2.3+ elapsed*2)*0.08
+    ctx.globalAlpha=Math.max(0,a); ctx.fillStyle='#ffffff'
+    ctx.beginPath(); ctx.arc(x,y, rand(0.6,1.6),0,Math.PI*2); ctx.fill()
+  }
+  ctx.globalAlpha=1
+  // underwater sand ripples — more layers, varied opacity
+  for(let i=0;i<5;i++){
+    ctx.strokeStyle=i%2===0 ? '#ffffff2e' : '#ffffff18'; ctx.lineWidth= i===2 ? 1.4 : 1
+    const y=H*0.52 + i*28 + Math.sin(elapsed*0.55+i*0.9)*6
+    ctx.beginPath(); for(let x=0;x<W;x+=10){ const yy=y+Math.sin(x*0.018+ i*1.4 + elapsed*0.75)*5 + Math.cos(x*0.01 - elapsed*0.5)*2; if(x===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy)} ctx.stroke()
+  }
+  // subtle light rays from surface
+  ctx.strokeStyle='#ffffff14'; ctx.lineWidth=1
   for(let i=0;i<4;i++){
-    const y=H*0.52 + i*34 + Math.sin(elapsed*0.6+i)*6
-    ctx.beginPath(); for(let x=0;x<W;x+=12){ const yy=y+Math.sin(x*0.02+ i*1.3 + elapsed*0.8)*5; if(x===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy)} ctx.stroke()
+    const x= 120+i*210 + Math.sin(elapsed*0.3+i)*6
+    ctx.beginPath(); ctx.moveTo(x, H*0.41); ctx.lineTo(x+18, H); ctx.stroke()
   }
 
   // rock (safe zone) - draw before other objects but with depth
@@ -589,9 +650,9 @@ function draw(){
   }
   ctx.globalAlpha=1
 
-  // vignette
-  const vg=ctx.createRadialGradient(W/2,H/2, W*0.35, W/2,H/2, W*0.9)
-  vg.addColorStop(0,'#00000000'); vg.addColorStop(1,'#00000018'); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H)
+  // soft daylight vignette — light, not dark arcade
+  const vg=ctx.createRadialGradient(W/2,H*0.42, W*0.28, W/2,H/2, W*0.95)
+  vg.addColorStop(0,'#00000000'); vg.addColorStop(0.72,'#00000000'); vg.addColorStop(1,'#0f2f440c'); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H)
 
   ctx.restore()
 

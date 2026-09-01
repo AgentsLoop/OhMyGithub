@@ -1,0 +1,7 @@
+node_modules/
+.opencode/
+.opencode-*/
+.opencode-web/
+.opencode-ssh/
+.agentsweb/
+.omgithub-runtime/
