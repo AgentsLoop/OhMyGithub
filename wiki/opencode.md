@@ -196,12 +196,9 @@ tracking; acceptance requires a screenshot while the run is active.
 
 ## Runner selection
 
-The reusable workflow uses `ubuntu-latest` (AMD64) by default. Add the exact
-`runner/arm64` label to an issue to select GitHub's `ubuntu-24.04-arm`
-GitHub-hosted runner. The label is passed through `labels_json`, so this works
-for both repository-local workflows and App-generated fallback wrappers. The
-`Android` label takes precedence and selects `ubuntu-latest`, because the
-hardware-accelerated emulator uses KVM and an x86_64 system image.
+The reusable workflow always uses GitHub's `ubuntu-latest` runner. Runner
+selection labels are ignored; this keeps web and Android verification on one
+consistent KVM-capable runner image.
 
 ## Repository settings
 

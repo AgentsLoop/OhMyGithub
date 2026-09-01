@@ -33,8 +33,7 @@ on:
         required: false
 jobs:
   opencode:
-    # Android requires the KVM-capable AMD64 image and overrides runner/arm64.
-    runs-on: ${{ !contains(inputs.labels_json, '"Android"') && contains(inputs.labels_json, '"runner/arm64"') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: write
