@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tide of Doubloons — Pirate Treasure Raid</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Inter:wght@500;700;800&family=Pirata+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="c"></canvas>
+
+    <!-- Top HUD -->
+    <div id="hud">
+      <div class="hud-left">
+        <div class="brand">
+          <span class="brand-mark">⚓</span>
+          <div>
+            <div class="brand-title">TIDE OF DOUBLOONS</div>
+            <div class="brand-sub">Pirate Treasure Raid</div>
+          </div>
+        </div>
+      </div>
+      <div class="hud-center">
+        <div id="objective" class="objective">Find the 3 lost chests, then return to your ship!</div>
+        <div class="chests-row" id="chestsRow">
+          <span class="chest-slot" data-i="0"><span class="slot-icon">◈</span><span class="slot-label">Chest 1</span></span>
+          <span class="chest-slot" data-i="1"><span class="slot-icon">◈</span><span class="slot-label">Chest 2</span></span>
+          <span class="chest-slot" data-i="2"><span class="slot-icon">◈</span><span class="slot-label">Chest 3</span></span>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="counter"><span id="count">0</span><span class="slash">/3</span> <span class="counter-label">collected</span></div>
+        <div id="shipHint" class="ship-hint">Ship at south dock →</div>
+      </div>
+    </div>
+
+    <!-- Controls hint -->
+    <div id="controls">
+      <div class="controls-title">CONTROLS</div>
+      <div class="controls-grid">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑←↓→</kbd> Move</span>
+        <span><kbd>E</kbd> / <kbd>Space</kbd> Pick up</span>
+        <span>🖱 Drag to orbit · Scroll to zoom</span>
+        <span>📱 Joystick drag on mobile</span>
+      </div>
+    </div>
+
+    <!-- Interact prompt -->
+    <div id="prompt" class="hidden">
+      <div class="prompt-card">
+        <div class="prompt-icon">◈</div>
+        <div>
+          <div id="promptText" class="prompt-text">Press E to plunder</div>
+          <div class="prompt-sub">Treasure awaits, captain!</div>
+        </div>
+        <button id="promptBtn" class="prompt-btn">PLUNDER</button>
+      </div>
+    </div>
+
+    <!-- Touch joystick -->
+    <div id="joystick" aria-hidden="true">
+      <div id="stick"></div>
+    </div>
+    <button id="mobileAction" class="mobile-action">⚓ PLUNDER</button>
+
+    <!-- Compass / minimap -->
+    <div id="minimap">
+      <div class="map-title">ISLA DEL ORO</div>
+      <canvas id="map" width="140" height="140"></canvas>
+      <div class="map-legend"><span class="dot chest">◈ chest</span><span class="dot ship">⬢ ship</span></div>
+    </div>
+
+    <!-- Win overlay -->
+    <div id="win" class="hidden">
+      <div class="win-card">
+        <div class="win-badge">★ VICTORY ★</div>
+        <h2>You escaped with the plunder!</h2>
+        <p>All 3 chests returned to your brigantine. The crew sings your name across the Caribbean!</p>
+        <div class="win-stats"><span id="winTime">00:00</span> · <span id="winMoves">0 chests</span></div>
+        <button id="restartBtn" class="primary">RAID AGAIN</button>
+        <button id="continueBtn" class="ghost">Keep exploring</button>
+      </div>
+    </div>
+
+    <!-- Credits button / panel -->
+    <button id="creditsBtn" class="credits-btn" aria-label="Credits">ⓘ Credits</button>
+    <div id="credits" class="hidden">
+      <div class="credits-card">
+        <h3>Credits & Craft</h3>
+        <p><strong>Tide of Doubloons</strong> — all scene geometry is carefully modeled procedural Three.js (no placeholder cubes). Island, ocean, palms, rocks, ship and chests built with Lathe, Extrude, Tube and custom displaced buffers.</p>
+        <p>Built with <a href="https://threejs.org" target="_blank">Three.js</a> r160. Fonts: Pirata One, Cinzel, Inter (Google Fonts). No external 3D model downloads required — 100% procedural so every asset loads offline.</p>
+        <p class="muted">Game design: collect 3 chests hidden across Isla del Oro and haul them back to the brigantine at the southern pier. Particles, camera shake, chest lid animation and gold burst use canvas + mesh tweens.</p>
+        <button id="closeCredits" class="ghost small">Close</button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loader">
+      <div class="loader-card">
+        <div class="loader-title">Hoist the colours!</div>
+        <div class="loader-bar"><div id="loaderFill"></div></div>
+        <div id="loaderText" class="loader-text">Charting Isla del Oro…</div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
