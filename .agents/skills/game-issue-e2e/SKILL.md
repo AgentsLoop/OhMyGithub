@@ -29,14 +29,15 @@ prompt for it. This skill intentionally ends after the workflow publishes the
 OpenCode Web UI session link; it does not watch the workflow to completion or
 claim that the implementation, PR, or public app is finished.
 
-## Repository boundary
+## Repository selection
 
-The default and only issue/workflow repository for this skill is
-`AgentsLoop/OhMyGithub`. Never create an issue, add a label, or trigger a
-workflow in a repository supplied by the caller unless it is that repository
-or an explicitly owned fork confirmed by `gh repo view`. Treat other repository
-URLs as contextual references only, and run the test against
-`AgentsLoop/OhMyGithub`.
+Use the repository supplied by the caller when one is provided. When no
+repository is supplied, default to `AgentsLoop/PlayGround`. Resolve the full
+`OWNER/REPO` with `gh repo view` and confirm the authenticated account can
+administer it before creating issues or triggering Actions. Do not silently
+substitute a different repository. Verify that the target contains the
+`.github/workflows/opencode.yml` workflow; if it does not, stop and report that
+the E2E workflow is unavailable rather than creating a misleading test issue.
 
 The caller's following message is sufficient as the prompt when one is
 provided, even when it is short or does not describe a game. If no prompt is
@@ -76,9 +77,8 @@ skill labels are:
 - `skill/mcp-duckgo` — use when the request explicitly requires DuckDuckGo/MCP
   search support.
 
-These labels are based on the skill labels currently configured in
-`AgentsLoop/OhMyGithub`; refresh them with `gh label list` before each test because
-the set can change. Do not add a skill label merely because a skill exists:
+Refresh the available labels with `gh label list` before each test because the
+set can change. Do not add a skill label merely because a skill exists:
 apply only labels supported by the issue's requirements. If a matching label
 does not exist, continue without inventing or creating one and record that in
 the test report.
@@ -98,12 +98,11 @@ OAuth provider.
    that the working tree is clean and the pushed commit is the branch tip
    before creating the issue or triggering any Action. Do not start the test
    with uncommitted or unpushed changes.
-2. Confirm `gh auth status` and identify the target with
-   `gh repo view AgentsLoop/OhMyGithub`. If the caller supplied another
-   repository URL, do not use it as the issue target; use the default repository
-   above.
-3. Inspect the current labels in `AgentsLoop/OhMyGithub` with
-   `gh label list --repo AgentsLoop/OhMyGithub`, identify the applicable
+2. Confirm `gh auth status`, resolve the target repository (default
+   `AgentsLoop/PlayGround`), and inspect it with `gh repo view <owner>/<repo>`.
+   Confirm `.github/workflows/opencode.yml` exists before continuing.
+3. Inspect the current labels in the target repository with
+   `gh label list --repo <owner>/<repo>`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
    with one `--label` option per applicable label, always including `OpenCode`.
    Add `Goal` by default; this specifically exercises the goal plugin and
@@ -125,10 +124,10 @@ OAuth provider.
    If multiple skills are needed, pass one `--label` option per matching
    label. Record the issue's final labels and verify them with
    `gh issue view <issue-number> --json labels`.
-4. Locate the newest `opencode.yml` run in `AgentsLoop/OhMyGithub` with:
+4. Locate the newest `opencode.yml` run in the target repository with:
 
    ```sh
-   gh run list --repo AgentsLoop/OhMyGithub --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
+   gh run list --repo <owner>/<repo> --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
    ```
 
    Confirm its event is `workflow_dispatch`, its title matches the new issue,
