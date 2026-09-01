@@ -43,3 +43,12 @@ capture `screenshots/final-android-workflow.png` after installing and launching
 the APK, and make that fresh frame the canonical report evidence. Implemented
 in `scripts/verify-android-app.sh` after the todo-list run exposed stale FPS
 screenshots in an otherwise successful report.
+
+## 6. Keep generated Android dependencies self-contained — executed
+
+The todo-list verifier initially failed because the generated manifest theme
+referenced `Theme.Material3.DayNight.NoActionBar` without the Material
+Components artifact. The verifier added
+`com.google.android.material:material:1.12.0` before rebuilding, so future
+issue runs should treat missing theme resources as an app dependency failure,
+not an emulator failure.

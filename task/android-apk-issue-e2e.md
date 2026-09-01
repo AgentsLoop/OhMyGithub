@@ -25,6 +25,11 @@
   [33479867966](https://github.com/AgentsLoop/OhMyGithub/actions/runs/33479867966),
   completed Android verification and published
   [app-release.apk](https://github.com/AgentsLoop/OhMyGithub/releases/download/opencode-logs-33479867966/app-release.apk).
+- Todo-list end-to-end issue: [#191](https://github.com/AgentsLoop/OhMyGithub/issues/191),
+  run [33483973090](https://github.com/AgentsLoop/OhMyGithub/actions/runs/33483973090),
+  built and installed the Compose todo app on the API 35 emulator, captured
+  `final-android-workflow.png`, and published
+  [app-release.apk](https://github.com/AgentsLoop/OhMyGithub/releases/download/opencode-logs-33483973090/app-release.apk).
 
 ## Gotchas
 
@@ -38,3 +43,6 @@
   tracker cannot hide the debugging command.
 - Existing screenshot files can come from an earlier app/run; always capture a
   fresh post-install frame and report that current-run file.
+- A generated Compose app that references `Theme.Material3.*` still needs the
+  Material Components dependency; the verifier caught the missing resource,
+  added `com.google.android.material:material:1.12.0`, and rebuilt successfully.
