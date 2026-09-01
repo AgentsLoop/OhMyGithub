@@ -5,6 +5,7 @@ const REQUIRED_INSTALLATION_PERMISSIONS = {
   actions: 'write',
   contents: 'write',
   issues: 'write',
+  pull_requests: 'write',
   workflows: 'write'
 }
 
@@ -72,6 +73,88 @@ export function verifyWebhookSignature(body, signature, secret) {
   return expected.length === actual.length && timingSafeEqual(expected, actual)
 }
 
+function githubHeaders(token, contentType = false) {
+  return {
+    accept: 'application/vnd.github+json',
+    ...(contentType ? { 'content-type': 'application/json' } : {}),
+    'user-agent': 'OmGithub',
+    'x-github-api-version': '2022-11-28',
+    authorization: `Bearer ${token}`
+  }
+}
+
+export async function createAppPullRequest(request, config, callerToken, requestFetch = fetch) {
+  const api = config.api || API
+  const repository = String(request.repository || '')
+  const [owner, repo, extra] = repository.split('/')
+  const runId = Number(request.run_id)
+  const issueNumber = Number(request.issue_number)
+  const head = String(request.head || '')
+  const base = String(request.base || '')
+  const commit = String(request.commit || '')
+  const title = String(request.title || '').slice(0, 120)
+  const body = String(request.body || '').slice(0, 65000)
+  if (!callerToken || !owner || !repo || extra || !Number.isSafeInteger(runId) || runId <= 0 ||
+      !Number.isSafeInteger(issueNumber) || issueNumber <= 0 || head !== `opencode/${runId}` ||
+      !/^[0-9a-f]{40}$/i.test(commit) || !title || !base) {
+    throw Object.assign(new Error('Invalid pull-request delivery request'), { status: 400 })
+  }
+
+  const runResponse = await requestFetch(`${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs/${runId}`, {
+    headers: githubHeaders(callerToken)
+  })
+  if (!runResponse.ok) throw Object.assign(new Error(`Workflow-run authorization returned ${runResponse.status}`), { status: 403 })
+  const run = await runResponse.json()
+  const runPrefix = `OpenCode #${issueNumber} —`
+  if (run.event !== 'workflow_dispatch' || run.repository?.full_name !== repository ||
+      run.status === 'completed' || run.head_branch !== base ||
+      !String(run.display_title || '').startsWith(runPrefix)) {
+    throw Object.assign(new Error('Caller token does not authorize this workflow delivery'), { status: 403 })
+  }
+
+  const refResponse = await requestFetch(`${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/heads/${encodeURIComponent(head)}`, {
+    headers: githubHeaders(callerToken)
+  })
+  if (!refResponse.ok) throw Object.assign(new Error(`Generated branch lookup returned ${refResponse.status}`), { status: 409 })
+  const ref = await refResponse.json()
+  if (ref.object?.sha !== commit) throw Object.assign(new Error('Generated branch does not match the requested commit'), { status: 409 })
+
+  const jwt = appJwt(config.appId, config.privateKey)
+  const installationResponse = await requestFetch(`${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/installation`, {
+    headers: githubHeaders(jwt)
+  })
+  if (!installationResponse.ok) throw Object.assign(new Error(`App installation lookup returned ${installationResponse.status}`), { status: 503 })
+  const installation = await installationResponse.json()
+  const tokenResponse = await requestFetch(`${api}/app/installations/${installation.id}/access_tokens`, {
+    method: 'POST', headers: githubHeaders(jwt, true)
+  })
+  if (!tokenResponse.ok) throw Object.assign(new Error(`Installation token request returned ${tokenResponse.status}`), { status: 503 })
+  const tokenData = await tokenResponse.json()
+  if (tokenData.permissions?.pull_requests !== 'write') {
+    throw Object.assign(new Error('GitHub App installation lacks pull_requests: write'), { status: 503 })
+  }
+
+  const pullsUrl = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`
+  const createResponse = await requestFetch(pullsUrl, {
+    method: 'POST', headers: githubHeaders(tokenData.token, true),
+    body: JSON.stringify({ title, head, base, body })
+  })
+  if (createResponse.ok) {
+    const pull = await createResponse.json()
+    return { route: 'app-created', pullRequestUrl: pull.html_url, number: pull.number }
+  }
+  if (createResponse.status === 422) {
+    const existingResponse = await requestFetch(`${pullsUrl}?state=open&head=${encodeURIComponent(`${owner}:${head}`)}&base=${encodeURIComponent(base)}`, {
+      headers: githubHeaders(tokenData.token)
+    })
+    if (existingResponse.ok) {
+      const pulls = await existingResponse.json()
+      if (pulls[0]?.html_url) return { route: 'app-existing', pullRequestUrl: pulls[0].html_url, number: pulls[0].number }
+    }
+  }
+  throw Object.assign(new Error(`GitHub App pull-request creation returned ${createResponse.status}`), { status: 502 })
+}
+
 export function repositoryWorkflow(owner = 'AgentsLoop', repo = 'OhMyGithub', ref = 'main') {
   return [
     'name: OpenCode',
@@ -94,6 +177,9 @@ export function repositoryWorkflow(owner = 'AgentsLoop', repo = 'OhMyGithub', re
     '',
     'jobs:',
     '  opencode:',
+    '    concurrency:',
+    '      group: opencode-${{ github.repository_id }}-issue-${{ inputs.issue_number }}',
+    '      cancel-in-progress: true',
     `    uses: ${owner}/${repo}/.github/workflows/opencode-reusable.yml@${ref}`,
     '    with:',
     '      issue_number: ${{ inputs.issue_number }}',
@@ -116,8 +202,9 @@ export function omgRequest(event, payload) {
   if (payload.sender?.type === 'Bot' && !automatedOpenCodeLabel) return null
   const labels = (payload.issue?.labels || []).map(label => typeof label === 'string' ? label : label.name).filter(Boolean)
   const openedWithoutOpenCode = payload.action === 'opened' && !labels.includes('OpenCode')
+  const openedWithOpenCode = payload.action === 'opened' && labels.includes('OpenCode')
   const openCodeAdded = payload.action === 'labeled' && payload.label?.name === 'OpenCode' && labels.includes('OpenCode')
-  if (!openedWithoutOpenCode && !openCodeAdded) return null
+  if (!openedWithoutOpenCode && !openedWithOpenCode && !openCodeAdded) return null
   if (!payload.installation?.id || !payload.repository?.full_name || !payload.issue?.number) return null
   const [owner, repo] = payload.repository.full_name.split('/')
   const parsed = parseIssueRequest(payload.issue, payload.repository.default_branch || 'main')
@@ -141,8 +228,8 @@ export function omgRequest(event, payload) {
   }
 }
 
-async function activeWorkflowRun(request, config, requestFetch) {
-  const path = `/repos/${encodeURIComponent(request.owner)}/${encodeURIComponent(request.repo)}/actions/runs?event=workflow_dispatch&status=in_progress&per_page=100`
+export async function activeWorkflowRun(request, config, requestFetch) {
+  const path = `/repos/${encodeURIComponent(request.owner)}/${encodeURIComponent(request.repo)}/actions/runs?event=workflow_dispatch&per_page=100`
   const response = await requestFetch(`${config.api || API}${path}`, {
     headers: {
       accept: 'application/vnd.github+json',
@@ -154,7 +241,9 @@ async function activeWorkflowRun(request, config, requestFetch) {
   if (!response.ok) throw new Error(`Active workflow lookup returned ${response.status}`)
   const data = await response.json()
   const prefix = `OpenCode #${request.issueNumber} —`
-  return (data.workflow_runs || []).find(run => String(run.name || run.display_title || '').startsWith(prefix)) || null
+  return (data.workflow_runs || []).find(run =>
+    run.status !== 'completed' && String(run.display_title || run.name || '').startsWith(prefix)
+  ) || null
 }
 
 async function dispatchOmgRequestOnce(request, config, requestFetch) {

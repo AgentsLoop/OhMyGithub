@@ -140,7 +140,6 @@ done
   exit 1
 }
 
-touch "$test_dir/response-comment.done"
 OPENCODE_WEB_PORT="$(<"$port_file")" \
 PROJECT_DIR="$test_dir" \
 OPENCODE_WEB_DIR="$test_dir" \

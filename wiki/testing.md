@@ -42,8 +42,16 @@ post-verification rebuild/sign/install/launch checks pass. The run release must
 contain a non-empty `app-release.apk` whose signature verifies and whose direct
 asset link appears in the final live-progress comment. Force a verifier failure
 to confirm the emulator remains reachable through the posted SSH session for
-the five-hour hold; failures outside Android verification must still execute
-the general five-hour SSH hold before cleanup.
+the five-hour hold after the fresh-emulator retry; failures outside Android
+verification must still execute the failure-only five-hour SSH hold before
+cleanup. Successful runs must not enter a hold and must conclude `success`.
+
+The release must contain `verification.json`, `app-release.apk`, and
+`final-android-workflow.png`. Confirm the manifest status is `passed`, its
+required build/sign/install/launch/crash/screenshot states are `passed`, and
+its APK SHA-256 matches a newly downloaded release asset. Todo-style apps must
+also report successful interaction and persistence; other app types record
+those checks as `not_applicable`.
 
 For a manual runner check, add the exact `ssh` label. This intentionally skips
 OpenCode and verification while leaving the runner available for debugging.
@@ -136,7 +144,9 @@ native Goal command and must not register a compatibility `ulw-loop` command.
 The log-release step must copy and upload only non-empty `.log`/`.json` files;
 empty service logs such as `nginx.log` can make GitHub's upload API return
 `400 Bad Content-Length`. The OpenCode response JSON remains required and must
-be non-empty.
+be non-empty. Release publication is transactional: create a draft, download
+and checksum-compare every asset, validate Android evidence, and only then
+publish it.
 
 Focused completion-evidence checks should also confirm that the workflow copies
 `agents.template.md` to `project/Agents.md`, and that a run sends up to two

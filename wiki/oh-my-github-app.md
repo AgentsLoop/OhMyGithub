@@ -9,15 +9,18 @@ The App has repository metadata read access and Issues read/write access. It
 subscribes only to the `Issues` event. Its configured webhook endpoint is
 `https://omgithub.com/api/github/webhooks`.
 
-The App also has Actions and Contents read/write access so it can dispatch or
-bootstrap the repository-local workflow. The dispatched workflow uses the
-repository's own `GITHUB_TOKEN` for branches and pull requests. Existing
-installations must approve newly requested permissions before those capabilities
-become active.
+The App also has Actions, Contents, Pull requests, and Workflows read/write
+access so it can dispatch/bootstrap the repository-local workflow and create
+the generated PR with an installation token. The workflow authenticates its PR
+request to `POST /api/github/pull-requests` with its repository-scoped token;
+the service verifies the workflow run, `opencode/<run-id>` branch, and exact
+commit before minting the installation token. Existing installations must
+approve newly requested permissions before those capabilities become active.
 
 ## Request routing
 
-The webhook service verifies `X-Hub-Signature-256`, ignores unrelated
+The webhook service verifies `X-Hub-Signature-256`, durably claims each
+`X-GitHub-Delivery`, ignores unrelated
 bot-authored and non-`OpenCode`-labeled issue events, and mints an
 installation-scoped token. It
 accepts only issue creation with `OpenCode` already present or addition of that
@@ -30,6 +33,11 @@ execute it.` The resulting bot-authored `OpenCode` label event is accepted as
 the execution trigger, using the issue author for authorization. A human adding
 that exact label later follows the same path.
 
+Webhook redelivery of the same delivery ID is ignored. Before dispatch, the App
+also checks queued and in-progress runs for the issue; the wrapper and reusable
+job enforce an issue-scoped concurrency key so a race still leaves only one
+active run.
+
 An optional issue-title suffix `branch: <existing-branch>` selects the target
 checkout and pull-request base. The App removes that metadata suffix from the
 OpenCode prompt and validates the branch before routing. Invalid or nonexistent
@@ -39,7 +47,7 @@ uses the reusable pipeline revision from that branch; a bootstrapped wrapper
 continues to call the central pipeline.
 
 Before dispatching or bootstrapping a wrapper, the service verifies that the
-installation token has Actions, Contents, Issues, and Workflows
+installation token has Actions, Contents, Issues, Pull requests, and Workflows
 write access. Missing permissions are posted to the triggering issue and the
 request stops before an Actions run is created. If Issues write access itself is
 missing, the service uses its configured notification token when that token can

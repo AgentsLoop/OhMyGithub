@@ -20,7 +20,8 @@ production-mode local check.
 - `GITHUB_TOKEN`: applies the `Goal` and `OpenCode` labels to Site-created
   issues and raises GitHub API limits.
 - `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`:
-  authenticate signed App webhooks and mint installation-scoped tokens.
+  authenticate signed App webhooks, deduplicate delivery IDs, and mint
+  installation-scoped tokens for dispatch and pull-request creation.
 - `OMG_FALLBACK_OWNER`, `OMG_FALLBACK_REPO`, and `OMG_FALLBACK_REF`: identify
   the centralized reusable workflow used by bootstrapped repository wrappers.
 - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: optional GitHub login.
@@ -46,7 +47,7 @@ verifies that the branch exists, and dispatches the workflow from that branch.
 Invalid branches are reported on the issue without starting an Actions run.
 
 Before dispatch or bootstrap, the router checks that the installation token grants
-Actions, Contents, Issues, and Workflows write access. If any are
+Actions, Contents, Issues, Pull requests, and Workflows write access. If any are
 missing, it posts the missing permissions to the triggering issue and does not
 start an Actions run. When Site issue creation cannot apply its required labels,
 it leaves the issue with the same actionable warning instead of starting work.

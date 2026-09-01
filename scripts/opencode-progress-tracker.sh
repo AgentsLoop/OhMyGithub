@@ -158,6 +158,7 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 _Image-context model calls are inferred from image attachments in the session transcript. Message contents and tool details are hidden. Full logs are published in the completion release._"
     if [[ "${PROGRESS_DRY_RUN:-false}" == "true" ]]; then
       printf '%s\n' "$body" > "${PROGRESS_OUTPUT:?PROGRESS_OUTPUT is required in dry-run mode}"
+      break
     else
       gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
         -f body="$body" >/dev/null || true
