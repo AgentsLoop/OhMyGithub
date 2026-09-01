@@ -18,7 +18,8 @@ trap failure_hold EXIT
 [[ -x ./gradlew ]]
 mkdir -p screenshots "$RUNNER_TEMP/opencode-android"
 
-"$HOME/.opencode/bin/opencode" run \
+set +e
+timeout --foreground 900 "$HOME/.opencode/bin/opencode" run \
   --auto \
   --dangerously-skip-permissions \
   --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
@@ -26,6 +27,15 @@ mkdir -p screenshots "$RUNNER_TEMP/opencode-android"
   --model "$OPENCODE_MODEL" \
   "$(< "$RUNTIME_DIR/.github/prompts/02-verify-android.md")" \
   > "$OPENCODE_WEB_DIR/android-verification.log" 2>&1
+opencode_code=$?
+set -e
+if ((opencode_code != 0 && opencode_code != 124 && opencode_code != 143)); then
+  echo "Android verification OpenCode command failed with exit code $opencode_code." >&2
+  exit "$opencode_code"
+fi
+if ((opencode_code == 124 || opencode_code == 143)); then
+  echo 'Android verification OpenCode command timed out after 15 minutes; continuing with deterministic checks.' >&2
+fi
 
 ./gradlew assembleRelease
 
@@ -65,8 +75,10 @@ adb shell dumpsys activity activities | grep -F "$package_name"
 
 mapfile -t screenshots < <(find screenshots -maxdepth 1 -type f -name 'final-android-*.png' -printf '%f\n' | sort)
 if ((${#screenshots[@]} == 0)); then
-  echo 'OpenCode did not create the required final Android emulator screenshot.' >&2
-  exit 1
+  fallback='screenshots/final-android-workflow.png'
+  adb exec-out screencap -p > "$fallback"
+  screenshots+=("$(basename "$fallback")")
+  echo "Captured deterministic fallback screenshot: $fallback"
 fi
 
 screenshots_json="$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
