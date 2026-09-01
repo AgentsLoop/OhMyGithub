@@ -220,6 +220,13 @@ before the issue is opened.
 
 ## Repository settings
 
+Generated work is isolated on `opencode/<run-id>`. The workflow removes the
+selected base branch's inherited upstream, configures ordinary pushes to target
+the current run branch, and installs a runner-local pre-push guard that rejects
+every other remote ref. The GitHub App-created pull request is therefore the
+integration boundary; the implementation session cannot push directly to the
+selected base branch.
+
 - Existing App installations must approve `Pull requests: write` for App-owned
   PR delivery. Allowing Actions to create pull requests remains a fallback.
 - For runner-side SSH access and verification, configure the

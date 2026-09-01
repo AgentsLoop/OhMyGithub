@@ -524,6 +524,28 @@ jobs:
           BASE_BRANCH="$TARGET_REF"
           git fetch origin "$BASE_BRANCH"
           git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
+          # checkout -B inherits the base branch's upstream. Remove it so an
+          # agent's ordinary `git push` can only create/update its run branch.
+          git branch --unset-upstream 2>/dev/null || true
+          git config push.default current
+          git config remote.pushDefault origin
+
+          # OpenCode is allowed to publish only the isolated run branch. The
+          # workflow's later delivery step opens the PR through the GitHub App.
+          pre_push_hook="$(git rev-parse --git-path hooks/pre-push)"
+          install -d "$(dirname "$pre_push_hook")"
+          cat > "$pre_push_hook" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          allowed_ref='refs/heads/$BRANCH_NAME'
+          while read -r _local_ref _local_sha remote_ref _remote_sha; do
+            if [[ "\$remote_ref" != "\$allowed_ref" ]]; then
+              printf 'OpenCode may push only %s; rejected %s.\n' "\$allowed_ref" "\$remote_ref" >&2
+              exit 1
+            fi
+          done
+          EOF
+          chmod +x "$pre_push_hook"
 
       - name: Resolve OpenCode model and skill labels
         id: opencode_labels
