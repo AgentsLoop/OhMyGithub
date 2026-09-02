@@ -41,6 +41,9 @@ jobs:
       pages: write
       pull-requests: write
       issues: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages_deploy.outputs.page_url }}
     env:
       SSH_NAME: opencode-issue-${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
       SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
