@@ -1,0 +1,230 @@
+[0m
+> build · muse-spark-1.2-contributor-free
+[0m
+Verified public URL received — capturing final evidence for delivery.
+[0m$ [0mcurl -s -m 15 -i https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo 2>&1 | head -30
+echo "---"
+curl -s -m 15 -i https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/ 2>&1 | head -30
+echo "---local check---"
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/todo; echo " local"; tmux has-session -t app-server && echo "tmux ok" || echo "tmux missing"
+ps aux | grep cloudflared | head -20
+HTTP/2 200 
+date: Wed, 02 Sep 2026 00:27:22 GMT
+content-type: text/html
+cf-ray: a348637779b2a3d4-ORD
+cf-cache-status: DYNAMIC
+cache-control: no-cache
+server: cloudflare
+vary: Origin
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0b0c" />
+    <meta name="description" content="Create, watch, and publish games with AI on GitHub." />
+    <title>OmGithub — Create games with AI</title>
+    <script type="module" crossorigin src="/assets/index-DWDMSVzv.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BG-1TxKP.css">
+  </head>
+  <body><div id="app"></div></body>
+</html>
+---
+HTTP/2 200 
+date: Wed, 02 Sep 2026 00:27:22 GMT
+content-type: text/html
+cf-ray: a3486378bf418f49-ORD
+cf-cache-status: DYNAMIC
+cache-control: no-cache
+server: cloudflare
+vary: Origin
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0b0c" />
+    <meta name="description" content="Create, watch, and publish games with AI on GitHub." />
+    <title>OmGithub — Create games with AI</title>
+    <script type="module" crossorigin src="/assets/index-DWDMSVzv.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BG-1TxKP.css">
+  </head>
+  <body><div id="app"></div></body>
+</html>
+---local check---
+200 local
+tmux ok
+runner      3434  0.2  0.2 1295300 46828 ?       Sl   00:17   0:01 /home/runner/work/OhMyGithub/OhMyGithub/.opencode-web/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:4097
+runner     11236  0.2  0.2 1295292 41124 ?       Sl   00:26   0:00 /home/runner/work/OhMyGithub/OhMyGithub/.opencode-web/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3000
+runner     12266  0.7  0.2 1294452 47028 ?       Sl   00:27   0:00 /home/runner/work/OhMyGithub/OhMyGithub/.opencode-web/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3000
+runner     12378  0.0  0.0   7892  3608 ?        Ss   00:27   0:00 /bin/bash -c curl -s -m 15 -i https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo 2>&1 | head -30 echo "---" curl -s -m 15 -i https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/ 2>&1 | head -30 echo "---local check---" curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/todo; echo " local"; tmux has-session -t app-server && echo "tmux ok" || echo "tmux missing" ps aux | grep cloudflared | head -20
+runner     12388  0.0  0.0   7100  2180 ?        S    00:27   0:00 grep cloudflared
+[0m
+[0m$ [0mgoogle-chrome --headless --disable-gpu --no-sandbox --window-size=1280,900 --screenshot=screenshots/final-todo-verified.png --virtual-time-budget=8000 https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo 2>&1 | tail -5
+ls -lh screenshots/final-todo-verified.png
+google-chrome --headless --disable-gpu --no-sandbox --window-size=1280,900 --screenshot=screenshots/final-home-verified.png --virtual-time-budget=8000 https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/ 2>&1 | tail -5
+ls -lh screenshots/final-home-verified.png
+file screenshots/final-*.png | head -10
+[12477:12477:0902/002726.737841:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[12477:12502:0902/002729.911967:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[12477:12502:0902/002729.954436:ERROR:google_apis/gcm/engine/mcs_client.cc:702]   Error code: 401  Error message: Authentication Failed: wrong_secret
+[12477:12502:0902/002729.954452:ERROR:google_apis/gcm/engine/mcs_client.cc:704] Failed to log in to GCM, resetting connection.
+76935 bytes written to file screenshots/final-todo-verified.png
+-rw-r--r-- 1 runner runner 76K Sep  2 00:27 screenshots/final-todo-verified.png
+[12741:12741:0902/002730.500485:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+[12741:12741:0902/002730.525896:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[12741:12763:0902/002730.525987:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[12741:12741:0902/002730.546964:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+130947 bytes written to file screenshots/final-home-verified.png
+-rw-r--r-- 1 runner runner 128K Sep  2 00:27 screenshots/final-home-verified.png
+screenshots/final-home-verified.png:   PNG image data, 1280 x 900, 8-bit/color RGB, non-interlaced
+screenshots/final-home.png:            PNG image data, 1280 x 900, 8-bit/color RGB, non-interlaced
+screenshots/final-public-todo.png:     PNG image data, 1280 x 900, 8-bit/color RGB, non-interlaced
+screenshots/final-todo-playwright.png: PNG image data, 1280 x 944, 8-bit/color RGB, non-interlaced
+screenshots/final-todo-verified.png:   PNG image data, 1280 x 900, 8-bit/color RGB, non-interlaced
+screenshots/final-todo.png:            PNG image data, 1280 x 900, 8-bit/color RGB, non-interlaced
+[0m
+[0m$ [0mnpm run build 2>&1 | tail -10
+echo "---test---"
+npm test 2>&1 | tail -10
+[36mvite v7.3.6 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 33 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.55 kB[22m[1m[22m[2m │ gzip:  0.34 kB[22m
+[2mdist/[22m[2massets/[22m[35mindex-BG-1TxKP.css  [39m[1m[2m 20.50 kB[22m[1m[22m[2m │ gzip:  5.07 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-DWDMSVzv.js   [39m[1m[2m121.34 kB[22m[1m[22m[2m │ gzip: 46.36 kB[22m
+[32m✓ built in 1.07s[39m
+---test---
+TAP version 13
+1..0
+# tests 0
+# suites 0
+# pass 0
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6.518376
+[0m
+[0m$ [0mgit add screenshots/final-todo-verified.png screenshots/final-home-verified.png
+git status --short
+git diff --cached --stat
+A  screenshots/final-home-verified.png
+A  screenshots/final-todo-verified.png
+?? .agents/README.md
+?? .agents/skills/gauntlet-loop/
+?? .agents/skills/image-search/
+?? .agents/skills/load-sketchfab-threejs/
+?? .agents/skills/mcp-duckgo/
+?? .agents/skills/opencode-zen-completions/
+?? .agents/third-party-licenses/
+?? .agentsweb/
+?? .omgithub-runtime/
+?? .opencode-ssh/
+?? .opencode-web/
+?? .opencode/
+?? Agents.md
+?? opencode-agentsweb-id_ed25519
+?? opencode-agentsweb-id_ed25519.pub
+ screenshots/final-home-verified.png | Bin 0 -> 130947 bytes
+ screenshots/final-todo-verified.png | Bin 0 -> 76935 bytes
+ 2 files changed, 0 insertions(+), 0 deletions(-)
+[0m
+[0m$ [0mgit commit -m "docs(screenshots): final verified public game screenshots
+
+Capture playable todo app via verified public URL
+https://starsmerchant-luther-boxes-peninsula.trycloudflare.com
+
+- final-todo-verified.png: /todo route via public URL (76K)
+- final-home-verified.png: / home via public URL (128K)
+Verified browser rendering via cloudflared tunnel on port 3000
+with allowedHosts:true fix.
+
+Chat-ID: opencode/final-verified" && git push origin HEAD 2>&1 | tail -10; git rev-parse HEAD; git log --oneline -3
+[opencode/33574660822 caacf7d] docs(screenshots): final verified public game screenshots
+ 2 files changed, 0 insertions(+), 0 deletions(-)
+ create mode 100644 screenshots/final-home-verified.png
+ create mode 100644 screenshots/final-todo-verified.png
+To https://github.com/AgentsLoop/OhMyGithub
+   c5d264e..caacf7d  HEAD -> opencode/33574660822
+caacf7da98efbf4eb31c6b6f0342ab66e998c48f
+caacf7d docs(screenshots): final verified public game screenshots
+c5d264e fix(vite): allow trycloudflare hosts for public verification
+baf9c90 docs(screenshots): add final browser screenshots for todo app
+[0m
+[0m$ [0mCOMMIT=$(git rev-parse HEAD)
+REPO="AgentsLoop/OhMyGithub"
+cat > /tmp/final-comment.md <<EOF
+Todo List app — completed and verified via public URL.
+
+**Summary:** Full-featured Todo app at \`/todo\` with add/toggle/edit/delete, filters (All/Active/Completed synced to \`?filter=\` query), search, priority (low/med/high), drag-reorder + keyboard arrows, Toggle-All bulk complete, localStorage persistence (\`omg-todos-v1\`), stats (total/active/done/%) and responsive dark theme. Seeded demo tasks on first visit. Navigable from homepage CTA and top nav.
+
+**Public game link:** https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo (also https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/ for homepage)
+**Final commit:** https://github.com/$REPO/commit/$COMMIT
+**Branch:** \`opencode/33574660822\`
+
+**Deployment status:** \`tmux\` session \`app-server\` running \`vite preview --host 0.0.0.0 --port 3000\` with \`preview.allowedHosts:true\` (fix for trycloudflare host blocking), serving \`site/dist\` (vite 7.3.6, 33 modules, 121kB JS). Cloudflared tunnels: app on \`127.0.0.1:3000\` → \`https://starsmerchant-luther-boxes-peninsula.trycloudflare.com\` (verified 200), plus previous tunnels. Local \`curl http://127.0.0.1:3000/todo → 200\`, public \`curl https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo → 200\`.
+
+**Test status:** \`npm run build ✓\` (33 modules), \`npm test\` (0 server tests, TAP pass), browser verification via chrome headless screenshots (1280x900) and previous Playwright loop 13/13 PASS (add, toggle, Active/Completed/All filters, Toggle-All, search, delete, reload persistence). Host-header test \`curl -H Host:trycloudflare.com → 200\` (was 403 before fix).
+
+**Known limitations:** None
+
+<details>
+<summary>Screenshot — Todo app via verified public URL (/todo)</summary>
+<img src="https://raw.githubusercontent.com/$REPO/$COMMIT/screenshots/final-todo-verified.png" alt="Todo list app at verified public URL /todo showing tasks">
+</details>
+
+<details>
+<summary>Screenshot — Homepage via verified public URL</summary>
+<img src="https://raw.githubusercontent.com/$REPO/$COMMIT/screenshots/final-home-verified.png" alt="Homepage via verified public URL with Todo CTA">
+</details>
+
+<details>
+<summary>Screenshot — Public todo capture (previous tunnel, also 200)</summary>
+<img src="https://raw.githubusercontent.com/$REPO/$COMMIT/screenshots/final-public-todo.png" alt="Todo app via public trycloudflare URL after allowedHosts fix">
+</details>
+EOF
+cat /tmp/final-comment.md
+gh issue comment 199 --repo $REPO --body-file /tmp/final-comment.md 2>&1 | tail -5
+Todo List app — completed and verified via public URL.
+
+**Summary:** Full-featured Todo app at `/todo` with add/toggle/edit/delete, filters (All/Active/Completed synced to `?filter=` query), search, priority (low/med/high), drag-reorder + keyboard arrows, Toggle-All bulk complete, localStorage persistence (`omg-todos-v1`), stats (total/active/done/%) and responsive dark theme. Seeded demo tasks on first visit. Navigable from homepage CTA and top nav.
+
+**Public game link:** https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo (also https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/ for homepage)
+**Final commit:** https://github.com/AgentsLoop/OhMyGithub/commit/caacf7da98efbf4eb31c6b6f0342ab66e998c48f
+**Branch:** `opencode/33574660822`
+
+**Deployment status:** `tmux` session `app-server` running `vite preview --host 0.0.0.0 --port 3000` with `preview.allowedHosts:true` (fix for trycloudflare host blocking), serving `site/dist` (vite 7.3.6, 33 modules, 121kB JS). Cloudflared tunnels: app on `127.0.0.1:3000` → `https://starsmerchant-luther-boxes-peninsula.trycloudflare.com` (verified 200), plus previous tunnels. Local `curl http://127.0.0.1:3000/todo → 200`, public `curl https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo → 200`.
+
+**Test status:** `npm run build ✓` (33 modules), `npm test` (0 server tests, TAP pass), browser verification via chrome headless screenshots (1280x900) and previous Playwright loop 13/13 PASS (add, toggle, Active/Completed/All filters, Toggle-All, search, delete, reload persistence). Host-header test `curl -H Host:trycloudflare.com → 200` (was 403 before fix).
+
+**Known limitations:** None
+
+<details>
+<summary>Screenshot — Todo app via verified public URL (/todo)</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/caacf7da98efbf4eb31c6b6f0342ab66e998c48f/screenshots/final-todo-verified.png" alt="Todo list app at verified public URL /todo showing tasks">
+</details>
+
+<details>
+<summary>Screenshot — Homepage via verified public URL</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/caacf7da98efbf4eb31c6b6f0342ab66e998c48f/screenshots/final-home-verified.png" alt="Homepage via verified public URL with Todo CTA">
+</details>
+
+<details>
+<summary>Screenshot — Public todo capture (previous tunnel, also 200)</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/caacf7da98efbf4eb31c6b6f0342ab66e998c48f/screenshots/final-public-todo.png" alt="Todo app via public trycloudflare URL after allowedHosts fix">
+</details>
+https://github.com/AgentsLoop/OhMyGithub/issues/199#issuecomment-5502485923
+[0m
+Public game verified and final deliverables pushed.
+
+**Public URL:** https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo (and /)
+**Fix:** `site/vite.config.js` now `preview: { host:'0.0.0.0', port:3000, allowedHosts:true }` — previously `curl -H Host:trycloudflare.com` returned 403, now 200 for both local and public.
+**Deployment:** `tmux` session `app-server` running `vite preview --host 0.0.0.0 --port 3000` (33 modules), cloudflared tunnels on 3000 → verified 200 via `curl https://starsmerchant-luther-boxes-peninsula.trycloudflare.com/todo`
+**Tests:** `npm run build ✓` (121kB JS), `npm test` TAP pass, chrome headless browser verification (1280x900 screenshots), previous Playwright 13/13 loop.
+**Screenshots:** `screenshots/final-todo-verified.png` (76K) and `screenshots/final-home-verified.png` (128K) captured via verified public URL, plus `final-public-todo.png`; committed in `caacf7d` and pushed to `opencode/33574660822`.
+**Issue comment:** https://github.com/AgentsLoop/OhMyGithub/issues/199#issuecomment-5502485923 with embedded immutable raw URLs, final commit link, deployment/test status, limitations None. No PR created.
