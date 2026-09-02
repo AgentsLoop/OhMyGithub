@@ -13,11 +13,15 @@ do not use comments, edits, or the word “tag” as a trigger. The App dispatch
 the workflow once when an issue is opened with the label or when `OpenCode` is
 added, including when the App adds it after issue creation.
 
-When the caller explicitly requests a custom branch, append
-` branch: <existing-branch>` to the issue title. Treat that suffix as routing
-metadata rather than part of the caller's implementation prompt.
-Verify the branch exists before creating the issue. Otherwise omit the directive
-and use the repository default branch.
+When the target repository is the current checkout, use the current checked-out
+branch for the test unless the caller explicitly requests a different existing
+branch. Derive it with `git branch --show-current`; do not reuse a branch name
+from an earlier E2E run. Append ` branch: <current-branch>` to the issue title
+and treat that suffix as routing metadata rather than part of the caller's
+implementation prompt. Verify that exact branch exists on the target remote
+before creating the issue. If the checkout is detached, the branch is empty, or
+the remote branch is missing, stop and report the routing prerequisite instead
+of silently falling back to the default branch.
 
 Use this skill when the user asks to start the issue-triggered workflow with a
 request or create an issue. Treat the user's next message after invoking this
@@ -94,11 +98,14 @@ OAuth provider.
 
 ## Procedure
 
-1. Before starting the test, inspect the working tree with `git status --short`.
-   Stage and commit all current changes, then push the current branch. Verify
-   that the working tree is clean and the pushed commit is the branch tip
-   before creating the issue or triggering any Action. Do not start the test
-   with uncommitted or unpushed changes.
+1. Before starting the test, inspect the working tree with `git status --short`
+   and resolve `current_branch=$(git branch --show-current)`. For a test of
+   this checkout, use `current_branch` as the issue-title branch directive and
+   verify it with `git ls-remote --exit-code origin
+   "refs/heads/$current_branch"`. Stage and commit all current changes, then
+   push the current branch. Verify that the working tree is clean and the
+   pushed commit is the branch tip before creating the issue or triggering any
+   Action. Do not start the test with uncommitted or unpushed changes.
 2. Confirm `gh auth status`, resolve the target repository (default
    `AgentsLoop/PlayGround`), and inspect it with `gh repo view <owner>/<repo>`.
    Check whether `.github/workflows/opencode.yml` exists. If it is missing,
