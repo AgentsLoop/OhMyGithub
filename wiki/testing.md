@@ -64,10 +64,9 @@ then remove it after the runner session closes.
 The manual SSH smoke test succeeded entirely on the Ubuntu runner: it installed
 the API 35 emulator and Google APIs image, created an AVD, built `app-debug.apk`,
 installed it with ADB, launched the app, interacted with it, and captured launch
-and interaction PNGs with `adb exec-out screencap -p`. Durable evidence is the
-[launch screenshot](../screenshots/final-android-manual-launch.png),
-[interaction screenshot](../screenshots/final-android-manual-interaction.png),
-and commit `a40d95c`.
+and interaction PNGs with `adb exec-out screencap -p`. Durable evidence is stored
+in the run-specific OpenCode release alongside `verification.json` and the
+signed APK; sample app screenshots are not checked into this repository.
 
 The repeatable command sequence is:
 
