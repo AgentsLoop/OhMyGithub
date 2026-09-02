@@ -706,6 +706,7 @@ jobs:
             "repos/$REPOSITORY/issues/$ISSUE_NUMBER/comments" \
             -f body='🟡 **OpenCode progress (live)**' --jq '.id')"
           [[ -n "$RESPONSE_COMMENT_ID" ]]
+          echo "comment_id=$RESPONSE_COMMENT_ID" >> "$GITHUB_OUTPUT"
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
           install -m 700 "$RUNTIME_DIR/scripts/opencode-progress-tracker.sh" "$TRACKER"
           # The tracker is intentionally independent of the step shell so it can poll
@@ -913,6 +914,7 @@ jobs:
           SCREENSHOTS_JSON: ${{ steps.web_verification.outputs.screenshots-json }}
           PROJECT_PATH: ${{ env.PROJECT_PATH }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
+          LIVE_PROGRESS_COMMENT_ID: ${{ steps.response_comment.outputs.comment_id }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -945,13 +947,9 @@ jobs:
               issue_number: number,
               per_page: 100
             });
-            const liveComment = comments.find((comment) =>
-              typeof comment.body === 'string' &&
-              comment.body.includes('🟡 **OpenCode progress (live)**')
-            );
-            if (!liveComment) {
-              throw new Error('Could not find the first OpenCode live-progress comment to update.');
-            }
+            const liveCommentId = Number(process.env.LIVE_PROGRESS_COMMENT_ID);
+            const liveComment = comments.find((comment) => comment.id === liveCommentId);
+            if (!liveComment) throw new Error(`Could not find this run's OpenCode live-progress comment: ${liveCommentId}`);
             await github.rest.issues.updateComment({
               owner: process.env.TARGET_OWNER,
               repo: process.env.TARGET_REPO,
@@ -971,6 +969,7 @@ jobs:
           APK_NAME: ${{ steps.android_verification.outputs.apk-name }}
           RELEASE_ASSETS_JSON: ${{ steps.opencode_release.outputs.assets_json }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
+          LIVE_PROGRESS_COMMENT_ID: ${{ steps.response_comment.outputs.comment_id }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -998,9 +997,9 @@ jobs:
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, per_page: 100
             });
-            const liveComment = comments.find((comment) =>
-              typeof comment.body === 'string' && comment.body.includes('🟡 **OpenCode progress (live)**'));
-            if (!liveComment) throw new Error('Could not find the first OpenCode live-progress comment to update.');
+            const liveCommentId = Number(process.env.LIVE_PROGRESS_COMMENT_ID);
+            const liveComment = comments.find((comment) => comment.id === liveCommentId);
+            if (!liveComment) throw new Error(`Could not find this run's OpenCode live-progress comment: ${liveCommentId}`);
             await github.rest.issues.updateComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               comment_id: liveComment.id, body: `${liveComment.body.trim()}\n\n${body}`
