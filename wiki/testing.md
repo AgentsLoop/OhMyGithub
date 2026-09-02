@@ -17,6 +17,12 @@ these checkpoints in order:
 5. `Mark SSH session closed` and `Clean up AgentsWeb SSH session` succeed.
 6. The expected branch and pull request exist.
 
+The verification loop must confirm a browser entrypoint before public-app and
+Pages checks: either `$PROJECT_DIR/index.html` or `$PROJECT_DIR/dist/index.html`
+must exist, and remediation retries must repeat that check. Static root
+`index.html` apps are copied to a temporary Pages directory; built
+`dist/index.html` apps are published directly.
+
 When `AGENTSWEB_SSH_PUBLIC_KEY` is missing, the SSH session and SSH-based
 verification steps must be skipped. OpenCode Web, the Cloudflare session URL,
 and the browser-based workflow path must still run; the access comment should
