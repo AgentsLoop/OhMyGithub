@@ -121,9 +121,13 @@ export function omgRequest(event, payload) {
   const automatedOpenCodeLabel = payload.sender?.type === 'Bot' && payload.action === 'labeled' && payload.label?.name === 'OpenCode'
   if (payload.sender?.type === 'Bot' && !automatedOpenCodeLabel) return null
   const labels = (payload.issue?.labels || []).map(label => typeof label === 'string' ? label : label.name).filter(Boolean)
-  const openedWithoutOpenCode = payload.action === 'opened' && !labels.includes('OpenCode')
+  const testGhRequest = labels.includes('test-gh')
+  const openedWithoutExecutionLabel = payload.action === 'opened' && !labels.includes('OpenCode') && !testGhRequest
+  const openedWithOpenCode = payload.action === 'opened' && labels.includes('OpenCode')
+  const openedWithTestGh = payload.action === 'opened' && testGhRequest
   const openCodeAdded = payload.action === 'labeled' && payload.label?.name === 'OpenCode' && labels.includes('OpenCode')
-  if (!openedWithoutOpenCode && !openCodeAdded) return null
+  const testGhAdded = payload.action === 'labeled' && payload.label?.name === 'test-gh' && testGhRequest
+  if (!openedWithoutExecutionLabel && !openedWithOpenCode && !openedWithTestGh && !openCodeAdded && !testGhAdded) return null
   if (!payload.installation?.id || !payload.repository?.full_name || !payload.issue?.number) return null
   const [owner, repo] = payload.repository.full_name.split('/')
   const parsed = parseIssueRequest(payload.issue, payload.repository.default_branch || 'main')
@@ -143,7 +147,8 @@ export function omgRequest(event, payload) {
     deliveryAction: payload.action,
     sender: automatedOpenCodeLabel ? payload.issue?.user?.login || '' : payload.sender?.login || '',
     labels,
-    missingOpenCodeLabel: openedWithoutOpenCode
+    testGhRequest,
+    missingOpenCodeLabel: openedWithoutExecutionLabel
   }
 }
 

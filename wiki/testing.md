@@ -35,6 +35,15 @@ actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.ym
 git diff --check
 ```
 
+For a direct GitHub Pages smoke test, apply the `test-gh` label to an issue.
+The App routes an issue opened with `test-gh`, or an existing issue when that
+label is added, without requiring `OpenCode`. The workflow skips OpenCode,
+creates and pushes a unique `test-gh/hello-world-*` branch containing a static
+Hello World page, and runs the Pages publication/deployment path strictly. A
+successful run comments with the source branch, commit, and published URL.
+The test path does not honor `PAGES_PUBLISH_ENABLED=false` and does not keep a
+temporary worker alive for five hours.
+
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.

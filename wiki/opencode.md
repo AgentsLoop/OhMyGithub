@@ -22,6 +22,12 @@ When a human opens an issue without `OpenCode`, the App posts a reminder to add
 the label and stops; it does not dispatch a workflow. Adding `OpenCode` later
 starts the normal App-dispatched flow.
 
+The `test-gh` label is a deliberate Pages-only smoke-test exception. An issue
+opened with `test-gh`, or an existing issue when `test-gh` is added, dispatches
+the same workflow without running OpenCode. It creates a unique
+`test-gh/hello-world-*` branch, commits a static Hello World page, and exercises
+the GitHub Pages publication and deployment steps.
+
 An optional issue-title suffix in the exact form `branch: <existing-branch>`
 selects the checkout and pull-request base. The App removes that suffix from the
 OpenCode request and validates the branch before dispatching the thin workflow

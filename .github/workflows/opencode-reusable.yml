@@ -69,6 +69,7 @@ jobs:
       AGENTSWEB_SSH_ENABLED: ${{ secrets.AGENTSWEB_SSH_PUBLIC_KEY != '' }}
       TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number }}
       COMMENT_BODY: ${{ inputs.request }}
+      TEST_GH_REQUEST: ${{ contains(inputs.labels_json, '"test-gh"') }}
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
       PAGES_PUBLISH_ENABLED: ${{ vars.PAGES_PUBLISH_ENABLED || 'true' }}
@@ -88,6 +89,7 @@ jobs:
           persist-credentials: true
 
       - name: Checkout centralized OMG runtime
+        if: env.TEST_GH_REQUEST != 'true'
         uses: actions/checkout@v6
         with:
           repository: AgentsLoop/OhMyGithub
@@ -98,6 +100,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout AgentsWeb tunnel client
+        if: env.TEST_GH_REQUEST != 'true'
         uses: actions/checkout@v6
         with:
           repository: agents-dev/agent-workspace
@@ -121,6 +124,7 @@ jobs:
           printf 'PROJECT_DIR=%s\n' "$GITHUB_WORKSPACE/${project_path#./}" >> "$GITHUB_ENV"
 
       - name: Checkout shared OpenCode skills
+        if: env.TEST_GH_REQUEST != 'true'
         uses: actions/checkout@v6
         with:
           repository: agents-dev/skills
@@ -129,6 +133,7 @@ jobs:
           persist-credentials: false
 
       - name: Exclude shared skills from generated changes
+        if: env.TEST_GH_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -145,6 +150,7 @@ jobs:
           fi
 
       - name: Install worker instructions
+        if: env.TEST_GH_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -153,6 +159,7 @@ jobs:
           cmp --silent "$RUNTIME_DIR/agents.template.md" "$PROJECT_DIR/Agents.md"
 
       - name: Sync OpenCode labels
+        if: env.TEST_GH_REQUEST != 'true'
         uses: actions/github-script@v7
         env:
           OPENCODE_MODEL: opencode/muse-spark-1.2-contributor-free
@@ -196,6 +203,7 @@ jobs:
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
               { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
+              { name: 'test-gh', color: '1D76DB', description: 'Bypass OpenCode and test GitHub Pages publication' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',
@@ -283,7 +291,7 @@ jobs:
 
       - name: Start AgentsWeb SSH session
         id: agentsweb
-        if: env.AGENTSWEB_SSH_ENABLED == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -328,6 +336,7 @@ jobs:
 
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
+        if: env.TEST_GH_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -451,6 +460,7 @@ jobs:
           printf 'url=%s\n' "$WEB_URL" >> "$GITHUB_OUTPUT"
 
       - name: Verify shared skills are visible to OpenCode
+        if: env.TEST_GH_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -470,6 +480,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
       - name: Create OpenCode branch
+        if: env.TEST_GH_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -477,8 +488,45 @@ jobs:
           git fetch origin "$BASE_BRANCH"
           git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
 
+      - name: Create test-gh Hello World branch
+        if: env.TEST_GH_REQUEST == 'true'
+        id: test_delivery
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          BASE_BRANCH="$TARGET_REF"
+          git fetch origin "$BASE_BRANCH"
+          TEST_BRANCH_NAME="test-gh/hello-world-${GITHUB_RUN_ID}-$(openssl rand -hex 8)"
+          git checkout -B "$TEST_BRANCH_NAME" "origin/$BASE_BRANCH"
+          printf 'BRANCH_NAME=%s\n' "$TEST_BRANCH_NAME" >> "$GITHUB_ENV"
+          mkdir -p dist
+          cat > dist/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>Hello World — GitHub Pages smoke test</title>
+            </head>
+            <body>
+              <main>
+                <h1>Hello World</h1>
+                <p>GitHub Pages publication smoke test passed.</p>
+              </main>
+            </body>
+          </html>
+          EOF
+          git add dist/index.html
+          git commit -m "Test GitHub Pages publication with Hello World"
+          git push --set-upstream origin "$TEST_BRANCH_NAME"
+          FINAL_COMMIT="$(git rev-parse HEAD)"
+          printf 'commit=%s\nbranch=%s\n' "$FINAL_COMMIT" "$TEST_BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "Created and pushed test branch $TEST_BRANCH_NAME at $FINAL_COMMIT"
+
       - name: Resolve OpenCode model and skill labels
         id: opencode_labels
+        if: env.TEST_GH_REQUEST != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -507,6 +555,7 @@ jobs:
 
       - name: Run OpenCode and locate its web session
         id: opencode_run
+        if: env.TEST_GH_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
@@ -573,7 +622,7 @@ jobs:
 
       - name: Verify live sessions through SSH
         id: verify_sessions
-        if: env.AGENTSWEB_SSH_ENABLED == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -598,6 +647,7 @@ jobs:
 
       - name: Post temporary access details
         id: access_comment
+        if: env.TEST_GH_REQUEST != 'true'
         uses: actions/github-script@v7
         env:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
@@ -633,6 +683,7 @@ jobs:
 
       - name: Start live OpenCode response comment
         id: response_comment
+        if: env.TEST_GH_REQUEST != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -654,7 +705,7 @@ jobs:
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
 
       - name: Verify app with second OpenCode prompt
-        if: env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -678,7 +729,7 @@ jobs:
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
       - name: Expose verified app
-        if: env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: app_tunnel
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
@@ -755,7 +806,7 @@ jobs:
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
 
       - name: Publish worker completion report
-        if: env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -773,7 +824,7 @@ jobs:
           touch "$OPENCODE_WEB_DIR/response-comment.done"
 
       - name: Request and verify final screenshots
-        if: env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: final_evidence
         shell: bash
         run: |
@@ -812,7 +863,7 @@ jobs:
           printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
 
       - name: Create pull request
-        if: env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: delivery
         shell: bash
         run: |
@@ -847,13 +898,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Prepare GitHub Pages result
-        if: env.VALIDATION_ENABLED == 'true' && env.PAGES_PUBLISH_ENABLED == 'true'
-        continue-on-error: true
+        if: env.TEST_GH_REQUEST == 'true' || (env.VALIDATION_ENABLED == 'true' && env.PAGES_PUBLISH_ENABLED == 'true')
+        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
         id: pages_meta
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
-          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
+          FINAL_COMMIT: ${{ steps.delivery.outputs.commit || steps.test_delivery.outputs.commit }}
         run: |
           set -euo pipefail
           [[ -f dist/index.html ]]
@@ -887,7 +938,7 @@ jobs:
       - name: Publish branch result to GitHub Pages
         if: steps.pages_meta.outcome == 'success'
         id: pages_publish
-        continue-on-error: true
+        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ github.token }}
@@ -895,12 +946,12 @@ jobs:
           publish_dir: ${{ steps.pages_meta.outputs.publish_dir }}
           destination_dir: ${{ steps.pages_meta.outputs.destination }}
           keep_files: true
-          commit_message: "Publish ${{ env.BRANCH_NAME }} at ${{ steps.delivery.outputs.commit }}"
+          commit_message: "Publish ${{ env.BRANCH_NAME }} at ${{ steps.delivery.outputs.commit || steps.test_delivery.outputs.commit }}"
 
       - name: Assemble GitHub Pages site
         if: steps.pages_publish.outcome == 'success'
         id: pages_aggregate
-        continue-on-error: true
+        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
         uses: actions/checkout@v6
         with:
           ref: gh-pages
@@ -911,7 +962,7 @@ jobs:
       - name: Upload GitHub Pages artifact
         if: steps.pages_aggregate.outcome == 'success'
         id: pages_artifact
-        continue-on-error: true
+        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ github.workspace }}/.pages-site
@@ -919,13 +970,13 @@ jobs:
       - name: Deploy GitHub Pages site
         if: steps.pages_artifact.outcome == 'success'
         id: pages_deploy
-        continue-on-error: true
+        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
         uses: actions/deploy-pages@v4
 
       - name: Record GitHub Pages URL
         if: steps.pages_deploy.outcome == 'success'
         id: pages_result
-        continue-on-error: true
+        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
         shell: bash
         env:
           PAGES_SITE_URL: ${{ steps.pages_deploy.outputs.page_url }}
@@ -936,7 +987,7 @@ jobs:
           printf 'url=%s\n' "$PAGES_URL" >> "$GITHUB_OUTPUT"
           echo "Published permanent branch result: $PAGES_URL"
       - name: Create OpenCode logs release
-        if: success() && env.VALIDATION_ENABLED == 'true'
+        if: success() && env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: opencode_release
         shell: bash
         run: |
@@ -980,7 +1031,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Post final game report
-        if: success() && env.VALIDATION_ENABLED == 'true' && env.APP_URL != ''
+        if: success() && env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
           APP_URL: ${{ steps.pages_result.outputs.url || env.APP_URL }}
@@ -1036,8 +1087,32 @@ jobs:
               body: `${liveComment.body.trim()}\n\n${body}`
             });
 
+      - name: Post test-gh Pages report
+        if: success() && env.TEST_GH_REQUEST == 'true'
+        uses: actions/github-script@v7
+        env:
+          GITHUB_PAGES_URL: ${{ steps.pages_result.outputs.url }}
+          TEST_BRANCH_NAME: ${{ steps.test_delivery.outputs.branch }}
+          FINAL_COMMIT: ${{ steps.test_delivery.outputs.commit }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER,
+              repo: process.env.TARGET_REPO,
+              issue_number: number,
+              body: [
+                '✅ **GitHub Pages smoke test passed.**', '',
+                `Published Hello World from branch \`${process.env.TEST_BRANCH_NAME}\` at commit \`${process.env.FINAL_COMMIT}\`.`,
+                `GitHub Pages: [${process.env.GITHUB_PAGES_URL}](${process.env.GITHUB_PAGES_URL})`,
+                `Actions run: [#${context.runNumber}](${runUrl})`
+              ].join('\n')
+            });
+
       - name: Mark issue complete
-        if: success() && env.VALIDATION_ENABLED == 'true'
+        if: success() && (env.TEST_GH_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -1093,7 +1168,7 @@ jobs:
             });
 
       - name: Keep temporary access available for 5 hours
-        if: success()
+        if: success() && env.TEST_GH_REQUEST != 'true'
         shell: bash
         run: sleep 18000
 
