@@ -63,8 +63,9 @@ fun filterTodos(todos: List<TodoItem>, filter: TodoFilter): List<TodoItem> = whe
 }
 
 fun addTodo(todos: List<TodoItem>, text: String, id: Long = System.currentTimeMillis(), createdAt: Long = System.currentTimeMillis()): List<TodoItem> {
-    val trimmed = text.trim()
+    var trimmed = text.trim()
     if (trimmed.isEmpty()) return todos
+    if (trimmed.length > MAX_TODO_LENGTH) trimmed = trimmed.take(MAX_TODO_LENGTH)
     return todos + TodoItem(id = id, text = trimmed, done = false, createdAt = createdAt)
 }
 
@@ -75,8 +76,9 @@ fun deleteTodo(todos: List<TodoItem>, id: Long): List<TodoItem> =
     todos.filterNot { it.id == id }
 
 fun updateTodoText(todos: List<TodoItem>, id: Long, newText: String): List<TodoItem> {
-    val trimmed = newText.trim()
+    var trimmed = newText.trim()
     if (trimmed.isEmpty()) return todos
+    if (trimmed.length > MAX_TODO_LENGTH) trimmed = trimmed.take(MAX_TODO_LENGTH)
     return todos.map { if (it.id == id) it.copy(text = trimmed) else it }
 }
 
@@ -239,14 +241,20 @@ fun todosFromJson(json: String): List<TodoItem> {
 object TodoPrefs {
     private const val PREFS = "todo_prefs"
     private const val KEY = "todos_json"
-    fun load(context: Context): List<TodoItem> {
+    fun load(context: Context): List<TodoItem> = try {
         val sp: SharedPreferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val json = sp.getString(KEY, null) ?: return emptyList()
-        return todosFromJson(json)
+        todosFromJson(json)
+    } catch (_: Exception) {
+        emptyList()
     }
     fun save(context: Context, todos: List<TodoItem>) {
-        val sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        sp.edit().putString(KEY, todosToJson(todos)).apply()
+        try {
+            val sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            sp.edit().putString(KEY, todosToJson(todos)).apply()
+        } catch (_: Exception) {
+            // ignore persistence failure – in-memory state remains valid
+        }
     }
 }
 
@@ -310,8 +318,8 @@ fun TodoApp() {
     var input by rememberSaveable { mutableStateOf("") }
     var filterName by rememberSaveable { mutableStateOf(TodoFilter.ALL.name) }
     val filter = remember(filterName) { runCatching { TodoFilter.valueOf(filterName) }.getOrDefault(TodoFilter.ALL) }
-    var editingId by remember { mutableStateOf<Long?>(null) }
-    var editingText by remember { mutableStateOf("") }
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editingText by rememberSaveable { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -608,7 +616,7 @@ fun TodoApp() {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)
                     ) {
-                        items(filtered, key = { it.id }) { item ->
+                        items(filtered, key = { it.id }, contentType = { "todo" }) { item ->
                             val isEditing = editingId == item.id
                             SwipeToDismissBoxWithUndo(
                                 modifier = Modifier.animateItem(),
@@ -810,6 +818,7 @@ private fun TodoRow(
                             .padding(12.dp)
                             .semantics {
                                 contentDescription = if (item.done) "Mark \"${item.text}\" as not done" else "Mark \"${item.text}\" as done"
+                                // keep role implicit; parent row handles toggle + long-press edit
                             }
                     )
                 }
