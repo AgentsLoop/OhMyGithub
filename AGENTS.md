@@ -17,12 +17,11 @@ stay aligned with this workflow. Its kickoff procedure creates a fresh issue
 with the `OpenCode` label (and `Goal` by default), does not use comments as
 triggers, and waits only for the initial OpenCode session link.
 The GitHub App dispatches execution for an issue opened with `OpenCode` or when
-the `OpenCode` label is added to an existing issue, including the App's own
-label event after it labels an issue opened without `OpenCode`. The workflow
-itself accepts only `workflow_dispatch`; edits, comments, and unrelated labels
-must not be documented as triggers.
-When a human opens an issue without `OpenCode`, the App adds that label, posts a
-reminder, and starts the workflow from the resulting exact-label event.
+the `OpenCode` label is added to an existing issue. The workflow itself accepts
+only `workflow_dispatch`; edits, comments, and unrelated labels must not be
+documented as triggers. When a human opens an issue without `OpenCode`, the App
+ensures the repository label exists, leaves the issue unlabeled, and posts a
+reminder; it does not start the workflow automatically.
 An optional issue-title suffix `branch: <existing-branch>` selects the target
 checkout and pull-request base; without it, the default branch is used.
 
