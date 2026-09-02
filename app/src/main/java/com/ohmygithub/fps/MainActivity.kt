@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -262,6 +263,7 @@ private val DarkScheme = darkColorScheme(
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             val dark = isSystemInDarkTheme()
@@ -316,12 +318,14 @@ fun TodoApp() {
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.safeDrawing
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .background(MaterialTheme.colorScheme.background)
         ) {
             Column(
@@ -511,13 +515,14 @@ private fun TodoRow(
     onLongPress: () -> Unit
 ) {
     val alpha by animateFloatAsState(targetValue = if (item.done) 0.62f else 1f, label = "alpha")
-    ElevatedCard(
+    Card(
         modifier = Modifier.fillMaxWidth().alpha(alpha),
         shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = if (item.done) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surface
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = if (item.done) 0.dp else 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (item.done) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surface
+        ),
+        border = if (!item.done) androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) else null
     ) {
         if (isEditing) {
             Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -592,17 +597,18 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             modifier = Modifier.size(140.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
+            val primaryColor = MaterialTheme.colorScheme.primary
             Canvas(modifier = Modifier.size(100.dp)) {
                 val c = center
-                drawCircle(color = Color(0xFF6750A4).copy(alpha = 0.12f), radius = 46.dp.toPx(), center = c)
-                drawCircle(color = Color(0xFF6750A4).copy(alpha = 0.16f), radius = 34.dp.toPx(), center = c, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+                drawCircle(color = primaryColor.copy(alpha = 0.12f), radius = 46.dp.toPx(), center = c)
+                drawCircle(color = primaryColor.copy(alpha = 0.16f), radius = 34.dp.toPx(), center = c, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
                 // dashed outer
-                drawCircle(color = Color(0xFF6750A4).copy(alpha = 0.22f), radius = 42.dp.toPx(), center = c, style = Stroke(width = 1.2.dp.toPx()))
+                drawCircle(color = primaryColor.copy(alpha = 0.22f), radius = 42.dp.toPx(), center = c, style = Stroke(width = 1.2.dp.toPx()))
             }
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
                 contentDescription = null,
-                tint = Color(0xFF6750A4),
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(56.dp)
             )
         }
