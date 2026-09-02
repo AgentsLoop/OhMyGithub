@@ -85,17 +85,25 @@ Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
 defaults to `true`. When set to `off` (or any value other than `true`), the
 workflow stops after the initial OpenCode prompt and temporary OpenCode Web
 trycloudflare exposure; app verification/remediation, completion and screenshot
-prompts, Git delivery, OmGithub publication, release/report generation, and the
+prompts, Git delivery, GitHub Pages publication, release/report generation, and the
 complete label are skipped. The temporary access session still sleeps for five
 hours before cleanup.
 
-After PR creation, OmGithub publishing is opt-in. Set the repository variable
-`OMGHITHUB_PUBLISH_ENABLED` to `true` to ZIP `$PROJECT_DIR/dist`, publish it through
-the token-protected API using GitHub's automatically generated repository token,
-verify the permanent wildcard URL, and include the permanent game and install
-links in the final issue comment. The variable defaults to `false`; if
-publishing is enabled but fails, the workflow continues and reports that
-publication was unsuccessful. See [OmGithub publishing](omgithub.md).
+After PR creation, the workflow publishes `$PROJECT_DIR/dist` into the target
+repository's `gh-pages` branch with `peaceiris/actions-gh-pages`. Every result
+uses `branches/<sanitized-opencode-branch>/<commit-prefix>/`, and `keep_files`
+preserves earlier branch results so they coexist. Vite projects are rebuilt
+with a relative asset base before publication. Publishing defaults to enabled;
+set `PAGES_PUBLISH_ENABLED=false` to skip it. The target repository must
+configure GitHub Pages to deploy from the root of the `gh-pages` branch. A
+publishing failure is non-blocking and is reported in the final issue comment.
+See [OmGithub publishing](omgithub.md).
+
+The OmGithub issue workspace polls issue comments every eight seconds. It shows
+the live OpenCode session on the left and the newest progress screenshot on the
+right. Once browser verification or GitHub Pages publishing is available, the
+right pane becomes a playable iframe; numbered controls retain access to every
+progress and final screenshot found in issue comments.
 
 The comment URL opens `/<encoded-worktree>/session/<session-id>` rather than
 the web home page. This matters because the web home page stores its project
