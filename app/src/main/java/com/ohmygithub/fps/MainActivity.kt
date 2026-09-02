@@ -86,9 +86,13 @@ fun clearCompleted(todos: List<TodoItem>): List<TodoItem> =
 fun countActive(todos: List<TodoItem>): Int = todos.count { !it.done }
 fun countCompleted(todos: List<TodoItem>): Int = todos.count { it.done }
 
+private const val MAX_TODO_LENGTH = 200
+
 private fun escapeJson(s: String): String = s
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
+    .replace("\b", "\\b")
+    .replace("\u000C", "\\f")
     .replace("\n", "\\n")
     .replace("\r", "\\r")
     .replace("\t", "\\t")
@@ -101,6 +105,8 @@ private fun unescapeJson(s: String): String {
             when (s[i + 1]) {
                 '\\' -> sb.append('\\')
                 '"' -> sb.append('"')
+                'b' -> sb.append('\b')
+                'f' -> sb.append('\u000C')
                 'n' -> sb.append('\n')
                 'r' -> sb.append('\r')
                 't' -> sb.append('\t')
@@ -180,6 +186,8 @@ fun todosFromJson(json: String): List<TodoItem> {
                         when (ch) {
                             '\\' -> sb.append('\\')
                             '"' -> sb.append('"')
+                            'b' -> sb.append('\b')
+                            'f' -> sb.append('\u000C')
                             'n' -> sb.append('\n')
                             'r' -> sb.append('\r')
                             't' -> sb.append('\t')
@@ -286,7 +294,8 @@ fun TodoApp() {
     val context = LocalContext.current
     var todos by remember { mutableStateOf(TodoPrefs.load(context)) }
     var input by rememberSaveable { mutableStateOf("") }
-    var filter by rememberSaveable { mutableStateOf(TodoFilter.ALL) }
+    var filterName by rememberSaveable { mutableStateOf(TodoFilter.ALL.name) }
+    val filter = remember(filterName) { runCatching { TodoFilter.valueOf(filterName) }.getOrDefault(TodoFilter.ALL) }
     var editingId by remember { mutableStateOf<Long?>(null) }
     var editingText by remember { mutableStateOf("") }
 
@@ -309,7 +318,10 @@ fun TodoApp() {
     fun doAdd() {
         val trimmed = input.trim()
         if (trimmed.isEmpty()) return
-        todos = addTodo(todos, trimmed, id = System.currentTimeMillis(), createdAt = System.currentTimeMillis())
+        // Avoid id collision on rapid adds: ensure new id not already present
+        var newId = System.currentTimeMillis()
+        while (todos.any { it.id == newId }) newId += 1
+        todos = addTodo(todos, trimmed, id = newId, createdAt = System.currentTimeMillis())
         input = ""
     }
 
@@ -323,8 +335,11 @@ fun TodoApp() {
         // close editing if it was the deleted item
         if (editingId == id) editingId = null
         scope.launch {
+            // Sanitize newlines for single-line snackbar
+            val preview = item.text.replace("\n", " ").replace("\r", " ").take(32)
+            val suffix = if (item.text.length > 32) "…" else ""
             val result = snackbarHostState.showSnackbar(
-                message = "\"${item.text.take(32)}${if (item.text.length > 32) "…" else ""}\" deleted",
+                message = "\"$preview$suffix\" deleted",
                 actionLabel = "Undo",
                 withDismissAction = true,
                 duration = SnackbarDuration.Short
@@ -429,9 +444,10 @@ fun TodoApp() {
                     ) {
                         OutlinedTextField(
                             value = input,
-                            onValueChange = { input = it },
-                            modifier = Modifier.weight(1f),
+                            onValueChange = { if (it.length <= MAX_TODO_LENGTH) input = it },
+                            modifier = Modifier.weight(1f).semantics { contentDescription = "New task input" },
                             placeholder = { Text("What needs to be done?") },
+                            label = { Text("Task") },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -440,7 +456,7 @@ fun TodoApp() {
                                 if (input.isNotEmpty()) {
                                     IconButton(
                                         onClick = { input = "" },
-                                        modifier = Modifier.size(32.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(
                                             Icons.Filled.Clear,
@@ -448,6 +464,15 @@ fun TodoApp() {
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
+                                }
+                            },
+                            supportingText = {
+                                if (input.length >= MAX_TODO_LENGTH - 20) {
+                                    Text(
+                                        "${input.length}/$MAX_TODO_LENGTH",
+                                        color = if (input.length >= MAX_TODO_LENGTH) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                                        fontSize = 11.sp
+                                    )
                                 }
                             },
                             colors = OutlinedTextFieldDefaults.colors(
@@ -475,7 +500,7 @@ fun TodoApp() {
                 ) {
                     FilterChip(
                         selected = filter == TodoFilter.ALL,
-                        onClick = { filter = TodoFilter.ALL },
+                        onClick = { filterName = TodoFilter.ALL.name },
                         label = { Text("All (${todos.size})") },
                         leadingIcon = if (filter == TodoFilter.ALL) {
                             { Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
@@ -483,12 +508,12 @@ fun TodoApp() {
                     )
                     FilterChip(
                         selected = filter == TodoFilter.ACTIVE,
-                        onClick = { filter = TodoFilter.ACTIVE },
+                        onClick = { filterName = TodoFilter.ACTIVE.name },
                         label = { Text("Active ($activeCount)") }
                     )
                     FilterChip(
                         selected = filter == TodoFilter.COMPLETED,
-                        onClick = { filter = TodoFilter.COMPLETED },
+                        onClick = { filterName = TodoFilter.COMPLETED.name },
                         label = { Text("Completed ($completedCount)") }
                     )
                     Spacer(Modifier.weight(1f))
@@ -508,7 +533,7 @@ fun TodoApp() {
                     // Empty state
                     EmptyState(modifier = Modifier.fillMaxWidth().padding(top = 32.dp))
                 } else if (filtered.isEmpty()) {
-                    // No results for filter
+                    // No results for filter – still useful and actionable
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
                         contentAlignment = Alignment.Center
@@ -518,17 +543,49 @@ fun TodoApp() {
                             Spacer(Modifier.height(12.dp))
                             Text(
                                 when (filter) {
-                                    TodoFilter.ACTIVE -> "No active tasks"
-                                    TodoFilter.COMPLETED -> "No completed tasks"
+                                    TodoFilter.ACTIVE -> "No active tasks — you’re all caught up!"
+                                    TodoFilter.COMPLETED -> "No completed tasks yet"
                                     else -> "No tasks"
                                 },
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text("Try another filter", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                            Text(
+                                when (filter) {
+                                    TodoFilter.ACTIVE -> "Completed tasks are hidden by this filter"
+                                    TodoFilter.COMPLETED -> "Complete a task to see it here"
+                                    else -> "Try another filter"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            FilledTonalButton(
+                                onClick = { filterName = TodoFilter.ALL.name },
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Show all tasks")
+                            }
                         }
                     }
                 } else {
+                    // Completed-state banner: visible when everything is done (useful positive feedback)
+                    AnimatedVisibility(visible = todos.isNotEmpty() && completedCount == todos.size) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                Text("All tasks completed — great work!", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                        }
+                    }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -672,7 +729,7 @@ private fun TodoRow(
     onCancelEdit: () -> Unit,
     onLongPress: () -> Unit
 ) {
-    val alpha by animateFloatAsState(targetValue = if (item.done) 0.62f else 1f, label = "alpha")
+    val alpha by animateFloatAsState(targetValue = if (item.done) 0.72f else 1f, label = "alpha")
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -691,7 +748,7 @@ private fun TodoRow(
             Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = editingText,
-                    onValueChange = onEditingTextChange,
+                    onValueChange = { if (it.length <= MAX_TODO_LENGTH) onEditingTextChange(it) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = false,
                     maxLines = 4,
@@ -700,8 +757,10 @@ private fun TodoRow(
                     keyboardActions = KeyboardActions(onDone = { onSaveEdit() }),
                     placeholder = { Text("Edit task") },
                     supportingText = {
-                        if (editingText.trim().isEmpty()) {
-                            Text("Task cannot be empty", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                        when {
+                            editingText.trim().isEmpty() -> Text("Task cannot be empty", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                            editingText.length >= MAX_TODO_LENGTH - 20 -> Text("${editingText.length}/$MAX_TODO_LENGTH", color = if (editingText.length >= MAX_TODO_LENGTH) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline, fontSize = 11.sp)
+                            else -> Text("${editingText.length}/$MAX_TODO_LENGTH", color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
                         }
                     }
                 )
@@ -803,11 +862,22 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             lineHeight = 20.sp
         )
         Spacer(Modifier.height(16.dp))
-        AssistChip(
-            onClick = {},
-            label = { Text("Tap Add or press Done on keyboard") },
-            leadingIcon = { Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
-        )
+        // Non-interactive hint chip (was AssistChip with empty onClick – avoid fake click target)
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Hint: Tap Add or press Done on keyboard" }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text("Tap Add or press Done on keyboard", style = MaterialTheme.typography.labelMedium)
+            }
+        }
         Spacer(Modifier.height(12.dp))
         Text(
             "Tip: swipe a task left to delete • long-press to edit",
