@@ -20,7 +20,7 @@
       </div>
     </section>
     <section id="discover" class="library">
-      <div class="section-heading"><div><p class="eyebrow orange">BUILT IN PUBLIC</p><h2>{{ me ? `${me.login}'s games` : 'Games created with OmGithub' }}</h2></div></div>
+      <div class="section-heading"><div><p class="eyebrow orange">BUILT IN PUBLIC</p><h2>{{ me ? `${me.login}'s games` : 'Games created with OmGithub' }}</h2></div><RouterLink to="/todo" style="border:1px solid #333;background:#1a1a1c;border-radius:999px;padding:10px 18px;font-size:13px;font-weight:700">Try Todo App →</RouterLink></div>
       <div v-if="loadingProjects" class="cards-grid"><div v-for="n in 3" :key="n" class="game-card skeleton"></div></div>
       <div v-else-if="projects.length" class="cards-grid"><GameCard v-for="project in projects" :key="project.id || project.issue_path" :project="project" /></div>
       <div v-else class="empty-library">Your published games will appear here.</div>

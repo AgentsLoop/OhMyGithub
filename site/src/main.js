@@ -5,10 +5,12 @@ import HomeView from './views/HomeView.vue'
 import ProjectView from './views/ProjectView.vue'
 import ProfileView from './views/ProfileView.vue'
 import StoreView from './views/StoreView.vue'
+import TodoView from './views/TodoView.vue'
 import './style.css'
 
 const routes = [
   { path: '/', component: HomeView },
+  { path: '/todo', component: TodoView },
   { path: '/:owner/:repo/issues/:number', component: ProjectView },
   { path: '/:owner/:repo/pull/:number', component: StoreView },
   { path: '/:login', component: ProfileView }
