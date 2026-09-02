@@ -865,6 +865,15 @@ jobs:
             npm run build -- --base=./
           fi
 
+          publish_dir="$PROJECT_DIR/dist"
+          if [[ ! -f "$publish_dir/index.html" && -f "$PROJECT_DIR/index.html" ]]; then
+            publish_dir="$RUNNER_TEMP/pages-build"
+            mkdir -p "$publish_dir"
+            rsync -a --exclude '.git' --exclude '.github' --exclude '.agents' \
+              --exclude 'node_modules' --exclude 'screenshots' "$PROJECT_DIR/" "$publish_dir/"
+          fi
+          [[ -f "$publish_dir/index.html" ]]
+
           branch_slug="$(sed -E 's/[^[:alnum:]._-]+/-/g; s/^-+|-+$//g' <<<"$BRANCH_NAME" | tr '[:upper:]' '[:lower:]')"
           destination="branches/${branch_slug}/${FINAL_COMMIT:0:12}"
           owner_slug="$(tr '[:upper:]' '[:lower:]' <<<"$TARGET_OWNER")"
@@ -873,7 +882,7 @@ jobs:
           else
             pages_root="https://${owner_slug}.github.io/$TARGET_REPO"
           fi
-          printf 'destination=%s\nurl=%s/%s/\n' "$destination" "$pages_root" "$destination" >> "$GITHUB_OUTPUT"
+          printf 'destination=%s\npublish_dir=%s\nurl=%s/%s/\n' "$destination" "$publish_dir" "$pages_root" "$destination" >> "$GITHUB_OUTPUT"
 
       - name: Publish branch result to GitHub Pages
         if: steps.pages_meta.outcome == 'success'
@@ -883,54 +892,43 @@ jobs:
         with:
           github_token: ${{ github.token }}
           publish_branch: gh-pages
-          publish_dir: ${{ env.PROJECT_DIR }}/dist
+          publish_dir: ${{ steps.pages_meta.outputs.publish_dir }}
           destination_dir: ${{ steps.pages_meta.outputs.destination }}
           keep_files: true
           commit_message: "Publish ${{ env.BRANCH_NAME }} at ${{ steps.delivery.outputs.commit }}"
 
-      - name: Configure and verify GitHub Pages
-        if: steps.pages_publish.outcome != 'cancelled'
-        id: pages_config
+      - name: Assemble GitHub Pages site
+        if: steps.pages_publish.outcome == 'success'
+        id: pages_aggregate
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          ref: gh-pages
+          path: .pages-site
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Upload GitHub Pages artifact
+        if: steps.pages_aggregate.outcome == 'success'
+        id: pages_artifact
+        continue-on-error: true
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ github.workspace }}/.pages-site
+
+      - name: Deploy GitHub Pages site
+        if: steps.pages_artifact.outcome == 'success'
+        id: pages_deploy
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Record GitHub Pages URL
+        if: steps.pages_deploy.outcome == 'success'
+        id: pages_result
         continue-on-error: true
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PAGES_REPOSITORY: ${{ env.TARGET_REPOSITORY }}
-        run: |
-          set -euo pipefail
-          pages_endpoint="repos/${PAGES_REPOSITORY}/pages"
-          source_json='{"source":{"branch":"gh-pages","path":"/"}}'
-          pages_json="$(gh api "$pages_endpoint" 2>/dev/null || true)"
-
-          if [[ -z "$pages_json" ]]; then
-            echo 'No GitHub Pages site exists; creating one from gh-pages.'
-            gh api --method POST "$pages_endpoint" \
-              --input - <<<"$source_json" > "$RUNNER_TEMP/pages-config.json"
-            pages_json="$(< "$RUNNER_TEMP/pages-config.json")"
-          else
-            pages_branch="$(jq -r '.source.branch // empty' <<<"$pages_json")"
-            pages_path="$(jq -r '.source.path // empty' <<<"$pages_json")"
-            if [[ "$pages_branch" != 'gh-pages' || "$pages_path" != '/' ]]; then
-              echo "Updating GitHub Pages source from ${pages_branch:-unset}:${pages_path:-unset} to gh-pages:/"
-              gh api --method PUT "$pages_endpoint" \
-                --input - <<<"$source_json" > "$RUNNER_TEMP/pages-config.json"
-              pages_json="$(< "$RUNNER_TEMP/pages-config.json")"
-            fi
-          fi
-
-          page_url="$(jq -r '.html_url // empty' <<<"$pages_json")"
-          [[ -n "$page_url" ]]
-          [[ "$(jq -r '.source.branch // empty' <<<"$pages_json")" == 'gh-pages' ]]
-          [[ "$(jq -r '.source.path // empty' <<<"$pages_json")" == '/' ]]
-          printf 'site_url=%s\n' "${page_url%/}" >> "$GITHUB_OUTPUT"
-          echo "GitHub Pages is configured at $page_url from gh-pages:/"
-
-      - name: Record GitHub Pages URL
-        if: steps.pages_config.outcome == 'success'
-        id: pages_result
-        shell: bash
-        env:
-          PAGES_SITE_URL: ${{ steps.pages_config.outputs.site_url }}
+          PAGES_SITE_URL: ${{ steps.pages_deploy.outputs.page_url }}
           PAGES_DESTINATION: ${{ steps.pages_meta.outputs.destination }}
         run: |
           set -euo pipefail
