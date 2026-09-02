@@ -132,29 +132,41 @@ class MainActivity : AppCompatActivity() {
             statsBar.contentDescription = "No data"
             return
         }
-        // average of most recent 7 entries
-        val recentForAvg = entries.take(7)
-        val avg = recentForAvg.map { it.mood }.average()
         val count = entries.size
         val best = entries.maxByOrNull { it.mood }?.mood ?: 3
         val worst = entries.minByOrNull { it.mood }?.mood ?: 3
-        val recent = recentForAvg.reversed()
-        val emojiRow = recent.joinToString(" ") { MoodEntry.moodEmoji(it.mood) }
-        val statsText = "Entries: $count  \u2022  7-day avg: ${String.format(Locale.US, "%.1f", avg)}/5  \u2022  Range: ${MoodEntry.moodLabel(worst)} \u2192 ${MoodEntry.moodLabel(best)}\n$emojiRow"
-        tvStats.text = statsText
-        tvStats.contentDescription = "Total entries $count, 7 day average ${String.format(Locale.US, "%.1f", avg)} out of 5, range from ${MoodEntry.moodLabel(worst)} to ${MoodEntry.moodLabel(best)}, recent moods $emojiRow"
 
-        // Build simple bar of last 7
+        // Day-based aggregation: group by calendar day, average per day, last 7 days
+        val dayFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val grouped = entries.groupBy { dayFormatter.format(Date(it.timestamp)) }
+        val dailyAvg = grouped.mapValues { (_, list) -> list.map { it.mood }.average() }
+        val sortedDays = dailyAvg.keys.sorted()
+        val last7Days = sortedDays.takeLast(7)
+        val avg7day = if (last7Days.isEmpty()) 0.0 else last7Days.map { dailyAvg[it]!! }.average()
+        // fallback to entry-based if less than 7 days of data but entries > days
+        val displayAvg = if (last7Days.size < 7 && entries.size >= 7) entries.take(7).map { it.mood }.average() else avg7day
+
+        val recentEntries = entries.take(7).reversed()
+        val emojiRow = recentEntries.joinToString(" ") { MoodEntry.moodEmoji(it.mood) }
+        val dayCount = grouped.size
+        val statsText = "Entries: $count  \u2022  Days: $dayCount  \u2022  7-day avg: ${String.format(Locale.US, "%.1f", displayAvg)}/5  \u2022  Range: ${MoodEntry.moodLabel(worst)} \u2192 ${MoodEntry.moodLabel(best)}\n$emojiRow"
+        tvStats.text = statsText
+        tvStats.contentDescription = "Total entries $count, days $dayCount, 7 day average ${String.format(Locale.US, "%.1f", displayAvg)} out of 5, range from ${MoodEntry.moodLabel(worst)} to ${MoodEntry.moodLabel(best)}, recent moods $emojiRow"
+
+        // Build bar chart: height proportional to mood (1=>14dp, 5=>40dp), bottom-aligned
         statsBar.removeAllViews()
-        for (e in recent) {
+        val density = resources.displayMetrics.density
+        for (e in recentEntries) {
             val bar = View(this)
-            val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-            lp.setMargins(2, 0, 2, 0)
+            val heightDp = 10 + e.mood * 6 // 16..40 dp
+            val heightPx = (heightDp * density).toInt()
+            val lp = LinearLayout.LayoutParams(0, heightPx, 1f)
+            lp.setMargins((2 * density).toInt(), 0, (2 * density).toInt(), 0)
             bar.layoutParams = lp
             bar.setBackgroundColor(Color.parseColor(MoodEntry.moodColor(e.mood)))
             bar.contentDescription = "${MoodEntry.moodLabel(e.mood)} mood level ${e.mood}"
             statsBar.addView(bar)
         }
-        statsBar.contentDescription = "Mood chart for last ${recent.size} entries: $emojiRow"
+        statsBar.contentDescription = "Mood chart for last ${recentEntries.size} entries over $dayCount days: $emojiRow"
     }
 }
