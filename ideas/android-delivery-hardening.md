@@ -11,6 +11,9 @@ and hung attached verification.
 - Run emulator remediation as a fresh attached `build` command pinned to the
   project directory. Continuing a completed Goal session, or opening an
   unqualified attached session, can remain idle until timeout.
+- Drive remediation from deterministic failures: preserve each attempt's
+  evidence, pass the failed phase to OpenCode, and retry twice on the same
+  emulator before using a fresh emulator as the final infrastructure fallback.
 - Retry emulator provisioning once and retain the second failed emulator over
   SSH; successful runs skip the five-hour hold.
 - Publish through a checksum-verified draft release transaction.

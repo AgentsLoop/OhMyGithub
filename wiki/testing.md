@@ -53,6 +53,12 @@ its APK SHA-256 matches a newly downloaded release asset. Todo-style apps must
 also report successful interaction and persistence; other app types record
 those checks as `not_applicable`.
 
+When a phase fails, the primary emulator runs up to two phase-specific OpenCode
+repairs followed by deterministic retries. Missing or multiple APKs fail the
+build phase. Screenshot creation is deterministic; a missing or invalid PNG
+fails the screenshot phase. After the three same-emulator attempts, one fresh
+emulator performs the final check before the SSH debugging hold begins.
+
 For a manual runner check, add the exact `ssh` label. This intentionally skips
 OpenCode and verification while leaving the runner available for debugging.
 Reuse one temporary file such as

@@ -82,7 +82,10 @@ runs:
       env:
         OPENCODE_SESSION_ID: ${{ inputs.session-id }}
         OPENCODE_MODEL: ${{ inputs.model }}
-        ANDROID_EVIDENCE_DIR: ${{ runner.temp }}/opencode-evidence/${{ github.run_id }}/android
+        ANDROID_EVIDENCE_DIR: ${{ runner.temp }}/opencode-evidence/${{ github.run_id }}/android/primary
+        ANDROID_VERIFY_ATTEMPTS: '3'
+        ANDROID_REPAIR_ENABLED: 'true'
+        ANDROID_INITIAL_OC_VERIFY_ENABLED: 'true'
         ANDROID_FAILURE_HOLD_SECONDS: '0'
       with:
         api-level: 35
@@ -92,7 +95,7 @@ runs:
         working-directory: ${{ env.PROJECT_DIR }}
         emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: true
-        script: bash "$RUNTIME_DIR/scripts/verify-android-app.sh"
+        script: bash "$RUNTIME_DIR/scripts/verify-android-with-retries.sh"
 
     - name: Retry with a fresh Android emulator
       id: emulator_retry
@@ -101,8 +104,10 @@ runs:
       env:
         OPENCODE_SESSION_ID: ${{ inputs.session-id }}
         OPENCODE_MODEL: ${{ inputs.model }}
-        ANDROID_EVIDENCE_DIR: ${{ runner.temp }}/opencode-evidence/${{ github.run_id }}/android
-        ANDROID_OPENCODE_VERIFY_ENABLED: 'false'
+        ANDROID_EVIDENCE_DIR: ${{ runner.temp }}/opencode-evidence/${{ github.run_id }}/android/fresh-emulator
+        ANDROID_VERIFY_ATTEMPTS: '1'
+        ANDROID_REPAIR_ENABLED: 'false'
+        ANDROID_INITIAL_OC_VERIFY_ENABLED: 'false'
         ANDROID_FAILURE_HOLD_SECONDS: ${{ inputs.hold-seconds }}
       with:
         api-level: 35
@@ -112,7 +117,7 @@ runs:
         working-directory: ${{ env.PROJECT_DIR }}
         emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: true
-        script: bash "$RUNTIME_DIR/scripts/verify-android-app.sh"
+        script: bash "$RUNTIME_DIR/scripts/verify-android-with-retries.sh"
 
     - name: Export Android verification outputs
       id: outputs

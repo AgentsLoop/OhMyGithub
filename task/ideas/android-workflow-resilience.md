@@ -22,12 +22,14 @@ guard against stale comment writes. Implemented in
 
 ## 3. Preserve a debuggable failure window — executed
 
-Wrap attached OpenCode verification in a bounded timeout, but keep the
-emulator and SSH session alive on failure. Treat timeout exits as permission
-to continue deterministic build/install checks; hold genuine failures for
-interactive diagnosis, and clean the temporary `known_hosts` file only after
-the session ends. This is implemented in the Android verifier and documented
-in `task/android-apk-issue-e2e.md`.
+Wrap every attached OpenCode verifier or repair in a bounded timeout. Run the
+deterministic checks first, pass the failed phase and attempt evidence to a
+fresh OpenCode `build` session, and retry twice on the same emulator. Treat
+OpenCode timeout exits as permission to continue deterministic checks. After
+those attempts, provision one fresh emulator; hold its final failure for
+interactive SSH diagnosis, and clean the temporary `known_hosts` file only
+after the session ends. This is implemented in the Android verifier and
+documented in `task/android-apk-issue-e2e.md`.
 
 ## 4. Add a deterministic screenshot fallback — executed
 
