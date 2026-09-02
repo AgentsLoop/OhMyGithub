@@ -114,6 +114,8 @@ over SSH first, using `scripts/ssh-run-log.sh` or a targeted SSH read from the
 same runner. Base the answer on those logs before discussing whether an action
 is confirmed; do not lead with a generic inability-to-confirm statement when
 live log evidence can be collected.
+If anything looks wrong, inspect the actual OpenCode chat transcript/API before
+concluding; shell arguments and wrapper prompts are not chat evidence.
 
 For real-time inspection from a live temporary SSH session, use the helper:
 
