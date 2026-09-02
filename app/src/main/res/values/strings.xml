@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Mood Tracker</string>
+    <string name="hint_note">How are you feeling? (optional note)</string>
+    <string name="btn_add">Add</string>
+    <string name="empty_history">No moods yet. Add your first entry!</string>
+    <string name="title_today">How are you today?</string>
+    <string name="title_history">History</string>
+    <string name="title_stats">Insights</string>
+    <string name="delete">Delete</string>
+    <string name="stats_7days">Last 7 days avg</string>
+</resources>

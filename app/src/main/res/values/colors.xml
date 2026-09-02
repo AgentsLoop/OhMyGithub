@@ -1,0 +1,15 @@
+<resources>
+    <color name="primary">#6C63FF</color>
+    <color name="primary_dark">#5A52D5</color>
+    <color name="primary_light">#E8E6FF</color>
+    <color name="accent">#FF6584</color>
+    <color name="background">#F8F7FF</color>
+    <color name="card">#FFFFFF</color>
+    <color name="text_primary">#1A1A2E</color>
+    <color name="text_secondary">#6B6B8A</color>
+    <color name="mood_terrible">#FF5252</color>
+    <color name="mood_bad">#FF8A65</color>
+    <color name="mood_okay">#FFD740</color>
+    <color name="mood_good">#66BB6A</color>
+    <color name="mood_great">#26C6DA</color>
+</resources>
