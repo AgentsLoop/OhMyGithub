@@ -5,21 +5,26 @@ import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,6 +35,7 @@ import com.example.moodtracker.data.Moods
 import com.example.moodtracker.ui.MoodViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MoodViewModel by viewModels()
@@ -38,7 +44,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme(
-                colorScheme = lightColorScheme()
+                colorScheme = lightColorScheme(
+                    primary = Color(0xFF2196F3),
+                    secondary = Color(0xFF64B5F6),
+                    tertiary = Color(0xFF81C784)
+                )
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -51,29 +61,37 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoodTrackerScreen(viewModel: MoodViewModel) {
     val entries by viewModel.entries.collectAsState()
     val selectedMood by viewModel.selectedMood.collectAsState()
     val noteText by viewModel.noteText.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Mood Tracker",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Text(
-            text = "How are you feeling today?",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.Gray,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Mood Tracker", fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFF2196F3),
+                    titleContentColor = Color.White
+                )
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "How are you feeling today?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
 
         // Mood selector - 5 levels with emojis
         Row(
@@ -198,36 +216,85 @@ fun MoodTrackerScreen(viewModel: MoodViewModel) {
                 Text(text = "No entries yet. Add your first mood!", color = Color.Gray)
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(entries, key = { it.id }) { entry ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                entries.forEach { entry ->
                     MoodHistoryItem(entry = entry, onDelete = { viewModel.deleteEntry(entry.id) })
                 }
             }
+        }
+            // Bottom spacer for scroll
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
 fun StatsSection(entries: List<MoodEntry>) {
+    // Compute stats
+    val total = entries.size
+    val avg = if (entries.isNotEmpty()) entries.map { it.moodLevel }.average() else 0.0
+    val counts = entries.groupingBy { it.moodLevel }.eachCount()
+
+    // Streak: consecutive days with at least one entry, counting backwards from today
+    val streak = remember(entries) {
+        if (entries.isEmpty()) 0 else {
+            val days = entries.map { TimeUnit.MILLISECONDS.toDays(it.timestamp) }.toSet()
+            var s = 0
+            var day = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis())
+            while (days.contains(day)) {
+                s++; day--
+            }
+            s
+        }
+    }
+    // Last 7 days avg for sparkline
+    val last7 = remember(entries) {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = System.currentTimeMillis()
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+        val todayStart = cal.timeInMillis
+        (0..6).map { offset ->
+            val dayStart = todayStart - offset * 24 * 60 * 60 * 1000L
+            val dayEnd = dayStart + 24 * 60 * 60 * 1000L
+            val dayEntries = entries.filter { it.timestamp in dayStart until dayEnd }
+            if (dayEntries.isEmpty()) null else dayEntries.map { it.moodLevel }.average()
+        }.reversed()
+    }
+    val last7Avg = last7.filterNotNull().let { if (it.isEmpty()) 0.0 else it.average() }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = "Stats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "Insights", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (streak > 0) {
+                    Row(
+                        modifier = Modifier
+                            .background(Color(0xFFFFF3E0), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "🔥", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "$streak day streak", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             if (entries.isEmpty()) {
-                Text(text = "No data yet", color = Color.Gray, fontSize = 12.sp)
+                Text(text = "No data yet — log your first mood to see trends", color = Color.Gray, fontSize = 12.sp)
             } else {
-                val total = entries.size
-                val avg = entries.map { it.moodLevel }.average()
-                val counts = entries.groupingBy { it.moodLevel }.eachCount()
-                Text(text = "Total: $total  •  Avg mood: ${String.format("%.1f", avg)} / 5", fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Total: $total  •  Avg: ${String.format("%.1f", avg)}/5  •  7-day avg: ${String.format("%.1f", last7Avg)}/5", fontSize = 11.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(10.dp))
+                // Per-mood distribution with proper labels
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -237,12 +304,12 @@ fun StatsSection(entries: List<MoodEntry>) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(text = mood.emoji, fontSize = 20.sp)
                             Text(text = "$count", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(text = mood.label.take(4), fontSize = 9.sp, color = Color.Gray)
+                            Text(text = mood.label, fontSize = 8.sp, color = Color.Gray)
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                // Simple bar visualization
+                Spacer(modifier = Modifier.height(10.dp))
+                // Segmented bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -262,6 +329,80 @@ fun StatsSection(entries: List<MoodEntry>) {
                                         .background(Color(mood.colorHex))
                                 )
                             }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                // 7-day sparkline
+                Text(text = "Last 7 days trend", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Spacer(modifier = Modifier.height(6.dp))
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .background(Color.White, RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    val w = size.width
+                    val h = size.height
+                    // Grid lines
+                    for (i in 1..3) {
+                        drawLine(Color(0xFFE0E0E0), start = Offset(0f, h * i / 4), end = Offset(w, h * i / 4), strokeWidth = 1f)
+                    }
+                    val valid = last7.mapIndexedNotNull { idx, v -> if (v != null) idx to v else null }
+                    if (valid.size >= 2) {
+                        val path = Path()
+                        valid.forEachIndexed { pi, (idx, v) ->
+                            val x = w * idx / 6f
+                            val y = h - (h * (v - 1) / 4f).toFloat()
+                            if (pi == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        }
+                        drawPath(path, color = Color(0xFF2196F3), style = Stroke(width = 3f))
+                        valid.forEach { (idx, v) ->
+                            val x = w * idx / 6f
+                            val y = h - (h * (v - 1) / 4f).toFloat()
+                            drawCircle(color = Color(0xFF2196F3), radius = 5f, center = Offset(x, y))
+                            drawCircle(color = Color.White, radius = 2.5f, center = Offset(x, y))
+                        }
+                    } else if (valid.size == 1) {
+                        val (idx, v) = valid[0]
+                        val x = w * idx / 6f
+                        val y = h - (h * (v - 1) / 4f).toFloat()
+                        drawCircle(color = Color(0xFF2196F3), radius = 6f, center = Offset(x, y))
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    listOf("6d ago", "3d ago", "Today").forEach { Text(it, fontSize = 9.sp, color = Color.Gray) }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                // Calendar heatmap - last 14 days
+                Text(text = "Recent activity", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    (13 downTo 0).forEach { offset ->
+                        val dayCal = Calendar.getInstance().apply { timeInMillis = System.currentTimeMillis() - offset * 24L * 60 * 60 * 1000L }
+                        val dayStart = dayCal.apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+                        val dayEnd = dayStart + 24 * 60 * 60 * 1000L
+                        val dayEntries = entries.filter { it.timestamp in dayStart until dayEnd }
+                        val avgLevel = if (dayEntries.isEmpty()) null else dayEntries.map { it.moodLevel }.average()
+                        val bg = if (avgLevel == null) Color(0xFFE0E0E0) else Color(Moods.byLevel(avgLevel.toInt()).colorHex)
+                        val dayLabel = SimpleDateFormat("MM/dd", Locale.getDefault()).format(Date(dayStart))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(bg)
+                                    .border(1.dp, Color.White, RoundedCornerShape(6.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (dayEntries.isNotEmpty()) {
+                                    Text(text = Moods.emojiFor(dayEntries.maxByOrNull { it.timestamp }!!.moodLevel), fontSize = 10.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(text = dayLabel.takeLast(2), fontSize = 7.sp, color = Color.Gray)
                         }
                     }
                 }
