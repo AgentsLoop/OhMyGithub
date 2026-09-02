@@ -130,8 +130,9 @@ current_phase=sign
 build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
 [[ -x "$build_tools/zipalign" && -x "$build_tools/apksigner" && -x "$build_tools/aapt" ]]
 keystore="$RUNNER_TEMP/opencode-android/release.jks"
-aligned_apk="$RUNNER_TEMP/opencode-android/app-release-aligned.apk"
+aligned_apk="$evidence_dir/app-release-aligned.apk"
 signed_apk="$evidence_dir/app-release.apk"
+rm -f -- "$keystore" "$aligned_apk" "$signed_apk"
 keytool -genkeypair -noprompt -keystore "$keystore" -storepass android -keypass android \
   -alias opencode -keyalg RSA -keysize 2048 -validity 1 \
   -dname 'CN=OpenCode CI,OU=Android,O=Oh My GitHub,L=CI,ST=CI,C=US' \
@@ -143,13 +144,60 @@ keytool -genkeypair -noprompt -keystore "$keystore" -storepass android -keypass 
   > "$evidence_dir/logs/apksigner.txt"
 record_state sign passed
 
-badging="$("$build_tools/aapt" dump badging "$signed_apk")"
+current_phase=metadata
+aapt_code=0
+badging="$("$build_tools/aapt" dump badging "$signed_apk" 2>&1)" || aapt_code=$?
 printf '%s\n' "$badging" > "$evidence_dir/logs/aapt-badging.txt"
 package_name="$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" <<<"$badging" | head -n 1)"
 launchable_activity="$(sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p" <<<"$badging" | head -n 1)"
 version_code="$(sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p" <<<"$badging" | head -n 1)"
 version_name="$(sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p" <<<"$badging" | head -n 1)"
-[[ -n "$package_name" && -n "$launchable_activity" ]]
+
+# Some valid APKs make aapt return non-zero while still printing package data
+# (for example when a framework icon reference cannot be resolved). Use the
+# SDK's apkanalyzer as a structured fallback instead of misreporting a
+# post-signing metadata problem as a signing failure.
+if [[ -z "$package_name" || -z "$launchable_activity" || -z "$version_code" || -z "$version_name" ]]; then
+  apkanalyzer=""
+  while IFS= read -r candidate; do
+    apkanalyzer="$candidate"
+  done < <(find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer -perm -111 2>/dev/null | sort -V)
+  if [[ -n "$apkanalyzer" ]]; then
+    manifest_print="$($apkanalyzer manifest print "$signed_apk" 2>&1 || true)"
+    printf '%s\n' "$manifest_print" > "$evidence_dir/logs/apkanalyzer-manifest.txt"
+    if [[ -z "$package_name" ]]; then
+      package_name="$(sed -n 's/.*package="\([^"]*\)".*/\1/p' <<<"$manifest_print" | head -n 1)"
+    fi
+    if [[ -z "$version_code" ]]; then
+      version_code="$(sed -n 's/.*android:versionCode="\([^"]*\)".*/\1/p' <<<"$manifest_print" | head -n 1)"
+    fi
+    if [[ -z "$version_name" ]]; then
+      version_name="$(sed -n 's/.*android:versionName="\([^"]*\)".*/\1/p' <<<"$manifest_print" | head -n 1)"
+    fi
+    if [[ -z "$launchable_activity" ]]; then
+      launchable_activity="$(awk '
+        /<activity$/ { in_activity=1; activity=""; has_main=0; has_launcher=0 }
+        in_activity && /android:name=/ {
+          line=$0
+          sub(/^.*android:name="/, "", line)
+          sub(/".*$/, "", line)
+          activity=line
+        }
+        in_activity && /android.intent.action.MAIN/ { has_main=1 }
+        in_activity && /android.intent.category.LAUNCHER/ { has_launcher=1 }
+        in_activity && /<\/activity>/ {
+          if (has_main && has_launcher && activity != "") { print activity; exit }
+          in_activity=0
+        }
+      ' <<<"$manifest_print" | head -n 1)"
+    fi
+  fi
+fi
+if [[ -z "$package_name" || -z "$launchable_activity" ]]; then
+  echo "Unable to identify package and launcher activity (aapt exit $aapt_code)." >&2
+  exit 1
+fi
+record_state metadata passed
 apk_sha256="$(sha256sum "$signed_apk" | awk '{print $1}')"
 update_json '.app = {package:$package, activity:$activity, version_code:$version_code,
   version_name:$version_name, apk_name:"app-release.apk", apk_sha256:$sha256}' \

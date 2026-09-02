@@ -109,6 +109,14 @@ adb exec-out screencap -p > screenshots/final-android-manual.png
   print the host-key warning; subsequent `ssh` and `scp` commands should pass
   the same `UserKnownHostsFile`. Delete it only after canceling/finishing the
   runner session.
+- Generated Android manifests must use an app-owned launcher icon. A framework
+  reference such as `@android:drawable/sym_def_app_icon` can make `aapt dump
+  badging` return non-zero even when signing succeeded; the verifier records
+  that output and falls back to the SDK `apkanalyzer` manifest parser so the
+  launcher activity can still be proven.
+- Android retries use an attempt-scoped ephemeral keystore and aligned APK.
+  Never reuse a fixed keystore alias across attempts, or keytool will fail with
+  `alias already exists` before installation begins.
 
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
