@@ -19,12 +19,13 @@ test('extractUrls separates OpenCode, screenshots, preview, and Pages result', (
   assert.deepEqual(result.screenshots, ['https://github.com/user-attachments/assets/abc-123'])
 })
 
-test('omgRequest routes the test-gh label without requiring OpenCode', () => {
+test('omgRequest routes test-gh when the label is added without requiring OpenCode', () => {
   const result = omgRequest('issues', {
-    action: 'opened',
+    action: 'labeled',
     installation: { id: 42 },
     repository: { full_name: 'AgentsLoop/OhMyGithub', default_branch: 'main' },
     sender: { login: 'igor', type: 'User' },
+    label: { name: 'test-gh' },
     issue: {
       number: 123,
       title: 'GitHub Pages smoke test',
@@ -36,6 +37,20 @@ test('omgRequest routes the test-gh label without requiring OpenCode', () => {
   assert.equal(result.testGhRequest, true)
   assert.equal(result.missingOpenCodeLabel, false)
   assert.deepEqual(result.labels, ['test-gh'])
+
+  const openedWithLabel = omgRequest('issues', {
+    action: 'opened',
+    installation: { id: 42 },
+    repository: { full_name: 'AgentsLoop/OhMyGithub', default_branch: 'main' },
+    sender: { login: 'igor', type: 'User' },
+    issue: {
+      number: 123,
+      title: 'GitHub Pages smoke test',
+      body: 'Publish Hello World',
+      labels: [{ name: 'test-gh' }]
+    }
+  })
+  assert.equal(openedWithLabel, null)
 })
 
 test('omgRequest still asks for OpenCode on an ordinary unlabeled issue', () => {

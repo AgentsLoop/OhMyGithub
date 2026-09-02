@@ -123,11 +123,9 @@ export function omgRequest(event, payload) {
   const labels = (payload.issue?.labels || []).map(label => typeof label === 'string' ? label : label.name).filter(Boolean)
   const testGhRequest = labels.includes('test-gh')
   const openedWithoutExecutionLabel = payload.action === 'opened' && !labels.includes('OpenCode') && !testGhRequest
-  const openedWithOpenCode = payload.action === 'opened' && labels.includes('OpenCode')
-  const openedWithTestGh = payload.action === 'opened' && testGhRequest
   const openCodeAdded = payload.action === 'labeled' && payload.label?.name === 'OpenCode' && labels.includes('OpenCode')
   const testGhAdded = payload.action === 'labeled' && payload.label?.name === 'test-gh' && testGhRequest
-  if (!openedWithoutExecutionLabel && !openedWithOpenCode && !openedWithTestGh && !openCodeAdded && !testGhAdded) return null
+  if (!openedWithoutExecutionLabel && !openCodeAdded && !testGhAdded) return null
   if (!payload.installation?.id || !payload.repository?.full_name || !payload.issue?.number) return null
   const [owner, repo] = payload.repository.full_name.split('/')
   const parsed = parseIssueRequest(payload.issue, payload.repository.default_branch || 'main')
