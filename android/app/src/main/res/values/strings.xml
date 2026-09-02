@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mood Tracker</string>
+    <string name="hint_notes">How are you feeling? Add notes…</string>
+    <string name="btn_save">Save Entry</string>
+    <string name="title_today">How are you today?</string>
+    <string name="title_history">History</string>
+    <string name="title_stats">Stats</string>
+    <string name="empty_history">No entries yet. Add your first mood!</string>
+    <string name="delete">Delete</string>
+    <string name="stats_total">Total entries: %1$d</string>
+    <string name="stats_avg">Average mood: %1$.1f / 5</string>
+    <string name="stats_streak">Entries this week: %1$d</string>
+    <string name="saved">Mood saved!</string>
+    <string name="select_mood">Select a mood</string>
+</resources>
