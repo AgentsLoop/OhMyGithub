@@ -70,7 +70,7 @@ jobs:
       COMMENT_BODY: ${{ inputs.request }}
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
-      OMGHITHUB_PUBLISH_ENABLED: ${{ vars.OMGHITHUB_PUBLISH_ENABLED || 'false' }}
+      PAGES_PUBLISH_ENABLED: ${{ vars.PAGES_PUBLISH_ENABLED || 'true' }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
       - name: Export target token
@@ -845,64 +845,58 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Publish game to OmGithub
-        if: env.VALIDATION_ENABLED == 'true' && env.OMGHITHUB_PUBLISH_ENABLED == 'true'
+      - name: Prepare GitHub Pages result
+        if: env.VALIDATION_ENABLED == 'true' && env.PAGES_PUBLISH_ENABLED == 'true'
         continue-on-error: true
-        id: omgithub_publish
+        id: pages_meta
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
-          PR_URL: ${{ steps.delivery.outputs.pr_url }}
-          SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
-          REQUEST_SENDER: ${{ inputs.sender }}
         run: |
           set -euo pipefail
-          [[ -n "$GH_TOKEN" ]]
           [[ -f dist/index.html ]]
           [[ -n "$FINAL_COMMIT" ]]
 
-          pr_number=''
-          if [[ "$PR_URL" =~ /pull/([0-9]+)$ ]]; then
-            pr_number="${BASH_REMATCH[1]}"
+          # Vite emits root-relative asset URLs by default. A relative base keeps
+          # each build working from its isolated Pages subdirectory.
+          if jq -e '((.dependencies // {}) + (.devDependencies // {})) | has("vite")' package.json >/dev/null 2>&1; then
+            npm run build -- --base=./
           fi
 
-          package_name="$(jq -r '.name // empty' package.json 2>/dev/null || true)"
-          request_title="${COMMENT_BODY%%$'\n'*}"
-          game_name="${package_name:-$request_title}"
-          game_name="$(sed -E 's/[^[:alnum:]]+/-/g; s/^-+|-+$//g' <<<"$game_name" | tr '[:upper:]' '[:lower:]')"
-          [[ -n "$game_name" ]] || game_name="game-$TRIGGER_ISSUE_NUMBER"
+          branch_slug="$(sed -E 's/[^[:alnum:]._-]+/-/g; s/^-+|-+$//g' <<<"$BRANCH_NAME" | tr '[:upper:]' '[:lower:]')"
+          destination="branches/${branch_slug}/${FINAL_COMMIT:0:12}"
+          owner_slug="$(tr '[:upper:]' '[:lower:]' <<<"$TARGET_OWNER")"
+          if [[ "${TARGET_REPO,,}" == "${owner_slug}.github.io" ]]; then
+            pages_root="https://${owner_slug}.github.io"
+          else
+            pages_root="https://${owner_slug}.github.io/$TARGET_REPO"
+          fi
+          printf 'destination=%s\nurl=%s/%s/\n' "$destination" "$pages_root" "$destination" >> "$GITHUB_OUTPUT"
 
-          project_path="${PROJECT_PATH#./}"
-          project_path="${project_path%/}"
-          screenshots="$(jq -c --arg repository "$TARGET_REPOSITORY" --arg commit "$FINAL_COMMIT" --arg project_path "$project_path" '
-            map("https://raw.githubusercontent.com/\($repository)/\($commit)/\($project_path | if length > 0 then . + "/" else "" end)screenshots/\(.)")
-          ' <<<"${SCREENSHOTS_JSON:-[]}")"
-          archive="$RUNNER_TEMP/omgithub-dist.zip"
-          (cd dist && zip -q -r "$archive" .)
-          response="$RUNNER_TEMP/omgithub-publish.json"
-          curl --fail-with-body --silent --show-error \
-            -X POST "https://omgithub.com/api/publish" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "X-OmGithub-GitHub-Token: $GH_TOKEN" \
-            -H 'Content-Type: application/zip' \
-            -H "X-OmGithub-Name: $game_name" \
-            -H "X-OmGithub-Title: ${request_title:0:150}" \
-            -H "X-OmGithub-Description: ${request_title:0:500}" \
-            -H "X-OmGithub-Owner: $TARGET_OWNER" \
-            -H "X-OmGithub-Repo: $TARGET_REPO" \
-            -H "X-OmGithub-Issue: $TRIGGER_ISSUE_NUMBER" \
-            -H "X-OmGithub-PR: $pr_number" \
-            -H "X-OmGithub-Commit: $FINAL_COMMIT" \
-            -H "X-OmGithub-Actor: $REQUEST_SENDER" \
-            -H "X-OmGithub-Screenshots: $screenshots" \
-            --data-binary "@$archive" > "$response"
-          jq -e '.ok == true and .project.url and .project.install_url' "$response" >/dev/null
-          published_url="$(jq -r '.project.url' "$response")"
-          install_url="$(jq -r '.project.install_url' "$response")"
-          curl --fail --silent --show-error --retry 10 --retry-delay 2 "$published_url" >/dev/null
-          printf 'url=%s\ninstall_url=%s\n' "$published_url" "$install_url" >> "$GITHUB_OUTPUT"
-          echo "Published permanent game URL: $published_url"
+      - name: Publish branch result to GitHub Pages
+        if: steps.pages_meta.outcome == 'success'
+        id: pages_publish
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ github.token }}
+          publish_branch: gh-pages
+          publish_dir: ${{ env.PROJECT_DIR }}/dist
+          destination_dir: ${{ steps.pages_meta.outputs.destination }}
+          keep_files: true
+          commit_message: "Publish ${{ env.BRANCH_NAME }} at ${{ steps.delivery.outputs.commit }}"
+
+      - name: Record GitHub Pages URL
+        if: steps.pages_publish.outcome == 'success'
+        id: pages_result
+        shell: bash
+        env:
+          PAGES_URL: ${{ steps.pages_meta.outputs.url }}
+        run: |
+          set -euo pipefail
+          printf 'url=%s\n' "$PAGES_URL" >> "$GITHUB_OUTPUT"
+          echo "Published permanent branch result: $PAGES_URL"
       - name: Create OpenCode logs release
         if: success() && env.VALIDATION_ENABLED == 'true'
         id: opencode_release
@@ -951,9 +945,9 @@ jobs:
         if: success() && env.VALIDATION_ENABLED == 'true' && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
-          APP_URL: ${{ steps.omgithub_publish.outputs.url || env.APP_URL }}
-          OMGITHUB_INSTALL_URL: ${{ steps.omgithub_publish.outputs.install_url }}
-          OMGHITHUB_PUBLISH_ENABLED: ${{ env.OMGHITHUB_PUBLISH_ENABLED }}
+          APP_URL: ${{ steps.pages_result.outputs.url || env.APP_URL }}
+          GITHUB_PAGES_URL: ${{ steps.pages_result.outputs.url }}
+          PAGES_PUBLISH_ENABLED: ${{ env.PAGES_PUBLISH_ENABLED }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
@@ -974,12 +968,11 @@ jobs:
             const body = [
               '✅ **Game complete and publicly verified.**', '',
               `Public app: [${process.env.APP_URL}](${process.env.APP_URL})`,
-              ...(process.env.OMGHITHUB_INSTALL_URL ? [
-                `OmGithub publication: [${process.env.APP_URL}](${process.env.APP_URL})`,
-                `Install game: [${process.env.OMGHITHUB_INSTALL_URL}](${process.env.OMGHITHUB_INSTALL_URL})`
-              ] : [process.env.OMGHITHUB_PUBLISH_ENABLED === 'true'
-                ? 'OmGithub publishing: failed, but the workflow continued.'
-                : 'OmGithub publishing: skipped (disabled by repository variable).']),
+              ...(process.env.GITHUB_PAGES_URL ? [
+                `GitHub Pages publication: [${process.env.GITHUB_PAGES_URL}](${process.env.GITHUB_PAGES_URL})`
+              ] : [process.env.PAGES_PUBLISH_ENABLED === 'true'
+                ? 'GitHub Pages publishing: failed, but the workflow continued.'
+                : 'GitHub Pages publishing: skipped (disabled by repository variable).']),
               `Final commit: [${process.env.FINAL_COMMIT}](${commitUrl})`,
               `Pull request: ${process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.'}`,
               `OpenCode logs release: [${process.env.OPENCODE_RELEASE_URL}](${process.env.OPENCODE_RELEASE_URL})`,
