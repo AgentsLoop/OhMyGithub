@@ -390,7 +390,7 @@ fun TodoApp() {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.semantics { heading() }
                     ) {
-                        Text("Tasks", fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                        Text("Tasks", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
                         Text(
                             "$activeCount active • ${todos.size} total",
                             style = MaterialTheme.typography.labelSmall,
@@ -520,7 +520,7 @@ fun TodoApp() {
                     AnimatedVisibility(visible = completedCount > 0) {
                         TextButton(
                             onClick = { clearCompletedWithUndo() },
-                            modifier = Modifier.height(36.dp)
+                            modifier = Modifier.height(48.dp)
                         ) {
                             Text("Clear completed", fontSize = 13.sp)
                         }
@@ -588,7 +588,7 @@ fun TodoApp() {
                     }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)
                     ) {
                         items(filtered, key = { it.id }) { item ->
@@ -650,13 +650,12 @@ private fun SwipeToDismissBoxWithUndo(
 ) {
     // Use SwipeToDismissBox with confirmValueChange to trigger delete only on EndToStart swipe
     val dismissState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { it * 0.45f },
+        positionalThreshold = { it * 0.5f },
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
                 onDismiss()
-                // returning false keeps the item visible until LazyColumn removes it;
-                // returning true would keep it in EndToStart state – we want immediate removal
-                // so we trigger delete and reset state by returning false (no state hold)
+                // Immediate removal via list filter with LazyColumn animation;
+                // returning false resets swipe state so next item doesn't inherit dismissed state
                 false
             } else false
         }
@@ -802,8 +801,7 @@ private fun TodoRow(
                     modifier = Modifier.weight(1f).padding(vertical = 14.dp),
                     style = MaterialTheme.typography.bodyLarge.copy(
                         textDecoration = if (item.done) TextDecoration.LineThrough else null,
-                        color = if (item.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                        fontSize = 16.sp
+                        color = if (item.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                     ),
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis
