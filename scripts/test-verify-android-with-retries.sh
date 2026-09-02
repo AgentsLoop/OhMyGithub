@@ -30,7 +30,7 @@ printf '%s\n' '#!/usr/bin/env bash' \
 
 printf '%s\n' '#!/usr/bin/env bash' \
   'set -euo pipefail' \
-  'printf "%s\n" "$*" > "$OPENCODE_ARGS_FILE"' \
+  'printf "%s\n" "$*" >> "$OPENCODE_ARGS_FILE"' \
   > "$fake_opencode"
 chmod +x "$fake_verify" "$fake_opencode"
 
@@ -43,7 +43,8 @@ PROJECT_DIR="$test_dir/project" \
 ANDROID_EVIDENCE_DIR="$runner_temp/evidence/android" \
 ANDROID_VERIFY_ATTEMPTS=3 \
 ANDROID_REPAIR_ENABLED=true \
-ANDROID_INITIAL_OC_VERIFY_ENABLED=false \
+ANDROID_INITIAL_OC_VERIFY_ENABLED=true \
+OPENCODE_SESSION_ID=sess-test-visible \
 ANDROID_FAILURE_HOLD_SECONDS=0 \
 ANDROID_VERIFY_SCRIPT="$fake_verify" \
 OPENCODE_BIN="$fake_opencode" \
@@ -52,6 +53,8 @@ OPENCODE_ARGS_FILE="$opencode_args" \
   bash "$(dirname "${BASH_SOURCE[0]}")/verify-android-with-retries.sh"
 
 [[ "$(< "$counter_file")" == 2 ]]
+[[ "$(wc -l < "$opencode_args" | tr -d " ")" == 2 ]]
+[[ "$(grep -Fc -- '--session sess-test-visible' "$opencode_args")" == 2 ]]
 grep -F -- '--command build' "$opencode_args" >/dev/null
 grep -F 'failed during phase `build`' "$opencode_args" >/dev/null
 jq -e '.status == "passed" and .repair_loop == {

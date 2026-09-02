@@ -77,6 +77,7 @@ for ((attempt = 1; attempt <= max_attempts; attempt++)); do
       --auto \
       --dangerously-skip-permissions \
       --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+      --session "$OPENCODE_SESSION_ID" \
       --dir "$PROJECT_DIR" \
       --model "$OPENCODE_MODEL" \
       --command build \

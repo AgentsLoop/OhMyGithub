@@ -81,8 +81,9 @@ record_state preflight passed
 update_json '.environment = {api:35, profile:"pixel_7_pro", available_disk_kb:$disk, available_memory_kb:$memory}' \
   --argjson disk "$available_kb" --argjson memory "$memory_kb"
 
-# Start a fresh verifier session on the existing OpenCode server and emulator.
-# Resuming the completed implementation Goal session can leave the CLI idle.
+# Continue the workflow's visible OpenCode session on the existing emulator.
+# This keeps the verification prompt and any repair work in the session linked
+# from the issue instead of silently creating an untracked second session.
 # Deterministic checks below remain the sole success authority, so a stuck or
 # failed verifier is recorded and cannot block a healthy app from delivery.
 current_phase=opencode_remediation
@@ -94,6 +95,7 @@ if [[ "${ANDROID_OPENCODE_VERIFY_ENABLED:-true}" == true ]]; then
       --auto \
       --dangerously-skip-permissions \
       --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+      --session "$OPENCODE_SESSION_ID" \
       --dir "$PROJECT_DIR" \
       --model "$OPENCODE_MODEL" \
       --command build \
