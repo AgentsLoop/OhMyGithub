@@ -728,6 +728,40 @@ jobs:
             "$(< "$RUNTIME_DIR/.github/prompts/02-verify.md")" \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
+      - name: Verify browser entrypoint exists
+        if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
+          ENTRYPOINT_PROMPT='The browser verifier cannot find a playable HTML entrypoint. Ensure the requested app has a working index.html at the project root or dist/index.html, make the app server serve that entrypoint on port 3000, and verify it in the browser before replying.'
+
+          for attempt in 1 2 3; do
+            if [[ -f "$PROJECT_DIR/index.html" || -f "$PROJECT_DIR/dist/index.html" ]]; then
+              if [[ -f "$PROJECT_DIR/index.html" ]]; then
+                echo "Browser entrypoint found at $PROJECT_PATH/index.html."
+              else
+                echo "Browser entrypoint found at $PROJECT_PATH/dist/index.html."
+              fi
+              exit 0
+            fi
+
+            echo "No browser entrypoint found under $PROJECT_PATH (attempt $attempt/3)."
+            if [[ "$attempt" -lt 3 ]]; then
+              "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
+                --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+                --session "$SESSION_ID" \
+                --model "$OPENCODE_MODEL" \
+                "$ENTRYPOINT_PROMPT" \
+                >> "$OPENCODE_WEB_DIR/entrypoint-fix-$attempt.log" 2>&1
+            fi
+          done
+
+          echo "Browser verification cannot continue without index.html or dist/index.html." >&2
+          exit 1
+
       - name: Expose verified app
         if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: app_tunnel
@@ -907,7 +941,6 @@ jobs:
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit || steps.test_delivery.outputs.commit }}
         run: |
           set -euo pipefail
-          [[ -f dist/index.html ]]
           [[ -n "$FINAL_COMMIT" ]]
 
           # Vite emits root-relative asset URLs by default. A relative base keeps
@@ -917,11 +950,17 @@ jobs:
           fi
 
           publish_dir="$PROJECT_DIR/dist"
-          if [[ ! -f "$publish_dir/index.html" && -f "$PROJECT_DIR/index.html" ]]; then
+          if [[ -f "$publish_dir/index.html" ]]; then
+            echo "Using built Pages entrypoint at $publish_dir/index.html."
+          elif [[ -f "$PROJECT_DIR/index.html" ]]; then
             publish_dir="$RUNNER_TEMP/pages-build"
             mkdir -p "$publish_dir"
             rsync -a --exclude '.git' --exclude '.github' --exclude '.agents' \
               --exclude 'node_modules' --exclude 'screenshots' "$PROJECT_DIR/" "$publish_dir/"
+            echo "Using static Pages entrypoint copied from $PROJECT_DIR/index.html."
+          else
+            echo "No index.html found at $PROJECT_DIR/index.html or $PROJECT_DIR/dist/index.html." >&2
+            exit 1
           fi
           [[ -f "$publish_dir/index.html" ]]
 
