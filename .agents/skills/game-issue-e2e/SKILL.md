@@ -23,9 +23,11 @@ Use this skill when the user asks to start the issue-triggered workflow with a
 request or create an issue. Treat the user's next message after invoking this
 skill as the task prompt when one is supplied. Preserve a supplied prompt's
 intent and details; do not invent, replace, summarize, or augment it with a
-random task. When no prompt is supplied (or the prompt is empty), randomly
-choose a small playable browser-game concept and write a brief implementation
-prompt for it. This skill intentionally ends after the workflow publishes the
+random task. When no prompt is supplied (or the prompt is empty), independently
+come up with a fresh random small playable browser-game concept and write a
+brief implementation prompt for that game. The fallback must be a game idea,
+not a request for clarification or a generic app. This skill intentionally ends
+after the workflow publishes the
 OpenCode Web UI session link; it does not watch the workflow to completion or
 claim that the implementation, PR, or public app is finished.
 
@@ -42,8 +44,8 @@ was started.
 
 The caller's following message is sufficient as the prompt when one is
 provided, even when it is short or does not describe a game. If no prompt is
-provided or the prompt is empty, invent a random, small playable browser game
-and write a brief issue prompt for it. Apply matching skill labels only when
+provided or the prompt is empty, invent a fresh random, small playable browser
+game and write a brief issue prompt for it. Apply matching skill labels only when
 the prompt or invented game clearly requires them.
 
 ## Required outcome
