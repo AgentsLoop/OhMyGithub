@@ -358,7 +358,8 @@ fun TodoApp() {
             )
             if (result == SnackbarResult.ActionPerformed) {
                 val toRestore = lastCleared ?: return@launch
-                todos = todos + toRestore
+                // restore preserving original insertion order (by createdAt)
+                todos = (todos + toRestore).sortedBy { it.createdAt }
                 lastCleared = null
             } else {
                 lastCleared = null

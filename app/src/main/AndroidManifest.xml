@@ -7,7 +7,7 @@
         android:roundIcon="@drawable/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.OMGFPS"
-        android:label="OMG FPS">
+        android:label="@string/app_name">
         <activity
             android:name=".MainActivity"
             android:exported="true"
