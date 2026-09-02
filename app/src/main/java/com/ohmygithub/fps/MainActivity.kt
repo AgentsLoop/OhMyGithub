@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -36,12 +37,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 
 // --- Data & Logic (testable pure functions) ---
@@ -274,7 +280,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodoApp() {
     val context = LocalContext.current
@@ -283,6 +289,13 @@ fun TodoApp() {
     var filter by rememberSaveable { mutableStateOf(TodoFilter.ALL) }
     var editingId by remember { mutableStateOf<Long?>(null) }
     var editingText by remember { mutableStateOf("") }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    // For undo: hold last deleted single item and last cleared batch
+    var lastDeleted by remember { mutableStateOf<Pair<TodoItem, Int>?>(null) }
+    var lastCleared by remember { mutableStateOf<List<TodoItem>?>(null) }
 
     // persist on change
     LaunchedEffect(todos) {
@@ -300,11 +313,67 @@ fun TodoApp() {
         input = ""
     }
 
+    fun deleteWithUndo(id: Long) {
+        val idx = todos.indexOfFirst { it.id == id }
+        if (idx == -1) return
+        val item = todos[idx]
+        lastDeleted = item to idx
+        lastCleared = null
+        todos = deleteTodo(todos, id)
+        // close editing if it was the deleted item
+        if (editingId == id) editingId = null
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "\"${item.text.take(32)}${if (item.text.length > 32) "…" else ""}\" deleted",
+                actionLabel = "Undo",
+                withDismissAction = true,
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                val (deleted, index) = lastDeleted ?: return@launch
+                // restore at original position if possible, otherwise append
+                val mutable = todos.toMutableList()
+                if (index in 0..mutable.size) mutable.add(index, deleted) else mutable.add(deleted)
+                todos = mutable
+                lastDeleted = null
+            } else {
+                lastDeleted = null
+            }
+        }
+    }
+
+    fun clearCompletedWithUndo() {
+        val completed = todos.filter { it.done }
+        if (completed.isEmpty()) return
+        lastCleared = completed
+        lastDeleted = null
+        todos = clearCompleted(todos)
+        if (editingId != null && todos.none { it.id == editingId }) editingId = null
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "${completed.size} completed ${if (completed.size == 1) "task" else "tasks"} cleared",
+                actionLabel = "Undo",
+                withDismissAction = true,
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                val toRestore = lastCleared ?: return@launch
+                todos = todos + toRestore
+                lastCleared = null
+            } else {
+                lastCleared = null
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.semantics { heading() }
+                    ) {
                         Text("Tasks", fontWeight = FontWeight.Bold, fontSize = 22.sp)
                         Text(
                             "$activeCount active • ${todos.size} total",
@@ -317,6 +386,17 @@ fun TodoApp() {
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = MaterialTheme.colorScheme.inverseSurface,
+                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    actionColor = MaterialTheme.colorScheme.inversePrimary,
+                    dismissActionContentColor = MaterialTheme.colorScheme.inverseOnSurface
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing
@@ -355,6 +435,20 @@ fun TodoApp() {
                             shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = { doAdd() }),
+                            trailingIcon = {
+                                if (input.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { input = "" },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Clear,
+                                            contentDescription = "Clear input",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                                 unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -399,7 +493,7 @@ fun TodoApp() {
                     Spacer(Modifier.weight(1f))
                     AnimatedVisibility(visible = completedCount > 0) {
                         TextButton(
-                            onClick = { todos = clearCompleted(todos) },
+                            onClick = { clearCompletedWithUndo() },
                             modifier = Modifier.height(36.dp)
                         ) {
                             Text("Clear completed", fontSize = 13.sp)
@@ -441,30 +535,36 @@ fun TodoApp() {
                     ) {
                         items(filtered, key = { it.id }) { item ->
                             val isEditing = editingId == item.id
-                            TodoRow(
-                                item = item,
-                                isEditing = isEditing,
-                                editingText = editingText,
-                                onEditingTextChange = { editingText = it },
-                                onToggle = { todos = toggleTodo(todos, item.id) },
-                                onDelete = { todos = deleteTodo(todos, item.id) },
-                                onStartEdit = {
-                                    editingId = item.id
-                                    editingText = item.text
-                                },
-                                onSaveEdit = {
-                                    val t = editingText.trim()
-                                    if (t.isNotEmpty()) {
-                                        todos = updateTodoText(todos, item.id, t)
+                            SwipeToDismissBoxWithUndo(
+                                modifier = Modifier.animateItem(),
+                                enabled = !isEditing,
+                                onDismiss = { deleteWithUndo(item.id) }
+                            ) {
+                                TodoRow(
+                                    item = item,
+                                    isEditing = isEditing,
+                                    editingText = editingText,
+                                    onEditingTextChange = { editingText = it },
+                                    onToggle = { todos = toggleTodo(todos, item.id) },
+                                    onDelete = { deleteWithUndo(item.id) },
+                                    onStartEdit = {
+                                        editingId = item.id
+                                        editingText = item.text
+                                    },
+                                    onSaveEdit = {
+                                        val t = editingText.trim()
+                                        if (t.isNotEmpty()) {
+                                            todos = updateTodoText(todos, item.id, t)
+                                        }
+                                        editingId = null
+                                    },
+                                    onCancelEdit = { editingId = null },
+                                    onLongPress = {
+                                        editingId = item.id
+                                        editingText = item.text
                                     }
-                                    editingId = null
-                                },
-                                onCancelEdit = { editingId = null },
-                                onLongPress = {
-                                    editingId = item.id
-                                    editingText = item.text
-                                }
-                            )
+                                )
+                            }
                         }
                         item {
                             Spacer(Modifier.height(8.dp))
@@ -481,6 +581,63 @@ fun TodoApp() {
             }
         }
     }
+}
+
+@Composable
+private fun SwipeToDismissBoxWithUndo(
+    modifier: Modifier = Modifier,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    // Use SwipeToDismissBox with confirmValueChange to trigger delete only on EndToStart swipe
+    val dismissState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { it * 0.45f },
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onDismiss()
+                // returning false keeps the item visible until LazyColumn removes it;
+                // returning true would keep it in EndToStart state – we want immediate removal
+                // so we trigger delete and reset state by returning false (no state hold)
+                false
+            } else false
+        }
+    )
+    SwipeToDismissBox(
+        modifier = modifier,
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = enabled,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Text(
+                        "Delete",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        },
+        content = { content() }
+    )
 }
 
 @Composable
@@ -516,7 +673,12 @@ private fun TodoRow(
 ) {
     val alpha by animateFloatAsState(targetValue = if (item.done) 0.62f else 1f, label = "alpha")
     Card(
-        modifier = Modifier.fillMaxWidth().alpha(alpha),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(alpha)
+            .semantics(mergeDescendants = false) {
+                contentDescription = "${if (item.done) "Completed" else "Active"} task: ${item.text}"
+            },
         shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = if (item.done) 0.dp else 1.dp),
         colors = CardDefaults.cardColors(
@@ -530,11 +692,17 @@ private fun TodoRow(
                     value = editingText,
                     onValueChange = onEditingTextChange,
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    singleLine = false,
+                    maxLines = 4,
                     shape = RoundedCornerShape(10.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { onSaveEdit() }),
-                    placeholder = { Text("Edit task") }
+                    placeholder = { Text("Edit task") },
+                    supportingText = {
+                        if (editingText.trim().isEmpty()) {
+                            Text("Task cannot be empty", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                        }
+                    }
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(onClick = onCancelEdit, modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(10.dp)) {
@@ -561,7 +729,12 @@ private fun TodoRow(
                     Checkbox(
                         checked = item.done,
                         onCheckedChange = { onToggle() },
-                        modifier = Modifier.size(48.dp).padding(12.dp)
+                        modifier = Modifier
+                            .size(48.dp)
+                            .padding(12.dp)
+                            .semantics {
+                                contentDescription = if (item.done) "Mark \"${item.text}\" as not done" else "Mark \"${item.text}\" as done"
+                            }
                     )
                 }
                 Text(
@@ -572,13 +745,14 @@ private fun TodoRow(
                         color = if (item.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp
                     ),
-                    maxLines = 3
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
                 )
                 IconButton(onClick = onStartEdit, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit task", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit task \"${item.text}\"", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete task", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete task \"${item.text}\"", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -588,7 +762,7 @@ private fun TodoRow(
 @Composable
 private fun EmptyState(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier,
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = "No tasks yet, add your first task above" },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -613,7 +787,12 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             )
         }
         Spacer(Modifier.height(20.dp))
-        Text("All clear!", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center)
+        Text(
+            "All clear!",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() }
+        )
         Spacer(Modifier.height(6.dp))
         Text(
             "No tasks yet.\nAdd your first task above and stay productive.",
@@ -627,6 +806,13 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             onClick = {},
             label = { Text("Tap Add or press Done on keyboard") },
             leadingIcon = { Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Tip: swipe a task left to delete • long-press to edit",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+            textAlign = TextAlign.Center
         )
     }
 }
