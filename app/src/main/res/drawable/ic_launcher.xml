@@ -1,0 +1,31 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#7C6CF6" android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,22C32,22 14,38 14,58C14,78 32,94 54,94C76,94 94,78 94,58C94,38 76,22 54,22Z" />
+    <!-- eyes -->
+    <path
+        android:fillColor="#2D2A4A"
+        android:pathData="M38,48C38,48 34,48 34,52C34,56 38,56 38,56C38,56 42,56 42,52C42,48 38,48 38,48Z" />
+    <path
+        android:fillColor="#2D2A4A"
+        android:pathData="M70,48C70,48 66,48 66,52C66,56 70,56 70,56C70,56 74,56 74,52C74,48 70,48 70,48Z" />
+    <!-- smile -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#2D2A4A"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M36,68 Q54,84 72,68" />
+    <!-- blush -->
+    <path
+        android:fillColor="#FFB5D8"
+        android:pathData="M24,62C24,62 20,62 20,65C20,68 24,68 24,68C24,68 28,68 28,65C28,62 24,62 24,62Z" />
+    <path
+        android:fillColor="#FFB5D8"
+        android:pathData="M84,62C84,62 80,62 80,65C80,68 84,68 84,68C84,68 88,68 88,65C88,62 84,62 84,62Z" />
+</vector>

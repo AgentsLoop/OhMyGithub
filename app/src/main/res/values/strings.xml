@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mood Tracker</string>
+    <string name="add_note_hint">Add a note...</string>
+    <string name="add_button">Add</string>
+    <string name="clear_all">Clear All</string>
+    <string name="history_title">History</string>
+    <string name="stats_title">Your Stats</string>
+    <string name="no_entries">No entries yet. Track your first mood!</string>
+    <string name="select_mood">How are you feeling?</string>
+</resources>
