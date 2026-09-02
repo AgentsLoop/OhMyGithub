@@ -13,11 +13,13 @@ do not use comments, edits, or the word “tag” as a trigger. The App dispatch
 the workflow once when an issue is opened with the label or when `OpenCode` is
 added, including when the App adds it after issue creation.
 
-When the caller explicitly requests a custom branch, append
-` branch: <existing-branch>` to the issue title. Treat that suffix as routing
-metadata rather than part of the caller's implementation prompt.
-Verify the branch exists before creating the issue. Otherwise omit the directive
-and use the repository default branch.
+Before every issue creation, inspect the caller's current branch with
+`git branch --show-current` and verify that exact branch exists on the target
+remote. Always append ` branch: <current-branch>` to the issue title, including
+when the current branch is the repository default. Treat that suffix as routing
+metadata rather than part of the caller's implementation prompt. Never silently
+fall back to `main` or omit the suffix because the caller did not repeat the
+branch request.
 
 Use this skill when the user asks to start the issue-triggered workflow with a
 request or create an issue. Treat the user's next message after invoking this
@@ -94,11 +96,15 @@ OAuth provider.
 
 ## Procedure
 
-1. Before starting the test, inspect the working tree with `git status --short`.
-   Stage and commit all current changes, then push the current branch. Verify
-   that the working tree is clean and the pushed commit is the branch tip
-   before creating the issue or triggering any Action. Do not start the test
-   with uncommitted or unpushed changes.
+1. Before starting the test, inspect the working tree with `git status --short`
+   and capture `CURRENT_BRANCH="$(git branch --show-current)"`. Reject a
+   detached HEAD or empty branch name. Verify
+   `git ls-remote --exit-code --heads origin "$CURRENT_BRANCH"` succeeds.
+   Stage and commit all current changes, then push `CURRENT_BRANCH`. Verify
+   that the working tree is clean, the pushed commit is the branch tip, and the
+   remote still resolves the same branch before creating the issue or
+   triggering any Action. Do not start the test with uncommitted or unpushed
+   changes.
 2. Confirm `gh auth status`, resolve the target repository (default
    `AgentsLoop/PlayGround`), and inspect it with `gh repo view <owner>/<repo>`.
    Check whether `.github/workflows/opencode.yml` exists. If it is missing,
@@ -111,8 +117,10 @@ OAuth provider.
    Add `Goal` by default; this specifically exercises the goal plugin and
    `opencode run --command goal`
    path. Omit `Goal` only when the caller explicitly requests the standard
-   OpenCode path. Do not add a comment because comments do not trigger the
-   workflow. If testing an existing issue instead, adding the `OpenCode` label
+   OpenCode path. Build the title as the caller's title plus the exact suffix
+   ` branch: $CURRENT_BRANCH`; verify the final title contains that suffix
+   before calling `gh issue create`. Do not add a comment because comments do
+   not trigger the workflow. If testing an existing issue instead, adding the `OpenCode` label
    is the only supported way to start it.
    If the caller supplied a prompt, use it as the complete issue prompt and
    preserve it verbatim. If no prompt was supplied, generate a random, small
