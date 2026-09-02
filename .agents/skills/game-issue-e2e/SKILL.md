@@ -34,10 +34,14 @@ claim that the implementation, PR, or public app is finished.
 ## Repository selection
 
 Use the repository supplied by the caller when one is provided. When no
-repository is supplied, default to `AgentsLoop/PlayGround`. Resolve the full
-`OWNER/REPO` with `gh repo view` and confirm the authenticated account can
+repository is supplied, inspect the caller's current branch before selecting
+the default: use `AgentsLoop/PlayGround` when the branch is exactly `main`, and
+use `AgentsLoop/OhMyGithub` for any other branch. This keeps a non-main branch
+suffix routable without asking the caller to repeat the repository. Resolve the
+full `OWNER/REPO` with `gh repo view` and confirm the authenticated account can
 administer it before creating issues or triggering Actions. Do not silently
-substitute a different repository. If the target does not contain
+substitute a different repository when the caller supplied one. If the target
+does not contain
 `.github/workflows/opencode.yml`, still create the requested issue, but report
 that the E2E workflow is unavailable and do not claim that an Action or session
 was started.
@@ -105,8 +109,8 @@ OAuth provider.
    remote still resolves the same branch before creating the issue or
    triggering any Action. Do not start the test with uncommitted or unpushed
    changes.
-2. Confirm `gh auth status`, resolve the target repository (default
-   `AgentsLoop/PlayGround`), and inspect it with `gh repo view <owner>/<repo>`.
+2. Confirm `gh auth status`, resolve the target repository using the branch-aware
+   default above, and inspect it with `gh repo view <owner>/<repo>`.
    Check whether `.github/workflows/opencode.yml` exists. If it is missing,
    continue through issue creation, then report that no workflow or session
    could be started and stop without attempting run polling.
