@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GOLDEN GATES — Aperture Rush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-icon" aria-hidden="true">
+        <span class="chevron left"></span><span class="chevron right"></span>
+      </div>
+      <div class="brand-text">
+        <h1>GOLDEN GATES</h1>
+        <p>APERTURE RUSH • Inspired by the golden &lt; &gt; portal</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="howBtn" class="ghost">What do I see?</button>
+      <button id="pauseBtn" class="ghost">⏸ Pause</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="panel left">
+      <section class="card">
+        <h3>Vision Answer</h3>
+        <div class="vision-box">
+          <div class="icon-preview">
+            <div class="frame">
+              <span class="flare tl"></span><span class="flare br"></span>
+              <div class="brackets"><span>&lt;</span><span>&gt;</span></div>
+            </div>
+          </div>
+          <p class="vision-text">
+            I see a <strong>luxurious golden “bracket” icon</strong> on matte black:
+            two thick, beveled chevrons facing each other <code>&lt; &gt;</code> at the center,
+            enclosed by a glowing, segmented rectangular gold frame with lens-flare
+            highlights at the top-left and bottom-right. The style is premium / sci-fi
+            — like a <em>code</em> or <em>expand-portal</em> symbol rendered in polished 3D gold.
+          </p>
+        </div>
+        <div class="controls-help">
+          <h4>HOW TO PLAY</h4>
+          <ul>
+            <li><kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> — slide</li>
+            <li>Mouse / touch drag — slide</li>
+            <li>Pass through the golden gates. Miss = damage.</li>
+            <li>3 lives. Speed &amp; gap tighten each level.</li>
+          </ul>
+          <div class="mobile-pad">
+            <button id="leftBtn" aria-label="move left">◀</button>
+            <button id="rightBtn" aria-label="move right">▶</button>
+          </div>
+        </div>
+      </section>
+      <section class="card stats-card">
+        <div class="stat"><span>SCORE</span><strong id="score">0</strong></div>
+        <div class="stat"><span>BEST</span><strong id="best">0</strong></div>
+        <div class="stat"><span>LEVEL</span><strong id="level">1</strong></div>
+        <div class="stat"><span>LIVES</span><strong id="lives">●●●</strong></div>
+      </section>
+    </aside>
+
+    <main class="stage">
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="520" height="760" aria-label="Golden Gates game canvas"></canvas>
+        <div id="overlay" class="overlay">
+          <div class="overlay-card" id="startCard">
+            <div class="badge">VISION TO PLAY</div>
+            <h2>GOLDEN GATES</h2>
+            <p class="subtitle">Dash through the shimmering apertures before they close.</p>
+            <div class="preview-gate">
+              <span class="g">&lt;</span><span class="g">&gt;</span>
+            </div>
+            <button id="startBtn" class="cta">▶ START RUN</button>
+            <p class="hint">Tip: stay centered, anticipate the gap.</p>
+          </div>
+          <div class="overlay-card hidden" id="pauseCard">
+            <h2>PAUSED</h2>
+            <button id="resumeBtn" class="cta">RESUME</button>
+            <button id="restartBtn2" class="ghost large">RESTART</button>
+          </div>
+          <div class="overlay-card hidden" id="gameOverCard">
+            <h2 id="gameOverTitle">GATE CLOSED</h2>
+            <p id="finalScore" class="final-score"></p>
+            <p id="finalMsg" class="hint"></p>
+            <button id="restartBtn" class="cta">↻ PLAY AGAIN</button>
+          </div>
+        </div>
+        <div class="hud-bar">
+          <span id="hudScore">0</span>
+          <span id="hudLevel">Lv 1</span>
+          <span id="hudSpeed">0 km/s</span>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel right">
+      <section class="card">
+        <h3>Progress</h3>
+        <div class="progress-row"><span>Gate</span><div class="bar"><i id="gateBar" style="width:0%"></i></div><span id="gateLabel">0/10</span></div>
+        <div class="progress-row"><span>Speed</span><div class="bar gold"><i id="speedBar" style="width:20%"></i></div><span id="speedLabel">×1.0</span></div>
+        <div class="streak" id="streak">Streak: 0 — keep it clean!</div>
+      </section>
+      <section class="card">
+        <h3>Image Analysis</h3>
+        <ul class="analysis">
+          <li>Palette: <span class="swatch" style="background:#0a0a0a"></span> matte black, <span class="swatch" style="background:linear-gradient(135deg,#ffe9a8,#c98d08)"></span> metallic gold, white specular flare</li>
+          <li>Composition: centered symmetric chevrons, rounded-rect gold border with 4 breaks</li>
+          <li>Lighting: top-left & bottom-right bloom + edge bevel highlights</li>
+          <li>Semantics: code / expand / portal affordance — invites “pass through”</li>
+        </ul>
+      </section>
+      <section class="card small">
+        <p class="foot">Built for “what images do you see?” — game mechanic IS the image. No external assets. Pure Canvas + CSS.</p>
+      </section>
+    </aside>
+  </div>
+
+  <div id="howModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>What image do I see? — Detailed breakdown</h3>
+      <p>The provided 1254×1254 image is a <strong>premium 3D icon</strong>:</p>
+      <ul>
+        <li><strong>Center:</strong> two large, thick, golden chevrons — <code>&lt;</code> on the left, <code>&gt;</code> on the right — with beveled edges, inner glow and soft drop shadows, facing inward like an open aperture.</li>
+        <li><strong>Frame:</strong> a thick, rounded-square golden border, broken into 6 segments (gaps at mid-sides), rendered with brushed-metal gradient and outer glow.</li>
+        <li><strong>Highlights:</strong> bright lens-flare streaks at the top edge (center-left) and bottom edge (center-right) where the frame catches light, giving a cinematic “luxury tech” feel.</li>
+        <li><strong>Background:</strong> smooth matte black / dark charcoal, vignetted, making the gold pop. No text, no additional objects.</li>
+        <li><strong>Vibe:</strong> AAA UI — could be a “code”, “expand”, “fullscreen”, or “portal” button. The game reuses this exact silhouette as the gate you dash through.</li>
+      </ul>
+      <button id="closeHow" class="cta small">Got it</button>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span>© Golden Gates • Canvas 60fps • Keyboard + Touch • </span><span id="buildInfo">build ok</span>
+  </footer>
+</div>
+<div id="toast" class="toast"></div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
