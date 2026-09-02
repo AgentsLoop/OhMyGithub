@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 class MoodAdapter(
     private var entries: MutableList<MoodEntry>,
+    private val onEdit: (MoodEntry) -> Unit,
     private val onDelete: (MoodEntry) -> Unit
 ) : RecyclerView.Adapter<MoodAdapter.VH>() {
 
@@ -17,6 +18,7 @@ class MoodAdapter(
         val moodName: TextView = v.findViewById(R.id.itemMoodName)
         val date: TextView = v.findViewById(R.id.itemDate)
         val note: TextView = v.findViewById(R.id.itemNote)
+        val edit: ImageButton = v.findViewById(R.id.btnEdit)
         val del: ImageButton = v.findViewById(R.id.btnDelete)
     }
 
@@ -36,6 +38,8 @@ class MoodAdapter(
             holder.note.visibility = View.VISIBLE
             holder.note.text = e.note
         }
+        holder.edit.setOnClickListener { onEdit(e) }
+        holder.itemView.setOnClickListener { onEdit(e) }
         holder.del.setOnClickListener { onDelete(e) }
     }
 

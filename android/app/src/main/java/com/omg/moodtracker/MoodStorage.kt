@@ -60,6 +60,15 @@ class MoodStorage(context: Context) {
         saveAll(list)
     }
 
+    fun update(entry: MoodEntry) {
+        val list = getAll().toMutableList()
+        val idx = list.indexOfFirst { it.id == entry.id }
+        if (idx >= 0) {
+            list[idx] = entry
+            saveAll(list)
+        }
+    }
+
     fun stats(): MoodStats {
         val entries = getAll()
         if (entries.isEmpty()) return MoodStats(0, 0.0, 0, emptyMap())

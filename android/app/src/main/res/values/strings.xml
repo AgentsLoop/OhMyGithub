@@ -12,5 +12,14 @@
     <string name="stats_avg">Average mood: %1$.1f / 5</string>
     <string name="stats_streak">Entries this week: %1$d</string>
     <string name="saved">Mood saved!</string>
+    <string name="updated">Mood updated!</string>
     <string name="select_mood">Select a mood</string>
+    <string name="date_label">Date: %1$s</string>
+    <string name="btn_pick_date">Change date</string>
+    <string name="btn_pick_time">Change time</string>
+    <string name="edit">Edit</string>
+    <string name="title_calendar">Calendar</string>
+    <string name="calendar_hint">Tap a date to filter history</string>
+    <string name="show_all">Show all</string>
+    <string name="filtering">Filtering: %1$s</string>
 </resources>
