@@ -99,11 +99,13 @@ configure GitHub Pages to deploy from the root of the `gh-pages` branch. A
 publishing failure is non-blocking and is reported in the final issue comment.
 See [OmGithub publishing](omgithub.md).
 
-The OmGithub issue workspace polls issue comments every eight seconds. It shows
-the live OpenCode session on the left and the newest progress screenshot on the
-right. Once browser verification or GitHub Pages publishing is available, the
-right pane becomes a playable iframe; numbered controls retain access to every
-progress and final screenshot found in issue comments.
+The OmGithub issue workspace polls issue comments every eight seconds. Its
+header contains the four numbered workflow stages plus the currently executing
+stage and description. On desktop it shows the live OpenCode session on the
+left and the newest progress screenshot or playable preview on the right. At
+the mobile breakpoint, Chat and Preview tabs keep only one iframe visible at a
+time. Numbered preview controls retain access to every progress and final
+screenshot found in issue comments.
 
 The comment URL opens `/<encoded-worktree>/session/<session-id>` rather than
 the web home page. This matters because the web home page stores its project
