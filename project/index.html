@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Comet Harvest — Collect & Dodge</title>
+  <meta name="description" content="Comet Harvest - collect glowing comets, dodge asteroids, survive the swarm.">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">☄️</div>
+        <div>
+          <h1>COMET HARVEST</h1>
+          <p>Collect the glow • Dodge the rocks • Survive the swarm</p>
+        </div>
+      </div>
+      <div class="hud" aria-live="polite">
+        <div class="badge"><span class="label">Score</span> <span class="val" id="score">0</span></div>
+        <div class="badge"><span class="label">Lives</span> <span class="lives" id="lives"></span></div>
+        <div class="badge"><span class="label">Level</span> <span class="val" id="level">1</span></div>
+        <div class="badge"><span class="label">Best</span> <span class="val" id="best">0</span></div>
+      </div>
+    </header>
+
+    <div class="main">
+      <div class="canvas-card">
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="game" width="800" height="600" aria-label="Comet Harvest game area"></canvas>
+
+          <div class="overlay show" id="startOverlay">
+            <div class="overlay-card">
+              <h2>Ready to Harvest?</h2>
+              <p>Use <b>WASD</b> or <b>Arrow Keys</b> to fly. Grab <span style="color:#38bdf8">cyan comets</span> for +10 and rare <span style="color:#facc15">gold comets</span> for +25. Avoid asteroids — you have 3 lives. Difficulty rises every 100 points.</p>
+              <div class="row">
+                <button class="btn" id="startBtn">▶ Play Now</button>
+                <button class="btn secondary" id="howBtn">How to Play</button>
+              </div>
+              <p style="margin-top:10px;font-size:12px">On mobile, use the D-pad or drag directly on the field.</p>
+            </div>
+          </div>
+
+          <div class="overlay" id="gameOverOverlay">
+            <div class="overlay-card">
+              <h2 id="gameOverTitle">Signal Lost</h2>
+              <p id="gameOverText">You were overwhelmed by the swarm.</p>
+              <p style="margin-top:8px"><b>Score:</b> <span id="finalScore">0</span> • <b>Level:</b> <span id="finalLevel">1</span></p>
+              <div class="row">
+                <button class="btn" id="restartBtn">↻ Restart</button>
+                <button class="btn secondary" id="shareBtn">Share Score</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="overlay" id="pauseOverlay">
+            <div class="overlay-card">
+              <h2>Paused</h2>
+              <p>Press <span class="kbd">P</span> or <span class="kbd">Esc</span> to resume.</p>
+              <div class="row"><button class="btn" id="resumeBtn">Resume</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mobile-controls" aria-hidden="false">
+          <div class="dpad" id="dpad">
+            <div class="spacer"></div><button data-dir="up" aria-label="Up">▲</button><div class="spacer"></div>
+            <button data-dir="left" aria-label="Left">◀</button><button data-dir="down" aria-label="Down">▼</button><button data-dir="right" aria-label="Right">▶</button>
+          </div>
+        </div>
+        <div class="touch-hint">Tip: Drag your finger on the field to steer • <span class="kbd">R</span> restart • <span class="kbd">P</span> pause</div>
+        <div style="display:flex;gap:10px;margin-top:10px">
+          <button class="btn" id="restartBtn2" style="flex:1">↻ Restart</button>
+          <button class="btn secondary" id="pauseBtn" style="flex:1">⏸ Pause</button>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="panel">
+          <h3>Progress</h3>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px"><span>Next level</span><span id="progressLabel">0 / 100</span></div>
+          <div class="progress"><div id="progressBar"></div></div>
+          <div style="margin-top:10px" class="stat"><span>Comets collected</span><b id="cometCount">0</b></div>
+          <div class="stat"><span>Asteroids dodged</span><b id="timeStat">0s</b></div>
+        </div>
+
+        <div class="panel">
+          <h3>Controls</h3>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+            <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span>
+            <span style="color:var(--muted);align-self:center">or</span>
+            <span class="kbd">▲</span><span class="kbd">◀</span><span class="kbd">▼</span><span class="kbd">▶</span>
+          </div>
+          <div class="controls-grid" style="font-size:13px;color:var(--muted);line-height:1.6">
+            <div><span class="kbd">R</span> Restart</div>
+            <div><span class="kbd">P</span> Pause</div>
+            <div>🟦 Cyan comet <b style="color:#38bdf8">+10</b></div>
+            <div>🟨 Gold comet <b style="color:#facc15">+25</b></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Difficulty</h3>
+          <p style="margin:0 0 8px;color:var(--muted);font-size:13px;line-height:1.5">Level increases every 100 points. Asteroids spawn faster and move quicker. At Level 5+, double asteroids may appear.</p>
+          <div class="stat"><span>Current</span><b id="diffLabel">Level 1 — Calm Belt</b></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="footer">Built for desktop & mobile • Canvas 800×600 scaled responsively • No install needed</div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
