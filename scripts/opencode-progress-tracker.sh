@@ -40,6 +40,10 @@ vision_calls() {
 }
 
 while :; do
+  # The completion reporter owns the comment after verification. Check before
+  # fetching or patching so a final report cannot be overwritten by a stale
+  # progress snapshot during the handoff.
+  [[ -f "$OPENCODE_WEB_DIR/response-comment.done" ]] && break
   payload="$(curl --fail --silent --show-error \
     -H "x-opencode-directory: $PROJECT_DIR" \
     "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" 2>/dev/null || true)"
@@ -154,6 +158,7 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 _Image-context model calls are inferred from image attachments in the session transcript. Message contents and tool details are hidden. Full logs are published in the completion release._"
     if [[ "${PROGRESS_DRY_RUN:-false}" == "true" ]]; then
       printf '%s\n' "$body" > "${PROGRESS_OUTPUT:?PROGRESS_OUTPUT is required in dry-run mode}"
+      break
     else
       gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
         -f body="$body" >/dev/null || true

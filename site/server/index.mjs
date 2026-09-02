@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cookies, nonce, sign, verify } from './auth.mjs'
-import { dispatchOmgRequest, extractUrls, github, omgRequest, slugify, verifyWebhookSignature } from './github.mjs'
+import { createAppPullRequest, dispatchOmgRequest, extractUrls, github, omgRequest, slugify, verifyWebhookSignature } from './github.mjs'
 import { createStore } from './store.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -102,10 +102,35 @@ app.post('/api/github/webhooks', express.raw({ type: 'application/json', limit: 
     const payload = JSON.parse(req.body.toString('utf8'))
     const request = omgRequest(String(req.headers['x-github-event'] || ''), payload)
     if (!request) return res.status(202).json({ accepted: false })
+    const deliveryId = String(req.headers['x-github-delivery'] || '')
+    if (!/^[A-Za-z0-9._-]{8,128}$/.test(deliveryId)) {
+      return res.status(400).json({ error: 'Missing or invalid GitHub delivery ID' })
+    }
     if (!githubApp.appId || !githubApp.privateKey) {
       return res.status(503).json({ error: 'GitHub App dispatch is not configured' })
     }
-    const dispatched = await dispatchOmgRequest(request, githubApp)
+    const claimed = await store.claimDelivery(deliveryId, {
+      repository: request.repository, issue_number: request.issueNumber,
+      event: request.deliveryEvent, action: request.deliveryAction
+    })
+    if (!claimed) return res.status(202).json({ accepted: true, route: 'duplicate-delivery' })
+    const executionId = createHash('sha256')
+      .update(`${request.repository}#${request.issueNumber}`)
+      .digest('hex')
+    const executionClaimed = request.missingOpenCodeLabel
+      ? false
+      : await store.claimExecution(executionId)
+    if (!request.missingOpenCodeLabel && !executionClaimed) {
+      return res.status(202).json({ accepted: true, route: 'duplicate-request' })
+    }
+    let dispatched
+    try {
+      dispatched = await dispatchOmgRequest(request, githubApp)
+    } catch (error) {
+      await store.releaseDelivery(deliveryId)
+      if (executionClaimed) await store.releaseExecution(executionId)
+      throw error
+    }
     console.log(`OMG webhook routed ${request.repository}#${request.issueNumber} through ${dispatched.route}`)
     const accepted = !['missing-opencode-label', 'permissions-missing', 'invalid-branch'].includes(dispatched.route)
     res.status(202).json({ accepted, route: dispatched.route, missing_permissions: dispatched.missingPermissions || [], commented: dispatched.commented })
@@ -113,6 +138,24 @@ app.post('/api/github/webhooks', express.raw({ type: 'application/json', limit: 
 })
 
 app.use(express.json({ limit: '2mb' }))
+app.post('/api/github/pull-requests', async (req, res, next) => {
+  try {
+    if (!githubApp.appId || !githubApp.privateKey) {
+      return res.status(503).json({ error: 'GitHub App delivery is not configured' })
+    }
+    const authorization = String(req.headers.authorization || '')
+    const callerToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
+    const result = await createAppPullRequest(req.body, githubApp, callerToken)
+    res.status(result.route === 'app-created' ? 201 : 200).json({
+      route: result.route,
+      pull_request_url: result.pullRequestUrl,
+      number: result.number
+    })
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message })
+    next(error)
+  }
+})
 app.get('/api/me', (req, res) => { const user = userFor(req); res.json({ user: user ? { login: user.login, name: user.name, avatar_url: user.avatar_url, html_url: user.html_url } : null }) })
 app.get('/api/projects', async (req, res, next) => { try { const user = userFor(req); let rows = await projects(); if (req.query.mine === '1') rows = user ? rows.filter(row => row.owner_login?.toLowerCase() === user.login.toLowerCase()) : []; res.json({ projects: rows.map(card) }) } catch (e) { next(e) } })
 app.get('/api/profiles/:login', async (req, res, next) => { try { const profile = await github(`/users/${encodeURIComponent(req.params.login)}`, githubToken); const rows = (await projects()).filter(row => row.owner_login?.toLowerCase() === req.params.login.toLowerCase()); res.json({ profile, projects: rows.map(card) }) } catch (e) { next(e) } })

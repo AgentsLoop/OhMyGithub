@@ -1,0 +1,124 @@
+name: Verify Android app
+description: Build, run, inspect, and capture an Android app on a live emulator.
+
+inputs:
+  session-id:
+    description: OpenCode session ID to continue.
+    required: true
+  model:
+    description: OpenCode model used by the session.
+    required: true
+  hold-seconds:
+    description: Time to retain the live emulator after a verification failure.
+    required: false
+    default: '18000'
+
+outputs:
+  apk-path:
+    description: Absolute path to the signed release APK.
+    value: ${{ steps.outputs.outputs.apk_path }}
+  apk-name:
+    description: Release APK filename.
+    value: ${{ steps.outputs.outputs.apk_name }}
+  package-name:
+    description: Installed Android application ID.
+    value: ${{ steps.outputs.outputs.package_name }}
+  screenshots-json:
+    description: JSON array of final emulator screenshot filenames.
+    value: ${{ steps.outputs.outputs.screenshots_json }}
+  verification-json:
+    description: Absolute path to the machine-readable verification manifest.
+    value: ${{ steps.outputs.outputs.verification_json }}
+  evidence-dir:
+    description: Absolute path to this run's isolated Android evidence directory.
+    value: ${{ steps.outputs.outputs.evidence_dir }}
+  apk-sha256:
+    description: SHA-256 checksum of the signed release APK.
+    value: ${{ steps.outputs.outputs.apk_sha256 }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v5
+
+    - name: Enable KVM
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo groupadd --force kvm
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | \
+          sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+        # A newly-added supplementary group is not inherited by this shell.
+        # Make the device directly usable by the emulator process as well.
+        if [[ -e /dev/kvm ]]; then
+          sudo chmod 0666 /dev/kvm
+        fi
+
+    - name: Preflight Android runner resources
+      shell: bash
+      run: |
+        set -euo pipefail
+        [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]
+        available_kb="$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
+        memory_kb="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
+        ((available_kb >= 5 * 1024 * 1024))
+        ((memory_kb >= 2 * 1024 * 1024))
+        printf 'Android preflight: %s KiB disk, %s KiB memory available.\n' \
+          "$available_kb" "$memory_kb"
+
+    - name: Build and verify on Android emulator
+      id: emulator_primary
+      continue-on-error: true
+      uses: reactivecircus/android-emulator-runner@v2
+      env:
+        OPENCODE_SESSION_ID: ${{ inputs.session-id }}
+        OPENCODE_MODEL: ${{ inputs.model }}
+        ANDROID_EVIDENCE_DIR: ${{ runner.temp }}/opencode-evidence/${{ github.run_id }}/android
+        ANDROID_FAILURE_HOLD_SECONDS: '0'
+      with:
+        api-level: 35
+        target: google_apis
+        arch: x86_64
+        profile: pixel_7_pro
+        working-directory: ${{ env.PROJECT_DIR }}
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: true
+        script: bash "$RUNTIME_DIR/scripts/verify-android-app.sh"
+
+    - name: Retry with a fresh Android emulator
+      id: emulator_retry
+      if: steps.emulator_primary.outcome == 'failure'
+      uses: reactivecircus/android-emulator-runner@v2
+      env:
+        OPENCODE_SESSION_ID: ${{ inputs.session-id }}
+        OPENCODE_MODEL: ${{ inputs.model }}
+        ANDROID_EVIDENCE_DIR: ${{ runner.temp }}/opencode-evidence/${{ github.run_id }}/android
+        ANDROID_OPENCODE_VERIFY_ENABLED: 'false'
+        ANDROID_FAILURE_HOLD_SECONDS: ${{ inputs.hold-seconds }}
+      with:
+        api-level: 35
+        target: google_apis
+        arch: x86_64
+        profile: pixel_7_pro
+        working-directory: ${{ env.PROJECT_DIR }}
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: true
+        script: bash "$RUNTIME_DIR/scripts/verify-android-app.sh"
+
+    - name: Export Android verification outputs
+      id: outputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        outputs_file="$OPENCODE_WEB_DIR/android-verification.outputs"
+        [[ -s "$outputs_file" ]]
+        cat "$outputs_file" >> "$GITHUB_OUTPUT"

@@ -18,9 +18,9 @@ path. The `OpenCode` label asks the App to launch the workflow; add `Goal` to se
 persistent goal mode. This keeps
 one request event mapped to one OpenCode session.
 
-When a human opens an issue without `OpenCode`, the App posts a reminder to add
-the label and stops; it does not dispatch a workflow. Adding `OpenCode` later
-starts the normal App-dispatched flow.
+When a human opens an issue without `OpenCode`, the App adds the label, posts a
+reminder, and stops processing that original delivery. The resulting exact-label
+event starts the normal App-dispatched flow.
 
 An optional issue-title suffix in the exact form `branch: <existing-branch>`
 selects the checkout and pull-request base. The App removes that suffix from the
@@ -61,10 +61,19 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    Message text, reasoning, prompts, and tool details are
    never rendered in the live comment; full logs are published only in the
    completion release.
-9. Runs a second verification prompt in the same OpenCode session as the build,
-   starts the app, and exposes it through a
-   separate temporary trycloudflare.com tunnel, and verifies the public URL.
-10. Verifies the app through the public tunnel. If verification fails, sends a
+9. Selects a dedicated web or Android composite verifier. Web issues run a
+   second browser-verification prompt, start the app, and expose it through a
+   separate temporary trycloudflare.com tunnel. Issues with the exact `Android`
+   label instead boot an API 35 Google APIs x86_64 emulator, run the Android
+   verification prompt in the same OpenCode session, then independently run
+   tests and `assembleRelease`, sign/install/launch the app, probe a todo-style
+   input and persistence flow when present, scan for crashes, and capture a
+   live-emulator screenshot. A fresh attached OpenCode `build` session, pinned
+   to the generated project directory, may repair and exercise the app on that
+   emulator; deterministic checks remain
+   the success authority. The manifest records the generated checkout commit,
+   not the centralized workflow runtime commit.
+10. Verifies web apps through the public tunnel. If verification fails, sends a
    remediation prompt to the same OpenCode session and retries up to three
    times. Detects both uncommitted generated files and commits already created
    by OpenCode, then pushes the branch and creates the pull request in YAML.
@@ -74,12 +83,21 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
     `🟡 **OpenCode progress (live)**` marker. If screenshots are missing, it
     sends up to two follow-up prompts to the same OpenCode session before
     continuing delivery with a warning.
-12. Creates a uniquely tagged GitHub release containing the final OpenCode
-    response JSON and safe runner log files, then appends its link to that same
-    live-progress comment.
-13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
-   verification,
-   then marks the comment closed and terminates both tunnels.
+12. Creates a draft, uniquely tagged GitHub release containing the final
+    OpenCode response JSON and safe runner logs. Android releases also contain
+    the signed APK, fresh screenshot, and `verification.json`. Every uploaded
+    asset is downloaded and checksum-compared before publication; an incomplete
+    draft is deleted.
+13. Successful runs close SSH and finish immediately. A failed first Android
+    emulator attempt is retried with a fresh AVD; a failed second attempt holds
+    that emulator and SSH session for five hours. Other failures use the same
+    failure-only SSH hold.
+
+An issue with the exact `ssh` label is a debugging-only mode: it starts the
+temporary AgentsWeb SSH session, posts the connection command, skips OpenCode,
+verification, release delivery, and reporting, then keeps the runner alive for
+five hours. Reuse one temporary `known_hosts` file for every SSH/scp command in
+that session and delete it after the session ends.
 
 Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
 defaults to `true`. When set to `off` (or any value other than `true`), the
@@ -87,7 +105,8 @@ workflow stops after the initial OpenCode prompt and temporary OpenCode Web
 trycloudflare exposure; app verification/remediation, completion and screenshot
 prompts, Git delivery, OmGithub publication, release/report generation, and the
 complete label are skipped. The temporary access session still sleeps for five
-hours before cleanup.
+hours before cleanup only in explicit `ssh` mode; an otherwise successful
+validation-disabled run cleans up immediately.
 
 After PR creation, OmGithub publishing is opt-in. Set the repository variable
 `OMGHITHUB_PUBLISH_ENABLED` to `true` to ZIP `$PROJECT_DIR/dist`, publish it through
@@ -113,9 +132,11 @@ The workflow uses the built-in OpenCode model path and does not require an
 `OPENCODE_API_KEY` secret. To authenticate an ephemeral worker with the Mac's
 OpenAI OAuth login, save the complete local OpenCode `auth.json` as the
 `OPENCODE_AUTH_JSON` repository secret; the workflow passes it through
-OpenCode's `OPENCODE_AUTH_CONTENT` environment variable. Branch creation,
-pushing, and pull-request creation are deliberately handled by the workflow
-rather than by OpenCode's GitHub integration.
+OpenCode's `OPENCODE_AUTH_CONTENT` environment variable. Branch creation and
+pushing are handled by the workflow rather than OpenCode's GitHub integration.
+Pull-request creation is requested from the Oh My Github App after it verifies
+the workflow run and exact generated branch SHA; the repository token remains
+a fallback while the App endpoint is unavailable.
 
 ## Findings: tracking the GitHub run in Web UI
 
@@ -190,14 +211,27 @@ tracking; acceptance requires a screenshot while the run is active.
 
 ## Runner selection
 
-The reusable workflow uses `ubuntu-latest` (AMD64) by default. Add the exact
-`runner/arm64` label to an issue to select GitHub's `ubuntu-24.04-arm`
-GitHub-hosted runner. The label is passed through `labels_json`, so this works
-for both repository-local workflows and App-generated fallback wrappers.
+The reusable workflow always uses GitHub's `ubuntu-latest` runner. Runner
+selection labels are ignored; this keeps web and Android verification on one
+consistent KVM-capable runner image.
+
+The centralized runtime checkout follows the triggering branch
+(`github.ref_name`) rather than hard-coding `main`. A title suffix of
+`branch: <existing-branch>` therefore keeps workflow scripts, prompts, and app
+source on the same branch under test; the branch must exist in the repository
+before the issue is opened.
 
 ## Repository settings
 
-- Actions must be allowed to create and approve pull requests.
+Generated work is isolated on `opencode/<run-id>`. The workflow removes the
+selected base branch's inherited upstream, configures ordinary pushes to target
+the current run branch, and installs a runner-local pre-push guard that rejects
+every other remote ref. The GitHub App-created pull request is therefore the
+integration boundary; the implementation session cannot push directly to the
+selected base branch.
+
+- Existing App installations must approve `Pull requests: write` for App-owned
+  PR delivery. Allowing Actions to create pull requests remains a fallback.
 - For runner-side SSH access and verification, configure the
   `AGENTSWEB_SSH_PUBLIC_KEY` Actions secret with the public key matching the Mac
   private key described in [access.md](access.md). Without it, the workflow

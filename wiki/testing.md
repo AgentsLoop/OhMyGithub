@@ -35,6 +35,76 @@ actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.ym
 git diff --check
 ```
 
+For an `Android`-labeled issue, additionally confirm that the workflow uses
+`ubuntu-latest`, KVM and the API 35 emulator start, OpenCode creates a
+`screenshots/final-android-*.png` image from the live device, and deterministic
+post-verification rebuild/sign/install/launch checks pass. The run release must
+contain a non-empty `app-release.apk` whose signature verifies and whose direct
+asset link appears in the final live-progress comment. Force a verifier failure
+to confirm the emulator remains reachable through the posted SSH session for
+the five-hour hold after the fresh-emulator retry; failures outside Android
+verification must still execute the failure-only five-hour SSH hold before
+cleanup. Successful runs must not enter a hold and must conclude `success`.
+
+The release must contain `verification.json`, `app-release.apk`, and
+`final-android-workflow.png`. Confirm the manifest status is `passed`, its
+required build/sign/install/launch/crash/screenshot states are `passed`, and
+its APK SHA-256 matches a newly downloaded release asset. Todo-style apps must
+also report successful interaction and persistence; other app types record
+those checks as `not_applicable`.
+
+For a manual runner check, add the exact `ssh` label. This intentionally skips
+OpenCode and verification while leaving the runner available for debugging.
+Reuse one temporary file such as
+`-o UserKnownHostsFile=/tmp/agentsweb-<run>-known_hosts` for all SSH/scp commands,
+then remove it after the runner session closes.
+
+## Android runner success path
+
+The manual SSH smoke test succeeded entirely on the Ubuntu runner: it installed
+the API 35 emulator and Google APIs image, created an AVD, built `app-debug.apk`,
+installed it with ADB, launched the app, interacted with it, and captured launch
+and interaction PNGs with `adb exec-out screencap -p`. Durable evidence is the
+[launch screenshot](../screenshots/final-android-manual-launch.png),
+[interaction screenshot](../screenshots/final-android-manual-interaction.png),
+and commit `a40d95c`.
+
+The repeatable command sequence is:
+
+```sh
+export ANDROID_AVD_HOME="$HOME/.config/.android/avd"
+yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+  emulator "system-images;android-35;google_apis;x86_64"
+echo no | avdmanager create avd -n manual-test \
+  -k "system-images;android-35;google_apis;x86_64" --force
+nohup sg kvm -c 'emulator @manual-test -no-snapshot -no-window \
+  -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none' \
+  > "$HOME/manual-emulator.log" 2>&1 &
+adb wait-for-device
+./gradlew --no-daemon assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell monkey -p <application-id> 1
+adb exec-out screencap -p > screenshots/final-android-manual.png
+```
+
+## Android and SSH gotchas
+
+- `/dev/kvm` can exist while the runner process still lacks the `kvm` group.
+  Reload the udev rule and make the device readable/writable (`chmod 0666`) in
+  the current job; adding the group alone does not refresh the current shell.
+- `avdmanager` may create the AVD under `$HOME/.config/.android/avd`, while
+  `emulator` searches another default. Export `ANDROID_AVD_HOME` for every
+  emulator and ADB command.
+- Use `sg kvm -c` when launching manually so the emulator receives the group
+  immediately. The workflow's KVM step handles the equivalent device access.
+- A long Gradle build can outlive the local SSH client's command timeout. Start
+  it remotely with `nohup` when needed, then poll the process and APK path over
+  the same SSH session.
+- Keep one known-hosts file for the whole session. The first connection may
+  print the host-key warning; subsequent `ssh` and `scp` commands should pass
+  the same `UserKnownHostsFile`. Delete it only after canceling/finishing the
+  runner session.
+
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
@@ -74,7 +144,9 @@ native Goal command and must not register a compatibility `ulw-loop` command.
 The log-release step must copy and upload only non-empty `.log`/`.json` files;
 empty service logs such as `nginx.log` can make GitHub's upload API return
 `400 Bad Content-Length`. The OpenCode response JSON remains required and must
-be non-empty.
+be non-empty. Release publication is transactional: create a draft, download
+and checksum-compare every asset, validate Android evidence, and only then
+publish it.
 
 Focused completion-evidence checks should also confirm that the workflow copies
 `agents.template.md` to `project/Agents.md`, and that a run sends up to two

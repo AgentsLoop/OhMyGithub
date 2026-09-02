@@ -33,8 +33,10 @@ on:
         required: false
 jobs:
   opencode:
-    # Add the runner/arm64 issue label to select GitHub's ARM64 image.
-    runs-on: ${{ contains(inputs.labels_json, '"runner/arm64"') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: opencode-${{ github.repository_id }}-issue-${{ inputs.issue_number }}
+      cancel-in-progress: true
     permissions:
       id-token: write
       contents: write
@@ -70,7 +72,10 @@ jobs:
       COMMENT_BODY: ${{ inputs.request }}
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
+      ANDROID_REQUEST: ${{ contains(inputs.labels_json, '"Android"') }}
+      SSH_ONLY_REQUEST: ${{ contains(inputs.labels_json, '"ssh"') }}
       OMGHITHUB_PUBLISH_ENABLED: ${{ vars.OMGHITHUB_PUBLISH_ENABLED || 'false' }}
+      OMGHITHUB_APP_URL: ${{ vars.OMGHITHUB_APP_URL || 'https://omgithub.com' }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
       - name: Export target token
@@ -90,7 +95,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: AgentsLoop/OhMyGithub
-          ref: main
+          # Keep the runtime assets on the same branch as the workflow under test.
+          ref: ${{ github.ref_name }}
           path: .omgithub-runtime
           token: ${{ github.token }}
           fetch-depth: 1
@@ -195,6 +201,8 @@ jobs:
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
               { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
+              { name: 'Android', color: '3DDC84', description: 'Build and verify an installable Android APK' },
+              { name: 'ssh', color: '5319E7', description: 'Start an SSH-only debugging session without OpenCode' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',
@@ -325,8 +333,46 @@ jobs:
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
 
+      - name: Post SSH-only access details
+        id: ssh_access_comment
+        if: env.SSH_ONLY_REQUEST == 'true'
+        uses: actions/github-script@v7
+        env:
+          AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
+          SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
+          SSH_HOST: ${{ steps.agentsweb.outputs.host }}
+          SSH_PORT: ${{ steps.agentsweb.outputs.port }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = process.env.AGENTSWEB_SSH_ENABLED === 'true'
+              ? [
+                  '🔐 **SSH-only debugging session is ready.**', '',
+                  `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
+                  'Connect while the job is active:', '', '```sh', process.env.SSH_COMMAND, '```', '',
+                  'This run skips OpenCode and sleeps for five hours for manual Android emulator testing.'
+                ].join('\n')
+              : [
+                  '❌ **SSH-only debugging session could not start.**', '',
+                  `Run: ${run}`, 'The `AGENTSWEB_SSH_PUBLIC_KEY` secret is not configured.'
+                ].join('\n');
+            const comment = await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, body
+            });
+            core.setOutput('comment_id', comment.data.id);
+            if (process.env.AGENTSWEB_SSH_ENABLED !== 'true') core.setFailed('AGENTSWEB SSH is required for the ssh label.');
+
+      - name: Hold SSH-only debugging session
+        if: env.SSH_ONLY_REQUEST == 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
+        shell: bash
+        run: sleep 18000
+
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -450,6 +496,7 @@ jobs:
           printf 'url=%s\n' "$WEB_URL" >> "$GITHUB_OUTPUT"
 
       - name: Verify shared skills are visible to OpenCode
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -463,21 +510,46 @@ jobs:
           [[ "$actual" -ge "$expected" ]]
 
       - name: Configure Git identity
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           git config user.name 'opencode[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
       - name: Create OpenCode branch
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
           BASE_BRANCH="$TARGET_REF"
           git fetch origin "$BASE_BRANCH"
           git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
+          # checkout -B inherits the base branch's upstream. Remove it so an
+          # agent's ordinary `git push` can only create/update its run branch.
+          git branch --unset-upstream 2>/dev/null || true
+          git config push.default current
+          git config remote.pushDefault origin
+
+          # OpenCode is allowed to publish only the isolated run branch. The
+          # workflow's later delivery step opens the PR through the GitHub App.
+          pre_push_hook="$(git rev-parse --git-path hooks/pre-push)"
+          install -d "$(dirname "$pre_push_hook")"
+          cat > "$pre_push_hook" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          allowed_ref='refs/heads/$BRANCH_NAME'
+          while read -r _local_ref _local_sha remote_ref _remote_sha; do
+            if [[ "\$remote_ref" != "\$allowed_ref" ]]; then
+              printf 'OpenCode may push only %s; rejected %s.\n' "\$allowed_ref" "\$remote_ref" >&2
+              exit 1
+            fi
+          done
+          EOF
+          chmod +x "$pre_push_hook"
 
       - name: Resolve OpenCode model and skill labels
         id: opencode_labels
+        if: env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -506,6 +578,7 @@ jobs:
 
       - name: Run OpenCode and locate its web session
         id: opencode_run
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
@@ -527,6 +600,9 @@ jobs:
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
+          if [[ "$ANDROID_REQUEST" == 'true' ]]; then
+            prompt+=$'\n\n'"$(< "$RUNTIME_DIR/.github/prompts/01-build-android.md")"
+          fi
           if [[ "$OMO_REQUEST" == 'true' ]]; then
             prompt=$'ulw\n\n'"$prompt"
           fi
@@ -560,19 +636,28 @@ jobs:
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
           SESSION_ID=''
-          for _ in {1..120}; do
+          for _ in {1..600}; do
             SESSION_ID="$(curl --fail --silent --show-error "http://127.0.0.1:$OPENCODE_WEB_PORT/session" | jq -r '.[0].id // empty')"
             [[ "$SESSION_ID" == ses_* ]] && break
+            if [[ -f "$RUN_EXIT" ]]; then
+              echo "OpenCode exited before a session was discoverable (code $(cat "$RUN_EXIT"))." >&2
+              [[ ! -s "$RUN_LOG" ]] || tail -200 "$RUN_LOG" >&2
+              exit 1
+            fi
             sleep 1
           done
-          [[ "$SESSION_ID" == ses_* ]]
+          if [[ "$SESSION_ID" != ses_* ]]; then
+            echo 'OpenCode session was not discoverable after 10 minutes.' >&2
+            [[ ! -s "$RUN_LOG" ]] || tail -200 "$RUN_LOG" >&2
+            exit 1
+          fi
           DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
           printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
             "${OPENCODE_WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
 
       - name: Verify live sessions through SSH
         id: verify_sessions
-        if: env.AGENTSWEB_SSH_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -597,6 +682,7 @@ jobs:
 
       - name: Post temporary access details
         id: access_comment
+        if: env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
         env:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
@@ -632,30 +718,33 @@ jobs:
 
       - name: Start live OpenCode response comment
         id: response_comment
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
           SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          RESPONSE_COMMENT_ID="$(gh api --method POST \
+            "repos/$REPOSITORY/issues/$ISSUE_NUMBER/comments" \
+            -f body='🟡 **OpenCode progress (live)**' --jq '.id')"
+          [[ -n "$RESPONSE_COMMENT_ID" ]]
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
           install -m 700 "$RUNTIME_DIR/scripts/opencode-progress-tracker.sh" "$TRACKER"
           # The tracker is intentionally independent of the step shell so it can poll
           # while later workflow steps run; cleanup stops it at the end of the job.
           nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
             OPENCODE_WEB_DIR="$OPENCODE_WEB_DIR" SESSION_ID="$SESSION_ID" \
-            COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
+            COMMENT_ID="$RESPONSE_COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
 
-      - name: Verify app with second OpenCode prompt
-        if: env.VALIDATION_ENABLED == 'true'
+      - name: Wait for OpenCode implementation
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
           for _ in {1..21600}; do
@@ -666,187 +755,85 @@ jobs:
           code="$(cat "$OPENCODE_WEB_DIR/opencode-run.exit")"
           echo "OpenCode exited with code $code"
           [[ "$code" == 0 ]]
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          "$OPENCODE_BIN" run \
-            --auto \
-            --dangerously-skip-permissions \
-            --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-            --session "${{ steps.opencode_run.outputs.session_id }}" \
-            --model "${{ steps.opencode_labels.outputs.model }}" \
-            "$(< "$RUNTIME_DIR/.github/prompts/02-verify.md")" \
-            > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
-      - name: Expose verified app
-        if: env.VALIDATION_ENABLED == 'true'
-        id: app_tunnel
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          FIX_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/03-public-app-fix.md")"
+      - name: Verify web app
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true'
+        id: web_verification
+        uses: ./.omgithub-runtime/.github/actions/verify-web
+        with:
+          session-id: ${{ steps.opencode_run.outputs.session_id }}
+          model: ${{ steps.opencode_labels.outputs.model }}
 
-          for attempt in 1 2 3; do
-            echo "Starting public app verification attempt $attempt/3."
-            [[ ! -f "$OPENCODE_WEB_DIR/app.pid" ]] || kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
-            [[ ! -f "$OPENCODE_WEB_DIR/app-cloudflared.pid" ]] || kill "$(cat "$OPENCODE_WEB_DIR/app-cloudflared.pid")" 2>/dev/null || true
-            : > "$OPENCODE_WEB_DIR/app.log"
-            : > "$OPENCODE_WEB_DIR/app-cloudflared.log"
-
-            npm run start -- --port "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
-            echo $! > "$OPENCODE_WEB_DIR/app.pid"
-            local_ok=''
-            for _ in {1..30}; do
-              if curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT" >/dev/null; then
-                local_ok='yes'
-                break
-              fi
-              sleep 1
-            done
-
-            if [[ "$local_ok" != 'yes' ]]; then
-              echo "Local app health check failed on attempt $attempt."
-            else
-              "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate \
-                --url "http://127.0.0.1:$APP_PORT" \
-                > "$OPENCODE_WEB_DIR/app-cloudflared.log" 2>&1 &
-              echo $! > "$OPENCODE_WEB_DIR/app-cloudflared.pid"
-              APP_URL=''
-              for _ in {1..60}; do
-                APP_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' \
-                  "$OPENCODE_WEB_DIR/app-cloudflared.log" | head -n 1)"
-                [[ -n "$APP_URL" ]] && break
-                sleep 1
-              done
-              public_app_ok=''
-              if [[ -n "$APP_URL" ]]; then
-                for _ in {1..60}; do
-                  if curl --fail --silent --show-error --max-time 10 "$APP_URL" >/dev/null; then
-                    public_app_ok='yes'
-                    break
-                  fi
-                  sleep 2
-                done
-              fi
-              if [[ "$public_app_ok" == 'yes' ]]; then
-                echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
-                echo "Public app verified at $APP_URL."
-                exit 0
-              fi
-              echo "Public app health check failed on attempt $attempt ($APP_URL)."
-            fi
-
-            if [[ "$attempt" -lt 3 ]]; then
-              echo "Sending OpenCode remediation prompt before retry $((attempt + 1))/3."
-              "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
-                --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-                --session "$SESSION_ID" \
-                --model "$OPENCODE_MODEL" \
-                "$FIX_PROMPT" \
-                >> "$OPENCODE_WEB_DIR/verification-fix-$attempt.log" 2>&1
-            fi
-          done
-
-          echo 'Public app verification failed after 3 attempts.'
-          exit 1
-        env:
-          OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
-
-      - name: Publish worker completion report
-        if: env.VALIDATION_ENABLED == 'true'
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          completion_prompt="$(< "$RUNTIME_DIR/.github/prompts/04-completion-report.md")"
-          completion_prompt="${completion_prompt//@APP_URL@/$APP_URL}"
-          completion_prompt="${completion_prompt//@TRIGGER_ISSUE_NUMBER@/$TRIGGER_ISSUE_NUMBER}"
-          "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
-            --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-            --session "${{ steps.opencode_run.outputs.session_id }}" \
-            --model "${{ steps.opencode_labels.outputs.model }}" \
-            "$completion_prompt" \
-            > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
-          touch "$OPENCODE_WEB_DIR/response-comment.done"
-
-      - name: Request and verify final screenshots
-        if: env.VALIDATION_ENABLED == 'true'
-        id: final_evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          SCREENSHOT_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/05-screenshot-evidence.md")"
-
-          for attempt in 1 2 3; do
-            mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
-              \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
-              -printf '%f\n' 2>/dev/null | sort)
-            if [[ "${#screenshots[@]}" -gt 0 ]]; then
-              printf '%s\n' "${screenshots[@]}"
-              printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
-              printf 'screenshots_status=present\n' >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            echo "No final screenshots found under $PROJECT_PATH/screenshots/ (attempt $attempt/3)."
-            if [[ "$attempt" -lt 3 ]]; then
-              echo "Sending OpenCode screenshot remediation prompt before retry $((attempt + 1))/3."
-              if ! "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
-                --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-                --session "$SESSION_ID" \
-                --model '${{ steps.opencode_labels.outputs.model }}' \
-                "$SCREENSHOT_PROMPT" \
-                > "$OPENCODE_WEB_DIR/screenshot-fix-$attempt.log" 2>&1; then
-                echo "OpenCode screenshot remediation failed on attempt $attempt; continuing to the next evidence check."
-              fi
-            fi
-          done
-
-          echo 'Final screenshots are still missing after three remediation attempts; continuing with delivery.'
-          printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"
-          printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
+      - name: Verify Android app
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST == 'true'
+        id: android_verification
+        uses: ./.omgithub-runtime/.github/actions/verify-android
+        with:
+          session-id: ${{ steps.opencode_run.outputs.session_id }}
+          model: ${{ steps.opencode_labels.outputs.model }}
 
       - name: Create pull request
-        if: env.VALIDATION_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: delivery
         shell: bash
         run: |
           set -euo pipefail
           BASE_BRANCH="$TARGET_REF"
-          # Dependencies are runtime-only and must never be included in the generated PR.
-          touch "$PROJECT_DIR/.gitignore"
-          grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
-            printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
+          # Web dependencies are runtime-only and must never be included in generated PRs.
+          if [[ "$ANDROID_REQUEST" != 'true' ]]; then
+            touch "$PROJECT_DIR/.gitignore"
+            grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
+              printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
+          fi
           git add -A -- "$PROJECT_PATH"
           if ! git diff --cached --quiet; then
             git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
           fi
           if git diff --quiet "origin/$BASE_BRANCH..HEAD" -- "$PROJECT_PATH"; then
             echo 'OpenCode made no changes; no pull request will be created.'
+            printf 'commit=%s\npr_url=\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git push --set-upstream origin "$BRANCH_NAME"
           FINAL_COMMIT="$(git rev-parse HEAD)"
           TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
           TITLE="${TITLE:0:120}"
-          if PR_URL="$(gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
-            --title "$TITLE" \
-            --body "Automated implementation requested in issue:\n\n$COMMENT_BODY")"; then
+          delivery_request="$RUNNER_TEMP/opencode-pr-delivery.json"
+          jq -n \
+            --arg repository "$TARGET_REPOSITORY" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson issue_number "$TRIGGER_ISSUE_NUMBER" \
+            --arg head "$BRANCH_NAME" --arg base "$BASE_BRANCH" \
+            --arg commit "$FINAL_COMMIT" --arg title "$TITLE" \
+            --arg body "Automated implementation requested in issue:\n\n$COMMENT_BODY" \
+            '{repository:$repository, run_id:$run_id, issue_number:$issue_number,
+              head:$head, base:$base, commit:$commit, title:$title, body:$body}' \
+            > "$delivery_request"
+          delivery_response="$RUNNER_TEMP/opencode-pr-delivery-response.json"
+          PR_URL=''
+          if curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors \
+              -X POST "$OMGHITHUB_APP_URL/api/github/pull-requests" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Content-Type: application/json' \
+              --data-binary "@$delivery_request" > "$delivery_response"; then
+            PR_URL="$(jq -r '.pull_request_url // empty' "$delivery_response")"
+          fi
+          if [[ -z "$PR_URL" ]] && PR_URL="$(gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
+              --title "$TITLE" \
+              --body "Automated implementation requested in issue:\n\n$COMMENT_BODY")"; then
+            echo 'GitHub App delivery was unavailable; repository token fallback created the pull request.' >&2
+          fi
+          if [[ -n "$PR_URL" ]]; then
             echo "Pull request created: $PR_URL"
           else
-            PR_URL=''
-            echo 'Pull request creation was blocked; treating PR delivery as optional.' >&2
+            echo 'Pull request creation was blocked through both App and repository-token delivery; continuing with commit delivery.' >&2
           fi
           printf 'commit=%s\npr_url=%s\n' "$FINAL_COMMIT" "$PR_URL" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: Publish game to OmGithub
-        if: env.VALIDATION_ENABLED == 'true' && env.OMGHITHUB_PUBLISH_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true' && env.OMGHITHUB_PUBLISH_ENABLED == 'true'
         continue-on-error: true
         id: omgithub_publish
         shell: bash
@@ -854,7 +841,7 @@ jobs:
         env:
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
-          SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
+          SCREENSHOTS_JSON: ${{ steps.web_verification.outputs.screenshots-json }}
           REQUEST_SENDER: ${{ inputs.sender }}
         run: |
           set -euo pipefail
@@ -904,12 +891,13 @@ jobs:
           printf 'url=%s\ninstall_url=%s\n' "$published_url" "$install_url" >> "$GITHUB_OUTPUT"
           echo "Published permanent game URL: $published_url"
       - name: Create OpenCode logs release
-        if: success() && env.VALIDATION_ENABLED == 'true'
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: opencode_release
         shell: bash
         run: |
           set -euo pipefail
           release_dir="$RUNNER_TEMP/opencode-release"
+          rm -rf "$release_dir"
           mkdir -p "$release_dir"
 
           # Preserve machine-readable responses and execution logs without
@@ -928,27 +916,41 @@ jobs:
             -size +0c \
             -exec cp -f {} "$release_dir/" \;
 
-          release_assets=()
-          while IFS= read -r -d '' asset; do
-            release_assets+=("$asset")
-          done < <(find "$release_dir" -maxdepth 1 -type f -size +0c -print0)
-          ((${#release_assets[@]} > 0))
+          if [[ "$ANDROID_REQUEST" == 'true' ]]; then
+            apk_path='${{ steps.android_verification.outputs.apk-path }}'
+            [[ -s "$apk_path" ]]
+            cp -f "$apk_path" "$release_dir/${{ steps.android_verification.outputs.apk-name }}"
+            verification_json='${{ steps.android_verification.outputs.verification-json }}'
+            [[ -s "$verification_json" ]]
+            cp -f "$verification_json" "$release_dir/verification.json"
+            evidence_dir='${{ steps.android_verification.outputs.evidence-dir }}'
+            screenshot="$evidence_dir/screenshots/final-android-workflow.png"
+            [[ -s "$screenshot" ]]
+            cp -f "$screenshot" "$release_dir/final-android-workflow.png"
+          fi
 
           tag="opencode-logs-${GITHUB_RUN_ID}"
-          gh release create "$tag" "${release_assets[@]}" \
-            --target "${{ steps.delivery.outputs.commit || github.sha }}" \
-            --title "OpenCode logs for run #${GITHUB_RUN_NUMBER}" \
-            --notes "Generated OpenCode response and execution logs for workflow run [#${GITHUB_RUN_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})." \
-            --latest=false
-
-          release_json="$(gh release view "$tag" --json url,assets)"
-          printf 'url=%s\n' "$(jq -r '.url' <<<"$release_json")" >> "$GITHUB_OUTPUT"
-          printf 'assets_json=%s\n' "$(jq -c '[.assets[] | {name, url: .browserDownloadUrl}]' <<<"$release_json")" >> "$GITHUB_OUTPUT"
+          RELEASE_DIR="$release_dir" \
+          RELEASE_TAG="$tag" \
+          RELEASE_TARGET='${{ steps.delivery.outputs.commit || github.sha }}' \
+          RELEASE_TITLE="OpenCode logs for run #${GITHUB_RUN_NUMBER}" \
+          RELEASE_NOTES="Generated and transactionally verified OpenCode evidence for workflow run [#${GITHUB_RUN_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})." \
+            bash "$RUNTIME_DIR/scripts/publish-opencode-release.sh"
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: Stop live OpenCode response tracker
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pid_file="$OPENCODE_WEB_DIR/response-comment-tracker.pid"
+          if [[ -s "$pid_file" ]]; then
+            kill "$(cat "$pid_file")" 2>/dev/null || true
+          fi
+
       - name: Post final game report
-        if: success() && env.VALIDATION_ENABLED == 'true' && env.APP_URL != ''
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST != 'true' && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
           APP_URL: ${{ steps.omgithub_publish.outputs.url || env.APP_URL }}
@@ -956,7 +958,7 @@ jobs:
           OMGHITHUB_PUBLISH_ENABLED: ${{ env.OMGHITHUB_PUBLISH_ENABLED }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
-          SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
+          SCREENSHOTS_JSON: ${{ steps.web_verification.outputs.screenshots-json }}
           PROJECT_PATH: ${{ env.PROJECT_PATH }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
         with:
@@ -1005,8 +1007,60 @@ jobs:
               body: `${liveComment.body.trim()}\n\n${body}`
             });
 
+      - name: Post final Android report
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.ANDROID_REQUEST == 'true'
+        uses: actions/github-script@v7
+        env:
+          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
+          PR_URL: ${{ steps.delivery.outputs.pr_url }}
+          SCREENSHOTS_JSON: ${{ steps.android_verification.outputs.screenshots-json }}
+          PROJECT_PATH: ${{ env.PROJECT_PATH }}
+          PACKAGE_NAME: ${{ steps.android_verification.outputs.package-name }}
+          APK_NAME: ${{ steps.android_verification.outputs.apk-name }}
+          APK_SHA256: ${{ steps.android_verification.outputs.apk-sha256 }}
+          RELEASE_ASSETS_JSON: ${{ steps.opencode_release.outputs.assets_json }}
+          OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
+            const assets = JSON.parse(process.env.RELEASE_ASSETS_JSON || '[]');
+            const apk = assets.find((asset) => asset.name === process.env.APK_NAME);
+            if (!apk?.url) throw new Error(`Release is missing APK asset: ${process.env.APK_NAME}`);
+            const verification = assets.find((asset) => asset.name === 'verification.json');
+            if (!verification?.url) throw new Error('Release is missing verification.json');
+            const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
+            const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
+            const images = screenshots.map((name) => {
+              const path = [projectPath, 'screenshots', name].filter(Boolean).join('/').split('/').map(encodeURIComponent).join('/');
+              return `![Final Android screenshot: ${name}](https://raw.githubusercontent.com/${process.env.TARGET_REPOSITORY}/${process.env.FINAL_COMMIT}/${path})`;
+            });
+            const body = [
+              '✅ **Android app complete and emulator verified.**', '',
+              `Install APK: [${process.env.APK_NAME}](${apk.url})`,
+              `APK SHA-256: \`${process.env.APK_SHA256}\``,
+              `Verification manifest: [verification.json](${verification.url})`,
+              `Package: \`${process.env.PACKAGE_NAME}\``,
+              `Final commit: [${process.env.FINAL_COMMIT}](${commitUrl})`,
+              `Pull request: ${process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.'}`,
+              `OpenCode release: [${process.env.OPENCODE_RELEASE_URL}](${process.env.OPENCODE_RELEASE_URL})`,
+              '', '<details><summary>Final Android screenshots</summary>', '', ...images, '', '</details>'
+            ].join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, per_page: 100
+            });
+            const liveComment = comments.find((comment) =>
+              typeof comment.body === 'string' && comment.body.includes('🟡 **OpenCode progress (live)**'));
+            if (!liveComment) throw new Error('Could not find the first OpenCode live-progress comment to update.');
+            await github.rest.issues.updateComment({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              comment_id: liveComment.id, body: `${liveComment.body.trim()}\n\n${body}`
+            });
+
       - name: Mark issue complete
-        if: success() && env.VALIDATION_ENABLED == 'true'
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -1061,13 +1115,18 @@ jobs:
               issue_number: number, labels: ['failed']
             });
 
-      - name: Keep temporary access available for 5 hours
-        if: success()
+      - name: Hold failed runner for SSH debugging
+        if: failure() && env.SSH_ONLY_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
         shell: bash
-        run: sleep 18000
+        run: |
+          if [[ -f "$OPENCODE_WEB_DIR/android-failure-hold-complete" ]]; then
+            echo 'The failed Android emulator already completed its debugging hold.'
+          else
+            sleep 18000
+          fi
 
       - name: Append SSH session closed
-        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.access_comment.outputs.comment_id != ''
+        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && (steps.access_comment.outputs.comment_id != '' || steps.ssh_access_comment.outputs.comment_id != '')
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
