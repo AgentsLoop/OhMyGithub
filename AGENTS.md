@@ -26,6 +26,14 @@ reminder, and starts the workflow from the resulting exact-label event.
 An optional issue-title suffix `branch: <existing-branch>` selects the target
 checkout and pull-request base; without it, the default branch is used.
 
+## Shell timing
+
+When writing shell scripts or invoking multiple commands in one shell call,
+always add explicit per-command execution-time measurements between commands.
+Use `/usr/bin/time -p` or a small timing helper around each meaningful command;
+the outer command duration is not sufficient because it hides which step is
+slow or hung.
+
 ## Ideas
 
 Store durable implementation ideas as individual Markdown files under
