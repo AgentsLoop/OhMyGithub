@@ -256,21 +256,35 @@ private val LightScheme = lightColorScheme(
     primary = Color(0xFF6750A4),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFEADDFF),
+    onPrimaryContainer = Color(0xFF21005D),
     secondary = Color(0xFF625B71),
     secondaryContainer = Color(0xFFE8DEF8),
+    onSecondaryContainer = Color(0xFF1D192B),
     background = Color(0xFFFFFBFE),
     surface = Color(0xFFFFFBFE),
     surfaceVariant = Color(0xFFE7E0EC),
-    outline = Color(0xFF79747E)
+    outline = Color(0xFF79747E),
+    outlineVariant = Color(0xFFCAC4D0),
+    error = Color(0xFFBA1A1A),
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002)
 )
 private val DarkScheme = darkColorScheme(
     primary = Color(0xFFD0BCFF),
     onPrimary = Color(0xFF381E72),
     primaryContainer = Color(0xFF4F378B),
+    onPrimaryContainer = Color(0xFFEADDFF),
     secondary = Color(0xFFCCC2DC),
+    secondaryContainer = Color(0xFF4F378B),
+    onSecondaryContainer = Color(0xFFE8DEF8),
     background = Color(0xFF141218),
     surface = Color(0xFF141218),
-    surfaceVariant = Color(0xFF49454F)
+    surfaceVariant = Color(0xFF49454F),
+    outline = Color(0xFF938F99),
+    outlineVariant = Color(0xFF49454F),
+    error = Color(0xFFFFB4AB),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 // --- Activity ---
@@ -504,17 +518,20 @@ fun TodoApp() {
                         label = { Text("All (${todos.size})") },
                         leadingIcon = if (filter == TodoFilter.ALL) {
                             { Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        } else null
+                        } else null,
+                        modifier = Modifier.semantics { contentDescription = "Filter All, ${todos.size} items" }
                     )
                     FilterChip(
                         selected = filter == TodoFilter.ACTIVE,
                         onClick = { filterName = TodoFilter.ACTIVE.name },
-                        label = { Text("Active ($activeCount)") }
+                        label = { Text("Active ($activeCount)") },
+                        modifier = Modifier.semantics { contentDescription = "Filter Active, $activeCount items" }
                     )
                     FilterChip(
                         selected = filter == TodoFilter.COMPLETED,
                         onClick = { filterName = TodoFilter.COMPLETED.name },
-                        label = { Text("Completed ($completedCount)") }
+                        label = { Text("Completed ($completedCount)") },
+                        modifier = Modifier.semantics { contentDescription = "Filter Completed, $completedCount items" }
                     )
                     Spacer(Modifier.weight(1f))
                     AnimatedVisibility(visible = completedCount > 0) {
@@ -748,7 +765,7 @@ private fun TodoRow(
                 OutlinedTextField(
                     value = editingText,
                     onValueChange = { if (it.length <= MAX_TODO_LENGTH) onEditingTextChange(it) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Edit task input" },
                     singleLine = false,
                     maxLines = 4,
                     shape = RoundedCornerShape(10.dp),
