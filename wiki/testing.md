@@ -38,7 +38,8 @@ git diff --check
 For an `Android`-labeled issue, additionally confirm that the workflow uses
 `ubuntu-latest`, KVM and the API 35 emulator start, OpenCode creates a
 `screenshots/final-android-*.png` image from the live device, and deterministic
-post-verification rebuild/sign/install/launch checks pass. The run release must
+post-verification rebuild/sign/install/launch checks pass on one of three
+same-session attempts. The run release must
 contain a non-empty `app-release.apk` whose signature verifies and whose direct
 asset link appears in the final live-progress comment. Force a verifier failure
 to confirm the emulator remains reachable through the posted SSH session for

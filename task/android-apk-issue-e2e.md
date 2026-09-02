@@ -8,6 +8,9 @@
   key, uninstalls any debug-signed package with the same ID, installs and
   launches the release APK, and captures a deterministic fallback screenshot
   when OpenCode does not leave one behind.
+- Verification follows the web workflow pattern: the initial check and up to
+  two repair prompts all use the original OpenCode session, with deterministic
+  build/install/launch checks repeated for at most three attempts.
 - `ssh`-labeled issues skip OpenCode entirely and hold the runner for manual
   debugging. A single temporary `known_hosts` file is reused for the session
   and removed after the session closes.

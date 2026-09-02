@@ -66,7 +66,10 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    separate temporary trycloudflare.com tunnel. Issues with the exact `Android`
    label instead boot an API 35 Google APIs x86_64 emulator, run the Android
    verification prompt in the same OpenCode session, build `assembleRelease`,
-   install and launch the app, and require a live-emulator screenshot.
+   install and launch the app, and require a live-emulator screenshot. Android
+   verification retries the build/install/launch check up to three times; every
+   repair prompt is attached to that same session, so the chat retains the
+   complete diagnosis and remediation history.
 10. Verifies web apps through the public tunnel. If verification fails, sends a
    remediation prompt to the same OpenCode session and retries up to three
    times. Detects both uncommitted generated files and commits already created
