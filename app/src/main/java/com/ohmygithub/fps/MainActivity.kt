@@ -446,10 +446,11 @@ fun TodoApp() {
                     .padding(horizontal = 16.dp)
             ) {
                 // Input row
-                ElevatedCard(
+                Card(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -754,11 +755,11 @@ private fun TodoRow(
                 contentDescription = "${if (item.done) "Completed" else "Active"} task: ${item.text}"
             },
         shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (item.done) 0.dp else 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (item.done) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surface
+            containerColor = if (item.done) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceContainerLowest
         ),
-        border = if (!item.done) androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) else null
+        border = null
     ) {
         if (isEditing) {
             Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -826,9 +827,8 @@ private fun TodoRow(
                 IconButton(onClick = onStartEdit, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Filled.Edit, contentDescription = "Edit task \"${item.text}\"", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete task \"${item.text}\"", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
-                }
+                // Delete is via swipe-left gesture (background Delete affordance + undo Snackbar);
+                // removing persistent Delete button reduces per-row visual noise to match M3 Lists (Google Tasks).
             }
         }
     }
