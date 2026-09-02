@@ -54,6 +54,12 @@ The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
 
+The reusable workflow's Pages deployment job must declare the `github-pages`
+environment and expose `steps.pages_deploy.outputs.page_url` as its URL. Without
+that environment, `actions/deploy-pages` returns `400 Missing environment`; with
+non-blocking Pages steps this can appear as a green step while URL recording and
+the final Pages link are skipped.
+
 For goal support, confirm the App checks the `OpenCode` label and dispatches the
 workflow once, while the workflow reads the forwarded `Goal` label without any
 native `issues` subscription, installs and configures
