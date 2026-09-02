@@ -38,6 +38,7 @@ jobs:
     permissions:
       id-token: write
       contents: write
+      pages: write
       pull-requests: write
       issues: write
     env:
@@ -887,14 +888,53 @@ jobs:
           keep_files: true
           commit_message: "Publish ${{ env.BRANCH_NAME }} at ${{ steps.delivery.outputs.commit }}"
 
+      - name: Configure and verify GitHub Pages
+        if: steps.pages_publish.outcome != 'cancelled'
+        id: pages_config
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_REPOSITORY: ${{ env.TARGET_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          pages_endpoint="repos/${PAGES_REPOSITORY}/pages"
+          source_json='{"source":{"branch":"gh-pages","path":"/"}}'
+          pages_json="$(gh api "$pages_endpoint" 2>/dev/null || true)"
+
+          if [[ -z "$pages_json" ]]; then
+            echo 'No GitHub Pages site exists; creating one from gh-pages.'
+            gh api --method POST "$pages_endpoint" \
+              --input - <<<"$source_json" > "$RUNNER_TEMP/pages-config.json"
+            pages_json="$(< "$RUNNER_TEMP/pages-config.json")"
+          else
+            pages_branch="$(jq -r '.source.branch // empty' <<<"$pages_json")"
+            pages_path="$(jq -r '.source.path // empty' <<<"$pages_json")"
+            if [[ "$pages_branch" != 'gh-pages' || "$pages_path" != '/' ]]; then
+              echo "Updating GitHub Pages source from ${pages_branch:-unset}:${pages_path:-unset} to gh-pages:/"
+              gh api --method PUT "$pages_endpoint" \
+                --input - <<<"$source_json" > "$RUNNER_TEMP/pages-config.json"
+              pages_json="$(< "$RUNNER_TEMP/pages-config.json")"
+            fi
+          fi
+
+          page_url="$(jq -r '.html_url // empty' <<<"$pages_json")"
+          [[ -n "$page_url" ]]
+          [[ "$(jq -r '.source.branch // empty' <<<"$pages_json")" == 'gh-pages' ]]
+          [[ "$(jq -r '.source.path // empty' <<<"$pages_json")" == '/' ]]
+          printf 'site_url=%s\n' "${page_url%/}" >> "$GITHUB_OUTPUT"
+          echo "GitHub Pages is configured at $page_url from gh-pages:/"
+
       - name: Record GitHub Pages URL
-        if: steps.pages_publish.outcome == 'success'
+        if: steps.pages_config.outcome == 'success'
         id: pages_result
         shell: bash
         env:
-          PAGES_URL: ${{ steps.pages_meta.outputs.url }}
+          PAGES_SITE_URL: ${{ steps.pages_config.outputs.site_url }}
+          PAGES_DESTINATION: ${{ steps.pages_meta.outputs.destination }}
         run: |
           set -euo pipefail
+          PAGES_URL="${PAGES_SITE_URL%/}/${PAGES_DESTINATION#/}/"
           printf 'url=%s\n' "$PAGES_URL" >> "$GITHUB_OUTPUT"
           echo "Published permanent branch result: $PAGES_URL"
       - name: Create OpenCode logs release
@@ -971,7 +1011,7 @@ jobs:
               ...(process.env.GITHUB_PAGES_URL ? [
                 `GitHub Pages publication: [${process.env.GITHUB_PAGES_URL}](${process.env.GITHUB_PAGES_URL})`
               ] : [process.env.PAGES_PUBLISH_ENABLED === 'true'
-                ? 'GitHub Pages publishing: failed, but the workflow continued.'
+                ? `GitHub Pages publishing could not be configured automatically. Enable it at [repository Settings → Pages](https://github.com/${process.env.TARGET_REPOSITORY}/settings/pages), choose **Deploy from a branch**, select **gh-pages** and **/(root)**, save, then rerun the issue.`
                 : 'GitHub Pages publishing: skipped (disabled by repository variable).']),
               `Final commit: [${process.env.FINAL_COMMIT}](${commitUrl})`,
               `Pull request: ${process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.'}`,

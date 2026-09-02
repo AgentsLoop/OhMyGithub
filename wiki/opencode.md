@@ -94,9 +94,12 @@ repository's `gh-pages` branch with `peaceiris/actions-gh-pages`. Every result
 uses `branches/<sanitized-opencode-branch>/<commit-prefix>/`, and `keep_files`
 preserves earlier branch results so they coexist. Vite projects are rebuilt
 with a relative asset base before publication. Publishing defaults to enabled;
-set `PAGES_PUBLISH_ENABLED=false` to skip it. The target repository must
-configure GitHub Pages to deploy from the root of the `gh-pages` branch. A
-publishing failure is non-blocking and is reported in the final issue comment.
+set `PAGES_PUBLISH_ENABLED=false` to skip it. After the first `gh-pages` push,
+the workflow automatically creates or updates the repository Pages source to
+the root of `gh-pages` and verifies it. If the token lacks permission to manage
+Pages, the final issue comment links directly to repository Settings → Pages
+and explains the required branch/source selection. Publication remains
+non-blocking.
 See [OmGithub publishing](omgithub.md).
 
 The OmGithub issue workspace polls issue comments every eight seconds. Its
