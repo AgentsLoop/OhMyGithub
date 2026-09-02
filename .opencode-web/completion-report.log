@@ -1,0 +1,396 @@
+[0m
+> build · muse-spark-1.2-contributor-free
+[0m
+Public game is live — capturing final screenshots to finalize delivery.
+[0m$ [0m/usr/bin/time -p curl -I https://guarantees-bob-proxy-tennis.trycloudflare.com 2>&1 | head -n 30; /usr/bin/time -p curl -s https://guarantees-bob-proxy-tennis.trycloudflare.com 2>&1 | head -n 100
+% Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+HTTP/2 200 
+date: Wed, 02 Sep 2026 01:42:29 GMT
+content-type: text/html
+cf-ray: a348d18418a58627-SJC
+cf-cache-status: DYNAMIC
+last-modified: Wed, 02 Sep 2026 01:41:31 GMT
+server: cloudflare
+
+real 0.07
+user 0.02
+sys 0.00
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mood Tracker — Preview</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:#f8f9ff;color:#111;padding:0}
+header{background:linear-gradient(135deg,#6200ee,#3700b3);color:#fff;padding:24px 20px;text-align:center}
+header h1{margin:0;font-size:28px}header p{margin:6px 0 0;opacity:.9}
+.container{max-width:780px;margin:0 auto;padding:16px}
+.card{background:#fff;border-radius:16px;padding:16px;margin-top:16px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+h2{margin:0 0 8px;font-size:18px;color:#3700b3}
+.moods{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.mood{border:2px solid #e0e0e0;border-radius:999px;padding:10px 14px;cursor:pointer;background:#fff;font-size:14px;transition:.15s}
+.mood.selected{border-color:#6200ee;background:#f3eaff;transform:scale(1.05)}
+textarea{width:100%;border:1px solid #ccc;border-radius:12px;padding:12px;font:14px system-ui;resize:vertical}
+.btn{width:100%;background:#6200ee;color:#fff;border:0;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;margin-top:10px}
+.btn:active{transform:scale(.98)}
+.row{display:flex;gap:8px;margin-top:8px}
+.row .btn{flex:1}
+.small{font-size:12px;color:#888}
+.statsbar{display:flex;gap:8px;align-items:end;height:120px;margin-top:12px}
+.bar{flex:1;background:#eee;border-radius:8px 8px 0 0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:end;padding-bottom:6px}
+.bar i{font-style:normal;font-size:22px}
+.bar span{font-size:11px;color:#555}
+.entry{border:1px solid #eee;border-radius:12px;padding:12px;margin-top:8px;display:flex;gap:12px;align-items:center}
+.entry .emoji{width:44px;height:44px;border-radius:50%;background:#f3eaff;display:grid;place-items:center;font-size:22px}
+.calendar{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+.calendar th{color:#6200ee;padding:6px}
+.calendar td{padding:8px;text-align:center;border-radius:8px;cursor:pointer}
+.calendar td.has{background:#aed581}
+.calendar td.selected{background:#6200ee;color:#fff}
+</style>
+</head>
+<body>
+<header>
+  <h1>😊 Mood Tracker</h1>
+  <p>Native Android APK + Web Preview — Track daily moods, notes & stats</p>
+  <p class="small" style="color:#fff;opacity:.85">APK: android/app/build/outputs/apk/debug/app-debug.apk • Package com.omg.moodtracker</p>
+</header>
+<div class="container">
+  <div class="card">
+    <h2>How are you today?</h2>
+    <div class="moods" id="moods"></div>
+    <textarea id="note" rows="3" placeholder="How are you feeling? Add notes…"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <span id="dateLabel" class="small" style="flex:1">Date: —</span>
+      <button class="btn" style="width:auto;padding:8px 12px;font-size:12px" onclick="pickDate()">📅 Date</button>
+      <button class="btn" style="width:auto;padding:8px 12px;font-size:12px;background:#03dac5;color:#111" onclick="pickTime()">⏰ Time</button>
+    </div>
+    <button class="btn" onclick="save()">Save Entry</button>
+  </div>
+
+  <div class="card">
+    <h2>📅 Calendar</h2>
+    <div class="small">Tap a day to filter history</div>
+    <div id="cal"></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><span id="filterLabel" class="small" style="flex:1">Filtering: All</span><button class="btn" style="width:auto;padding:6px 10px;font-size:12px;background:#eee;color:#111" onclick="showAll()">Show all</button></div>
+  </div>
+
+  <div class="card">
+    <h2>📊 Stats</h2>
+    <div class="small"><span id="total">Total 0</span> • <span id="avg">Avg 0.0</span> • <span id="week">This week 0</span></div>
+    <div class="statsbar" id="chart"></div>
+  </div>
+
+  <div class="card">
+    <h2>📜 History</h2>
+    <div id="history"></div>
+  </div>
+
+  <div class="card" style="text-align:center">
+    <h2>📦 Android APK</h2>
+    <p class="small">Native build verified — 6.5 MB, SDK 34, Material3</p>
+    <a class="btn" href="/apk/app-debug.apk" download style="display:block;text-decoration:none;text-align:center">⬇ Download APK</a>
+    <p class="small">If APK link 404, grab from: android/app/build/outputs/apk/debug/app-debug.apk</p>
+  </div>
+</div>
+<script>
+const MOODS=[{name:'Terrible',emoji:'😭',v:1,color:'#ef5350'},{name:'Bad',emoji:'😕',v:2,color:'#ff8a65'},{name:'Okay',emoji:'😐',v:3,color:'#ffd54f'},{name:'Good',emoji:'🙂',v:4,color:'#aed581'},{name:'Great',emoji:'😄',v:5,color:'#66bb6a'}];
+let selected=null,selectedTs=Date.now(),filterDay=null;
+const fmt=d=>new Date(d).toLocaleString(); const dayStr=d=>new Date(d).toISOString().slice(0,10);
+function load(){try{return JSON.parse(localStorage.getItem('moods')||'[]')}catch{return[]}}
+function saveStore(a){localStorage.setItem('moods',JSON.stringify(a))}
+function renderMoods(){const c=document.getElementById('moods');c.innerHTML='';MOODS.forEach(m=>{const b=document.createElement('button');b.className='mood'+(selected===m.name?' selected':'');b.textContent=m.emoji+' '+m.name;b.onclick=()=>{selected=m.name;renderMoods()};c.appendChild(b)})}
+function updateDateLabel(){document.getElementById('dateLabel').textContent='Date: '+fmt(selectedTs)}
+function pickDate(){const i=prompt('Enter date YYYY-MM-DD',dayStr(selectedTs));if(!i)return;const d=new Date(i+'T00:00:00');if(isNaN(d))return alert('Invalid');const cur=new Date(selectedTs);d.setHours(cur.getHours(),cur.getMinutes());selectedTs=d.getTime();updateDateLabel()}
+function pickTime(){const i=prompt('Enter time HH:MM (24h)',new Date(selectedTs).toTimeString().slice(0,5));if(!i)return;const [h,m]=i.split(':').map(Number);if(isNaN(h))return;const d=new Date(selectedTs);d.setHours(h,m);selectedTs=d.getTime();updateDateLabel()}
+function save(){if(!selected)return alert('Select a mood');const note=document.getElementById('note').value.trim();const arr=load();arr.unshift({id:Date.now(),mood:selected,note,ts:selectedTs});saveStore(arr);document.getElementById('note').value='';selected=null;selectedTs=Date.now();updateDateLabel();renderMoods();renderAll()}
+function showAll(){filterDay=null;renderAll()}
+function renderCal(){const now=new Date();const y=now.getFullYear(),m=now.getMonth();const first=new Date(y,m,1).getDay();const days=new Date(y,m+1,0).getDate();const entries=load();const byDay=new Set(entries.map(e=>dayStr(e.ts)));let h='<table class="calendar"><tr><th>Su<th>Mo<th>Tu<th>We<th>Th<th>Fr<th>Sa<tr>';for(let i=0;i<first;i++)h+='<td>';for(let d=1;d<=days;d++){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const has=byDay.has(ds);h+=`<td class="${has?'has ':''}${filterDay===ds?'selected':''}" onclick="filterDay='${ds}';renderAll()">${d}`;if((first+d)%7===0)h+='<tr>'}h+='</table>';document.getElementById('cal').innerHTML=h;document.getElementById('filterLabel').textContent='Filtering: '+(filterDay||'All')}
+function renderStats(){const arr=load();const total=arr.length;const avg=total? (arr.reduce((s,e)=>s+MOODS.find(x=>x.name===e.mood).v,0)/total).toFixed(1):'0.0';const week=arr.filter(e=>Date.now()-e.ts<7*864e5).length;document.getElementById('total').textContent='Total '+total;document.getElementById('avg').textContent='Avg '+avg+' /5';document.getElementById('week').textContent='This week '+week;const counts={};MOODS.forEach(m=>counts[m.name]=arr.filter(e=>e.mood===m.name).length);const max=Math.max(1,...Object.values(counts));const c=document.getElementById('chart');c.innerHTML='';MOODS.forEach(m=>{const h=(counts[m.name]/max*90);c.innerHTML+=`<div class="bar" style="height:${20+h}% ; background:${m.color}"><span style="position:absolute;top:-18px;font-weight:700">${counts[m.name]||''}</span><i>${m.emoji}</i><span>${m.name}</span></div>`})}
+function renderHistory(){const arr=load();const filtered=filterDay?arr.filter(e=>dayStr(e.ts)===filterDay):arr;const h=document.getElementById('history');if(!filtered.length){h.innerHTML='<p class="small" style="text-align:center;padding:20px">No entries yet. Add your first mood!</p>';return}h.innerHTML=filtered.map(e=>{const m=MOODS.find(x=>x.name===e.mood);return `<div class="entry"><div class="emoji">${m.emoji}</div><div style="flex:1"><b>${m.name}</b> <span class="small">${fmt(e.ts)}</span><div class="small" style="color:#111;margin-top:4px">${e.note||'<i style=color:#999>no note</i>'}</div></div><button onclick="edit(${e.id})" style="border:0;background:#f3eaff;border-radius:8px;padding:6px 10px;cursor:pointer">Edit</button><button onclick="del(${e.id})" style="border:0;background:#fee;border-radius:8px;padding:6px 10px;cursor:pointer">🗑</button></div>`}).join('')}
+function del(id){saveStore(load().filter(e=>e.id!==id));renderAll()}
+function edit(id){const arr=load();const e=arr.find(x=>x.id===id);if(!e)return;const m=prompt('Mood: Terrible, Bad, Okay, Good, Great',e.mood);if(m&&MOODS.find(x=>x.name===m))e.mood=m;const n=prompt('Note',e.note);if(n!==null)e.note=n;const d=prompt('Date YYYY-MM-DD HH:MM',new Date(e.ts).toISOString().slice(0,16).replace('T',' '));if(d){const nd=new Date(d.replace(' ','T'));if(!isNaN(nd))e.ts=nd.getTime()}saveStore(arr);renderAll()}
+function renderAll(){renderCal();renderStats();renderHistory()}
+if(!load().length){saveStore([{id:1,mood:'Good',note:'First day! Feeling optimistic.',ts:Date.now()-864e5},{id:2,mood:'Great',note:'Shipped the APK 🚀',ts:Date.now()}])}
+renderMoods();updateDateLabel();renderAll();
+</script>
+[0m
+[0m→ [0mRead Agents.md
+[0m
+[0m$ [0mls -lh screenshots/ 2>&1; ls -lh project/screenshots/ 2>&1; git log --oneline -5 2>&1; git status 2>&1 | head -n 30; tmux ls 2>&1; /usr/bin/time -p curl -s -o /dev/null -w "%{http_code}" https://guarantees-bob-proxy-tennis.trycloudflare.com 2>&1; echo ""; /usr/bin/time -p curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ 2>&1; echo ""
+total 368K
+-rw-r--r-- 1 runner runner 159K Sep  2 01:41 final-mood-tracker-full.png
+-rw-r--r-- 1 runner runner  83K Sep  2 01:41 final-mood-tracker-mobile.png
+-rw-r--r-- 1 runner runner 122K Sep  2 01:41 final-mood-tracker.png
+total 368K
+-rw-r--r-- 1 runner runner 159K Sep  2 01:41 final-mood-tracker-full.png
+-rw-r--r-- 1 runner runner  83K Sep  2 01:41 final-mood-tracker-mobile.png
+-rw-r--r-- 1 runner runner 122K Sep  2 01:41 final-mood-tracker.png
+bc9c097 chore: add browser preview, screenshots and verify app server on port 3000
+749d990 feat(moodtracker): add calendar, date/time picker and edit flow
+8777e4f feat(android): add native mood tracker APK (Kotlin, Material3, SharedPreferences)
+1bd29d8 Auto configure GitHub Pages publication
+On branch opencode/33579682130
+Your branch is ahead of 'origin/main' by 3 commits.
+  (use "git push" to publish your local commits)
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.agents/README.md
+	.agents/skills/gauntlet-loop/
+	.agents/skills/image-search/
+	.agents/skills/load-sketchfab-threejs/
+	.agents/skills/mcp-duckgo/
+	.agents/skills/opencode-zen-completions/
+	.agents/third-party-licenses/
+	.agentsweb/
+	.omgithub-runtime/
+	.opencode-ssh/
+	.opencode-web/
+	.opencode/
+	Agents.md
+	opencode-agentsweb-id_ed25519
+	opencode-agentsweb-id_ed25519.pub
+
+nothing added to commit but untracked files present (use "git add" to track)
+app-server: 1 windows (created Wed Sep  2 01:41:33 2026)
+200real 0.08
+user 0.03
+sys 0.00
+
+200real 0.00
+user 0.00
+sys 0.00
+[0m
+[0m$ [0m/usr/bin/time -p google-chrome --headless --disable-gpu --no-sandbox --window-size=1280,900 --screenshot=screenshots/final-mood-tracker.png https://guarantees-bob-proxy-tennis.trycloudflare.com 2>&1 | tail -n 5; ls -lh screenshots/final-mood-tracker.png 2>&1; /usr/bin/time -p google-chrome --headless --disable-gpu --no-sandbox --window-size=390,844 --screenshot=screenshots/final-mood-tracker-mobile.png https://guarantees-bob-proxy-tennis.trycloudflare.com 2>&1 | tail -n 5; ls -lh screenshots/final-mood-tracker-mobile.png 2>&1; /usr/bin/time -p google-chrome --headless --disable-gpu --no-sandbox --window-size=1280,2000 --screenshot=screenshots/final-mood-tracker-full.png https://guarantees-bob-proxy-tennis.trycloudflare.com 2>&1 | tail -n 5; ls -lh screenshots/final-*.png 2>&1
+[13373:13373:0902/014236.479626:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+124538 bytes written to file screenshots/final-mood-tracker.png
+real 1.16
+user 0.66
+sys 0.34
+-rw-r--r-- 1 runner runner 122K Sep  2 01:42 screenshots/final-mood-tracker.png
+[13562:13562:0902/014237.646045:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+84769 bytes written to file screenshots/final-mood-tracker-mobile.png
+real 0.95
+user 0.63
+sys 0.33
+-rw-r--r-- 1 runner runner 83K Sep  2 01:42 screenshots/final-mood-tracker-mobile.png
+[13754:13754:0902/014238.592063:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+162335 bytes written to file screenshots/final-mood-tracker-full.png
+real 1.11
+user 0.68
+sys 0.36
+-rw-r--r-- 1 runner runner 159K Sep  2 01:42 screenshots/final-mood-tracker-full.png
+-rw-r--r-- 1 runner runner  83K Sep  2 01:42 screenshots/final-mood-tracker-mobile.png
+-rw-r--r-- 1 runner runner 122K Sep  2 01:42 screenshots/final-mood-tracker.png
+[0m
+[0m$ [0mmkdir -p project/screenshots; cp screenshots/final-*.png project/screenshots/ 2>&1; ls -lh project/screenshots/ 2>&1; file screenshots/final-*.png 2>&1
+total 368K
+-rw-r--r-- 1 runner runner 159K Sep  2 01:42 final-mood-tracker-full.png
+-rw-r--r-- 1 runner runner  83K Sep  2 01:42 final-mood-tracker-mobile.png
+-rw-r--r-- 1 runner runner 122K Sep  2 01:42 final-mood-tracker.png
+screenshots/final-mood-tracker-full.png:   PNG image data, 1280 x 2000, 8-bit/color RGB, non-interlaced
+screenshots/final-mood-tracker-mobile.png: PNG image data, 390 x 844, 8-bit/color RGB, non-interlaced
+screenshots/final-mood-tracker.png:        PNG image data, 1280 x 900, 8-bit/color RGB, non-interlaced
+[0m
+[0m$ [0mgit status --porcelain 2>&1 | head -n 30; git diff --stat 2>&1 | head -n 30; echo "---"; /usr/bin/time -p ./gradlew assembleDebug 2>&1 | tail -n 10
+M project/screenshots/final-mood-tracker-full.png
+ M project/screenshots/final-mood-tracker-mobile.png
+ M project/screenshots/final-mood-tracker.png
+ M screenshots/final-mood-tracker-full.png
+ M screenshots/final-mood-tracker-mobile.png
+ M screenshots/final-mood-tracker.png
+?? .agents/README.md
+?? .agents/skills/gauntlet-loop/
+?? .agents/skills/image-search/
+?? .agents/skills/load-sketchfab-threejs/
+?? .agents/skills/mcp-duckgo/
+?? .agents/skills/opencode-zen-completions/
+?? .agents/third-party-licenses/
+?? .agentsweb/
+?? .omgithub-runtime/
+?? .opencode-ssh/
+?? .opencode-web/
+?? .opencode/
+?? Agents.md
+?? opencode-agentsweb-id_ed25519
+?? opencode-agentsweb-id_ed25519.pub
+ project/screenshots/final-mood-tracker-full.png   | Bin 161797 -> 162335 bytes
+ project/screenshots/final-mood-tracker-mobile.png | Bin 84623 -> 84769 bytes
+ project/screenshots/final-mood-tracker.png        | Bin 124411 -> 124538 bytes
+ screenshots/final-mood-tracker-full.png           | Bin 161797 -> 162335 bytes
+ screenshots/final-mood-tracker-mobile.png         | Bin 84623 -> 84769 bytes
+ screenshots/final-mood-tracker.png                | Bin 124411 -> 124538 bytes
+ 6 files changed, 0 insertions(+), 0 deletions(-)
+---
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:packageDebug UP-TO-DATE
+> Task :app:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleDebug UP-TO-DATE
+
+BUILD SUCCESSFUL in 1s
+37 actionable tasks: 1 executed, 36 up-to-date
+real 1.25
+user 2.04
+sys 0.17
+[0m
+[0m$ [0m/usr/bin/time -p npm test 2>&1 | tail -n 20
+TAP version 13
+# Subtest: extractUrls separates OpenCode, screenshots, preview, and Pages result
+ok 1 - extractUrls separates OpenCode, screenshots, preview, and Pages result
+  ---
+  duration_ms: 2.106731
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 66.194277
+real 0.22
+user 0.19
+sys 0.04
+[0m
+[0m$ [0m/usr/bin/time -p curl -s https://guarantees-bob-proxy-tennis.trycloudflare.com 2>&1 | grep -i "Mood Tracker" | head; echo "public 200 check"; curl -s -o /dev/null -w "%{http_code}" https://guarantees-bob-proxy-tennis.trycloudflare.com 2>&1; echo ""; tmux ls 2>&1; curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ 2>&1; echo " local"
+<title>Mood Tracker — Preview</title>
+  <h1>😊 Mood Tracker</h1>
+public 200 check
+200
+app-server: 1 windows (created Wed Sep  2 01:41:33 2026)
+200 local
+[0m
+Public verification passed — committing evidence and posting completion notice.
+[0m$ [0mgit add screenshots/final-mood-tracker.png screenshots/final-mood-tracker-mobile.png screenshots/final-mood-tracker-full.png project/screenshots/final-mood-tracker.png project/screenshots/final-mood-tracker-mobile.png project/screenshots/final-mood-tracker-full.png 2>&1; git commit -m "chore: update final screenshots from public game https://guarantees-bob-proxy-tennis.trycloudflare.com
+
+- recaptured screenshots from verified public URL via chrome headless
+- 1280x900 desktop, 390x844 mobile, 1280x2000 full page
+- both screenshots/ and project/screenshots updated for Agents.md immutable URL
+- verified public 200, local app-server 200, assembleDebug PASS, npm test PASS" 2>&1; git log --oneline -4 2>&1
+[opencode/33579682130 aa6296c] chore: update final screenshots from public game https://guarantees-bob-proxy-tennis.trycloudflare.com
+ 6 files changed, 0 insertions(+), 0 deletions(-)
+aa6296c chore: update final screenshots from public game https://guarantees-bob-proxy-tennis.trycloudflare.com
+bc9c097 chore: add browser preview, screenshots and verify app server on port 3000
+749d990 feat(moodtracker): add calendar, date/time picker and edit flow
+8777e4f feat(android): add native mood tracker APK (Kotlin, Material3, SharedPreferences)
+[0m
+[0m$ [0mgit push origin HEAD --force-with-lease 2>&1 | head -n 20; git rev-parse HEAD 2>&1
+To https://github.com/AgentsLoop/OhMyGithub
+   bc9c097..aa6296c  HEAD -> opencode/33579682130
+aa6296cac2b86666aec022beedb81b5907ef91bb
+[0m
+[0m$ [0mcat > /tmp/final_public_comment.md <<'MD'
+## ✅ Mood Tracker APK — Complete (Public Game Verified)
+
+**Summary:** Native Android mood tracker built in Kotlin + Material3 (`android/`). Five moods 😭😕😐🙂😄 with emoji, notes, calendar filter, date/time pickers for backdated edits, editable history (edit/delete), SharedPreferences JSON persistence, stats (total / avg / week + Canvas bar chart `StatsView`). Web preview at `web-preview/index.html` mirrors the APK UI and is served interchangeably via local `tmux app-server` port 3000 and the verified Cloudflare tunnel.
+
+**Public game URL:** https://guarantees-bob-proxy-tennis.trycloudflare.com
+**Local app-server:** http://127.0.0.1:3000/ — `tmux ls` → `app-server: 1 windows` (`python3 -m http.server 3000 --directory web-preview`)
+**APK (in repo):** `android/app/build/outputs/apk/debug/app-debug.apk` (6.5 MB, `aapt` → `com.omg.moodtracker` v1.0 targetSdk 34 minSdk 24)
+**APK via preview:** https://guarantees-bob-proxy-tennis.trycloudflare.com/apk/app-debug.apk
+**Raw APK (immutable):** https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/web-preview/apk/app-debug.apk
+
+**Final commit:** https://github.com/AgentsLoop/OhMyGithub/commit/aa6296cac2b86666aec022beedb81b5907ef91bb
+**Branch:** `opencode/33579682130` (no PR created — workflow owns PR creation)
+
+**Deployment & Test Status**
+- `tmux app-server` running on port 3000 — `curl http://127.0.0.1:3000/` 200, `curl https://guarantees-bob-proxy-tennis.trycloudflare.com` 200 (`<title>Mood Tracker — Preview` verified)
+- `/usr/bin/time -p ./gradlew assembleDebug` — BUILD SUCCESSFUL in 1.25s (android/)
+- `/usr/bin/time -p ./gradlew lintDebug` — BUILD SUCCESSFUL in 1.5s
+- `/usr/bin/time -p npm test` (site/server/*.test.mjs) — PASS 1/1 `extractUrls separates OpenCode, screenshots, preview, and Pages result`
+- `aapt dump badging` — package `com.omg.moodtracker` OK
+- Chrome headless verified in real browser: `/usr/bin/time -p google-chrome --headless --screenshot` to public URL (1280x900, 390x844, 1280x2000)
+
+**Known limitations:** None blocking. Calendar is month-grid filter + picker dialogs (no Year-in-Pixels heatmap). Stats uses custom `StatsView` Canvas (no MPAndroidChart). Auth/cloud sync not in scope — data is local only.
+
+<details>
+<summary>Screenshot — Desktop 1280×900 (public)</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/screenshots/final-mood-tracker.png" alt="Mood Tracker desktop 1280x900 from public URL — mood chips, note, date/time, calendar, stats chart and history">
+</details>
+
+<details>
+<summary>Screenshot — Mobile 390×844 (public)</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/screenshots/final-mood-tracker-mobile.png" alt="Mood Tracker mobile 390x844 from public URL — stacked responsive cards">
+</details>
+
+<details>
+<summary>Screenshot — Full page 1280×2000 (public)</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/screenshots/final-mood-tracker-full.png" alt="Mood Tracker full page 1280x2000 from public URL — calendar, stats, history and APK download card">
+</details>
+
+<!-- also available as project/screenshots for workflow evidence check -->
+<!-- https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/project/screenshots/final-mood-tracker.png -->
+MD
+cat /tmp/final_public_comment.md
+echo "--- posting ---"
+gh issue comment 201 --repo AgentsLoop/OhMyGithub --body-file /tmp/final_public_comment.md 2>&1
+
+## ✅ Mood Tracker APK — Complete (Public Game Verified)
+
+**Summary:** Native Android mood tracker built in Kotlin + Material3 (`android/`). Five moods 😭😕😐🙂😄 with emoji, notes, calendar filter, date/time pickers for backdated edits, editable history (edit/delete), SharedPreferences JSON persistence, stats (total / avg / week + Canvas bar chart `StatsView`). Web preview at `web-preview/index.html` mirrors the APK UI and is served interchangeably via local `tmux app-server` port 3000 and the verified Cloudflare tunnel.
+
+**Public game URL:** https://guarantees-bob-proxy-tennis.trycloudflare.com
+**Local app-server:** http://127.0.0.1:3000/ — `tmux ls` → `app-server: 1 windows` (`python3 -m http.server 3000 --directory web-preview`)
+**APK (in repo):** `android/app/build/outputs/apk/debug/app-debug.apk` (6.5 MB, `aapt` → `com.omg.moodtracker` v1.0 targetSdk 34 minSdk 24)
+**APK via preview:** https://guarantees-bob-proxy-tennis.trycloudflare.com/apk/app-debug.apk
+**Raw APK (immutable):** https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/web-preview/apk/app-debug.apk
+
+**Final commit:** https://github.com/AgentsLoop/OhMyGithub/commit/aa6296cac2b86666aec022beedb81b5907ef91bb
+**Branch:** `opencode/33579682130` (no PR created — workflow owns PR creation)
+
+**Deployment & Test Status**
+- `tmux app-server` running on port 3000 — `curl http://127.0.0.1:3000/` 200, `curl https://guarantees-bob-proxy-tennis.trycloudflare.com` 200 (`<title>Mood Tracker — Preview` verified)
+- `/usr/bin/time -p ./gradlew assembleDebug` — BUILD SUCCESSFUL in 1.25s (android/)
+- `/usr/bin/time -p ./gradlew lintDebug` — BUILD SUCCESSFUL in 1.5s
+- `/usr/bin/time -p npm test` (site/server/*.test.mjs) — PASS 1/1 `extractUrls separates OpenCode, screenshots, preview, and Pages result`
+- `aapt dump badging` — package `com.omg.moodtracker` OK
+- Chrome headless verified in real browser: `/usr/bin/time -p google-chrome --headless --screenshot` to public URL (1280x900, 390x844, 1280x2000)
+
+**Known limitations:** None blocking. Calendar is month-grid filter + picker dialogs (no Year-in-Pixels heatmap). Stats uses custom `StatsView` Canvas (no MPAndroidChart). Auth/cloud sync not in scope — data is local only.
+
+<details>
+<summary>Screenshot — Desktop 1280×900 (public)</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/screenshots/final-mood-tracker.png" alt="Mood Tracker desktop 1280x900 from public URL — mood chips, note, date/time, calendar, stats chart and history">
+</details>
+
+<details>
+<summary>Screenshot — Mobile 390×844 (public)</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/screenshots/final-mood-tracker-mobile.png" alt="Mood Tracker mobile 390x844 from public URL — stacked responsive cards">
+</details>
+
+<details>
+<summary>Screenshot — Full page 1280×2000 (public)</summary>
+<img src="https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/screenshots/final-mood-tracker-full.png" alt="Mood Tracker full page 1280x2000 from public URL — calendar, stats, history and APK download card">
+</details>
+
+<!-- also available as project/screenshots for workflow evidence check -->
+<!-- https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296cac2b86666aec022beedb81b5907ef91bb/project/screenshots/final-mood-tracker.png -->
+--- posting ---
+https://github.com/AgentsLoop/OhMyGithub/issues/201#issuecomment-5503073112
+[0m
+Public game verified and completion comment posted per `Agents.md`.
+
+**Public URL:** https://guarantees-bob-proxy-tennis.trycloudflare.com — `curl -I` 200, `curl -s | grep Mood Tracker` OK
+**App server:** `tmux ls` → `app-server: 1 windows` serving `web-preview` on port 3000 — `curl http://127.0.0.1:3000/` 200
+
+**Tests & deployment:**
+- `/usr/bin/time -p ./gradlew assembleDebug` (android/) BUILD SUCCESSFUL 1.25s
+- `/usr/bin/time -p ./gradlew lintDebug` BUILD SUCCESSFUL
+- `/usr/bin/time -p npm test` site/ PASS 1/1
+- `aapt dump badging` `com.omg.moodtracker` v1.0 target 34
+
+**Screenshots (from public URL):**
+- `screenshots/final-mood-tracker.png` 1280×900 `google-chrome --headless --screenshot https://guarantees-bob-proxy-tennis.trycloudflare.com` 124538 bytes
+- `screenshots/final-mood-tracker-mobile.png` 390×844 84769 bytes
+- `screenshots/final-mood-tracker-full.png` 1280×2000 162335 bytes
+- Mirrored to `project/screenshots/final-*.png` for workflow evidence check
+
+**Commit & push:** `aa6296cac2b86666aec022beedb81b5907ef91bb` https://github.com/AgentsLoop/OhMyGithub/commit/aa6296cac2b86666aec022beedb81b5907ef91bb pushed via `git push origin HEAD --force-with-lease` on branch `opencode/33579682130` — no PR created
+
+**Final comment:** https://github.com/AgentsLoop/OhMyGithub/issues/201#issuecomment-5503073112 includes public URL, 3 embedded `https://raw.githubusercontent.com/AgentsLoop/OhMyGithub/aa6296c…/screenshots/final-*.png` blocks, final commit, deployment/test status, known limitations.
