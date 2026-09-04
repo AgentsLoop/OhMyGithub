@@ -110,7 +110,7 @@ the repository default branch remains the target.
 Labels let you control the workflow without editing YAML.
 
 ```text
-model/opencode/muse-spark-1.2-contributor-free
+model/opencode/muse-spark-1.3-contributor-free
 skill/load-sketchfab-threejs
 skill/gauntlet-loop
 ```
