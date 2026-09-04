@@ -174,7 +174,7 @@ Use `model/openai/gpt-5.6-luna` when the OpenAI provider is required. Default Gi
 the triggering issue is marked `in progress`,
 `complete`, or `failed` as the job advances.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
-`model/opencode/muse-spark-1.2-contributor-free` label; if that label is
+`model/opencode/muse-spark-1.3-contributor-free` label; if that label is
 unavailable, the skill records that it used the workflow default instead.
 
 The workflow reads the repository variable `PROJECT_DIR` as a repository-relative
