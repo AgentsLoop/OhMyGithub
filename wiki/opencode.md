@@ -51,13 +51,15 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
 1. Checks out the repository with persisted `GITHUB_TOKEN` credentials.
 2. Copies `agents.template.md` to `$PROJECT_DIR/Agents.md` so the worker receives
    issue-update, screenshot, and completion-report requirements.
-3. Starts an ephemeral AgentsWeb SSH tunnel.
+3. Attempts to start an ephemeral AgentsWeb SSH tunnel. If setup fails, the
+   workflow continues without SSH access and keeps the browser session path
+   available.
 4. Starts the OpenCode web UI and publishes it through a temporary public
    trycloudflare.com tunnel.
 5. Creates an `opencode/<run-id>` branch from the relevant base branch.
 6. Starts `opencode run --attach` against the same OpenCode installation and
    server-backed session store, then posts a direct URL to that live session.
-7. Verifies SSH connectivity.
+7. Verifies SSH connectivity when the optional tunnel was started successfully.
 8. Replaces the access comment with aggregate OpenCode progress statistics and
    refreshes it about every 10 seconds while the run is active. The report also
    counts active child sessions from `/session/status` and all descendant
