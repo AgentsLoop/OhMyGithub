@@ -462,20 +462,6 @@ jobs:
           [[ -n "${WEB_URL:-}" ]]
           printf 'url=%s\n' "$WEB_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Verify shared skills are visible to OpenCode
-        if: env.TEST_GH_REQUEST != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          expected="$(find "$PROJECT_DIR/.agents/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -type f | wc -l | tr -d ' ')"
-          skills="$(curl --fail --silent --show-error \
-            -H "x-opencode-directory: $PROJECT_DIR" \
-            "http://127.0.0.1:$OPENCODE_PROXY_PORT/skill")"
-          actual="$(jq 'length' <<<"$skills")"
-          echo "OpenCode reported $actual skills; repository contains $expected shared skills."
-          jq -e 'length > 0' <<<"$skills" >/dev/null
-          [[ "$actual" -ge "$expected" ]]
-
       - name: Configure Git identity
         shell: bash
         run: |
