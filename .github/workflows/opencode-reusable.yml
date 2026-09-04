@@ -33,8 +33,7 @@ on:
         required: false
 jobs:
   opencode:
-    # Add the runner/arm64 issue label to select GitHub's ARM64 image.
-    runs-on: ${{ contains(inputs.labels_json, '"runner/arm64"') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: write
