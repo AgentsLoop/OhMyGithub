@@ -295,6 +295,7 @@ jobs:
       - name: Start AgentsWeb SSH session
         id: agentsweb
         if: env.TEST_GH_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -625,7 +626,7 @@ jobs:
 
       - name: Verify live sessions through SSH
         id: verify_sessions
-        if: env.TEST_GH_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -654,6 +655,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
+          AGENTSWEB_SSH_READY: ${{ steps.agentsweb.outcome == 'success' }}
           SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
@@ -666,7 +668,7 @@ jobs:
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const command = process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode';
             const body = [];
-            if (process.env.AGENTSWEB_SSH_ENABLED === 'true') {
+            if (process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true') {
               body.push(
                 '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
                 `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
@@ -1215,7 +1217,7 @@ jobs:
         run: sleep 18000
 
       - name: Append SSH session closed
-        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.access_comment.outputs.comment_id != ''
+        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success' && steps.access_comment.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
