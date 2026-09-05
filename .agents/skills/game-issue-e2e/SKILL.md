@@ -52,9 +52,9 @@ the prompt or invented game clearly requires them.
 
 The kickoff is complete when all of these are true:
 
-- A fresh GitHub issue was created with the `OpenCode` label. Add the `Goal`
-  label by default; omit it only when the caller explicitly requests a
-  standard-mode workflow test. The App dispatches the workflow once.
+- A fresh GitHub issue was created with the `OpenCode` and `ralph` labels.
+  Always add `ralph`; do not add `Goal`, because Ralph is the required
+  auto-continuation mode for this skill. The App dispatches the workflow once.
 - The App triggered `.github/workflows/opencode.yml` through `workflow_dispatch`.
   For a custom branch, the run's head branch is that requested branch. An
   `issues` event or default-branch run is a routing failure, not a successful
@@ -69,6 +69,9 @@ pull request, or tests after the session link has been found.
 Before creating the test issue, inspect the repository's current labels and
 use the available `skill/*` labels that match the requested game. The current
 skill labels are:
+
+- `ralph` — required for every kickoff; runs the Ralph same-session
+  auto-continuation loop. Do not add `Goal` to a Ralph kickoff.
 
 - `skill/gauntlet-loop` — use for Gauntlet Loop/gameplay-loop or iterative
   game-building requests.
@@ -113,12 +116,14 @@ OAuth provider.
    `gh label list --repo <owner>/<repo>`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
    with one `--label` option per applicable label, always including `OpenCode`.
-   Add `Goal` by default; this specifically exercises the goal plugin and
-   `opencode run --command goal`
-   path. Omit `Goal` only when the caller explicitly requests the standard
-   OpenCode path. Do not add a comment because comments do not trigger the
-   workflow. If testing an existing issue instead, adding the `OpenCode` label
-   is the only supported way to start it.
+   Always also include `ralph`; never add `Goal` for this skill. This exercises
+   the Ralph plugin and `opencode run --command ralph-loop` path. If the
+   repository does not have the `ralph` label, create it with
+   `gh label create ralph --repo <owner>/<repo> --color 5319E7 --description
+   'Run OpenCode with the Ralph auto-continuation loop'` before creating the
+   issue. Do not add a comment because comments do not trigger the workflow.
+   If testing an existing issue instead, adding the `OpenCode` and `ralph`
+   labels is the only supported way to start it.
    If the caller supplied a prompt, use it as the complete issue prompt and
    preserve it verbatim. If no prompt was supplied, generate a random, small
    playable browser game and use a concise implementation brief as the issue
