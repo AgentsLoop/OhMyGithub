@@ -60,8 +60,11 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
 ## What the job does
 
 1. Checks out the repository with persisted `GITHUB_TOKEN` credentials.
-2. Copies `agents.template.md` to `$PROJECT_DIR/Agents.md` so the worker receives
-   issue-update, screenshot, and completion-report requirements.
+2. Copies `templates/agents.template.md` to `$PROJECT_DIR/Agents.md`, then
+   appends `templates/goal.md` or `templates/ralph.md` when the corresponding
+   issue label selects that mode. Ralph takes precedence if both labels exist.
+   The worker therefore receives the shared issue-update, screenshot, and
+   completion-report requirements plus only the active mode policy.
 3. Attempts to start an ephemeral AgentsWeb SSH tunnel. If setup fails, the
    workflow continues without SSH access and keeps the browser session path
    available.

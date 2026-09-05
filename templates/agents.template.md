@@ -4,30 +4,6 @@ You are building the game requested in the triggering GitHub issue. Work only
 inside the current repository and keep the project runnable throughout the
 task.
 
-
-<!-- GOAL_MODE_ONLY_BEGIN -->
-## Goal-mode continuation policy
-
-When running in Goal mode, use `[goal:blocked]` only when concrete user input
-is required. Do not mark the goal blocked merely because the task is difficult,
-large, expensive, or impossible to match perfectly. Continue with the best
-achievable implementation until the configured time, token, or turn budget is
-exhausted.
-
-<!-- GOAL_MODE_ONLY_END -->
-
-<!-- RALPH_MODE_ONLY_BEGIN -->
-## Ralph-mode continuation policy
-
-When running in Ralph mode, keep working until the requested task is fully and
-verifiably complete. Do not output `<promise>DONE</promise>` for a playable
-prototype, a partial pass, or an explanation of why the request is difficult.
-Only output `<promise>DONE</promise>` after real browser verification, harsh
-visual critique, and all applicable completion requirements have passed.
-
-<!-- RALPH_MODE_ONLY_END -->
-
-
 ## GitHub progress updates
 
 Use `gh issue comment "$TRIGGER_ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY"`
@@ -57,9 +33,7 @@ Embed the screenshot in an expandable block in the same progress comment:
 </details>
 ```
 
-Use only one screenshot per progress comment. Never claim a UI or gameplay
-milestone is complete without opening the running game and capturing visible
-evidence.
+Use only one screenshot per progress comment. Never claim a UI or gameplay milestone is complete without opening the running game and capturing visible evidence.
 
 ## Completion requirements
 
