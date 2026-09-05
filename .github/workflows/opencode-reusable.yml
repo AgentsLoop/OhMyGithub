@@ -442,14 +442,18 @@ jobs:
               "$HOME/.config/opencode/opencode.json" > "$config_tmp"
           fi
           mv "$config_tmp" "$HOME/.config/opencode/opencode.json"
-          nohup "$OPENCODE_BIN" web --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
+          nohup "$OPENCODE_BIN" serve --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
           for _ in {1..45}; do
-            curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null && break
+            curl --fail --silent --show-error --max-time 3 \
+              -H "x-opencode-directory: $PROJECT_DIR" \
+              "http://127.0.0.1:$OPENCODE_WEB_PORT/session" >/dev/null && break
             sleep 1
           done
-          curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null
+          curl --fail --silent --show-error --max-time 10 \
+            -H "x-opencode-directory: $PROJECT_DIR" \
+            "http://127.0.0.1:$OPENCODE_WEB_PORT/session" >/dev/null
           cat > "$OPENCODE_WEB_DIR/header-proxy.mjs" <<'EOF'
           import http from 'node:http';
           import net from 'node:net';
@@ -512,10 +516,12 @@ jobs:
             > "$OPENCODE_WEB_DIR/header-proxy.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/header-proxy.pid"
           for _ in {1..20}; do
-            curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$OPENCODE_PROXY_PORT/" >/dev/null && break
+            curl --fail --silent --show-error --max-time 3 \
+              "http://127.0.0.1:$OPENCODE_PROXY_PORT/session" >/dev/null && break
             sleep 1
           done
-          curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_PROXY_PORT/" >/dev/null
+          curl --fail --silent --show-error --max-time 10 \
+            "http://127.0.0.1:$OPENCODE_PROXY_PORT/session" >/dev/null
           case "$RUNNER_OS/$RUNNER_ARCH" in
             Linux/X64) CLOUDFLARED_ASSET='cloudflared-linux-amd64' ;;
             Linux/ARM64) CLOUDFLARED_ASSET='cloudflared-linux-arm64' ;;
