@@ -64,7 +64,7 @@ The kickoff is complete when all of these are true:
 Do not wait for `gh run watch`, the verification prompt, the public tunnel, the
 pull request, or tests after the session link has been found.
 
-## Skill labels
+## Skill and runner labels
 
 Before creating the test issue, inspect the repository's current labels and
 use the available `skill/*` labels that match the requested game. The current
@@ -77,14 +77,17 @@ skill labels are:
 - `skill/load-sketchfab-threejs` — required for 3D game requests; use it for
   Sketchfab, GLB, Three.js, or PlayCanvas model-loading/material/animation
   requests.
+- `mac` — required for every 3D request; selects the `macos-latest`
+  GitHub-hosted runner.
 - `skill/mcp-duckgo` — use when the request explicitly requires DuckDuckGo/MCP
   search support.
 
 Refresh the available labels with `gh label list` before each test because the
-set can change. Do not add a skill label merely because a skill exists:
+set can change. Do not add a `skill/*` label merely because a skill exists:
 apply only labels supported by the issue's requirements. If a matching label
 does not exist, continue without inventing or creating one and record that in
-the test report.
+the test report. The `mac` runner label is the explicit exception for 3D
+requests and may be created when missing, as described below.
 
 When the caller requests the Luna model, use the OpenAI provider label
 `model/openai/gpt-5.6-luna`. Confirm that label exists before creating the
@@ -119,11 +122,18 @@ OAuth provider.
    If the caller supplied a prompt, use it as the complete issue prompt and
    preserve it verbatim. If no prompt was supplied, generate a random, small
    playable browser game and use a concise implementation brief as the issue
-   prompt. If the prompt requests 3D content, also pass
-   `--label skill/load-sketchfab-threejs` when that label exists, and require
-   the issue prompt to use the
-   `load-sketchfab-threejs` skill for a suitable downloadable GLB asset while
-   preserving attribution and verifying geometry, materials, and animations.
+   prompt. If the prompt requests 3D content, verify that the target workflow
+   routes the `mac` label to `macos-latest`; if it does not, stop and report
+   that the target workflow must be updated before starting the issue. If the
+   repository does not have the `mac` label, create it with
+   `gh label create mac --repo <owner>/<repo> --color B60205 --description
+   'Run OpenCode on the macos-latest GitHub-hosted runner'`. Then pass both
+   `--label mac` and
+   `--label skill/load-sketchfab-threejs`; `mac` is mandatory for 3D requests,
+   even when the caller did not mention the runner. Require the issue prompt
+   to use the `load-sketchfab-threejs` skill for a suitable downloadable GLB
+   asset while preserving attribution and verifying geometry, materials, and
+   animations.
    Do not add this label or requirement when the prompt does not request 3D
    content.
    If multiple skills are needed, pass one `--label` option per matching
