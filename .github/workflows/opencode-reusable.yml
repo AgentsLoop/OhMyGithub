@@ -438,35 +438,67 @@ jobs:
             sleep 1
           done
           curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null
-          if [[ "$RUNNER_OS" == 'Linux' ]]; then
-            sudo apt-get install -y nginx
-          else
-            command -v nginx >/dev/null 2>&1 || brew install nginx
-          fi
-          NGINX_BIN="$(command -v nginx)"
-          cat > "$OPENCODE_WEB_DIR/nginx.conf" <<EOF
-          pid $OPENCODE_WEB_DIR/nginx.pid;
-          events {}
-          http {
-            map \$http_upgrade \$connection_upgrade {
-              default upgrade;
-              '' close;
-            }
-            server {
-              listen 127.0.0.1:$OPENCODE_PROXY_PORT;
-              location / {
-                proxy_set_header x-opencode-directory "$PROJECT_DIR";
-                proxy_set_header Host \$host;
-                proxy_set_header Upgrade \$http_upgrade;
-                proxy_set_header Connection \$connection_upgrade;
-                proxy_pass http://127.0.0.1:$OPENCODE_WEB_PORT;
-              }
-            }
+          cat > "$OPENCODE_WEB_DIR/header-proxy.mjs" <<'EOF'
+          import http from 'node:http';
+          import net from 'node:net';
+
+          const targetPort = Number(process.env.OPENCODE_WEB_PORT);
+          const listenPort = Number(process.env.OPENCODE_PROXY_PORT);
+          const directory = process.env.PROJECT_DIR;
+
+          function forwardedHeaders(headers) {
+            return {
+              ...headers,
+              host: headers.host || `127.0.0.1:${targetPort}`,
+              'x-opencode-directory': directory,
+            };
           }
+
+          const proxy = http.createServer((request, response) => {
+            const upstream = http.request({
+              hostname: '127.0.0.1',
+              port: targetPort,
+              method: request.method,
+              path: request.url,
+              headers: forwardedHeaders(request.headers),
+            }, (upstreamResponse) => {
+              response.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);
+              upstreamResponse.pipe(response);
+            });
+            upstream.on('error', () => {
+              if (!response.headersSent) response.writeHead(502);
+              response.end('OpenCode upstream unavailable');
+            });
+            request.pipe(upstream);
+          });
+
+          proxy.on('upgrade', (request, socket, head) => {
+            const upstream = net.connect(targetPort, '127.0.0.1', () => {
+              const headers = forwardedHeaders(request.headers);
+              headers.connection = 'Upgrade';
+              headers.upgrade = 'websocket';
+              const lines = [`${request.method} ${request.url} HTTP/1.1`];
+              for (const [name, value] of Object.entries(headers)) {
+                if (Array.isArray(value)) lines.push(`${name}: ${value.join(', ')}`);
+                else if (value !== undefined) lines.push(`${name}: ${value}`);
+              }
+              upstream.write(`${lines.join('\\r\\n')}\\r\\n\\r\\n`);
+              if (head.length) upstream.write(head);
+              socket.pipe(upstream).pipe(socket);
+            });
+            upstream.on('error', () => socket.destroy());
+            socket.on('error', () => upstream.destroy());
+          });
+
+          proxy.listen(listenPort, '127.0.0.1', () => {
+            console.log(`header proxy listening on 127.0.0.1:${listenPort}`);
+          });
           EOF
-          nohup sudo "$NGINX_BIN" -c "$OPENCODE_WEB_DIR/nginx.conf" -g 'daemon off;' \
-            > "$OPENCODE_WEB_DIR/nginx.log" 2>&1 &
-          echo $! > "$OPENCODE_WEB_DIR/nginx.pid"
+          PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
+            OPENCODE_PROXY_PORT="$OPENCODE_PROXY_PORT" \
+            nohup node "$OPENCODE_WEB_DIR/header-proxy.mjs" \
+            > "$OPENCODE_WEB_DIR/header-proxy.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/header-proxy.pid"
           for _ in {1..20}; do
             curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$OPENCODE_PROXY_PORT/" >/dev/null && break
             sleep 1
@@ -1299,7 +1331,7 @@ jobs:
         run: |
           set +e
           [[ -f "$OPENCODE_WEB_DIR/cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/cloudflared.pid")" 2>/dev/null || true
-          [[ -f "$OPENCODE_WEB_DIR/nginx.pid" ]] && sudo kill "$(cat "$OPENCODE_WEB_DIR/nginx.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/header-proxy.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/header-proxy.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode-run.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/response-comment-tracker.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/response-comment-tracker.pid")" 2>/dev/null || true
