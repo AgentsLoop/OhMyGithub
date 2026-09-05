@@ -38,7 +38,8 @@ on:
         required: false
 jobs:
   opencode:
-    runs-on: ubuntu-latest
+    # The mac label opts this run into GitHub's macOS hosted runner.
+    runs-on: ${{ contains(inputs.labels_json, '"mac"') && 'macos-latest' || 'ubuntu-latest' }}
     permissions:
       id-token: write
       contents: write
@@ -212,6 +213,7 @@ jobs:
               { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
               { name: 'test-gh', color: '1D76DB', description: 'Bypass OpenCode and test GitHub Pages publication' },
+              { name: 'mac', color: 'B60205', description: 'Run OpenCode on the macos-latest GitHub-hosted runner' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',
