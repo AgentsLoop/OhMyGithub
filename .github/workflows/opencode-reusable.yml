@@ -221,6 +221,7 @@ jobs:
               { name: 'in progress', color: 'FBCA04', description: 'OpenCode workflow is running' },
               { name: 'validating', color: '1D76DB', description: 'OpenCode workflow is validating the result' },
               { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
+              { name: 'blocked', color: 'D93F0B', description: 'OpenCode Goal needs user input or bounded recovery was exhausted' },
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
               { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
@@ -442,6 +443,24 @@ jobs:
               "$HOME/.config/opencode/opencode.json" > "$config_tmp"
           fi
           mv "$config_tmp" "$HOME/.config/opencode/opencode.json"
+          PORTS="$(node --input-type=module -e '
+            import net from "node:net";
+            const servers = [net.createServer(), net.createServer()];
+            await Promise.all(servers.map((server) => new Promise((resolve, reject) => {
+              server.once("error", reject);
+              server.listen(0, "127.0.0.1", resolve);
+            })));
+            console.log(servers.map((server) => server.address().port).join("\n"));
+            servers.forEach((server) => server.close());
+          ')"
+          OPENCODE_WEB_PORT="$(printf '%s\n' "$PORTS" | sed -n '1p')"
+          OPENCODE_PROXY_PORT="$(printf '%s\n' "$PORTS" | sed -n '2p')"
+          [[ "$OPENCODE_WEB_PORT" =~ ^[0-9]+$ && "$OPENCODE_PROXY_PORT" =~ ^[0-9]+$ ]]
+          {
+            printf 'OPENCODE_WEB_PORT=%s\n' "$OPENCODE_WEB_PORT"
+            printf 'OPENCODE_PROXY_PORT=%s\n' "$OPENCODE_PROXY_PORT"
+          } >> "$GITHUB_ENV"
+          echo "Allocated OpenCode ports: web=$OPENCODE_WEB_PORT proxy=$OPENCODE_PROXY_PORT"
           nohup "$OPENCODE_BIN" serve --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
@@ -789,6 +808,112 @@ jobs:
             COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
+
+      - name: Recover blocked Goal with Zen critique
+        id: blocked_recovery
+        if: env.TEST_GH_REQUEST != 'true' && env.GOAL_REQUEST == 'true'
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
+          OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
+          CRITIQUE_TEMPLATE: ${{ env.RUNTIME_DIR }}/.github/prompts/critique-blocked.md
+          ORIGINAL_REQUEST: ${{ env.COMMENT_BODY }}
+        run: |
+          set -euo pipefail
+          echo 'GOAL_BLOCKED=false' >> "$GITHUB_ENV"
+          RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
+          RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
+          MESSAGES_FILE="$OPENCODE_WEB_DIR/opencode-response-before-recovery.json"
+          CONTEXT_FILE="$OPENCODE_WEB_DIR/blocked-goal-context.md"
+          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+          max_attempts=3
+
+          for _ in {1..21600}; do
+            [[ -f "$RUN_EXIT" ]] && break
+            sleep 1
+          done
+          [[ -f "$RUN_EXIT" ]]
+          initial_code="$(cat "$RUN_EXIT")"
+
+          fetch_messages() {
+            curl --fail --silent --show-error \
+              -H "x-opencode-directory: $PROJECT_DIR" \
+              "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" \
+              > "$MESSAGES_FILE"
+          }
+
+          has_blocked_marker() {
+            local current_log="${1:-$RUN_LOG}"
+            grep -Eiq '\[goal:blocked\]|"status"[[:space:]]*:[[:space:]]*"blocked"|status[^[:alnum:]]+blocked' "$current_log" && return 0
+            if [[ "$current_log" == "$RUN_LOG" ]]; then
+              jq -e '.. | strings | select(test("\\[goal:blocked\\]|update_goal|AAA COD parity|status[^[:alnum:]]+blocked"; "i"))' \
+                "$MESSAGES_FILE" >/dev/null 2>&1
+            else
+              return 1
+            fi
+          }
+
+          fetch_messages
+          blocked=false
+          if has_blocked_marker; then
+            blocked=true
+            echo 'GOAL_BLOCKED=true' >> "$GITHUB_ENV"
+          elif [[ "$initial_code" != 0 ]]; then
+            echo "OpenCode exited with $initial_code without a blocked Goal marker." >&2
+            exit "$initial_code"
+          fi
+
+          if [[ "$blocked" != true ]]; then
+            echo 'Goal completed without a blocked marker; continuing to verification.'
+            exit 0
+          fi
+
+          for attempt in $(seq 1 "$max_attempts"); do
+            {
+              echo '# OpenCode blocked Goal evidence'
+              echo
+              tail -c 50000 "$RUN_LOG" || true
+              echo
+              echo '# Matching session transcript strings'
+              jq -r '.. | strings | select(test("\\[goal:blocked\\]|update_goal|AAA COD parity|status[^[:alnum:]]+blocked"; "i"))' \
+                "$MESSAGES_FILE" 2>/dev/null | tail -c 30000 || true
+            } > "$CONTEXT_FILE"
+
+            critique_file="$OPENCODE_WEB_DIR/blocked-critique-$attempt.md"
+            echo "Goal is blocked; generating Zen critique $attempt/$max_attempts."
+            CRITIQUE_TEMPLATE="$CRITIQUE_TEMPLATE" \
+              BLOCKED_CONTEXT_FILE="$CONTEXT_FILE" \
+              ORIGINAL_REQUEST="$ORIGINAL_REQUEST" \
+              OUTPUT_FILE="$critique_file" \
+              OPENCODE_SESSION_ID="$SESSION_ID" \
+              OPENCODE_CAPTURE_FILE="$OPENCODE_WEB_DIR/zen-critique-$attempt-request.json" \
+              "$RUNTIME_DIR/scripts/generate-blocked-critique.sh"
+
+            "$OPENCODE_BIN" run \
+              --auto \
+              --dangerously-skip-permissions \
+              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+              --session "$SESSION_ID" \
+              --model "$OPENCODE_MODEL" \
+              --command goal \
+              "$(< "$critique_file")" \
+              > "$OPENCODE_WEB_DIR/blocked-recovery-$attempt.log" 2>&1
+
+            fetch_messages
+            recovery_log="$OPENCODE_WEB_DIR/blocked-recovery-$attempt.log"
+            if ! has_blocked_marker "$recovery_log"; then
+              echo 'GOAL_BLOCKED=false' >> "$GITHUB_ENV"
+              echo "Blocked Goal recovery succeeded on attempt $attempt."
+              exit 0
+            fi
+            echo "Goal remains blocked after attempt $attempt; preparing another critique."
+          done
+
+          echo 'Goal remained blocked after bounded Zen recovery attempts.' >&2
+          echo 'GOAL_BLOCKED=true' >> "$GITHUB_ENV"
+          exit 1
 
       - name: Mark issue validating
         if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
@@ -1278,7 +1403,7 @@ jobs:
             });
 
       - name: Mark issue complete
-        if: success() && (env.TEST_GH_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: success() && env.GOAL_BLOCKED != 'true' && (env.TEST_GH_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -1297,8 +1422,37 @@ jobs:
               issue_number: number, labels: ['complete']
             });
 
+      - name: Mark issue blocked
+        if: failure() && env.GOAL_BLOCKED == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
+            for (const name of ['in progress', 'validating', 'complete', 'failed']) {
+              await github.rest.issues.removeLabel({
+                owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+                issue_number: number, name
+              }).catch((error) => { if (error.status !== 404) throw error; });
+            }
+            await github.rest.issues.addLabels({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, labels: ['blocked']
+            });
+            await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number,
+              body: [
+                '🟠 **OpenCode Goal remains blocked.**', '',
+                'The workflow detected `[goal:blocked]`, sent bounded harsh critiques through OpenCode Zen, and the same session still reported a blocked Goal.',
+                `Actions run: [${runUrl}](${runUrl})`,
+                '', 'No completion claim was published.'
+              ].join('\n')
+            });
+
       - name: Mark issue failed
-        if: failure()
+        if: failure() && env.GOAL_BLOCKED != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
