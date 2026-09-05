@@ -741,7 +741,8 @@ jobs:
               issue_number: number, labels: ['validating']
             });
 
-      - name: Verify app with second OpenCode prompt
+      - name: Fork OpenCode session for verification
+        id: verification_fork
         if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
@@ -755,12 +756,31 @@ jobs:
           code="$(cat "$OPENCODE_WEB_DIR/opencode-run.exit")"
           echo "OpenCode exited with code $code"
           [[ "$code" == 0 ]]
+
+          BUILD_SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
+          VERIFICATION_SESSION_ID="$(curl --fail --silent --show-error \
+            -X POST \
+            -H "x-opencode-directory: $PROJECT_DIR" \
+            "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$BUILD_SESSION_ID/fork" \
+            | jq -r '.id // empty')"
+          [[ "$VERIFICATION_SESSION_ID" == ses_* ]]
+          DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')"
+          printf 'session_id=%s\nsession_url=%s\n' "$VERIFICATION_SESSION_ID" \
+            "${{ steps.opencode_web.outputs.url }}/${DIRECTORY_B64}/session/${VERIFICATION_SESSION_ID}" >> "$GITHUB_OUTPUT"
+          echo "Verification fork: $VERIFICATION_SESSION_ID"
+
+      - name: Verify app with forked OpenCode session
+        if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           "$OPENCODE_BIN" run \
             --auto \
             --dangerously-skip-permissions \
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-            --session "${{ steps.opencode_run.outputs.session_id }}" \
+            --session "${{ steps.verification_fork.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
             "$(< "$RUNTIME_DIR/.github/prompts/02-verify.md")" \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
@@ -772,7 +792,7 @@ jobs:
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
+          SESSION_ID='${{ steps.verification_fork.outputs.session_id }}'
           ENTRYPOINT_PROMPT='The browser verifier cannot find a playable HTML entrypoint. Ensure the requested app has a working index.html at the project root or dist/index.html, make the app server serve that entrypoint on port 3000, and verify it in the browser before replying.'
 
           for attempt in 1 2 3; do
@@ -807,7 +827,7 @@ jobs:
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
+          SESSION_ID='${{ steps.verification_fork.outputs.session_id }}'
           FIX_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/03-public-app-fix.md")"
 
           for attempt in 1 2 3; do
@@ -888,7 +908,7 @@ jobs:
           completion_prompt="${completion_prompt//@TRIGGER_ISSUE_NUMBER@/$TRIGGER_ISSUE_NUMBER}"
           "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-            --session "${{ steps.opencode_run.outputs.session_id }}" \
+            --session "${{ steps.verification_fork.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
             "$completion_prompt" \
             > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
@@ -901,7 +921,7 @@ jobs:
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
+          SESSION_ID='${{ steps.verification_fork.outputs.session_id }}'
           SCREENSHOT_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/05-screenshot-evidence.md")"
 
           for attempt in 1 2 3; do
