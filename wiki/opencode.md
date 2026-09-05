@@ -18,6 +18,14 @@ path. The `OpenCode` label asks the App to launch the workflow; add `Goal` to se
 persistent goal mode. This keeps
 one request event mapped to one OpenCode session.
 
+An issue with the `ralph` label installs the standalone
+[`opencode-ralph-loop`](https://github.com/charfeng1/opencode-ralph-loop) plugin
+and starts `opencode run --command ralph-loop` in the same workflow session.
+Ralph takes precedence when both `Goal` and `ralph` are present, which makes it
+safe to add `ralph` to the usual Goal-labeled issue. The workflow requires
+Ralph's `<promise>DONE</promise>` completion marker before validation and
+completion reporting.
+
 When a human opens an issue without `OpenCode`, the App posts a reminder to add
 the label and stops; it does not dispatch a workflow. Adding `OpenCode` later
 starts the normal App-dispatched flow.
@@ -212,19 +220,17 @@ shared OpenCode session/database
         ^
         | x-opencode-directory: $PROJECT_DIR
         |
-local header-injecting proxy
-        ^
-        |
-trycloudflare tunnel -> browser Web UI
+trycloudflare tunnel -> workspace-scoped OpenCode Web UI
 ```
 
-The workflow tunnels a minimal local Node reverse proxy that injects
-`x-opencode-directory: $PROJECT_DIR` before forwarding requests to
-OpenCode Web, including WebSocket upgrade headers. It uses the runner's
-built-in Node runtime rather than a platform-specific nginx package. The access comment points
-to the encoded worktree/session route, so the browser opens the live run
-directly. A loaded Web UI or healthy tunnel alone does not prove session
-tracking; acceptance requires a screenshot while the run is active.
+The workflow starts OpenCode from `$PROJECT_DIR`, so its direct server is
+already scoped to the checked-out worktree. API and session probes explicitly
+send `x-opencode-directory: $PROJECT_DIR`, while Cloudflare tunnels directly
+to that same loopback server. This avoids an extra reverse-proxy hop and keeps
+WebSocket upgrades native. The access comment points to the encoded
+worktree/session route, so the browser opens the live run directly. A loaded
+Web UI or healthy tunnel alone does not prove session tracking; acceptance
+requires a screenshot while the run is active.
 
 ## Repository settings
 
