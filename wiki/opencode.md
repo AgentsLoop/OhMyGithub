@@ -208,9 +208,10 @@ local header-injecting proxy
 trycloudflare tunnel -> browser Web UI
 ```
 
-The workflow tunnels a minimal local nginx reverse proxy that injects
+The workflow tunnels a minimal local Node reverse proxy that injects
 `x-opencode-directory: $PROJECT_DIR` before forwarding requests to
-OpenCode Web, including WebSocket upgrade headers. The access comment points
+OpenCode Web, including WebSocket upgrade headers. It uses the runner's
+built-in Node runtime rather than a platform-specific nginx package. The access comment points
 to the encoded worktree/session route, so the browser opens the live run
 directly. A loaded Web UI or healthy tunnel alone does not prove session
 tracking; acceptance requires a screenshot while the run is active.
