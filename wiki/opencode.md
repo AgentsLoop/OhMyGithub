@@ -73,12 +73,13 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    Message text, reasoning, prompts, and tool details are
    never rendered in the live comment; full logs are published only in the
    completion release.
-9. Runs a second verification prompt in the same OpenCode session as the build,
-   starts the app, and exposes it through a
+9. Waits for the build session to finish, forks it into a separate verification
+   session, runs the verification prompt there, starts the app, and exposes it through a
    separate temporary trycloudflare.com tunnel, and verifies the public URL.
 10. Verifies the app through the public tunnel. If verification fails, sends a
-   remediation prompt to the same OpenCode session and retries up to three
-   times. Detects both uncommitted generated files and commits already created
+   remediation prompt to the forked verification session and retries up to three
+   times. The completion report and screenshot evidence prompts also use that
+   verification session. Detects both uncommitted generated files and commits already created
    by OpenCode, then pushes the branch and creates the pull request in YAML.
 11. Gives the verified public URL back to the worker, requests committed final
     browser screenshots, and appends immutable screenshot URLs with the game,
