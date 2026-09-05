@@ -73,6 +73,14 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    Message text, reasoning, prompts, and tool details are
    never rendered in the live comment; full logs are published only in the
    completion release.
+   For Goal runs, the workflow inspects the finished session for an explicit
+   `[goal:blocked]` result before validation. A blocked result is sent, with
+   the original request and blocked evidence, to the OpenCode Zen Responses API
+   using `.github/prompts/critique-blocked.md`; the generated continuation is
+   forwarded to the same OpenCode session with `--session` and
+   `--command goal`. This recovery is bounded to three attempts. If the same
+   session remains blocked, the issue receives the `blocked` label and no
+   completion report or `complete` label is published.
 9. Waits for the build session to finish, forks it into a separate verification
    session, runs the verification prompt there, starts the app, and exposes it through a
    separate temporary trycloudflare.com tunnel, and verifies the public URL.
@@ -177,8 +185,10 @@ Model labels are refreshed from the live OpenCode catalog on each run and are
 limited to models with zero input, output, and cache-read cost, plus the
 explicitly allowed `opencode/gpt-5.6-luna` and `openai/gpt-5.6-luna` models.
 Use `model/openai/gpt-5.6-luna` when the OpenAI provider is required. Default GitHub labels are removed, and
-the triggering issue is marked `in progress`,
-`complete`, or `failed` as the job advances.
+the triggering issue is marked `in progress`, `validating`, `complete`,
+`blocked`, or `failed` as the job advances. `complete` means the Goal recovery
+gate and validation pipeline passed; it is not a substitute for an explicit
+blocked Goal result.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 `model/opencode/muse-spark-1.3-contributor-free` label; if that label is
 unavailable, the skill records that it used the workflow default instead.
