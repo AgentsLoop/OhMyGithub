@@ -465,7 +465,7 @@ jobs:
           function forwardedHeaders(headers) {
             return {
               ...headers,
-              host: headers.host || `127.0.0.1:${targetPort}`,
+              host: `127.0.0.1:${targetPort}`,
               'x-opencode-directory': directory,
             };
           }
