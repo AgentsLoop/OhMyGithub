@@ -166,25 +166,32 @@ jobs:
         run: |
           set -euo pipefail
           install -d "$PROJECT_DIR"
-          goal_instructions="$GOAL_REQUEST"
-          if [[ "$RALPH_REQUEST" == 'true' ]]; then
-            goal_instructions=false
-          fi
-          awk -v include_goal="$goal_instructions" -v include_ralph="$RALPH_REQUEST" '
-            /<!-- GOAL_MODE_ONLY_BEGIN -->/ { in_goal = 1; next }
-            /<!-- GOAL_MODE_ONLY_END -->/ { in_goal = 0; next }
-            /<!-- RALPH_MODE_ONLY_BEGIN -->/ { in_ralph = 1; next }
-            /<!-- RALPH_MODE_ONLY_END -->/ { in_ralph = 0; next }
-            (!in_goal || include_goal == "true") && (!in_ralph || include_ralph == "true") { print }
-          ' "$RUNTIME_DIR/agents.template.md" > "$PROJECT_DIR/Agents.md"
+          template_dir="$RUNTIME_DIR/templates"
+          base_template="$template_dir/agents.template.md"
+          [[ -f "$base_template" ]] || { echo "Missing worker base template: $base_template" >&2; exit 1; }
+          cp "$base_template" "$PROJECT_DIR/Agents.md"
 
-          if [[ "$goal_instructions" == "true" ]]; then
+          append_template() {
+            local label="$1"
+            local template="$template_dir/${label}.md"
+            [[ -f "$template" ]] || { echo "Missing worker label template: $template" >&2; exit 1; }
+            printf '\n' >> "$PROJECT_DIR/Agents.md"
+            cat "$template" >> "$PROJECT_DIR/Agents.md"
+          }
+
+          # Ralph is the execution mode when both labels are present, so only
+          # append the snippet that matches the command OpenCode will run.
+          if [[ "$RALPH_REQUEST" == "true" ]]; then
+            append_template ralph
+          elif [[ "$GOAL_REQUEST" == "true" ]]; then
+            append_template goal
+          fi
+
+          if [[ "$GOAL_REQUEST" == "true" && "$RALPH_REQUEST" != "true" ]]; then
             grep -qF 'When running in Goal mode' "$PROJECT_DIR/Agents.md"
-          else
-            if grep -qF 'When running in Goal mode' "$PROJECT_DIR/Agents.md"; then
-              echo 'Goal-mode instructions leaked into a standard-mode Agents.md.' >&2
-              exit 1
-            fi
+          elif grep -qF 'When running in Goal mode' "$PROJECT_DIR/Agents.md"; then
+            echo 'Goal-mode instructions leaked into a non-Goal Agents.md.' >&2
+            exit 1
           fi
           if [[ "$RALPH_REQUEST" == "true" ]]; then
             grep -qF 'When running in Ralph mode' "$PROJECT_DIR/Agents.md"
