@@ -562,6 +562,7 @@ jobs:
               listen 127.0.0.1:$PROJECT_FILE_PORT;
               root $PROJECT_DIR;
               index index.html;
+              autoindex on;
               location / {
                 try_files \$uri \$uri/ =404;
               }
