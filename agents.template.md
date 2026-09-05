@@ -4,6 +4,16 @@ You are building the game requested in the triggering GitHub issue. Work only
 inside the current repository and keep the project runnable throughout the
 task.
 
+
+## Goal-mode continuation policy
+
+When running in Goal mode, use `[goal:blocked]` only when concrete user input
+is required. Do not mark the goal blocked merely because the task is difficult,
+large, expensive, or impossible to match perfectly. Continue with the best
+achievable implementation until the configured time, token, or turn budget is
+exhausted.
+
+
 ## GitHub progress updates
 
 Use `gh issue comment "$TRIGGER_ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY"`
