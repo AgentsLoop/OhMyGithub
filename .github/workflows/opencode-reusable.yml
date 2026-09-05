@@ -445,14 +445,21 @@ jobs:
           nohup "$OPENCODE_BIN" serve --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
-          for _ in {1..45}; do
-            curl --fail --silent --show-error --max-time 3 \
-              "http://127.0.0.1:$OPENCODE_WEB_PORT/global/health" >/dev/null && break
-            sleep 1
-          done
-          if ! curl --fail --silent --show-error --max-time 10 \
-            "http://127.0.0.1:$OPENCODE_WEB_PORT/global/health" >/dev/null; then
+          wait_for_http() {
+            local url="$1"
+            local attempts="$2"
+            for _ in $(seq 1 "$attempts"); do
+              if curl --fail --silent --show-error --max-time 3 "$url" >/dev/null; then
+                return 0
+              fi
+              sleep 1
+            done
+            return 1
+          }
+          if ! wait_for_http "http://127.0.0.1:$OPENCODE_WEB_PORT/global/health" 45; then
             echo 'OpenCode server did not become healthy; server log follows:' >&2
+            curl --silent --show-error --max-time 10 \
+              -i "http://127.0.0.1:$OPENCODE_WEB_PORT/global/health" >&2 || true
             sed -n '1,160p' "$OPENCODE_WEB_DIR/opencode.log" >&2 || true
             exit 1
           fi
@@ -517,14 +524,10 @@ jobs:
             nohup node "$OPENCODE_WEB_DIR/header-proxy.mjs" \
             > "$OPENCODE_WEB_DIR/header-proxy.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/header-proxy.pid"
-          for _ in {1..20}; do
-            curl --fail --silent --show-error --max-time 3 \
-              "http://127.0.0.1:$OPENCODE_PROXY_PORT/global/health" >/dev/null && break
-            sleep 1
-          done
-          if ! curl --fail --silent --show-error --max-time 10 \
-            "http://127.0.0.1:$OPENCODE_PROXY_PORT/global/health" >/dev/null; then
+          if ! wait_for_http "http://127.0.0.1:$OPENCODE_PROXY_PORT/global/health" 20; then
             echo 'OpenCode header proxy did not become healthy; logs follow:' >&2
+            curl --silent --show-error --max-time 10 \
+              -i "http://127.0.0.1:$OPENCODE_PROXY_PORT/global/health" >&2 || true
             sed -n '1,160p' "$OPENCODE_WEB_DIR/opencode.log" >&2 || true
             sed -n '1,160p' "$OPENCODE_WEB_DIR/header-proxy.log" >&2 || true
             exit 1
