@@ -517,12 +517,18 @@ jobs:
           case "$RUNNER_OS/$RUNNER_ARCH" in
             Linux/X64) CLOUDFLARED_ASSET='cloudflared-linux-amd64' ;;
             Linux/ARM64) CLOUDFLARED_ASSET='cloudflared-linux-arm64' ;;
-            macOS/X64) CLOUDFLARED_ASSET='cloudflared-darwin-amd64' ;;
-            macOS/ARM64) CLOUDFLARED_ASSET='cloudflared-darwin-arm64' ;;
+            macOS/X64) CLOUDFLARED_ASSET='cloudflared-darwin-amd64.tgz' ;;
+            macOS/ARM64) CLOUDFLARED_ASSET='cloudflared-darwin-arm64.tgz' ;;
             *) echo "Unsupported runner platform: $RUNNER_OS/$RUNNER_ARCH" >&2; exit 1 ;;
           esac
-          curl --fail --silent --show-error --location --output "$OPENCODE_WEB_DIR/cloudflared" \
-            "https://github.com/cloudflare/cloudflared/releases/latest/download/$CLOUDFLARED_ASSET"
+          if [[ "$CLOUDFLARED_ASSET" == *.tgz ]]; then
+            curl --fail --silent --show-error --location --output "$OPENCODE_WEB_DIR/cloudflared.tgz" \
+              "https://github.com/cloudflare/cloudflared/releases/latest/download/$CLOUDFLARED_ASSET"
+            tar -xzf "$OPENCODE_WEB_DIR/cloudflared.tgz" -C "$OPENCODE_WEB_DIR" cloudflared
+          else
+            curl --fail --silent --show-error --location --output "$OPENCODE_WEB_DIR/cloudflared" \
+              "https://github.com/cloudflare/cloudflared/releases/latest/download/$CLOUDFLARED_ASSET"
+          fi
           chmod 755 "$OPENCODE_WEB_DIR/cloudflared"
           nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_PROXY_PORT" \
             > "$OPENCODE_WEB_DIR/cloudflared.log" 2>&1 &
