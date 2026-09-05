@@ -206,6 +206,7 @@ jobs:
 
             const labels = [
               { name: 'in progress', color: 'FBCA04', description: 'OpenCode workflow is running' },
+              { name: 'validating', color: '1D76DB', description: 'OpenCode workflow is validating the result' },
               { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
               { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
@@ -279,7 +280,7 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
-            const statuses = ['in progress', 'complete', 'failed'];
+            const statuses = ['in progress', 'validating', 'complete', 'failed'];
             for (const status of statuses) {
               try {
                 await github.rest.issues.removeLabel({
@@ -698,6 +699,22 @@ jobs:
             COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
+
+      - name: Mark issue validating
+        if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            await github.rest.issues.removeLabel({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, name: 'in progress'
+            }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.addLabels({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, labels: ['validating']
+            });
 
       - name: Verify app with second OpenCode prompt
         if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
@@ -1156,6 +1173,10 @@ jobs:
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, name: 'in progress'
             }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.removeLabel({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, name: 'validating'
+            }).catch((error) => { if (error.status !== 404) throw error; });
             await github.rest.issues.addLabels({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, labels: ['complete']
@@ -1195,6 +1216,10 @@ jobs:
             await github.rest.issues.removeLabel({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, name: 'in progress'
+            }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.removeLabel({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, name: 'validating'
             }).catch((error) => { if (error.status !== 404) throw error; });
             await github.rest.issues.addLabels({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
