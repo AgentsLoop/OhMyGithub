@@ -473,22 +473,28 @@ jobs:
           mv "$config_tmp" "$HOME/.config/opencode/opencode.json"
           PORTS="$(node --input-type=module -e '
             import net from "node:net";
-            const server = net.createServer();
-            await new Promise((resolve, reject) => {
-              server.once("error", reject);
-              server.listen(0, "127.0.0.1", resolve);
-            });
-            console.log(server.address().port);
-            server.close();
+            const ports = [];
+            for (let index = 0; index < 2; index += 1) {
+              const server = net.createServer();
+              await new Promise((resolve, reject) => {
+                server.once("error", reject);
+                server.listen(0, "127.0.0.1", resolve);
+              });
+              ports.push(server.address().port);
+              server.close();
+            }
+            console.log(ports.join(" "));
           ')"
-          OPENCODE_WEB_PORT="$PORTS"
+          read -r OPENCODE_WEB_PORT PROJECT_FILE_PORT <<< "$PORTS"
           OPENCODE_PROXY_PORT="$OPENCODE_WEB_PORT"
-          [[ "$OPENCODE_WEB_PORT" =~ ^[0-9]+$ ]]
+          [[ "$OPENCODE_WEB_PORT" =~ ^[0-9]+$ && "$PROJECT_FILE_PORT" =~ ^[0-9]+$ ]]
           {
             printf 'OPENCODE_WEB_PORT=%s\n' "$OPENCODE_WEB_PORT"
             printf 'OPENCODE_PROXY_PORT=%s\n' "$OPENCODE_PROXY_PORT"
+            printf 'PROJECT_FILE_PORT=%s\n' "$PROJECT_FILE_PORT"
           } >> "$GITHUB_ENV"
           echo "Allocated OpenCode port: $OPENCODE_WEB_PORT"
+          echo "Allocated project file server port: $PROJECT_FILE_PORT"
           nohup "$OPENCODE_BIN" serve --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
@@ -513,7 +519,56 @@ jobs:
             sed -n '1,160p' "$OPENCODE_WEB_DIR/opencode.log" >&2 || true
             exit 1
           fi
-          echo 'Cloudflare will tunnel directly to the workspace-scoped OpenCode server'
+          if ! command -v nginx >/dev/null 2>&1; then
+            case "$RUNNER_OS" in
+              Linux)
+                sudo apt-get update
+                sudo apt-get install -y nginx
+                ;;
+              macOS)
+                brew install nginx
+                ;;
+              *)
+                echo "Nginx is not installed and cannot be provisioned on $RUNNER_OS" >&2
+                exit 1
+                ;;
+            esac
+          fi
+          NGINX_BIN="$(command -v nginx)"
+          NGINX_PREFIX="$OPENCODE_WEB_DIR/nginx"
+          install -d -m 700 "$NGINX_PREFIX" "$NGINX_PREFIX/client_body_temp" \
+            "$NGINX_PREFIX/proxy_temp" "$NGINX_PREFIX/fastcgi_temp" \
+            "$NGINX_PREFIX/uwsgi_temp" "$NGINX_PREFIX/scgi_temp"
+          cat > "$NGINX_PREFIX/nginx.conf" <<EOF
+          worker_processes 1;
+          pid $NGINX_PREFIX/nginx.pid;
+          error_log $NGINX_PREFIX/error.log;
+          events { worker_connections 128; }
+          http {
+            access_log $NGINX_PREFIX/access.log;
+            client_body_temp_path $NGINX_PREFIX/client_body_temp;
+            proxy_temp_path $NGINX_PREFIX/proxy_temp;
+            fastcgi_temp_path $NGINX_PREFIX/fastcgi_temp;
+            uwsgi_temp_path $NGINX_PREFIX/uwsgi_temp;
+            scgi_temp_path $NGINX_PREFIX/scgi_temp;
+            server {
+              listen 127.0.0.1:$PROJECT_FILE_PORT;
+              root $PROJECT_DIR;
+              index index.html;
+              location / {
+                try_files \$uri \$uri/ =404;
+              }
+            }
+          }
+          EOF
+          "$NGINX_BIN" -t -c "$NGINX_PREFIX/nginx.conf" -p "$NGINX_PREFIX"
+          "$NGINX_BIN" -c "$NGINX_PREFIX/nginx.conf" -p "$NGINX_PREFIX"
+          if ! wait_for_http "http://127.0.0.1:$PROJECT_FILE_PORT/" 15; then
+            echo 'Nginx project file server did not become healthy; server log follows:' >&2
+            sed -n '1,160p' "$NGINX_PREFIX/error.log" >&2 || true
+            exit 1
+          fi
+          echo 'Cloudflare will tunnel directly to the workspace-scoped OpenCode server and project file server'
           case "$RUNNER_OS/$RUNNER_ARCH" in
             Linux/X64) CLOUDFLARED_ASSET='cloudflared-linux-amd64' ;;
             Linux/ARM64) CLOUDFLARED_ASSET='cloudflared-linux-arm64' ;;
@@ -533,13 +588,17 @@ jobs:
           nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_PROXY_PORT" \
             > "$OPENCODE_WEB_DIR/cloudflared.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/cloudflared.pid"
+          nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$PROJECT_FILE_PORT" \
+            > "$OPENCODE_WEB_DIR/project-cloudflared.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/project-cloudflared.pid"
           for _ in {1..60}; do
             WEB_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
-            [[ -n "$WEB_URL" ]] && break
+            PROJECT_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' "$OPENCODE_WEB_DIR/project-cloudflared.log" | head -n 1)"
+            [[ -n "$WEB_URL" && -n "$PROJECT_URL" ]] && break
             sleep 1
           done
-          [[ -n "${WEB_URL:-}" ]]
-          printf 'url=%s\n' "$WEB_URL" >> "$GITHUB_OUTPUT"
+          [[ -n "${WEB_URL:-}" && -n "${PROJECT_URL:-}" ]]
+          printf 'url=%s\nproject_url=%s\n' "$WEB_URL" "$PROJECT_URL" >> "$GITHUB_OUTPUT"
 
       - name: Configure Git identity
         shell: bash
@@ -731,6 +790,7 @@ jobs:
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
+          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
           RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
         with:
@@ -753,6 +813,8 @@ jobs:
             body.push(
               '🌐 **Live OpenCode web session is ready.**', '',
               `URL: ${process.env.OPENCODE_WEB_URL}`, '',
+              '📁 **Project files are available through Nginx.**', '',
+              `URL: ${process.env.PROJECT_FILE_URL}`, '',
               `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
             );
             const comment = await github.rest.issues.createComment({
@@ -1522,6 +1584,8 @@ jobs:
         run: |
           set +e
           [[ -f "$OPENCODE_WEB_DIR/cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/cloudflared.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/project-cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/project-cloudflared.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/nginx/nginx.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/nginx/nginx.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode-run.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/response-comment-tracker.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/response-comment-tracker.pid")" 2>/dev/null || true
