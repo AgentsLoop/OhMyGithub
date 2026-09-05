@@ -77,6 +77,13 @@ Creating an issue with both `OpenCode` and `Goal` labels must start one
 `workflow_dispatch` run through the App, not separate `opened` and `labeled`
 runs.
 
+For Ralph support, create an issue with `OpenCode` and `ralph` labels and
+confirm the workflow installs `opencode-ralph-loop`, invokes
+`opencode run --command ralph-loop`, and preserves the same OpenCode session.
+The build is accepted only when the session emits
+`<promise>DONE</promise>`; a missing promise must not receive the `complete`
+label. If both `Goal` and `ralph` are present, Ralph takes precedence.
+
 For custom-branch support, create an issue whose title ends with
 `branch: <existing-branch>`. Confirm the App strips the suffix from the
 OpenCode request and dispatches the workflow from that branch for checkout and

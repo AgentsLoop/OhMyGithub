@@ -312,7 +312,7 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
-            const statuses = ['in progress', 'validating', 'complete', 'failed'];
+            const statuses = ['in progress', 'validating', 'complete', 'blocked', 'failed'];
             for (const status of statuses) {
               try {
                 await github.rest.issues.removeLabel({
@@ -1482,6 +1482,10 @@ jobs:
             await github.rest.issues.removeLabel({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, name: 'validating'
+            }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.removeLabel({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, name: 'blocked'
             }).catch((error) => { if (error.status !== 404) throw error; });
             await github.rest.issues.addLabels({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
