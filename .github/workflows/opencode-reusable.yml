@@ -447,13 +447,15 @@ jobs:
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
           for _ in {1..45}; do
             curl --fail --silent --show-error --max-time 3 \
-              -H "x-opencode-directory: $PROJECT_DIR" \
-              "http://127.0.0.1:$OPENCODE_WEB_PORT/session" >/dev/null && break
+              "http://127.0.0.1:$OPENCODE_WEB_PORT/global/health" >/dev/null && break
             sleep 1
           done
-          curl --fail --silent --show-error --max-time 10 \
-            -H "x-opencode-directory: $PROJECT_DIR" \
-            "http://127.0.0.1:$OPENCODE_WEB_PORT/session" >/dev/null
+          if ! curl --fail --silent --show-error --max-time 10 \
+            "http://127.0.0.1:$OPENCODE_WEB_PORT/global/health" >/dev/null; then
+            echo 'OpenCode server did not become healthy; server log follows:' >&2
+            sed -n '1,160p' "$OPENCODE_WEB_DIR/opencode.log" >&2 || true
+            exit 1
+          fi
           cat > "$OPENCODE_WEB_DIR/header-proxy.mjs" <<'EOF'
           import http from 'node:http';
           import net from 'node:net';
@@ -517,11 +519,16 @@ jobs:
           echo $! > "$OPENCODE_WEB_DIR/header-proxy.pid"
           for _ in {1..20}; do
             curl --fail --silent --show-error --max-time 3 \
-              "http://127.0.0.1:$OPENCODE_PROXY_PORT/session" >/dev/null && break
+              "http://127.0.0.1:$OPENCODE_PROXY_PORT/global/health" >/dev/null && break
             sleep 1
           done
-          curl --fail --silent --show-error --max-time 10 \
-            "http://127.0.0.1:$OPENCODE_PROXY_PORT/session" >/dev/null
+          if ! curl --fail --silent --show-error --max-time 10 \
+            "http://127.0.0.1:$OPENCODE_PROXY_PORT/global/health" >/dev/null; then
+            echo 'OpenCode header proxy did not become healthy; logs follow:' >&2
+            sed -n '1,160p' "$OPENCODE_WEB_DIR/opencode.log" >&2 || true
+            sed -n '1,160p' "$OPENCODE_WEB_DIR/header-proxy.log" >&2 || true
+            exit 1
+          fi
           case "$RUNNER_OS/$RUNNER_ARCH" in
             Linux/X64) CLOUDFLARED_ASSET='cloudflared-linux-amd64' ;;
             Linux/ARM64) CLOUDFLARED_ASSET='cloudflared-linux-arm64' ;;
@@ -681,7 +688,9 @@ jobs:
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
           SESSION_ID=''
           for _ in {1..120}; do
-            SESSION_ID="$(curl --fail --silent --show-error "http://127.0.0.1:$OPENCODE_WEB_PORT/session" | jq -r '.[0].id // empty')"
+            SESSION_ID="$(curl --fail --silent --show-error \
+              -H "x-opencode-directory: $PROJECT_DIR" \
+              "http://127.0.0.1:$OPENCODE_WEB_PORT/session" | jq -r '.[0].id // empty')"
             [[ "$SESSION_ID" == ses_* ]] && break
             sleep 1
           done
