@@ -163,8 +163,20 @@ jobs:
         run: |
           set -euo pipefail
           install -d "$PROJECT_DIR"
-          cp "$RUNTIME_DIR/agents.template.md" "$PROJECT_DIR/Agents.md"
-          cmp --silent "$RUNTIME_DIR/agents.template.md" "$PROJECT_DIR/Agents.md"
+          awk -v include_goal="$GOAL_REQUEST" '
+            /<!-- GOAL_MODE_ONLY_BEGIN -->/ { in_goal = 1; next }
+            /<!-- GOAL_MODE_ONLY_END -->/ { in_goal = 0; next }
+            !in_goal || include_goal == "true" { print }
+          ' "$RUNTIME_DIR/agents.template.md" > "$PROJECT_DIR/Agents.md"
+
+          if [[ "$GOAL_REQUEST" == "true" ]]; then
+            grep -qF 'When running in Goal mode' "$PROJECT_DIR/Agents.md"
+          else
+            if grep -qF 'When running in Goal mode' "$PROJECT_DIR/Agents.md"; then
+              echo 'Goal-mode instructions leaked into a standard-mode Agents.md.' >&2
+              exit 1
+            fi
+          fi
 
       - name: Sync OpenCode labels
         if: env.TEST_GH_REQUEST != 'true'
