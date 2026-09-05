@@ -312,8 +312,12 @@ jobs:
           # broker's 32000-32999 public-port range.
           SSH_PORT=$((32000 + GITHUB_RUN_ID % 1000))
           echo "SSH_PORT=$SSH_PORT" >> "$GITHUB_ENV"
-          sudo apt-get update
-          sudo apt-get install -y openssh-server tmux
+          if [[ "$RUNNER_OS" == 'Linux' ]]; then
+            sudo apt-get update
+            sudo apt-get install -y openssh-server tmux
+          else
+            command -v tmux >/dev/null 2>&1 || brew install tmux
+          fi
           install -d -m 700 "$SSH_DIR"
           ssh-keygen -t ed25519 -f "$SSH_KEY" -N '' -q
           chmod 600 "$SSH_KEY"
@@ -323,14 +327,21 @@ jobs:
             printf '%s\n' '${{ secrets.AGENTSWEB_SSH_PUBLIC_KEY }}'
           } > "$HOME/.ssh/authorized_keys"
           chmod 600 "$HOME/.ssh/authorized_keys"
-          sudo mkdir -p /run/sshd
+          [[ "$RUNNER_OS" != 'Linux' ]] || sudo mkdir -p /run/sshd
           sudo /usr/sbin/sshd -p 2222 -o PasswordAuthentication=no \
             -o PermitRootLogin=no -o PubkeyAuthentication=yes
+          is_listening() {
+            if command -v ss >/dev/null 2>&1; then
+              ss -ltn | grep -q ':2222 '
+            else
+              lsof -nP -iTCP:2222 -sTCP:LISTEN >/dev/null 2>&1
+            fi
+          }
           for _ in {1..20}; do
-            ss -ltn | grep -q ':2222 ' && break
+            is_listening && break
             sleep 1
           done
-          ss -ltn | grep -q ':2222 '
+          is_listening
           nohup env PYTHONPATH="$GITHUB_WORKSPACE/.agentsweb" \
             python3 -m lolgames_tunnel client 127.0.0.1:2222 \
             --server agentsweb.space --name "$SSH_NAME" --public-port "$SSH_PORT" \
@@ -427,7 +438,12 @@ jobs:
             sleep 1
           done
           curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_WEB_PORT/" >/dev/null
-          sudo apt-get install -y nginx
+          if [[ "$RUNNER_OS" == 'Linux' ]]; then
+            sudo apt-get install -y nginx
+          else
+            command -v nginx >/dev/null 2>&1 || brew install nginx
+          fi
+          NGINX_BIN="$(command -v nginx)"
           cat > "$OPENCODE_WEB_DIR/nginx.conf" <<EOF
           pid $OPENCODE_WEB_DIR/nginx.pid;
           events {}
@@ -448,7 +464,7 @@ jobs:
             }
           }
           EOF
-          nohup sudo nginx -c "$OPENCODE_WEB_DIR/nginx.conf" -g 'daemon off;' \
+          nohup sudo "$NGINX_BIN" -c "$OPENCODE_WEB_DIR/nginx.conf" -g 'daemon off;' \
             > "$OPENCODE_WEB_DIR/nginx.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/nginx.pid"
           for _ in {1..20}; do
@@ -456,8 +472,15 @@ jobs:
             sleep 1
           done
           curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$OPENCODE_PROXY_PORT/" >/dev/null
+          case "$RUNNER_OS/$RUNNER_ARCH" in
+            Linux/X64) CLOUDFLARED_ASSET='cloudflared-linux-amd64' ;;
+            Linux/ARM64) CLOUDFLARED_ASSET='cloudflared-linux-arm64' ;;
+            macOS/X64) CLOUDFLARED_ASSET='cloudflared-darwin-amd64' ;;
+            macOS/ARM64) CLOUDFLARED_ASSET='cloudflared-darwin-arm64' ;;
+            *) echo "Unsupported runner platform: $RUNNER_OS/$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
           curl --fail --silent --show-error --location --output "$OPENCODE_WEB_DIR/cloudflared" \
-            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+            "https://github.com/cloudflare/cloudflared/releases/latest/download/$CLOUDFLARED_ASSET"
           chmod 755 "$OPENCODE_WEB_DIR/cloudflared"
           nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_PROXY_PORT" \
             > "$OPENCODE_WEB_DIR/cloudflared.log" 2>&1 &
@@ -613,7 +636,7 @@ jobs:
             sleep 1
           done
           [[ "$SESSION_ID" == ses_* ]]
-          DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+          DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')"
           printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
             "${OPENCODE_WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
 
@@ -882,9 +905,12 @@ jobs:
           SCREENSHOT_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/05-screenshot-evidence.md")"
 
           for attempt in 1 2 3; do
-            mapfile -t screenshots < <(find "$PROJECT_DIR/screenshots" -maxdepth 1 -type f \
+            screenshots=()
+            while IFS= read -r screenshot; do
+              screenshots+=("$screenshot")
+            done < <(find "$PROJECT_DIR/screenshots" -type f \
               \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
-              -printf '%f\n' 2>/dev/null | sort)
+              -exec basename {} \; 2>/dev/null | sort)
             if [[ "${#screenshots[@]}" -gt 0 ]]; then
               printf '%s\n' "${screenshots[@]}"
               printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
@@ -981,7 +1007,8 @@ jobs:
           branch_slug="$(sed -E 's/[^[:alnum:]._-]+/-/g; s/^-+|-+$//g' <<<"$BRANCH_NAME" | tr '[:upper:]' '[:lower:]')"
           destination="branches/${branch_slug}/${FINAL_COMMIT:0:12}"
           owner_slug="$(tr '[:upper:]' '[:lower:]' <<<"$TARGET_OWNER")"
-          if [[ "${TARGET_REPO,,}" == "${owner_slug}.github.io" ]]; then
+          target_repo_slug="$(tr '[:upper:]' '[:lower:]' <<<"$TARGET_REPO")"
+          if [[ "$target_repo_slug" == "${owner_slug}.github.io" ]]; then
             pages_root="https://${owner_slug}.github.io"
           else
             pages_root="https://${owner_slug}.github.io/$TARGET_REPO"
@@ -1058,16 +1085,17 @@ jobs:
             echo 'OpenCode response artifact is empty; refusing to create an incomplete release.' >&2
             exit 1
           fi
-          find "$OPENCODE_WEB_DIR" -maxdepth 1 -type f \
-            \( -name '*.log' -o -name '*.json' \) \
-            ! -name 'opencode.json' \
-            -size +0c \
-            -exec cp -f {} "$release_dir/" \;
+          for artifact in "$OPENCODE_WEB_DIR"/*.log "$OPENCODE_WEB_DIR"/*.json; do
+            [[ -f "$artifact" && -s "$artifact" ]] || continue
+            [[ "$(basename "$artifact")" == 'opencode.json' ]] && continue
+            cp -f "$artifact" "$release_dir/"
+          done
 
           release_assets=()
-          while IFS= read -r -d '' asset; do
+          for asset in "$release_dir"/*; do
+            [[ -f "$asset" && -s "$asset" ]] || continue
             release_assets+=("$asset")
-          done < <(find "$release_dir" -maxdepth 1 -type f -size +0c -print0)
+          done
           ((${#release_assets[@]} > 0))
 
           tag="opencode-logs-${GITHUB_RUN_ID}"
