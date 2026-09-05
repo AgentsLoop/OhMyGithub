@@ -779,7 +779,7 @@ jobs:
 
       - name: Recover blocked Goal with Zen critique
         id: blocked_recovery
-        if: env.TEST_GH_REQUEST != 'true' && env.GOAL_REQUEST == 'true'
+        if: env.TEST_GH_REQUEST != 'true' && env.GOAL_REQUEST == 'true' && env.RALPH_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
