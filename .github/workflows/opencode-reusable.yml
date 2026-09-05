@@ -79,6 +79,7 @@ jobs:
       COMMENT_BODY: ${{ inputs.request }}
       TEST_GH_REQUEST: ${{ contains(inputs.labels_json, '"test-gh"') && contains(inputs.labels_json, '"OpenCode"') }}
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
+      RALPH_REQUEST: ${{ contains(inputs.labels_json, '"ralph"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
       PAGES_PUBLISH_ENABLED: ${{ inputs.pages_publish_enabled && (vars.PAGES_PUBLISH_ENABLED || 'true') || 'false' }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
@@ -148,7 +149,9 @@ jobs:
           project_path="${PROJECT_PATH#./}"
           project_path="${project_path%/}"
           skills_path="${project_path:+/$project_path}/.agents/"
+          ralph_state_path="${project_path:+/$project_path}/.opencode/ralph-loop.local.md"
           grep -qxF "$skills_path" .git/info/exclude || echo "$skills_path" >> .git/info/exclude
+          grep -qxF "$ralph_state_path" .git/info/exclude || echo "$ralph_state_path" >> .git/info/exclude
 
           if [[ -z "$project_path" ]]; then
             for runtime_path in '/.agentsweb/' '/.omgithub-runtime/' '/.opencode-ssh/' '/.opencode-web/' \
@@ -163,19 +166,31 @@ jobs:
         run: |
           set -euo pipefail
           install -d "$PROJECT_DIR"
-          awk -v include_goal="$GOAL_REQUEST" '
+          goal_instructions="$GOAL_REQUEST"
+          if [[ "$RALPH_REQUEST" == 'true' ]]; then
+            goal_instructions=false
+          fi
+          awk -v include_goal="$goal_instructions" -v include_ralph="$RALPH_REQUEST" '
             /<!-- GOAL_MODE_ONLY_BEGIN -->/ { in_goal = 1; next }
             /<!-- GOAL_MODE_ONLY_END -->/ { in_goal = 0; next }
-            !in_goal || include_goal == "true" { print }
+            /<!-- RALPH_MODE_ONLY_BEGIN -->/ { in_ralph = 1; next }
+            /<!-- RALPH_MODE_ONLY_END -->/ { in_ralph = 0; next }
+            (!in_goal || include_goal == "true") && (!in_ralph || include_ralph == "true") { print }
           ' "$RUNTIME_DIR/agents.template.md" > "$PROJECT_DIR/Agents.md"
 
-          if [[ "$GOAL_REQUEST" == "true" ]]; then
+          if [[ "$goal_instructions" == "true" ]]; then
             grep -qF 'When running in Goal mode' "$PROJECT_DIR/Agents.md"
           else
             if grep -qF 'When running in Goal mode' "$PROJECT_DIR/Agents.md"; then
               echo 'Goal-mode instructions leaked into a standard-mode Agents.md.' >&2
               exit 1
             fi
+          fi
+          if [[ "$RALPH_REQUEST" == "true" ]]; then
+            grep -qF 'When running in Ralph mode' "$PROJECT_DIR/Agents.md"
+          elif grep -qF 'When running in Ralph mode' "$PROJECT_DIR/Agents.md"; then
+            echo 'Ralph-mode instructions leaked into a non-Ralph Agents.md.' >&2
+            exit 1
           fi
 
       - name: Sync OpenCode labels
@@ -224,6 +239,7 @@ jobs:
               { name: 'blocked', color: 'D93F0B', description: 'OpenCode Goal needs user input or bounded recovery was exhausted' },
               { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
               { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
+              { name: 'ralph', color: '5319E7', description: 'Run OpenCode with the Ralph auto-continuation loop' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
               { name: 'test-gh', color: '1D76DB', description: 'Bypass OpenCode and test GitHub Pages publication' },
               { name: 'mac', color: 'B60205', description: 'Run OpenCode on the macos-latest GitHub-hosted runner' },
@@ -291,6 +307,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -309,7 +326,11 @@ jobs:
             await github.rest.issues.addLabels({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number,
-              labels: ['in progress', ...(process.env.GOAL_REQUEST === 'true' ? ['Goal'] : [])]
+              labels: [
+                'in progress',
+                ...(process.env.GOAL_REQUEST === 'true' ? ['Goal'] : []),
+                ...(process.env.RALPH_REQUEST === 'true' ? ['ralph'] : [])
+              ]
             });
 
       - name: Start AgentsWeb SSH session
@@ -400,7 +421,7 @@ jobs:
             }
           }
           EOF
-          if [[ "$OMO_REQUEST" == 'true' ]]; then
+          if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
             echo 'Installing oh-my-openagent for the omo-labeled request'
             if ! command -v bun >/dev/null 2>&1; then
               curl --fail --silent --show-error --location https://bun.sh/install | bash
@@ -426,7 +447,14 @@ jobs:
               --skip-auth
           fi
           config_tmp="$OPENCODE_WEB_DIR/opencode.json"
-          if [[ "$OMO_REQUEST" != 'true' ]]; then
+          if [[ "$RALPH_REQUEST" == 'true' ]]; then
+            npm install --prefix "$HOME/.config/opencode" --no-save --no-package-lock \
+              --ignore-scripts opencode-ralph-loop@1.0.10
+            jq '
+              .plugin = ((.plugin // []) + ["opencode-ralph-loop"]) |
+              .permission = ((.permission // {}) + {"*": "allow", "task": "allow"})
+            ' "$HOME/.config/opencode/opencode.json" > "$config_tmp"
+          elif [[ "$OMO_REQUEST" != 'true' ]]; then
             npm install --prefix "$HOME/.config/opencode" --no-save --no-package-lock \
               --ignore-scripts opencode-goal-plugin@0.8.2
             jq '
@@ -445,22 +473,22 @@ jobs:
           mv "$config_tmp" "$HOME/.config/opencode/opencode.json"
           PORTS="$(node --input-type=module -e '
             import net from "node:net";
-            const servers = [net.createServer(), net.createServer()];
-            await Promise.all(servers.map((server) => new Promise((resolve, reject) => {
+            const server = net.createServer();
+            await new Promise((resolve, reject) => {
               server.once("error", reject);
               server.listen(0, "127.0.0.1", resolve);
-            })));
-            console.log(servers.map((server) => server.address().port).join("\n"));
-            servers.forEach((server) => server.close());
+            });
+            console.log(server.address().port);
+            server.close();
           ')"
-          OPENCODE_WEB_PORT="$(printf '%s\n' "$PORTS" | sed -n '1p')"
-          OPENCODE_PROXY_PORT="$(printf '%s\n' "$PORTS" | sed -n '2p')"
-          [[ "$OPENCODE_WEB_PORT" =~ ^[0-9]+$ && "$OPENCODE_PROXY_PORT" =~ ^[0-9]+$ ]]
+          OPENCODE_WEB_PORT="$PORTS"
+          OPENCODE_PROXY_PORT="$OPENCODE_WEB_PORT"
+          [[ "$OPENCODE_WEB_PORT" =~ ^[0-9]+$ ]]
           {
             printf 'OPENCODE_WEB_PORT=%s\n' "$OPENCODE_WEB_PORT"
             printf 'OPENCODE_PROXY_PORT=%s\n' "$OPENCODE_PROXY_PORT"
           } >> "$GITHUB_ENV"
-          echo "Allocated OpenCode ports: web=$OPENCODE_WEB_PORT proxy=$OPENCODE_PROXY_PORT"
+          echo "Allocated OpenCode port: $OPENCODE_WEB_PORT"
           nohup "$OPENCODE_BIN" serve --hostname 127.0.0.1 --port "$OPENCODE_WEB_PORT" \
             > "$OPENCODE_WEB_DIR/opencode.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode.pid"
@@ -485,75 +513,7 @@ jobs:
             sed -n '1,160p' "$OPENCODE_WEB_DIR/opencode.log" >&2 || true
             exit 1
           fi
-          cat > "$OPENCODE_WEB_DIR/header-proxy.mjs" <<'EOF'
-          import http from 'node:http';
-          import net from 'node:net';
-
-          const targetPort = Number(process.env.OPENCODE_WEB_PORT);
-          const listenPort = Number(process.env.OPENCODE_PROXY_PORT);
-          const directory = process.env.PROJECT_DIR;
-
-          function forwardedHeaders(headers) {
-            return {
-              ...headers,
-              host: `127.0.0.1:${targetPort}`,
-              'x-opencode-directory': directory,
-            };
-          }
-
-          const proxy = http.createServer((request, response) => {
-            const upstream = http.request({
-              hostname: '127.0.0.1',
-              port: targetPort,
-              method: request.method,
-              path: request.url,
-              headers: forwardedHeaders(request.headers),
-            }, (upstreamResponse) => {
-              response.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);
-              upstreamResponse.pipe(response);
-            });
-            upstream.on('error', () => {
-              if (!response.headersSent) response.writeHead(502);
-              response.end('OpenCode upstream unavailable');
-            });
-            request.pipe(upstream);
-          });
-
-          proxy.on('upgrade', (request, socket, head) => {
-            const upstream = net.connect(targetPort, '127.0.0.1', () => {
-              const headers = forwardedHeaders(request.headers);
-              headers.connection = 'Upgrade';
-              headers.upgrade = 'websocket';
-              const lines = [`${request.method} ${request.url} HTTP/1.1`];
-              for (const [name, value] of Object.entries(headers)) {
-                if (Array.isArray(value)) lines.push(`${name}: ${value.join(', ')}`);
-                else if (value !== undefined) lines.push(`${name}: ${value}`);
-              }
-              upstream.write(`${lines.join('\\r\\n')}\\r\\n\\r\\n`);
-              if (head.length) upstream.write(head);
-              socket.pipe(upstream).pipe(socket);
-            });
-            upstream.on('error', () => socket.destroy());
-            socket.on('error', () => upstream.destroy());
-          });
-
-          proxy.listen(listenPort, '127.0.0.1', () => {
-            console.log(`header proxy listening on 127.0.0.1:${listenPort}`);
-          });
-          EOF
-          PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
-            OPENCODE_PROXY_PORT="$OPENCODE_PROXY_PORT" \
-            nohup node "$OPENCODE_WEB_DIR/header-proxy.mjs" \
-            > "$OPENCODE_WEB_DIR/header-proxy.log" 2>&1 &
-          echo $! > "$OPENCODE_WEB_DIR/header-proxy.pid"
-          if ! wait_for_http "http://127.0.0.1:$OPENCODE_PROXY_PORT/global/health" 20; then
-            echo 'OpenCode header proxy did not become healthy; logs follow:' >&2
-            curl --silent --show-error --max-time 10 \
-              -i "http://127.0.0.1:$OPENCODE_PROXY_PORT/global/health" >&2 || true
-            sed -n '1,160p' "$OPENCODE_WEB_DIR/opencode.log" >&2 || true
-            sed -n '1,160p' "$OPENCODE_WEB_DIR/header-proxy.log" >&2 || true
-            exit 1
-          fi
+          echo 'Cloudflare will tunnel directly to the workspace-scoped OpenCode server'
           case "$RUNNER_OS/$RUNNER_ARCH" in
             Linux/X64) CLOUDFLARED_ASSET='cloudflared-linux-amd64' ;;
             Linux/ARM64) CLOUDFLARED_ASSET='cloudflared-linux-arm64' ;;
@@ -666,6 +626,7 @@ jobs:
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
           OPENCODE_SKILLS: ${{ steps.opencode_labels.outputs.skills_json }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
           OMO_REQUEST: ${{ env.OMO_REQUEST }}
         run: |
           set -euo pipefail
@@ -679,25 +640,29 @@ jobs:
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
-          if [[ "$OMO_REQUEST" == 'true' ]]; then
+          if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
             prompt=$'ulw\n\n'"$prompt"
           fi
           printf '%s\n' "$prompt" > "$PROMPT_FILE"
-          if [[ "$OMO_REQUEST" == 'true' ]]; then
+          if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
             cat >> "$PROMPT_FILE" <<'EOF'
 
             This request has the `omo` issue label. Use oh-my-openagent Ultimate's native Goal system for the persistent objective and `ulw` for full OMO orchestration. Keep the objective active through verified implementation iterations and do not stop after the first successful pass. Preserve the workflow's evidence, commit, and push requirements.
           EOF
           fi
-          if [[ "$OMO_REQUEST" == 'true' ]]; then
+          if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
             echo 'OpenCode invocation mode: omo-goal-ulw'
+          elif [[ "$RALPH_REQUEST" == 'true' ]]; then
+            echo 'OpenCode invocation mode: ralph-loop'
           else
             echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
           fi
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
           nohup bash -c '
-            if [[ "$8" == true ]]; then
+            if [[ "$9" == true ]]; then
+              "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" --command ralph-loop "$(cat "$3")" > "$4" 2>&1
+            elif [[ "$8" == true ]]; then
               "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
             elif [[ "$7" == true ]]; then
               "$1" run --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
@@ -708,7 +673,7 @@ jobs:
             echo "$code" > "$5"
             exit "$code"
           ' \
-            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" "$GOAL_REQUEST" "$OMO_REQUEST" \
+            _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" "$GOAL_REQUEST" "$OMO_REQUEST" "$RALPH_REQUEST" \
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
           SESSION_ID=''
@@ -761,12 +726,15 @@ jobs:
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
+          RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
         with:
           github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const command = process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode';
+            const command = process.env.RALPH_REQUEST === 'true'
+              ? 'OpenCode with Ralph Loop'
+              : (process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode');
             const body = [];
             if (process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true') {
               body.push(
@@ -914,6 +882,36 @@ jobs:
           echo 'Goal remained blocked after bounded Zen recovery attempts.' >&2
           echo 'GOAL_BLOCKED=true' >> "$GITHUB_ENV"
           exit 1
+
+      - name: Verify Ralph completion promise
+        if: env.TEST_GH_REQUEST != 'true' && env.RALPH_REQUEST == 'true'
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
+        run: |
+          set -euo pipefail
+          RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
+          RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
+          RESPONSE_FILE="$OPENCODE_WEB_DIR/ralph-response.json"
+          for _ in {1..21600}; do
+            [[ -f "$RUN_EXIT" ]] && break
+            sleep 1
+          done
+          [[ -f "$RUN_EXIT" ]]
+          code="$(cat "$RUN_EXIT")"
+          [[ "$code" == 0 ]]
+          curl --fail --silent --show-error \
+            -H "x-opencode-directory: $PROJECT_DIR" \
+            "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" \
+            > "$RESPONSE_FILE"
+          response_text="$(jq -r '[.[] | select(.info.role == "assistant") | (.parts[]? | select(.type == "text") | .text)] | join("\n")' "$RESPONSE_FILE")"
+          if grep -Eiq '<promise>DONE</promise>' "$RUN_LOG" || grep -Eiq '<promise>DONE</promise>' <<<"$response_text"; then
+            echo 'Ralph completion promise verified.'
+          else
+            echo 'Ralph stopped without <promise>DONE</promise>; refusing completion.' >&2
+            exit 1
+          fi
 
       - name: Mark issue validating
         if: env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
@@ -1518,7 +1516,6 @@ jobs:
         run: |
           set +e
           [[ -f "$OPENCODE_WEB_DIR/cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/cloudflared.pid")" 2>/dev/null || true
-          [[ -f "$OPENCODE_WEB_DIR/header-proxy.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/header-proxy.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode-run.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/response-comment-tracker.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/response-comment-tracker.pid")" 2>/dev/null || true
