@@ -24,6 +24,11 @@ on:
         description: GitHub username that submitted the request
         required: true
         type: string
+      pages_publish_enabled:
+        description: Whether to configure and publish GitHub Pages
+        required: false
+        default: true
+        type: boolean
     secrets:
       OPENCODE_API_KEY:
         required: false
@@ -41,7 +46,7 @@ jobs:
       pull-requests: write
       issues: write
     environment:
-      name: github-pages
+      name: ${{ inputs.pages_publish_enabled && vars.PAGES_PUBLISH_ENABLED != 'false' && 'github-pages' || '' }}
       url: ${{ steps.pages_deploy.outputs.page_url }}
     env:
       SSH_NAME: opencode-issue-${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
@@ -74,7 +79,7 @@ jobs:
       TEST_GH_REQUEST: ${{ contains(inputs.labels_json, '"test-gh"') && contains(inputs.labels_json, '"OpenCode"') }}
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
-      PAGES_PUBLISH_ENABLED: ${{ vars.PAGES_PUBLISH_ENABLED || 'true' }}
+      PAGES_PUBLISH_ENABLED: ${{ inputs.pages_publish_enabled && (vars.PAGES_PUBLISH_ENABLED || 'true') || 'false' }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
       - name: Export target token
