@@ -21,9 +21,12 @@ Locate `Issue e2e` (or this skill's invocation) in the user message:
 Always remove the invocation, skill name, local path, and skill link from the
 issue prompt. With no request text, invent a small playable browser-game brief.
 
-If an existing branch is requested, verify it exists and append
-` branch: <existing-branch>` to the issue title. The suffix is routing metadata,
-not prompt text. Otherwise use the repository default branch.
+Before creating the issue, check `git branch --show-current`. If the current
+branch is non-empty and not `main`, verify it exists and append
+` branch: <current-branch>` to the issue title. The reusable workflow checks
+out `github.ref_name` and bases its OpenCode branch on it, so this preserves the
+debugging worktree. The suffix is routing metadata, not prompt text. On `main`,
+omit it and use the default branch.
 
 ## Target and labels
 
@@ -66,12 +69,13 @@ attribution, and geometry/material/animation verification.
 
 ## Procedure
 
-1. Check `git status --short`; preserve unrelated changes.
+1. Check `git status --short` and `git branch --show-current`; preserve
+   unrelated changes and derive the branch suffix as described above.
 2. Create a fresh issue with `OpenCode`, `Goal`, and applicable labels. Do not
    use comments, edits, or other labels as triggers. Verify with:
    `gh issue view <number> --json labels`.
-3. Confirm the newest run is a matching `workflow_dispatch` run on the
-   requested or default branch:
+3. Confirm the newest run is a matching `workflow_dispatch` run on the current
+   non-`main` branch, or on `main` when the current branch is `main`:
 
    ```sh
    gh run list --repo <owner>/<repo> --workflow opencode.yml --limit 5 \
