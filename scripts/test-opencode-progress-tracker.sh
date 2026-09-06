@@ -146,8 +146,10 @@ PROJECT_DIR="$test_dir" \
 OPENCODE_WEB_DIR="$test_dir" \
 SESSION_ID=ses_root \
 OPENCODE_WEB_URL=http://127.0.0.1/session/ses_root \
+PROJECT_FILE_URL=http://127.0.0.1/project-files \
 PROGRESS_DRY_RUN=true \
 PROGRESS_OUTPUT="$output_file" \
+PROGRESS_COMMENT_TEMPLATE="$script_dir/opencode-progress-comment-template.md" \
   "$tracker" || {
     echo "Tracker failed; mock server log:" >&2
     sed -n '1,120p' "$test_dir/server.log" >&2
@@ -168,6 +170,8 @@ assert_line "- Active subagents: 2"
 assert_line "- Total subagents executed: 4"
 assert_line "- Total failed subagents: 1"
 assert_line "- Image-context model calls: 5"
+assert_line "🌐 **OpenCode Web UI:** http://127.0.0.1/session/ses_root"
+assert_line "📁 **Project files:** http://127.0.0.1/project-files"
 assert_line "- Token count: 190"
 assert_line "- Speed score:"
 if ! grep -Eq -- '^- Elapsed: [0-9]+m$' "$output_file"; then

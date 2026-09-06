@@ -134,13 +134,14 @@ while :; do
     elapsed="$(format_elapsed "$elapsed_seconds")"
     speed_score="$(awk -v tokens="$token_count" -v elapsed="$elapsed_seconds" \
       'BEGIN { if (elapsed > 0) printf "%.1f", tokens / elapsed; else print "0.0" }')"
+    access_links="$(< "${PROGRESS_COMMENT_TEMPLATE:-$(dirname "$0")/opencode-progress-comment-template.md}")"
+    access_links="${access_links//@OPENCODE_WEB_URL@/$OPENCODE_WEB_URL}"
+    access_links="${access_links//@PROJECT_FILE_URL@/${PROJECT_FILE_URL:-unavailable}}"
     body="🟡 **OpenCode progress (live)**
 
 Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
-🌐 **OpenCode Web UI:** $OPENCODE_WEB_URL
-
-📁 **Project files:** ${PROJECT_FILE_URL:-unavailable}
+$access_links
 
 - Elapsed: ${elapsed}
 - Token count: ${token_count}
