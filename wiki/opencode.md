@@ -78,8 +78,9 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
 6. Starts `opencode run --attach` against the same OpenCode installation and
    server-backed session store, then posts a direct URL to that live session.
 7. Verifies SSH connectivity when the optional tunnel was started successfully.
-8. Replaces the access comment with aggregate OpenCode progress statistics and
-   refreshes it about every 10 seconds while the run is active. The report also
+8. Creates and refreshes one unified progress-comment template with aggregate
+   OpenCode statistics about every 10 seconds while the run is active, keeping
+   the launch access details intact. The report also
    counts active child sessions from `/session/status` and all descendant
    subagent sessions from their `parentID` lineage. It also reports inferred
    human-readable elapsed time, aggregate token count and tokens-per-second speed,
