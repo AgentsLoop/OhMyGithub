@@ -213,7 +213,7 @@ For difficult game requests, the `game-issue-e2e` skill selects the synchronized
 unavailable, the skill records that it used the workflow default instead.
 
 The workflow reads the repository variable `PROJECT_DIR` as a repository-relative
-project home. It defaults to `./`, while this repository sets it to `./project/`.
+project home. It defaults to `./`.
 Absolute paths and parent-directory traversal are rejected. OpenCode Web and all
 OpenCode runs use the resolved directory, and skill checkout, Git delivery,
 publishing, and screenshot links use the same project home. OpenCode's server
