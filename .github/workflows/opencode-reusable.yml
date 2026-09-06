@@ -1143,7 +1143,7 @@ jobs:
             : > "$OPENCODE_WEB_DIR/app.log"
             : > "$OPENCODE_WEB_DIR/app-cloudflared.log"
 
-            npm run start -- --port "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
+            PORT="$APP_PORT" npm run start -- --port "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
             echo $! > "$OPENCODE_WEB_DIR/app.pid"
             local_ok=''
             for _ in {1..30}; do
