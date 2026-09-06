@@ -158,11 +158,16 @@ ${SSH_COMMAND}
 - Total failed subagents: $failed_subagents
 - Image-context model calls: $vision_count
 - Changed workspace files: $changed_count"
+    validation_session_section=""
+    if [[ -s "$OPENCODE_WEB_DIR/validation-session-url" ]]; then
+      validation_session_section="🔎 **Validation OpenCode Web UI:** $(<"$OPENCODE_WEB_DIR/validation-session-url")"
+    fi
     access_note="This opens the currently running OpenCode session directly. Access remains available while OpenCode runs and for 5 hours afterwards."
     access_links="${access_links//@SSH_SECTION@/$ssh_section}"
     access_links="${access_links//@UPDATED@/$(date -u '+%Y-%m-%d %H:%M:%S UTC')}"
     access_links="${access_links//@OPENCODE_WEB_URL@/$OPENCODE_WEB_URL}"
     access_links="${access_links//@PROJECT_FILE_URL@/${PROJECT_FILE_URL:-unavailable}}"
+    access_links="${access_links//@VALIDATION_SESSION_SECTION@/$validation_session_section}"
     access_links="${access_links//@PROGRESS_STATS@/$progress_stats}"
     access_links="${access_links//@ACCESS_NOTE@/$access_note}"
     body="${access_links}

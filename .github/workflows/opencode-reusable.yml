@@ -834,6 +834,7 @@ jobs:
               UPDATED: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
               OPENCODE_WEB_URL: process.env.OPENCODE_WEB_URL,
               PROJECT_FILE_URL: process.env.PROJECT_FILE_URL || 'unavailable',
+              VALIDATION_SESSION_SECTION: '',
               PROGRESS_STATS: '- Waiting for live OpenCode progress statistics.',
               ACCESS_NOTE: `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
             });
@@ -1053,6 +1054,8 @@ jobs:
           DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')"
           printf 'session_id=%s\nsession_url=%s\n' "$VERIFICATION_SESSION_ID" \
             "${{ steps.opencode_web.outputs.url }}/${DIRECTORY_B64}/session/${VERIFICATION_SESSION_ID}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${{ steps.opencode_web.outputs.url }}/${DIRECTORY_B64}/session/${VERIFICATION_SESSION_ID}" \
+            > "$OPENCODE_WEB_DIR/validation-session-url"
           echo "Verification fork: $VERIFICATION_SESSION_ID"
 
       - name: Verify app with forked OpenCode session
