@@ -25,6 +25,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/trycf"
           printf 'trycf diagnostic\n' > "$RUNNER_TEMP/trycf/index.html"
           (cd "$RUNNER_TEMP/trycf" && time python3 -m http.server 3000 --bind 127.0.0.1 > "$RUNNER_TEMP/trycf/origin.log" 2>&1 & echo $! > "$RUNNER_TEMP/trycf/origin.pid")
+          for _ in {1..30}; do
+            curl --fail --silent --show-error --max-time 2 http://127.0.0.1:3000/ >/dev/null && break
+            sleep 1
+          done
           time curl --fail --silent --show-error --max-time 5 http://127.0.0.1:3000/ >/dev/null
           (time cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3000 > "$RUNNER_TEMP/trycf/cloudflared.log" 2>&1 & echo $! > "$RUNNER_TEMP/trycf/cloudflared.pid")
 
