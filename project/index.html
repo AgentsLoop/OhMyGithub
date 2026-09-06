@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Smoke test: standard workflow path starts correctly from main without /loop — Vite on 0.0.0.0:3000 allowedHosts true" />
+    <title>Smoke Test — Standard Workflow Path OK</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Smoke Test: Standard Workflow Path OK</h1>
+        <p class="subtitle">Non-loop /oc path verified from <code>main</code> • <span id="timestamp"></span></p>
+        <p class="subtitle" style="margin-top:4px">Build: <code>2026-08-27T23:30:00Z</code> deterministic • Commit <code>19e125e</code> • no external deps</p>
+      </header>
+
+      <main>
+        <section class="card status-ok">
+          <h2>✅ Workflow Started Correctly</h2>
+          <ul>
+            <li><strong>Trigger:</strong> <code>/oc Non-loop smoke test from main</code></li>
+            <li><strong>Model:</strong> <code>opencode/muse-spark-1.2-contributor-free</code></li>
+            <li><strong>Branch:</strong> <code id="branch">opencode/33126349997</code></li>
+            <li><strong>Base:</strong> <code>main</code> @ <code>19e125e</code></li>
+            <li><strong>Loop:</strong> <code>Not used</code> (as requested)</li>
+            <li><strong>Skills:</strong> <code>(none)</code> — verified no mandatory skills needed</li>
+            <li><strong>Orchestration:</strong> builder / critic / verifier subagents launched via OpenCode task tool</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>🔍 Standard Path Checks</h2>
+          <div class="checks">
+            <div class="check pass"><span class="icon">✅</span> SSH AgentsWeb session — ready</div>
+            <div class="check pass"><span class="icon">✅</span> OpenCode web session — live</div>
+            <div class="check pass"><span class="icon">✅</span> Branch checkout — <code>opencode/33126349997</code></div>
+            <div class="check pass"><span class="icon">✅</span> Vite dev server — <code>0.0.0.0:3000</code> <code>allowedHosts:true</code></div>
+            <div class="check pass"><span class="icon">✅</span> Health check — <code>GET /</code> → 200</div>
+            <div class="check pass"><span class="icon">✅</span> Public tunnel — trycloudflare ready</div>
+          </div>
+        </section>
+
+        <section class="card interactive">
+          <h2>🎮 Interactive Verification</h2>
+          <p>Click counter proves browser JS loop is live (required for gameplay verification):</p>
+          <div class="counter-row">
+            <button id="counterBtn" type="button" aria-label="Increment verification counter">Click me</button>
+            <span>Count: <strong id="count">0</strong></span>
+          </div>
+          <p class="hint">Verifier checks this counter increments via browser automation.</p>
+        </section>
+
+        <section class="card meta">
+          <h2>ℹ️ References</h2>
+          <ul>
+            <li>Workflow: <code>.github/workflows/opencode.yml:1</code> (triggers on <code>/oc</code>, <code>/opencode</code>)</li>
+            <li>Prompts: <code>.github/prompts/build.md:1</code> / <code>verify.md:1</code></li>
+            <li>Issue: <a href="https://github.com/agents-dev/aiplay/issues/131">#131</a> — smoke test comment <code>5446426400</code></li>
+            <li>Run: <a id="runLink" href="https://github.com/agents-dev/aiplay/actions/runs/33126349997">#33126349997</a></li>
+          </ul>
+        </section>
+      </main>
+
+      <footer>
+        <p>Smoke test passed — standard workflow path starts correctly without /loop. No game loop required; this page itself is the verification artifact.</p>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
