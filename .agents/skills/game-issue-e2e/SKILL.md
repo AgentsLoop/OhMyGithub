@@ -5,63 +5,80 @@ description: Start the issue-triggered workflow and return its initial OpenCode 
 
 # Issue E2E kickoff
 
-Use this only when the user explicitly asks for an issue-triggered E2E run. It
-creates a real GitHub issue and Action, then stops at the first OpenCode Web UI
-session link. Do not claim that implementation, tests, PR, or deployment are
-complete.
+Use only when the user explicitly requests an issue-triggered E2E run. Create
+the real issue and Action, then stop at the initial Web UI session link; do not
+claim implementation, tests, PR, or deployment completion.
 
-## Prompt
+## Prompt and branch
 
-Find the invocation in the user's message:
+Locate `Issue e2e` (or this skill's invocation) in the user message:
 
-- If `Issue e2e` is at the beginning, preserve the following request directly.
-  Only make necessary cleanup, such as removing the invocation itself.
-- If it is in the middle or at the end, use request text on both sides as
-  context, reason about the desired result, and rewrite a concise prompt in
-  your own words.
-- In every case, remove the skill name, local skill path, and invocation link
-  from the issue prompt. If there is no request text, invent a small playable
-  browser-game brief.
+- At the beginning: preserve the following request directly, making only
+  necessary cleanup.
+- In the middle or at the end: combine request text on both sides, reason about
+  the desired result, and rewrite a concise prompt in your own words.
 
-If the user requests an existing branch, verify it exists and append
-` branch: <existing-branch>` to the issue title. Otherwise use the repository's
-default branch. This suffix is routing metadata, not part of the prompt.
+Always remove the invocation, skill name, local path, and skill link from the
+issue prompt. With no request text, invent a small playable browser-game brief.
+
+If an existing branch is requested, verify it exists and append
+` branch: <existing-branch>` to the issue title. The suffix is routing metadata,
+not prompt text. Otherwise use the repository default branch.
 
 ## Target and labels
 
-Use the supplied repository, or `AgentsLoop/PlayGround` by default. Verify
-`gh auth status`, admin access with `gh repo view`, and that
-`.github/workflows/opencode.yml` exists. If the workflow is missing, create the
-issue but report that no run or session could start.
+Use the supplied repository or default to `AgentsLoop/PlayGround`. Verify
+`gh auth status`, admin access via `gh repo view`, and
+`.github/workflows/opencode.yml`. If the workflow is absent, create the issue
+but report that no Action or session could start.
 
-Before creating the issue, run `gh label list`. Always apply `OpenCode` and
-`Goal`. Apply matching labels only when they exist:
+Run `gh label list` before each kickoff. Always apply `OpenCode` and `Goal`.
+Apply only existing matching labels: `skill/image-search`,
+`skill/load-sketchfab-threejs` for 3D/GLB/Three.js/PlayCanvas,
+`skill/gauntlet-loop`, `skill/mcp-duckgo`, `linux` for explicit Linux requests,
+and a requested model label. Do not invent `skill/*` labels; record unavailable
+matches. If `Goal` is missing, create it:
 
-- `skill/image-search` for image discovery.
-- `skill/load-sketchfab-threejs` for 3D, GLB, Three.js, or PlayCanvas work.
-- `skill/gauntlet-loop` for Gauntlet Loop work.
-- `linux` only for an explicitly Linux request.
-- The requested model label when one is specified.
+```sh
+gh label create Goal --repo <owner>/<repo> --color 8A2BE2 \
+  --description 'Run OMG with the persistent Goal command'
+```
 
-For 3D requests, verify the workflow defaults to `macos-latest`; for Linux
-requests, verify `linux` routes to `ubuntu-latest`. Create missing `Goal` or
-`linux` labels using the repository's documented commands.
+If Linux is requested and `linux` is missing, create it:
+
+```sh
+gh label create linux --repo <owner>/<repo> --color 1D76DB \
+  --description 'Run OpenCode on the ubuntu-latest GitHub-hosted runner'
+```
+
+For Luna, use `model/openai/gpt-5.6-luna`; create it if missing rather than
+using `model/opencode/gpt-5.6-luna`:
+
+```sh
+gh label create model/openai/gpt-5.6-luna --repo <owner>/<repo> \
+  --color 5319E7 --description 'OpenAI model: openai/gpt-5.6-luna'
+```
+
+For 3D, verify the workflow defaults to
+`macos-latest`; for Linux, verify `linux` routes to `ubuntu-latest`.
+Require the 3D prompt to use `load-sketchfab-threejs` for a downloadable GLB,
+attribution, and geometry/material/animation verification.
 
 ## Procedure
 
-1. Check `git status --short` and leave unrelated changes untouched.
-2. Create a fresh issue with the derived prompt and required labels. Do not
-   add a comment as a trigger. Verify labels with `gh issue view <number>`.
-3. Find the newest run:
+1. Check `git status --short`; preserve unrelated changes.
+2. Create a fresh issue with `OpenCode`, `Goal`, and applicable labels. Do not
+   use comments, edits, or other labels as triggers. Verify with:
+   `gh issue view <number> --json labels`.
+3. Confirm the newest run is a matching `workflow_dispatch` run on the
+   requested or default branch:
 
    ```sh
    gh run list --repo <owner>/<repo> --workflow opencode.yml --limit 5 \
      --json databaseId,displayTitle,event,status,url,headBranch
    ```
 
-   Require `workflow_dispatch`, the new issue title, and the requested branch
-   (or the default branch when none was requested).
-4. Poll issue comments or the run only until the initial OpenCode Web UI URL
-   appears. Return clickable links for the issue, run, and session immediately.
-
-Never cancel or rerun an active run without checking its current step first.
+   An `issues` event or wrong branch is routing failure, not validation.
+4. Poll only until the initial OpenCode Web UI URL appears. Return clickable
+   issue, run, and session links immediately. Do not use `gh run watch` to
+   completion or cancel/rerun an active run without checking its current step.
