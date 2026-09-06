@@ -172,7 +172,10 @@ The previous GitHub integration installed the OpenCode CLI and ran:
 opencode github run
 ```
 
-The workflow now sends the comment text directly to `opencode run --attach`.
+The workflow now sends the comment text directly to `opencode run --attach --dir
+<project-directory>`. The explicit directory is required when the CLI attaches
+to a separately started OpenCode server; without it, the CLI can answer while
+the resulting session is not visible in the intended Web UI workspace.
 
 For the installed `opencode-goal-plugin`, invoke a goal from the non-interactive
 CLI with `opencode run --command goal "<objective>"`; passing `/goal <objective>`
