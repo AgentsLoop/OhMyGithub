@@ -1,173 +1,62 @@
 ---
 name: issue-e2e
-description: Start the issue-triggered workflow from the caller's prompt, wait for the OpenCode session link, and return that link without waiting for the workflow to finish.
+description: Start the issue-triggered workflow and return its initial OpenCode session link.
 ---
 
-# Issue workflow kickoff
+# Issue E2E kickoff
 
-## Trigger rule
+Use this only when the user explicitly asks for an issue-triggered E2E run. It
+creates a real GitHub issue and Action, then stops at the first OpenCode Web UI
+session link. Do not claim that implementation, tests, PR, or deployment are
+complete.
 
-GitHub uses the term **label**. The required execution label is exactly
-`OpenCode`. Create the issue with that label, or add it to an existing issue;
-do not use comments, edits, or the word “tag” as a trigger. The App dispatches
-the workflow once when an issue is opened with the label or when `OpenCode` is
-added, including when the App adds it after issue creation.
+## Prompt
 
-When the caller explicitly requests a custom branch, append
-` branch: <existing-branch>` to the issue title. Treat that suffix as routing
-metadata rather than part of the caller's implementation prompt.
-Verify the branch exists before creating the issue. Otherwise omit the directive
-and use the repository default branch.
+Find the invocation in the user's message:
 
-Use this skill when the user asks to start the issue-triggered workflow with a
-request or create an issue. When the skill is invoked within a user message,
-use the surrounding request text before and after the invocation as task
-context. If both are present, combine them. Think through that context and
-write a clear implementation prompt in your own words; do not paste the user's
-wording verbatim. Preserve the actual intent and important requirements while
-removing invocation syntax, local skill links, and any reference to this
-`issue-e2e` skill from the generated prompt. When no task context is supplied,
-independently come up with a fresh random small playable browser-game concept
-and write a brief implementation prompt for that game.
-The fallback must be a game idea, not a request for clarification or a generic
-app. This skill intentionally ends after the workflow publishes the
-OpenCode Web UI session link; it does not watch the workflow to completion or
-claim that the implementation, PR, or public app is finished.
+- If `Issue e2e` is at the beginning, preserve the following request directly.
+  Only make necessary cleanup, such as removing the invocation itself.
+- If it is in the middle or at the end, use request text on both sides as
+  context, reason about the desired result, and rewrite a concise prompt in
+  your own words.
+- In every case, remove the skill name, local skill path, and invocation link
+  from the issue prompt. If there is no request text, invent a small playable
+  browser-game brief.
 
-## Repository selection
+## Target and labels
 
-Use the repository supplied by the caller when one is provided. When no
-repository is supplied, default to `AgentsLoop/PlayGround`. Resolve the full
-`OWNER/REPO` with `gh repo view` and confirm the authenticated account can
-administer it before creating issues or triggering Actions. Do not silently
-substitute a different repository. If the target does not contain
-`.github/workflows/opencode.yml`, still create the requested issue, but report
-that the E2E workflow is unavailable and do not claim that an Action or session
-was started.
+Use the supplied repository, or `AgentsLoop/PlayGround` by default. Verify
+`gh auth status`, admin access with `gh repo view`, and that
+`.github/workflows/opencode.yml` exists. If the workflow is missing, create the
+issue but report that no run or session could start.
 
-Text surrounding the skill invocation is sufficient as source context even
-when it is short or does not describe a game. Combine available text from both
-sides, then convert it into a concise issue prompt in your own words before
-creating the issue. Never include the `issue-e2e` skill name, its local path, or
-the skill-invocation link in the issue prompt. If no context is supplied,
-invent a fresh random, small playable browser game and write a brief issue
-prompt for it. Apply matching skill labels only when the resulting prompt or
-invented game clearly requires them.
+Before creating the issue, run `gh label list`. Always apply `OpenCode` and
+`Goal`. Apply matching labels only when they exist:
 
-## Required outcome
+- `skill/image-search` for image discovery.
+- `skill/load-sketchfab-threejs` for 3D, GLB, Three.js, or PlayCanvas work.
+- `skill/gauntlet-loop` for Gauntlet Loop work.
+- `linux` only for an explicitly Linux request.
+- The requested model label when one is specified.
 
-The kickoff is complete when all of these are true:
-
-- A fresh GitHub issue was created with the `OpenCode` and `Goal` labels.
-  Always add `Goal`; Goal is the required persistent command mode for this
-  skill. The App dispatches the workflow once.
-- The App triggered `.github/workflows/opencode.yml` through `workflow_dispatch`.
-  For a custom branch, the run's head branch is that requested branch. An
-  `issues` event or default-branch run is a routing failure, not a successful
-  custom-branch test.
-- The initial OpenCode Web UI session link was posted.
-
-Do not wait for `gh run watch`, the verification prompt, the public tunnel, the
-pull request, or tests after the session link has been found.
-
-## Skill and runner labels
-
-Before creating the test issue, inspect the repository's current labels and
-use the available `skill/*` labels that match the requested game. The current
-skill labels are:
-
-- `Goal` — required for every kickoff; runs the persistent Goal command.
-
-- `skill/gauntlet-loop` — use for Gauntlet Loop/gameplay-loop or iterative
-  game-building requests.
-- `skill/image-search` — use when the request needs web image discovery or
-  image-search assets.
-- `skill/load-sketchfab-threejs` — required for 3D game requests; use it for
-  Sketchfab, GLB, Three.js, or PlayCanvas model-loading/material/animation
-  requests.
-- `linux` — use when the request should run on the `ubuntu-latest`
-  GitHub-hosted runner instead of the default macOS runner.
-- `skill/mcp-duckgo` — use when the request explicitly requires DuckDuckGo/MCP
-  search support.
-
-Refresh the available labels with `gh label list` before each test because the
-set can change. Do not add a `skill/*` label merely because a skill exists:
-apply only labels supported by the issue's requirements. If a matching label
-does not exist, continue without inventing or creating one and record that in
-the test report. The `mac` runner label is the explicit exception for 3D
-requests and may be created when missing, as described below.
-
-When the caller requests the Luna model, use the OpenAI provider label
-`model/openai/gpt-5.6-luna`. Confirm that label exists before creating the
-issue; if it is missing, create the model label with `gh label create` because
-the workflow synchronizes model labels during the run but cannot add a label to
-the triggering issue retroactively. Do not use
-`model/opencode/gpt-5.6-luna`, which selects OpenCode Zen instead of the OpenAI
-OAuth provider.
+For 3D requests, verify the workflow defaults to `macos-latest`; for Linux
+requests, verify `linux` routes to `ubuntu-latest`. Create missing `Goal` or
+`linux` labels using the repository's documented commands.
 
 ## Procedure
 
-1. Before starting the test, inspect the working tree with `git status --short`.
-2. Confirm `gh auth status`, resolve the target repository (default
-   `AgentsLoop/PlayGround`), and inspect it with `gh repo view <owner>/<repo>`.
-   Check whether `.github/workflows/opencode.yml` exists. If it is missing,
-   continue through issue creation, then report that no workflow or session
-   could be started and stop without attempting run polling.
-3. Inspect the current labels in the target repository with
-   `gh label list --repo <owner>/<repo>`, identify the applicable
-   `skill/*` labels and model label from the request, and create a new issue
-   with one `--label` option per applicable label, always including `OpenCode`.
-   Always also include `Goal` for this skill. This exercises the persistent
-   Goal command path. If the repository does not have the `Goal` label, create
-   it with `gh label create Goal --repo <owner>/<repo> --color 8A2BE2
-   --description 'Run OMG with the persistent Goal command'` before creating
-   the issue. Do not add a comment because comments do not trigger the workflow.
-   If testing an existing issue instead, adding the `OpenCode` and `Goal`
-   labels is the only supported way to start it.
-   Derive the complete issue prompt from all request text surrounding the skill
-   invocation, using text both before and after it when available. Rewrite it
-   in your own words after reasoning about the desired outcome; never copy it
-   verbatim. Exclude the `issue-e2e` skill name, local path, and invocation link.
-   If no surrounding context was supplied, generate a random, small playable
-   browser game and use a concise implementation brief as the issue prompt. If
-   the resulting prompt requests 3D content, verify that the target workflow
-   defaults to `macos-latest`; if it does not, stop and report that the target
-   workflow must be updated before starting the issue. For an explicitly Linux
-   request, verify that the target workflow routes the `linux` label to
-   `ubuntu-latest`. If the repository does not have the `linux` label, create it
-   with `gh label create linux --repo <owner>/<repo> --color 1D76DB --description
-   'Run OpenCode on the ubuntu-latest GitHub-hosted runner'`. Pass `--label linux`
-   when Linux was requested. Require the issue prompt
-   to use the `load-sketchfab-threejs` skill for a suitable downloadable GLB
-   asset while preserving attribution and verifying geometry, materials, and
-   animations.
-   Do not add this label or requirement when the prompt does not request 3D
-   content.
-   If multiple skills are needed, pass one `--label` option per matching
-   label. Record the issue's final labels and verify them with
-   `gh issue view <issue-number> --json labels`.
-4. Locate the newest `opencode.yml` run in the target repository with:
+1. Check `git status --short` and leave unrelated changes untouched.
+2. Create a fresh issue with the derived prompt and required labels. Do not
+   add a comment as a trigger. Verify labels with `gh issue view <number>`.
+3. Find the newest run:
 
    ```sh
-   gh run list --repo <owner>/<repo> --workflow opencode.yml --limit 5 --json databaseId,displayTitle,event,status,url
+   gh run list --repo <owner>/<repo> --workflow opencode.yml --limit 5 \
+     --json databaseId,displayTitle,event,status,url,headBranch
    ```
 
-   Confirm its event is `workflow_dispatch`, its title matches the new issue,
-   and its head branch matches the requested branch (or the default branch when
-   no directive was supplied). If it is an `issues` event or uses the wrong
-   branch, report the routing failure and do not treat a session as validation.
-   Poll the run or issue comments only until the initial OpenCode session link
-   appears.
-   Do not use `gh run watch` through completion.
-5. Extract the OpenCode Web UI URL from the issue comment or the completed
-   `Run OpenCode and locate its web session` step. Return the issue, run, and
-   session URL immediately. Clearly state that the workflow remains active and
-   that build, verification, public-app, PR, and test results have not yet been
-   checked.
+   Require `workflow_dispatch`, the new issue title, and the correct branch.
+4. Poll issue comments or the run only until the initial OpenCode Web UI URL
+   appears. Return clickable links for the issue, run, and session immediately.
 
-## Safety and scope
-
-This skill intentionally creates a real issue and starts a real GitHub Action.
-Use it only when the user explicitly requests an end-to-end workflow test.
-Never cancel or rerun an active test without checking its current step first.
-Keep unrelated worktree changes untouched.
+Never cancel or rerun an active run without checking its current step first.
