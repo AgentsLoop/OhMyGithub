@@ -218,7 +218,6 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
-            const fs = require('node:fs');
             const path = require('node:path');
 
             const catalog = await fetch('https://models.opencode.ai/api.json').then(async (response) => {
@@ -814,15 +813,16 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/scripts/opencode-comment-templates.cjs`);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const command = process.env.RALPH_REQUEST === 'true'
               ? 'OpenCode with Ralph Loop'
               : (process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode');
-            const accessLinks = fs.readFileSync(process.env.PROGRESS_COMMENT_TEMPLATE, 'utf8')
-              .trim()
-              .replaceAll('@OPENCODE_WEB_URL@', process.env.OPENCODE_WEB_URL)
-              .replaceAll('@PROJECT_FILE_URL@', process.env.PROJECT_FILE_URL || 'unavailable');
+            const accessLinks = renderTemplate('opencode-progress-comment-template.md', {
+              OPENCODE_WEB_URL: process.env.OPENCODE_WEB_URL,
+              PROJECT_FILE_URL: process.env.PROJECT_FILE_URL || 'unavailable'
+            });
             const body = [];
             if (process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true') {
               body.push(
@@ -1464,25 +1464,27 @@ jobs:
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
+            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/scripts/opencode-comment-templates.cjs`);
             const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
             const images = screenshots.map((name) => {
               const path = [projectPath, 'screenshots', name].filter(Boolean).join('/').split('/').map(encodeURIComponent).join('/');
               const url = `https://raw.githubusercontent.com/${process.env.TARGET_REPOSITORY}/${process.env.FINAL_COMMIT}/${path}`;
               return `![Final game screenshot: ${name}](${url})`;
             });
-            const body = [
-              '✅ **Game complete and publicly verified.**', '',
-              `Public app: [${process.env.APP_URL}](${process.env.APP_URL})`,
-              ...(process.env.GITHUB_PAGES_URL ? [
-                `GitHub Pages publication: [${process.env.GITHUB_PAGES_URL}](${process.env.GITHUB_PAGES_URL})`
-              ] : [process.env.PAGES_PUBLISH_ENABLED === 'true'
+            const pagesLine = process.env.GITHUB_PAGES_URL
+              ? `GitHub Pages publication: [${process.env.GITHUB_PAGES_URL}](${process.env.GITHUB_PAGES_URL})`
+              : (process.env.PAGES_PUBLISH_ENABLED === 'true'
                 ? `GitHub Pages publishing could not be configured automatically. Enable it at [repository Settings → Pages](https://github.com/${process.env.TARGET_REPOSITORY}/settings/pages), choose **Deploy from a branch**, select **gh-pages** and **/(root)**, save, then rerun the issue.`
-                : 'GitHub Pages publishing: skipped (disabled by repository variable).']),
-              `Final commit: [${process.env.FINAL_COMMIT}](${commitUrl})`,
-              `Pull request: ${process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.'}`,
-              `OpenCode logs release: [${process.env.OPENCODE_RELEASE_URL}](${process.env.OPENCODE_RELEASE_URL})`,
-              '', '<details><summary>Final screenshots</summary>', '', ...images, '', '</details>'
-            ].join('\n');
+                : 'GitHub Pages publishing: skipped (disabled by repository variable).');
+            const body = renderTemplate('opencode-final-report.md', {
+              APP_URL: process.env.APP_URL,
+              PAGES_LINE: pagesLine,
+              FINAL_COMMIT: process.env.FINAL_COMMIT,
+              COMMIT_URL: commitUrl,
+              PR_LINE: process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.',
+              RELEASE_URL: process.env.OPENCODE_RELEASE_URL,
+              IMAGES: images.join('\n')
+            });
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: process.env.TARGET_OWNER,
               repo: process.env.TARGET_REPO,
@@ -1515,16 +1517,18 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
+            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/scripts/opencode-comment-templates.cjs`);
             await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER,
               repo: process.env.TARGET_REPO,
               issue_number: number,
-              body: [
-                '✅ **GitHub Pages smoke test passed.**', '',
-                `Published Hello World from branch \`${process.env.TEST_BRANCH_NAME}\` at commit \`${process.env.FINAL_COMMIT}\`.`,
-                `GitHub Pages: [${process.env.GITHUB_PAGES_URL}](${process.env.GITHUB_PAGES_URL})`,
-                `Actions run: [#${context.runNumber}](${runUrl})`
-              ].join('\n')
+              body: renderTemplate('opencode-test-gh-report.md', {
+                TEST_BRANCH_NAME: process.env.TEST_BRANCH_NAME,
+                FINAL_COMMIT: process.env.FINAL_COMMIT,
+                PAGES_URL: process.env.GITHUB_PAGES_URL,
+                RUN_NUMBER: context.runNumber,
+                RUN_URL: runUrl
+              })
             });
 
       - name: Mark issue complete
@@ -1559,6 +1563,7 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
+            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/scripts/opencode-comment-templates.cjs`);
             for (const name of ['in progress', 'validating', 'complete', 'failed']) {
               await github.rest.issues.removeLabel({
                 owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
@@ -1572,12 +1577,7 @@ jobs:
             await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number,
-              body: [
-                '🟠 **OpenCode Goal remains blocked.**', '',
-                'The workflow detected `[goal:blocked]`, sent bounded harsh critiques through OpenCode Zen, and the same session still reported a blocked Goal.',
-                `Actions run: [${runUrl}](${runUrl})`,
-                '', 'No completion claim was published.'
-              ].join('\n')
+              body: renderTemplate('opencode-blocked-comment.md', { RUN_URL: runUrl })
             });
 
       - name: Mark issue failed
@@ -1588,6 +1588,7 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
+            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/scripts/opencode-comment-templates.cjs`);
             const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -1605,11 +1606,7 @@ jobs:
               owner: process.env.TARGET_OWNER,
               repo: process.env.TARGET_REPO,
               issue_number: number,
-              body: [
-                '❌ **OpenCode workflow failed.**', '',
-                `Actions run: ${runUrl}`,
-                '', '**Failed step(s):**', details
-              ].join('\n')
+              body: renderTemplate('opencode-failed-comment.md', { RUN_URL: runUrl, FAILED_STEPS: details })
             });
             await github.rest.issues.removeLabel({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
@@ -1635,10 +1632,14 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/scripts/opencode-comment-templates.cjs`);
             await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER),
-              body: `🔒 **AgentsWeb SSH session closed.**\n\nTemporary access for [run #${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) has expired.`
+              body: renderTemplate('opencode-ssh-closed-comment.md', {
+                RUN_NUMBER: context.runNumber,
+                RUN_URL: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              })
             });
 
       - name: Clean up OpenCode session
