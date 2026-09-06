@@ -1158,7 +1158,18 @@ jobs:
               done
               public_app_ok=''
               if [[ -n "$APP_URL" ]]; then
-                pin_tunnel_dns "$APP_URL" || true
+                dns_ok=''
+                for _ in {1..90}; do
+                  if pin_tunnel_dns "$APP_URL"; then
+                    dns_ok='yes'
+                    break
+                  fi
+                  sleep 2
+                done
+                if [[ "$dns_ok" != 'yes' ]]; then
+                  echo "Public app DNS did not propagate for $APP_URL."
+                  continue
+                fi
                 for _ in {1..60}; do
                   if curl --fail --silent --show-error --max-time 10 "$APP_URL" >/dev/null; then
                     public_app_ok='yes'

@@ -50,10 +50,20 @@ jobs:
           dscacheutil -q host -a name "$host" || true
           dig +short A "$host" || true
           echo '--- authoritative resolver ---'
-          ips="$(dig @1.1.1.1 +short A "$host" | awk '/^[0-9]+(\.[0-9]+){3}$/ { print }')"
+          ips=''
+          for _ in {1..90}; do
+            ips="$(dig @1.1.1.1 +short A "$host" | awk '/^[0-9]+(\.[0-9]+){3}$/ { print }')"
+            [[ -n "$ips" ]] && break
+            sleep 2
+          done
           printf '%s\n' "$ips"
           echo '--- default curl ---'
-          curl --fail --silent --show-error --max-time 10 "$url/" && echo
+          if curl --fail --silent --show-error --max-time 10 "$url/"; then
+            echo
+            echo 'Default resolver/curl: PASS'
+          else
+            echo 'Default resolver/curl: FAIL (expected when runner DNS is stale)'
+          fi
           echo '--- result ---'
           if [[ -n "$ips" ]]; then
             echo 'Cloudflare DNS has an answer; compare this with the system resolver above.'
