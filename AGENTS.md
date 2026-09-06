@@ -37,10 +37,11 @@ completion.
 
 ## Shell timing
 
-Do not invoke `/usr/bin/time` or another timing wrapper directly in ad hoc
-shell commands. When a script needs diagnostics for a slow or hung step, put a
-small timing helper inside the script and report timings there. Keep ordinary
-shell commands unwrapped.
+When writing shell scripts,
+always add explicit per-command execution-time measurements between commands.
+Use `/usr/bin/time -p` or a small timing helper around each meaningful command;
+the outer command duration is not sufficient because it hides which step is
+slow or hung.
 
 ## Ideas
 
