@@ -1460,7 +1460,7 @@ jobs:
         if: success() && env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
-          APP_URL: ${{ steps.pages_result.outputs.url || env.APP_URL }}
+          APP_URL: ${{ env.APP_URL }}
           GITHUB_PAGES_URL: ${{ steps.pages_result.outputs.url }}
           PAGES_PUBLISH_ENABLED: ${{ env.PAGES_PUBLISH_ENABLED }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
