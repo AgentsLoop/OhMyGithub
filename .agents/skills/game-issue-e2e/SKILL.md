@@ -52,8 +52,8 @@ the prompt or invented game clearly requires them.
 
 The kickoff is complete when all of these are true:
 
-- A fresh GitHub issue was created with the `OpenCode` and `ralph` labels.
-  Always add `ralph`; Ralph is the required auto-continuation mode for this
+- A fresh GitHub issue was created with the `OpenCode` and `Goal` labels.
+  Always add `Goal`; Goal is the required persistent command mode for this
   skill. The App dispatches the workflow once.
 - The App triggered `.github/workflows/opencode.yml` through `workflow_dispatch`.
   For a custom branch, the run's head branch is that requested branch. An
@@ -70,8 +70,7 @@ Before creating the test issue, inspect the repository's current labels and
 use the available `skill/*` labels that match the requested game. The current
 skill labels are:
 
-- `ralph` — required for every kickoff; runs the Ralph same-session
-  auto-continuation loop.
+- `Goal` — required for every kickoff; runs the persistent Goal command.
 
 - `skill/gauntlet-loop` — use for Gauntlet Loop/gameplay-loop or iterative
   game-building requests.
@@ -112,13 +111,12 @@ OAuth provider.
    `gh label list --repo <owner>/<repo>`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
    with one `--label` option per applicable label, always including `OpenCode`.
-   Always also include `ralph` for this skill. This exercises the Ralph plugin
-   and `opencode run --command ralph-loop` path. If the
-   repository does not have the `ralph` label, create it with
-   `gh label create ralph --repo <owner>/<repo> --color 5319E7 --description
-   'Run OpenCode with the Ralph auto-continuation loop'` before creating the
-   issue. Do not add a comment because comments do not trigger the workflow.
-   If testing an existing issue instead, adding the `OpenCode` and `ralph`
+   Always also include `Goal` for this skill. This exercises the persistent
+   Goal command path. If the repository does not have the `Goal` label, create
+   it with `gh label create Goal --repo <owner>/<repo> --color 8A2BE2
+   --description 'Run OMG with the persistent Goal command'` before creating
+   the issue. Do not add a comment because comments do not trigger the workflow.
+   If testing an existing issue instead, adding the `OpenCode` and `Goal`
    labels is the only supported way to start it.
    If the caller supplied a prompt, use it as the complete issue prompt and
    preserve it verbatim. If no prompt was supplied, generate a random, small
