@@ -105,8 +105,8 @@ empty service logs such as `nginx.log` can make GitHub's upload API return
 be non-empty.
 
 Focused completion-evidence checks should also confirm that the workflow copies
-`templates/agents.template.md` to `project/Agents.md` and appends the active
-label template, then forks the completed build session
+`templates/agents.template.md` to `project/Agents.md` and appends every
+label-matched template, then forks the completed build session
 before verification, and sends up to two follow-up prompts to that verification
 session when no `project/screenshots/final-*` image exists, with three total
 evidence checks. Missing screenshots warn and do not block delivery; when present,
