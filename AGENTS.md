@@ -35,6 +35,10 @@ documentation example unless the user explicitly asks to preserve it. Verify
 the result with a case-insensitive search for the old option before reporting
 completion.
 
+When a user asks to remove a requirement or behavior, delete that instruction
+without adding a replacement prohibition, disclaimer, or alternate behavior
+unless the user explicitly requests one.
+
 ## Shell timing
 
 When writing shell scripts,
