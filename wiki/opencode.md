@@ -235,7 +235,9 @@ already scoped to the checked-out worktree. API and session probes explicitly
 send `x-opencode-directory: $PROJECT_DIR`, while Cloudflare tunnels directly
 to that same loopback server. This avoids an extra reverse-proxy hop and keeps
 WebSocket upgrades native. The access comment points to the encoded
-worktree/session route, so the browser opens the live run directly. A loaded
+canonical worktree/session route, so the browser opens the live run directly.
+The resolver emits the repository root without a trailing `/.`; this keeps the
+encoded browser route identical to OpenCode's canonical session directory. A loaded
 Web UI or healthy tunnel alone does not prove session tracking; acceptance
 requires a screenshot while the run is active.
 

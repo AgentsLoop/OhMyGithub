@@ -128,8 +128,13 @@ jobs:
           project_path="${PROJECT_PATH#./}"
           project_path="${project_path%/}"
           project_path="${project_path:-.}"
+          if [[ "$project_path" == '.' ]]; then
+            resolved_project_dir="$GITHUB_WORKSPACE"
+          else
+            resolved_project_dir="$GITHUB_WORKSPACE/$project_path"
+          fi
           printf 'PROJECT_PATH=%s\n' "$project_path" >> "$GITHUB_ENV"
-          printf 'PROJECT_DIR=%s\n' "$GITHUB_WORKSPACE/${project_path#./}" >> "$GITHUB_ENV"
+          printf 'PROJECT_DIR=%s\n' "$resolved_project_dir" >> "$GITHUB_ENV"
 
       - name: Checkout shared OpenCode skills
         if: env.TEST_GH_REQUEST != 'true'
