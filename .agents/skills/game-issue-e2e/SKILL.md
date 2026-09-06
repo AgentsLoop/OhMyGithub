@@ -53,8 +53,8 @@ the prompt or invented game clearly requires them.
 The kickoff is complete when all of these are true:
 
 - A fresh GitHub issue was created with the `OpenCode` and `ralph` labels.
-  Always add `ralph`; do not add `Goal`, because Ralph is the required
-  auto-continuation mode for this skill. The App dispatches the workflow once.
+  Always add `ralph`; Ralph is the required auto-continuation mode for this
+  skill. The App dispatches the workflow once.
 - The App triggered `.github/workflows/opencode.yml` through `workflow_dispatch`.
   For a custom branch, the run's head branch is that requested branch. An
   `issues` event or default-branch run is a routing failure, not a successful
@@ -71,7 +71,7 @@ use the available `skill/*` labels that match the requested game. The current
 skill labels are:
 
 - `ralph` — required for every kickoff; runs the Ralph same-session
-  auto-continuation loop. Do not add `Goal` to a Ralph kickoff.
+  auto-continuation loop.
 
 - `skill/gauntlet-loop` — use for Gauntlet Loop/gameplay-loop or iterative
   game-building requests.
@@ -116,8 +116,8 @@ OAuth provider.
    `gh label list --repo <owner>/<repo>`, identify the applicable
    `skill/*` labels and model label from the request, and create a new issue
    with one `--label` option per applicable label, always including `OpenCode`.
-   Always also include `ralph`; never add `Goal` for this skill. This exercises
-   the Ralph plugin and `opencode run --command ralph-loop` path. If the
+   Always also include `ralph` for this skill. This exercises the Ralph plugin
+   and `opencode run --command ralph-loop` path. If the
    repository does not have the `ralph` label, create it with
    `gh label create ralph --repo <owner>/<repo> --color 5319E7 --description
    'Run OpenCode with the Ralph auto-continuation loop'` before creating the
