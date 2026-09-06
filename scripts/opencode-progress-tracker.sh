@@ -140,6 +140,8 @@ Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
 🌐 **OpenCode Web UI:** $OPENCODE_WEB_URL
 
+📁 **Project files:** ${PROJECT_FILE_URL:-unavailable}
+
 - Elapsed: ${elapsed}
 - Token count: ${token_count}
 - Speed score: ${speed_score} tokens/s
