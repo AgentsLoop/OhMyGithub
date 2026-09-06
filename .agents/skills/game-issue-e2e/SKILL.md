@@ -103,10 +103,6 @@ OAuth provider.
 ## Procedure
 
 1. Before starting the test, inspect the working tree with `git status --short`.
-   Stage and commit all current changes, then push the current branch. Verify
-   that the working tree is clean and the pushed commit is the branch tip
-   before creating the issue or triggering any Action. Do not start the test
-   with uncommitted or unpushed changes.
 2. Confirm `gh auth status`, resolve the target repository (default
    `AgentsLoop/PlayGround`), and inspect it with `gh repo view <owner>/<repo>`.
    Check whether `.github/workflows/opencode.yml` exists. If it is missing,
