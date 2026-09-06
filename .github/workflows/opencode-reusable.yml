@@ -1105,6 +1105,25 @@ jobs:
           SESSION_ID='${{ steps.verification_fork.outputs.session_id }}'
           FIX_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/03-public-app-fix.md")"
 
+          pin_tunnel_dns() {
+            local url="$1"
+            local host
+            local ips
+            host="${url#https://}"
+            host="${host%%/*}"
+            ips="$(dig @1.1.1.1 +short A "$host" | awk '/^[0-9]+(\.[0-9]+){3}$/ { print }')"
+            if [[ -z "$ips" ]]; then
+              echo "Authoritative DNS lookup failed for $host."
+              return 1
+            fi
+            while IFS= read -r ip; do
+              [[ -z "$ip" ]] && continue
+              if ! grep -Eq "^[[:space:]]*${ip}[[:space:]]+${host}[[:space:]]*$" /etc/hosts; then
+                echo "$ip $host" | sudo tee -a /etc/hosts >/dev/null
+              fi
+            done <<< "$ips"
+          }
+
           for attempt in 1 2 3; do
             echo "Starting public app verification attempt $attempt/3."
             [[ ! -f "$OPENCODE_WEB_DIR/app.pid" ]] || kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
@@ -1139,6 +1158,7 @@ jobs:
               done
               public_app_ok=''
               if [[ -n "$APP_URL" ]]; then
+                pin_tunnel_dns "$APP_URL" || true
                 for _ in {1..60}; do
                   if curl --fail --silent --show-error --max-time 10 "$APP_URL" >/dev/null; then
                     public_app_ok='yes'
