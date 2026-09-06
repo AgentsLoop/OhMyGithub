@@ -20,15 +20,15 @@ Verify the branch exists before creating the issue. Otherwise omit the directive
 and use the repository default branch.
 
 Use this skill when the user asks to start the issue-triggered workflow with a
-request or create an issue. When the skill is invoked after text in the same
-user message, treat the text before the invocation as the task context. Think
-through that context and write a clear implementation prompt in your own words;
-do not paste the user's wording verbatim. Preserve the actual intent and
-important requirements while removing invocation syntax, local skill links,
-and any reference to this `issue-e2e` skill from the generated prompt. Text
-after the invocation is not the task prompt for this run. When no task context
-is supplied, independently come up with a fresh random small playable
-browser-game concept and write a brief implementation prompt for that game.
+request or create an issue. When the skill is invoked within a user message,
+use the surrounding request text before and after the invocation as task
+context. If both are present, combine them. Think through that context and
+write a clear implementation prompt in your own words; do not paste the user's
+wording verbatim. Preserve the actual intent and important requirements while
+removing invocation syntax, local skill links, and any reference to this
+`issue-e2e` skill from the generated prompt. When no task context is supplied,
+independently come up with a fresh random small playable browser-game concept
+and write a brief implementation prompt for that game.
 The fallback must be a game idea, not a request for clarification or a generic
 app. This skill intentionally ends after the workflow publishes the
 OpenCode Web UI session link; it does not watch the workflow to completion or
@@ -45,13 +45,14 @@ substitute a different repository. If the target does not contain
 that the E2E workflow is unavailable and do not claim that an Action or session
 was started.
 
-The text before the skill invocation is sufficient as source context even when
-it is short or does not describe a game. Convert it into a concise issue prompt
-in your own words before creating the issue. Never include the `issue-e2e` skill
-name, its local path, or the skill-invocation link in the issue prompt. If no
-context is supplied, invent a fresh random, small playable browser game and
-write a brief issue prompt for it. Apply matching skill labels only when the
-resulting prompt or invented game clearly requires them.
+Text surrounding the skill invocation is sufficient as source context even
+when it is short or does not describe a game. Combine available text from both
+sides, then convert it into a concise issue prompt in your own words before
+creating the issue. Never include the `issue-e2e` skill name, its local path, or
+the skill-invocation link in the issue prompt. If no context is supplied,
+invent a fresh random, small playable browser game and write a brief issue
+prompt for it. Apply matching skill labels only when the resulting prompt or
+invented game clearly requires them.
 
 ## Required outcome
 
@@ -123,13 +124,13 @@ OAuth provider.
    the issue. Do not add a comment because comments do not trigger the workflow.
    If testing an existing issue instead, adding the `OpenCode` and `Goal`
    labels is the only supported way to start it.
-   Derive the complete issue prompt from the text before the skill invocation.
-   Rewrite it in your own words after reasoning about the desired outcome;
-   never copy it verbatim. Exclude the `issue-e2e` skill name, local path, and
-   invocation link. Ignore text after the invocation for this run. If no
-   preceding context was supplied, generate a random, small playable browser
-   game and use a concise implementation brief as the issue prompt. If the
-   resulting prompt requests 3D content, verify that the target workflow
+   Derive the complete issue prompt from all request text surrounding the skill
+   invocation, using text both before and after it when available. Rewrite it
+   in your own words after reasoning about the desired outcome; never copy it
+   verbatim. Exclude the `issue-e2e` skill name, local path, and invocation link.
+   If no surrounding context was supplied, generate a random, small playable
+   browser game and use a concise implementation brief as the issue prompt. If
+   the resulting prompt requests 3D content, verify that the target workflow
    defaults to `macos-latest`; if it does not, stop and report that the target
    workflow must be updated before starting the issue. For an explicitly Linux
    request, verify that the target workflow routes the `linux` label to
