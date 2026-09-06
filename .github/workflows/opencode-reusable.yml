@@ -328,6 +328,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            const fs = require('node:fs');
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const statuses = ['in progress', 'validating', 'complete', 'blocked', 'failed'];
             for (const status of statuses) {
@@ -807,6 +808,7 @@ jobs:
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
+          PROGRESS_COMMENT_TEMPLATE: ${{ env.RUNTIME_DIR }}/scripts/opencode-progress-comment-template.md
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
           RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
         with:
@@ -817,6 +819,10 @@ jobs:
             const command = process.env.RALPH_REQUEST === 'true'
               ? 'OpenCode with Ralph Loop'
               : (process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode');
+            const accessLinks = fs.readFileSync(process.env.PROGRESS_COMMENT_TEMPLATE, 'utf8')
+              .trim()
+              .replaceAll('@OPENCODE_WEB_URL@', process.env.OPENCODE_WEB_URL)
+              .replaceAll('@PROJECT_FILE_URL@', process.env.PROJECT_FILE_URL || 'unavailable');
             const body = [];
             if (process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true') {
               body.push(
@@ -828,9 +834,7 @@ jobs:
             }
             body.push(
               '🌐 **Live OpenCode web session is ready.**', '',
-              `URL: ${process.env.OPENCODE_WEB_URL}`, '',
-              '📁 **Project files are available through Nginx.**', '',
-              `URL: ${process.env.PROJECT_FILE_URL}`, '',
+              accessLinks, '',
               `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
             );
             const comment = await github.rest.issues.createComment({
@@ -858,6 +862,7 @@ jobs:
           nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
             OPENCODE_WEB_DIR="$OPENCODE_WEB_DIR" SESSION_ID="$SESSION_ID" \
             PROJECT_FILE_URL="${{ steps.opencode_web.outputs.project_url }}" \
+            PROGRESS_COMMENT_TEMPLATE="$RUNTIME_DIR/scripts/opencode-progress-comment-template.md" \
             COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"

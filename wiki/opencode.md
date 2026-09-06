@@ -70,7 +70,9 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    available.
 4. Starts the OpenCode web UI and a loopback Nginx file server rooted at the
    resolved project directory, then publishes each through its own temporary
-   trycloudflare.com tunnel. The access comment contains both URLs.
+   trycloudflare.com tunnel. The access comment contains both URLs, rendered
+   from the shared `scripts/opencode-progress-comment-template.md` template
+   for both its initial and live-progress forms.
 5. Creates an `opencode/<run-id>` branch from the relevant base branch.
 6. Starts `opencode run --attach` against the same OpenCode installation and
    server-backed session store, then posts a direct URL to that live session.
