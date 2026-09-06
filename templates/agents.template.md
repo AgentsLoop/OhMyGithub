@@ -21,7 +21,7 @@ issue comment, commit it, push the current branch, and use an immutable URL in
 this form:
 
 ```text
-https://raw.githubusercontent.com/$GITHUB_REPOSITORY/<commit-sha>/project/screenshots/<file-name>
+https://raw.githubusercontent.com/$GITHUB_REPOSITORY/<commit-sha>/screenshots/<file-name>
 ```
 
 Embed the screenshot in an expandable block in the same progress comment:
@@ -29,7 +29,7 @@ Embed the screenshot in an expandable block in the same progress comment:
 ```html
 <details>
 <summary>Screenshot</summary>
-<img src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/<commit-sha>/project/screenshots/<file-name>" alt="Description of the visible milestone">
+<img src="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/<commit-sha>/screenshots/<file-name>" alt="Description of the visible milestone">
 </details>
 ```
 
