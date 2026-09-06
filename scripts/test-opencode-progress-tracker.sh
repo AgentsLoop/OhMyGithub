@@ -150,6 +150,12 @@ PROJECT_FILE_URL=http://127.0.0.1/project-files \
 PROGRESS_DRY_RUN=true \
 PROGRESS_OUTPUT="$output_file" \
 PROGRESS_COMMENT_TEMPLATE="$script_dir/opencode-progress-comment-template.md" \
+AGENTSWEB_SSH_ENABLED=true \
+AGENTSWEB_SSH_READY=true \
+SSH_COMMAND='ssh -p 2222 runner@example' \
+SSH_HOST=example \
+SSH_PORT=2222 \
+RUN_URL=http://127.0.0.1/run \
   "$tracker" || {
     echo "Tracker failed; mock server log:" >&2
     sed -n '1,120p' "$test_dir/server.log" >&2
@@ -172,6 +178,8 @@ assert_line "- Total failed subagents: 1"
 assert_line "- Image-context model calls: 5"
 assert_line "🌐 **OpenCode Web UI:** http://127.0.0.1/session/ses_root"
 assert_line "📁 **Project files:** http://127.0.0.1/project-files"
+assert_line "🔐 **Temporary AgentsWeb SSH session is ready.**"
+assert_line "ssh -p 2222 runner@example"
 assert_line "- Token count: 190"
 assert_line "- Speed score:"
 if ! grep -Eq -- '^- Elapsed: [0-9]+m$' "$output_file"; then

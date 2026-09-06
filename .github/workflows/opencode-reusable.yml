@@ -813,32 +813,30 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
-            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/scripts/opencode-comment-templates.cjs`);
+            const { renderProgressComment } = require(`${process.env.RUNTIME_DIR}/scripts/opencode-comment-templates.cjs`);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const command = process.env.RALPH_REQUEST === 'true'
               ? 'OpenCode with Ralph Loop'
               : (process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode');
-            const accessLinks = renderTemplate('opencode-progress-comment-template.md', {
+            const sshSection = process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true'
+              ? [
+                  '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
+                  `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
+                  'Run this command while the job is active:', '',
+                  '```sh', process.env.SSH_COMMAND, '```'
+                ].join('\n')
+              : '';
+            const body = renderProgressComment({
+              SSH_SECTION: sshSection,
+              UPDATED: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
               OPENCODE_WEB_URL: process.env.OPENCODE_WEB_URL,
-              PROJECT_FILE_URL: process.env.PROJECT_FILE_URL || 'unavailable'
+              PROJECT_FILE_URL: process.env.PROJECT_FILE_URL || 'unavailable',
+              PROGRESS_STATS: '- Waiting for live OpenCode progress statistics.',
+              ACCESS_NOTE: `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
             });
-            const body = [];
-            if (process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true') {
-              body.push(
-                '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
-                `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
-                'Run this command while the job is active:', '',
-                '```sh', process.env.SSH_COMMAND, '```', ''
-              );
-            }
-            body.push(
-              '🌐 **Live OpenCode web session is ready.**', '',
-              accessLinks, '',
-              `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
-            );
             const comment = await github.rest.issues.createComment({
-              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO, issue_number: number, body: body.join('\n')
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO, issue_number: number, body
             });
             core.setOutput('comment_id', comment.data.id);
 
@@ -851,6 +849,7 @@ jobs:
           COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
           SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
+          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
           ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
           REPOSITORY: ${{ github.repository }}
         run: |
@@ -863,6 +862,12 @@ jobs:
             OPENCODE_WEB_DIR="$OPENCODE_WEB_DIR" SESSION_ID="$SESSION_ID" \
             PROJECT_FILE_URL="${{ steps.opencode_web.outputs.project_url }}" \
             PROGRESS_COMMENT_TEMPLATE="$RUNTIME_DIR/scripts/opencode-progress-comment-template.md" \
+            AGENTSWEB_SSH_ENABLED="$AGENTSWEB_SSH_ENABLED" \
+            AGENTSWEB_SSH_READY="${{ steps.agentsweb.outcome == 'success' }}" \
+            SSH_COMMAND="${{ steps.agentsweb.outputs.command }}" \
+            SSH_HOST="${{ steps.agentsweb.outputs.host }}" \
+            SSH_PORT="${{ steps.agentsweb.outputs.port }}" \
+            RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"

@@ -9,4 +9,8 @@ function renderTemplate(name, values) {
   return body;
 }
 
-module.exports = { renderTemplate };
+function renderProgressComment(values) {
+  return renderTemplate('opencode-progress-comment-template.md', values);
+}
+
+module.exports = { renderProgressComment, renderTemplate };

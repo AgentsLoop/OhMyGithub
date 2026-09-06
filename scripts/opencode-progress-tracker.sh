@@ -135,15 +135,20 @@ while :; do
     speed_score="$(awk -v tokens="$token_count" -v elapsed="$elapsed_seconds" \
       'BEGIN { if (elapsed > 0) printf "%.1f", tokens / elapsed; else print "0.0" }')"
     access_links="$(< "${PROGRESS_COMMENT_TEMPLATE:-$(dirname "$0")/opencode-progress-comment-template.md}")"
-    access_links="${access_links//@OPENCODE_WEB_URL@/$OPENCODE_WEB_URL}"
-    access_links="${access_links//@PROJECT_FILE_URL@/${PROJECT_FILE_URL:-unavailable}}"
-    body="🟡 **OpenCode progress (live)**
+    ssh_section=""
+    if [[ "${AGENTSWEB_SSH_ENABLED:-false}" == "true" && "${AGENTSWEB_SSH_READY:-false}" == "true" ]]; then
+      ssh_section="🔐 **Temporary AgentsWeb SSH session is ready.**
 
-Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+Run: ${RUN_URL}
+Host: ${SSH_HOST}:${SSH_PORT}
 
-$access_links
+Run this command while the job is active:
 
-- Elapsed: ${elapsed}
+Command:
+${SSH_COMMAND}
+"
+    fi
+    progress_stats="- Elapsed: ${elapsed}
 - Token count: ${token_count}
 - Speed score: ${speed_score} tokens/s
 - Tool calls: $tool_count
@@ -152,7 +157,15 @@ $access_links
 - Total subagents executed: $total_subagents
 - Total failed subagents: $failed_subagents
 - Image-context model calls: $vision_count
-- Changed workspace files: $changed_count
+- Changed workspace files: $changed_count"
+    access_note="This opens the currently running OpenCode session directly. Access remains available while OpenCode runs and for 5 hours afterwards."
+    access_links="${access_links//@SSH_SECTION@/$ssh_section}"
+    access_links="${access_links//@UPDATED@/$(date -u '+%Y-%m-%d %H:%M:%S UTC')}"
+    access_links="${access_links//@OPENCODE_WEB_URL@/$OPENCODE_WEB_URL}"
+    access_links="${access_links//@PROJECT_FILE_URL@/${PROJECT_FILE_URL:-unavailable}}"
+    access_links="${access_links//@PROGRESS_STATS@/$progress_stats}"
+    access_links="${access_links//@ACCESS_NOTE@/$access_note}"
+    body="${access_links}
 
 _Image-context model calls are inferred from image attachments in the session transcript. Message contents and tool details are hidden. Full logs are published in the completion release._"
     if [[ "${PROGRESS_DRY_RUN:-false}" == "true" ]]; then
