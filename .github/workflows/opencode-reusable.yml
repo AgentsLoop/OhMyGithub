@@ -38,8 +38,8 @@ on:
         required: false
 jobs:
   opencode:
-    # The mac label opts this run into GitHub's macOS hosted runner.
-    runs-on: ${{ contains(inputs.labels_json, '"mac"') && 'macos-latest' || 'ubuntu-latest' }}
+    # macOS is the default; the linux label opts this run into Ubuntu.
+    runs-on: ${{ contains(inputs.labels_json, '"linux"') && 'ubuntu-latest' || 'macos-latest' }}
     permissions:
       id-token: write
       contents: write
@@ -260,6 +260,7 @@ jobs:
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
               { name: 'test-gh', color: '1D76DB', description: 'Bypass OpenCode and test GitHub Pages publication' },
               { name: 'mac', color: 'B60205', description: 'Run OpenCode on the macos-latest GitHub-hosted runner' },
+              { name: 'linux', color: '1D76DB', description: 'Run OpenCode on the ubuntu-latest GitHub-hosted runner' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',

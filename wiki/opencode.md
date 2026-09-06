@@ -37,8 +37,8 @@ OpenCode. It creates a unique `test-gh/hello-world-*` branch, commits a static
 Hello World page, and exercises the GitHub Pages publication and deployment
 steps.
 
-The `mac` label selects the `macos-latest` GitHub-hosted runner for the entire
-OpenCode job. Without `mac`, the workflow uses `ubuntu-latest`.
+The workflow uses the `macos-latest` GitHub-hosted runner by default for the
+entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
 
 An optional issue-title suffix in the exact form `branch: <existing-branch>`
 selects the checkout and pull-request base. The App removes that suffix from the
