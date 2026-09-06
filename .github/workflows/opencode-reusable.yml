@@ -218,6 +218,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            const fs = require('node:fs');
             const path = require('node:path');
 
             const catalog = await fetch('https://models.opencode.ai/api.json').then(async (response) => {
