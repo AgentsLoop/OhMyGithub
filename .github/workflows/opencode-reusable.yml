@@ -857,6 +857,7 @@ jobs:
           # while later workflow steps run; cleanup stops it at the end of the job.
           nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
             OPENCODE_WEB_DIR="$OPENCODE_WEB_DIR" SESSION_ID="$SESSION_ID" \
+            PROJECT_FILE_URL="${{ steps.opencode_web.outputs.project_url }}" \
             COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
