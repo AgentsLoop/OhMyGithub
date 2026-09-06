@@ -23,6 +23,10 @@ Find the invocation in the user's message:
   from the issue prompt. If there is no request text, invent a small playable
   browser-game brief.
 
+If the user requests an existing branch, verify it exists and append
+` branch: <existing-branch>` to the issue title. Otherwise use the repository's
+default branch. This suffix is routing metadata, not part of the prompt.
+
 ## Target and labels
 
 Use the supplied repository, or `AgentsLoop/PlayGround` by default. Verify
@@ -55,7 +59,8 @@ requests, verify `linux` routes to `ubuntu-latest`. Create missing `Goal` or
      --json databaseId,displayTitle,event,status,url,headBranch
    ```
 
-   Require `workflow_dispatch`, the new issue title, and the correct branch.
+   Require `workflow_dispatch`, the new issue title, and the requested branch
+   (or the default branch when none was requested).
 4. Poll issue comments or the run only until the initial OpenCode Web UI URL
    appears. Return clickable links for the issue, run, and session immediately.
 
