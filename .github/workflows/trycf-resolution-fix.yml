@@ -45,7 +45,12 @@ jobs:
           done
           [[ -n "$url" ]] || { cat "$log"; exit 1; }
           host="${url#https://}"
-          ips="$(dig @1.1.1.1 +short A "$host" | awk '/^[0-9]+(\.[0-9]+){3}$/ { print }')"
+          ips=''
+          for _ in {1..90}; do
+            ips="$(dig @1.1.1.1 +short A "$host" | awk '/^[0-9]+(\.[0-9]+){3}$/ { print }')"
+            [[ -n "$ips" ]] && break
+            sleep 2
+          done
           [[ -n "$ips" ]] || { echo "No authoritative DNS answer for $host"; exit 1; }
           echo "URL=$url"
           echo "IPs=$ips"
