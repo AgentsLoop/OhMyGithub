@@ -14,7 +14,7 @@ The main project file is [.github/workflows/opencode.yml](.github/workflows/open
 
 The local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md) must
 stay aligned with this workflow. Its kickoff procedure creates a fresh issue
-with the `OpenCode` label (and `Goal` by default), does not use comments as
+with the `OpenCode` label (and `ralph` by default), does not use comments as
 triggers, and waits only for the initial OpenCode session link.
 The GitHub App dispatches execution for an issue opened with `OpenCode` or when
 the `OpenCode` label is added to an existing issue. The workflow itself accepts
@@ -24,6 +24,16 @@ ensures the repository label exists, leaves the issue unlabeled, and posts a
 reminder; it does not start the workflow automatically.
 An optional issue-title suffix `branch: <existing-branch>` selects the target
 checkout and pull-request base; without it, the default branch is used.
+
+## Literal instruction replacements
+
+When a user asks to replace one mode, label, command, or behavior with another,
+interpret “instead of” literally. Remove every reference to the old option from
+the affected instruction and replace its behavior with the new option. Do not
+keep the old option as a prohibition, exception, fallback, precedence note, or
+documentation example unless the user explicitly asks to preserve it. Verify
+the result with a case-insensitive search for the old option before reporting
+completion.
 
 ## Shell timing
 
@@ -70,7 +80,8 @@ When mentioning a commit, append its relative age in hours or days.
 To execute an issue, open it with the `OpenCode` label, or add that label to an
 existing issue. The GitHub App converts that event into one workflow dispatch.
 Edits, comments, and other labels do not execute it. Add
-the `Goal` issue label to use persistent goal mode. The workflow starts a temporary AgentsWeb SSH session,
+the `ralph` issue label to use the Ralph same-session auto-continuation mode.
+The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 
 When monitoring a triggered run, use `gh run watch <run-id> --repo AgentsLoop/OhMyGithub --exit-status` for overall job status.
