@@ -9,7 +9,9 @@ for command in curl jq python3 git; do
 done
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-tracker="$script_dir/opencode-progress-tracker.sh"
+repo_root="$(cd -- "$script_dir/.." && pwd)"
+workflow_script_dir="$repo_root/.github/scripts"
+tracker="$workflow_script_dir/opencode-progress-tracker.sh"
 test_dir="$(mktemp -d "${TMPDIR:-/tmp}/opencode-progress-test.XXXXXX")"
 port_file="$test_dir/port"
 output_file="$test_dir/progress.md"
@@ -149,7 +151,7 @@ OPENCODE_WEB_URL=http://127.0.0.1/session/ses_root \
 PROJECT_FILE_URL=http://127.0.0.1/project-files \
 PROGRESS_DRY_RUN=true \
 PROGRESS_OUTPUT="$output_file" \
-PROGRESS_COMMENT_TEMPLATE="$script_dir/opencode-progress-comment-template.md" \
+PROGRESS_COMMENT_TEMPLATE="$workflow_script_dir/opencode-progress-comment-template.md" \
 AGENTSWEB_SSH_ENABLED=true \
 AGENTSWEB_SSH_READY=true \
 SSH_COMMAND='ssh -p 2222 runner@example' \
