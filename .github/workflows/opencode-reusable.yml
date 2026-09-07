@@ -40,8 +40,8 @@ on:
         required: false
 jobs:
   opencode:
-    # macOS is the default; the linux label opts this run into Ubuntu.
-    runs-on: ${{ contains(inputs.labels_json, '"linux"') && 'ubuntu-latest' || 'macos-latest' }}
+    # Ubuntu is the default; the mac label opts this run into macOS.
+    runs-on: ${{ contains(inputs.labels_json, '"mac"') && 'macos-latest' || 'ubuntu-latest' }}
     permissions:
       contents: write
       pull-requests: write
