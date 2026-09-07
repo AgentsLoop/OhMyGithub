@@ -6,22 +6,41 @@ description: Start the issue-triggered workflow and return its initial OpenCode 
 # Issue E2E kickoff
 
 Use only for an explicitly requested issue-triggered E2E run. Create the issue
-and Action, then stop at the initial Web UI link; do not claim completion.
+and Action, then stop at the initial Web UI link. Do not claim implementation
+completion.
 
-## Prompt and branch
+## Write the issue prompt
 
-Locate `Issue e2e` (or this skill's invocation):
+Read `references/gauntlet-prompt-rubric.md` before rewriting a sparse request.
+Use these rules:
 
-- If the skill invocation begins the request, preserve the following request
-  directly, with only necessary cleanup such as removing this invocation.
-- If request text appears before the invocation, or the invocation is in the
-  middle, combine the text on both sides, reason about the desired result, and
-  rewrite a concise prompt in your own words; do not copy it verbatim. Read
-  `references/gauntlet-prompt-rubric.md` and apply its prompt-quality criteria.
-  The resulting issue prompt must remain short while carrying the full loop
-  contract from that rubric.
-  This reuses the rubric only; do not execute the full Gauntlet Loop during
-  issue-e2e kickoff.
+- Preserve the requested subject, named game, and intended player experience.
+  Keep a named game recognizable in the title and set the goal as the closest
+  practical visual and gameplay recreation, not a generic game in the same
+  genre.
+- Determine the source game's dimensionality. If it is a 3D game or the user
+  asks for 3D, require a real 3D scene with perspective, depth, 3D geometry,
+  lighting, materials, and spatial collision. Preserve that dimensionality in
+  the implementation and never silently flatten the experience.
+- Require reference research before implementation. Search for real gameplay
+  screenshots or footage of the named game and collect several high-signal
+  references for the camera, arena, player objects, effects, HUD, and menus.
+  Record source URLs and the selected visual anchors in the live progress page.
+- Require an iterative fidelity loop: a builder produces the piece, a
+  fresh-context critic inspects the running output, compares it with the
+  references, identifies the largest mismatch, and sends it back for another
+  improvement. Continue until the result closely resembles the references or
+  the run is stopped; do not use a fixed round count.
+- State only observable controls, game loop, feedback, restart behavior, and
+  fidelity requirements. Let the lead choose the implementation and divide
+  the work into independently judgeable pieces.
+- If text appears before or after the skill invocation, merge it and rewrite
+  it in your own words. If the invocation begins the request, preserve the
+  request after removing only invocation syntax and routing labels. Keep the
+  final prompt concise while retaining the full fidelity and review contract.
+
+Do not execute the full Gauntlet Loop during issue-e2e kickoff. The prompt
+should instruct the worker to do that work after the issue starts.
 
 
 Check `git branch --show-current`. If non-empty and not `main`, verify it and
