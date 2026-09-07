@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "goals": [],
+  "results": [
+    {
+      "condition": "Share the remote web-shell link together with the initial OpenCode session link.",
+      "state": "achieved",
+      "reason": "",
+      "evidence": "Remote web-shell via ttyd 1.7.7 on runner port 38557 tunneled to https://morrison-conference-maker-cargo.trycloudflare.com (public HTTP 200, ttyd title verified); initial OpenCode session link https://induction-requiring-pointing-bay.trycloudflare.com/L2hvbWUvcnVubmVyL3dvcmsvT2hNeUdpdGh1Yi9PaE15R2l0aHVi/session/ses_f85c5a909ffeP91F8WHBf3nPwX (session ses_f85c5a909ffeP91F8WHBf3nPwX live, public HTTP 200 verified); both links posted together in issue #215 comment https://github.com/AgentsLoop/OhMyGithub/issues/215#issuecomment-5565254846 alongside project-files URL.",
+      "blockedReason": "",
+      "turnCount": 0,
+      "totalTokens": 67075,
+      "usage": {
+        "input": 67026,
+        "output": 4380,
+        "reasoning": 2102,
+        "cacheRead": 1217417,
+        "cacheWrite": 0,
+        "cost": 0,
+        "costKnown": true
+      },
+      "startedAt": 1788757039498,
+      "finishedAt": 1788757109202,
+      "lastStatus": "Goal completed.",
+      "lastCheckpoint": {
+        "summary": "[goal:evidence] Remote web-shell via ttyd 1.7.7 on runner port 38557 tunneled to https://morrison-conference-maker-cargo.trycloudflare.com (public HTTP 200, ttyd title verified); initial OpenCode session link https://induction-requiring-pointing-bay.trycloudflare.com/L2hvbWUvcnV…",
+        "timestamp": 1788757109201
+      },
+      "checkpoints": [
+        {
+          "summary": "[goal:evidence] Remote web-shell via ttyd 1.7.7 on runner port 38557 tunneled to https://morrison-conference-maker-cargo.trycloudflare.com (public HTTP 200, ttyd title verified); initial OpenCode session link https://induction-requiring-pointing-bay.trycloudflare.com/L2hvbWUvcnV…",
+          "timestamp": 1788757109201
+        }
+      ],
+      "history": [
+        {
+          "type": "set",
+          "detail": "Goal created with limits: 10 auto-continues, 900s, 200,000 context tokens.",
+          "timestamp": 1788757039500
+        },
+        {
+          "type": "completed",
+          "detail": "Assistant marked the goal complete with evidence: Remote web-shell via ttyd 1.7.7 on runner port 38557 tunneled to https://morrison-conference-maker-cargo.trycloudflare.com (public HTTP 200, ttyd title verified); initial OpenCode session link https://induction-requiring-pointing-bay.trycloudflare.com/L2hvbWUvcnVubmVyL3dvcmsvT2hNeUdpdGh1Yi9PaE15R2l0aHVi/session/ses_f85c5a909ffeP91F8WHBf3nPwX (sess…",
+          "timestamp": 1788757109202
+        }
+      ],
+      "sessionID": "ses_f85c5a909ffeP91F8WHBf3nPwX"
+    }
+  ],
+  "archives": [
+    {
+      "sessionID": "ses_f85c5a909ffeP91F8WHBf3nPwX",
+      "results": [
+        {
+          "condition": "Share the remote web-shell link together with the initial OpenCode session link.",
+          "state": "achieved",
+          "reason": "",
+          "evidence": "Remote web-shell via ttyd 1.7.7 on runner port 38557 tunneled to https://morrison-conference-maker-cargo.trycloudflare.com (public HTTP 200, ttyd title verified); initial OpenCode session link https://induction-requiring-pointing-bay.trycloudflare.com/L2hvbWUvcnVubmVyL3dvcmsvT2hNeUdpdGh1Yi9PaE15R2l0aHVi/session/ses_f85c5a909ffeP91F8WHBf3nPwX (session ses_f85c5a909ffeP91F8WHBf3nPwX live, public HTTP 200 verified); both links posted together in issue #215 comment https://github.com/AgentsLoop/OhMyGithub/issues/215#issuecomment-5565254846 alongside project-files URL.",
+          "blockedReason": "",
+          "turnCount": 0,
+          "totalTokens": 67075,
+          "usage": {
+            "input": 67026,
+            "output": 4380,
+            "reasoning": 2102,
+            "cacheRead": 1217417,
+            "cacheWrite": 0,
+            "cost": 0,
+            "costKnown": true
+          },
+          "startedAt": 1788757039498,
+          "finishedAt": 1788757109202,
+          "lastStatus": "Goal completed.",
+          "lastCheckpoint": {
+            "summary": "[goal:evidence] Remote web-shell via ttyd 1.7.7 on runner port 38557 tunneled to https://morrison-conference-maker-cargo.trycloudflare.com (public HTTP 200, ttyd title verified); initial OpenCode session link https://induction-requiring-pointing-bay.trycloudflare.com/L2hvbWUvcnV…",
+            "timestamp": 1788757109201
+          },
+          "checkpoints": [
+            {
+              "summary": "[goal:evidence] Remote web-shell via ttyd 1.7.7 on runner port 38557 tunneled to https://morrison-conference-maker-cargo.trycloudflare.com (public HTTP 200, ttyd title verified); initial OpenCode session link https://induction-requiring-pointing-bay.trycloudflare.com/L2hvbWUvcnV…",
+              "timestamp": 1788757109201
+            }
+          ],
+          "history": [
+            {
+              "type": "set",
+              "detail": "Goal created with limits: 10 auto-continues, 900s, 200,000 context tokens.",
+              "timestamp": 1788757039500
+            },
+            {
+              "type": "completed",
+              "detail": "Assistant marked the goal complete with evidence: Remote web-shell via ttyd 1.7.7 on runner port 38557 tunneled to https://morrison-conference-maker-cargo.trycloudflare.com (public HTTP 200, ttyd title verified); initial OpenCode session link https://induction-requiring-pointing-bay.trycloudflare.com/L2hvbWUvcnVubmVyL3dvcmsvT2hNeUdpdGh1Yi9PaE15R2l0aHVi/session/ses_f85c5a909ffeP91F8WHBf3nPwX (sess…",
+              "timestamp": 1788757109202
+            }
+          ],
+          "sessionID": "ses_f85c5a909ffeP91F8WHBf3nPwX"
+        }
+      ]
+    }
+  ],
+  "orderedSessions": []
+}
