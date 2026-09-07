@@ -51,6 +51,11 @@ Use these rules:
   independently judgeable pieces. State observable behavior, quality bars,
   evidence requirements, and recovery behavior instead of prescribing an
   architecture.
+- Write the issue body as readable GitHub-flavored Markdown. Use short
+  headings such as `## Objective`, `## Quality bar`, `## Execution`,
+  `## Verification`, and `## Progress`; use bullets or numbered lists where
+  they improve scanning, and use Markdown links for references. Keep the issue
+  title plain and keep routing metadata out of the body.
 - If text appears before or after the skill invocation, merge it and rewrite
   it in your own words. If the invocation begins the request, preserve the
   request after removing only invocation syntax and routing labels. Keep the

@@ -42,20 +42,42 @@ The prompt must:
   count or stop after the first build or smoke test.
 - Include only observable product constraints, evidence requirements, and
   recovery behavior. Let the lead choose the tools and implementation.
+- Format the issue body as GitHub-flavored Markdown. Use concise headings for
+  the objective, quality bar, execution, verification, and progress; use
+  bullets for requirements and Markdown links for references. Keep the issue
+  title separate from the body and do not put routing metadata in the body.
 
 ## Prompt shape
 
-Use this structure:
+Use this structure for the issue body:
 
-```text
+```markdown
+## Objective
+
 Deliver [project outcome] to production quality for [intended users]. Preserve
-[named source, output surface, dimensionality, or domain constraints]. Before
-coding, research authoritative references and record the selected anchors or
-acceptance fixtures. Have the lead split the work into judgeable pieces, give
-each piece a builder and a fresh-context critic or verifier, inspect the actual
-artifact with the relevant tools, fix the largest gap, and repeat until the
-acceptance bar is met. Work across as many days or sessions as necessary and
-maintain a resumable live progress page with references, evidence, decisions,
+[named source, output surface, dimensionality, or domain constraints].
+
+## Quality bar
+
+- Research authoritative references and record selected anchors or acceptance
+  fixtures before coding.
+- Inspect the real artifact with the relevant tools and compare it with the
+  acceptance bar.
+
+## Execution
+
+- Have the lead split the work into judgeable pieces.
+- Give each piece a builder and a fresh-context critic or verifier.
+- Work across as many days or sessions as necessary.
+
+## Verification
+
+- Fix the largest remaining gap and repeat until the acceptance bar is met.
+- Record concrete evidence for behavior, quality, and delivery.
+
+## Progress
+
+Maintain a resumable live progress page with references, evidence, decisions,
 blockers, gaps, and next actions.
 ```
 
