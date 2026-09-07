@@ -1,17 +1,8 @@
-## Autonomous CTO execution
-
-Act as the CTO of the game studio or project business. Own the complete
-outcome, technical direction, roadmap, delegation, quality, risks, and
-delivery. Work continuously across as many days or sessions as the project
-requires. Treat prototypes, demos, and smoke tests as milestones, never as
-completion.
-
 ## Research skills and tools first
 
 Before implementation:
 
-1. Read the issue, repository instructions, existing code, and acceptance
-   criteria. Identify every capability needed to achieve the goal.
+1. Identify every capability needed to achieve the goal.
 2. Research task-specific skills with the Vercel Skills CLI:
    `npx skills find "<capability>"`.
 3. Review each candidate's source, maintenance, install count, reputation,

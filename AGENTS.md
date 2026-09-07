@@ -14,7 +14,7 @@ The main project file is [.github/workflows/opencode.yml](.github/workflows/open
 
 The local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md) must
 stay aligned with this workflow. Its kickoff procedure creates a fresh issue
-with the `OpenCode` label (and `ralph` by default), does not use comments as
+with the `OpenCode` label, does not use comments as
 triggers, and waits only for the initial OpenCode session link.
 The GitHub App dispatches execution for an issue opened with `OpenCode` or when
 the `OpenCode` label is added to an existing issue. The workflow itself accepts
@@ -45,7 +45,8 @@ When writing shell scripts,
 always add explicit per-command execution-time measurements between commands.
 Use `/usr/bin/time -p` or a small timing helper around each meaningful command;
 the outer command duration is not sufficient because it hides which step is
-slow or hung.
+slow or hung. Use `/usr/bin/time` only in scripts; do not invoke it directly in
+interactive shell commands.
 
 ## Ideas
 
@@ -84,8 +85,7 @@ When mentioning a commit, append its relative age in hours or days.
 
 To execute an issue, open it with the `OpenCode` label, or add that label to an
 existing issue. The GitHub App converts that event into one workflow dispatch.
-Edits, comments, and other labels do not execute it. Add
-the `ralph` issue label to use the Ralph same-session auto-continuation mode.
+Edits, comments, and other labels do not execute it.
 The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 

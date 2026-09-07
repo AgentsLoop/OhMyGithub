@@ -170,9 +170,7 @@ ${SSH_COMMAND}
     access_links="${access_links//@VALIDATION_SESSION_SECTION@/$validation_session_section}"
     access_links="${access_links//@PROGRESS_STATS@/$progress_stats}"
     access_links="${access_links//@ACCESS_NOTE@/$access_note}"
-    body="${access_links}
-
-_Image-context model calls are inferred from image attachments in the session transcript. Message contents and tool details are hidden. Full logs are published in the completion release._"
+    body="${access_links}"
     if [[ "${PROGRESS_DRY_RUN:-false}" == "true" ]]; then
       printf '%s\n' "$body" > "${PROGRESS_OUTPUT:?PROGRESS_OUTPUT is required in dry-run mode}"
     else
