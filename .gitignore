@@ -1,0 +1,6 @@
+.agentsweb/
+.opencode-ssh/
+opencode-agentsweb-id_ed25519
+opencode-agentsweb-id_ed25519.pub
+node_modules/
+.DS_Store
