@@ -45,10 +45,10 @@ For a full workflow test, apply both the `OpenCode` and `test` labels to an
 issue. The App remains triggered only by the exact `OpenCode` label; `test`
 selects a deterministic mock-generation path. The workflow copies the fixture
 from `.github/fixtures/test-project` instead of invoking OpenCode, then verifies
-it locally, creates the normal branch and pull request, deploys to Vercel,
-verifies the public page, reports the result, and completes the issue. The test
-path does not honor `VERCEL_PUBLISH_ENABLED=false` and does not keep a temporary
-worker alive for five hours.
+it locally, creates the normal branch and attempts pull-request delivery,
+deploys to Vercel when enabled by repository defaults, verifies the public page,
+reports the result, and completes the issue. The test path does not keep a
+temporary worker alive for five hours.
 
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
