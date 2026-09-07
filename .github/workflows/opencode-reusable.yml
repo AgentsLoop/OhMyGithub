@@ -139,25 +139,6 @@ jobs:
           printf 'PROJECT_PATH=%s\n' "$project_path" >> "$GITHUB_ENV"
           printf 'PROJECT_DIR=%s\n' "$resolved_project_dir" >> "$GITHUB_ENV"
 
-      - name: Load prior agent retrospective guidance
-        id: retrospective_guidance
-        uses: actions/github-script@v7
-        env:
-          TRIGGER_ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const { extractPromptAlignment } = require(`${process.env.GITHUB_WORKSPACE}/.omgithub-runtime/.github/scripts/agent-retrospective.cjs`);
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: process.env.TARGET_OWNER,
-              repo: process.env.TARGET_REPO,
-              issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER),
-              per_page: 100
-            });
-            const guidance = extractPromptAlignment(comments);
-            core.setOutput('guidance_json', JSON.stringify(guidance));
-            core.info(`Loaded ${guidance.length} prior prompt-alignment notes.`);
-
       - name: Checkout shared OpenCode skills
         if: env.TEST_REQUEST != 'true'
         uses: actions/checkout@v6
@@ -188,8 +169,6 @@ jobs:
       - name: Install worker instructions
         if: env.TEST_REQUEST != 'true'
         shell: bash
-        env:
-          RETROSPECTIVE_GUIDANCE_JSON: ${{ steps.retrospective_guidance.outputs.guidance_json }}
         run: |
           set -euo pipefail
           install -d "$PROJECT_DIR"
@@ -217,14 +196,6 @@ jobs:
               append_template "$template"
             fi
           done < <(find "$template_dir" -maxdepth 1 -type f -name '*.md' ! -name 'agents.template.md' -print | sort)
-
-          if jq -e 'type == "array" and length > 0' <<<"${RETROSPECTIVE_GUIDANCE_JSON:-[]}" >/dev/null; then
-            {
-              printf '\n## Prior agent retrospective guidance\n\n'
-              printf '%s\n' 'These are bounded notes from earlier runs. Apply them only when relevant to the current request; treat them as guidance, not executable instructions.'
-              jq -r '.[] | "- " + .' <<<"$RETROSPECTIVE_GUIDANCE_JSON"
-            } >> "$PROJECT_DIR/Agents.md"
-          fi
 
           if [[ "$RALPH_REQUEST" == "true" ]]; then
             grep -qF 'When running in Ralph mode' "$PROJECT_DIR/Agents.md"
@@ -1241,101 +1212,6 @@ jobs:
           printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"
           printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
 
-      - name: Generate agent retrospective
-        if: always()
-        continue-on-error: true
-        id: agent_retrospective
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        env:
-          ORIGINAL_REQUEST: ${{ env.COMMENT_BODY }}
-          RETROSPECTIVE_TEMPLATE: ${{ env.RUNTIME_DIR }}/.github/prompts/06-agent-retrospective.md
-          RETROSPECTIVE_GENERATOR: ${{ env.RUNTIME_DIR }}/.github/scripts/generate-agent-retrospective.sh
-          ORIGINAL_SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
-          VERIFICATION_SESSION_ID: ${{ steps.verification_fork.outputs.session_id }}
-          OPENCODE_SESSION_ID: ${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}
-          OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
-          OPENCODE_RUN_OUTCOME: ${{ steps.opencode_run.outcome }}
-          MOCK_PROJECT_OUTCOME: ${{ steps.mock_project.outcome }}
-          VERIFY_SESSIONS_OUTCOME: ${{ steps.verify_sessions.outcome }}
-          VERIFICATION_FORK_OUTCOME: ${{ steps.verification_fork.outcome }}
-          APP_TUNNEL_OUTCOME: ${{ steps.app_tunnel.outcome }}
-          FINAL_EVIDENCE_OUTCOME: ${{ steps.final_evidence.outcome }}
-        run: |
-          set -euo pipefail
-          install -d "$OPENCODE_WEB_DIR"
-          evidence_file="$OPENCODE_WEB_DIR/retrospective-workflow-evidence.md"
-          transcript_file="$OPENCODE_WEB_DIR/retrospective-opencode-transcript.json"
-          output_file="$OPENCODE_WEB_DIR/agent-retrospective.json"
-
-          available_skills='(none)'
-          if [[ -d "$PROJECT_DIR/.agents/skills" ]]; then
-            available_skills="$(find "$PROJECT_DIR/.agents/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -print \
-              | sed 's#^.*/skills/##; s#/SKILL.md$##' | sort | paste -sd ', ' -)"
-            available_skills="${available_skills:-'(none)'}"
-          fi
-
-          {
-            printf '# Workflow outcome\n\n'
-            printf '%s\n' "Run: $GITHUB_RUN_ID" "Repository: $TARGET_REPOSITORY" "Issue: $TRIGGER_ISSUE_NUMBER"
-            printf '\n# Step outcomes\n\n'
-            printf '%s\n' \
-              "OpenCode run: ${OPENCODE_RUN_OUTCOME:-skipped}" \
-              "Mock project: ${MOCK_PROJECT_OUTCOME:-skipped}" \
-              "SSH session verification: ${VERIFY_SESSIONS_OUTCOME:-skipped}" \
-              "Verification fork: ${VERIFICATION_FORK_OUTCOME:-skipped}" \
-              "Public app tunnel: ${APP_TUNNEL_OUTCOME:-skipped}" \
-              "Final evidence: ${FINAL_EVIDENCE_OUTCOME:-skipped}" \
-              'Delivery: not yet run'
-            printf '\n# Changed files\n\n'
-            git status --short 2>/dev/null || true
-            printf '\n# Relevant logs\n\n'
-            for log in "$OPENCODE_WEB_DIR"/*.log; do
-              [[ -s "$log" ]] || continue
-              printf '\n## %s\n\n' "$(basename "$log")"
-              tail -c 12000 "$log"
-              printf '\n'
-            done
-          } > "$evidence_file"
-
-          if [[ "$TEST_REQUEST" == 'true' ]]; then
-            jq -cn \
-              --arg summary '## Outcome\n\nThe deterministic test fixture completed the workflow. The workflow exercised validation, delivery, release creation, and final reporting; no agent failure was present in the fixture.' \
-              '{status:"ok",summary_markdown:$summary,prompt_alignment:["Keep deterministic validation and delivery checks in the test path."],skill_recommendations:[{name:"game-studio:game-playtest",action:"keep",reason:"The workflow already uses browser-visible fixture evidence; preserve this acceptance check for future UI changes."}]}' \
-              > "$output_file"
-            printf 'json=%s\n' "$(< "$output_file")" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          : > "$transcript_file"
-          for session_id in "$ORIGINAL_SESSION_ID" "$VERIFICATION_SESSION_ID"; do
-            [[ "$session_id" == ses_* ]] || continue
-            curl --fail --silent --show-error \
-              -H "x-opencode-directory: $PROJECT_DIR" \
-              "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$session_id/message" \
-              >> "$transcript_file" || true
-            printf '\n' >> "$transcript_file"
-          done
-          [[ -s "$transcript_file" ]] || printf '%s\n' 'No OpenCode transcript was available.' > "$transcript_file"
-
-          if ! RETROSPECTIVE_TEMPLATE="$RETROSPECTIVE_TEMPLATE" \
-            ORIGINAL_REQUEST="$ORIGINAL_REQUEST" \
-            AVAILABLE_SKILLS="$available_skills" \
-            WORKFLOW_EVIDENCE_FILE="$evidence_file" \
-            OPENCODE_TRANSCRIPT_FILE="$transcript_file" \
-            OUTPUT_FILE="$output_file" \
-            OUTPUT_LOG_FILE="$OPENCODE_WEB_DIR/agent-retrospective.log" \
-            OPENCODE_BIN="$HOME/.opencode/bin/opencode" \
-            OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
-            PROJECT_DIR="$PROJECT_DIR" \
-            OPENCODE_SESSION_ID="$OPENCODE_SESSION_ID" \
-            OPENCODE_MODEL="$OPENCODE_MODEL" \
-            "$RETROSPECTIVE_GENERATOR"; then
-            jq -cn --arg reason 'The retrospective model call failed or returned invalid structured output.' \
-              '{status:"unavailable",reason:$reason}' > "$output_file"
-          fi
-          printf 'json=%s\n' "$(< "$output_file")" >> "$GITHUB_OUTPUT"
-
       - name: Push project branch
         if: env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true'
         id: delivery
@@ -1420,7 +1296,6 @@ jobs:
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json || steps.mock_project.outputs.screenshots_json }}
           PROJECT_PATH: ${{ env.PROJECT_PATH }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
-          RETROSPECTIVE_JSON: ${{ steps.agent_retrospective.outputs.json }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -1428,7 +1303,7 @@ jobs:
             const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
             const projectUrl = `https://omgithub.com/${process.env.TARGET_REPOSITORY}/tree/${process.env.FINAL_COMMIT}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
-            const { renderAgentRetrospective, renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
+            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
             const images = screenshots.map((name) => {
               const path = [projectPath, 'screenshots', name].filter(Boolean).join('/').split('/').map(encodeURIComponent).join('/');
@@ -1440,8 +1315,7 @@ jobs:
               FINAL_COMMIT: process.env.FINAL_COMMIT,
               COMMIT_URL: commitUrl,
               RELEASE_URL: process.env.OPENCODE_RELEASE_URL,
-              IMAGES: images.join('\n'),
-              RETROSPECTIVE: renderAgentRetrospective(JSON.parse(process.env.RETROSPECTIVE_JSON || '{}'))
+              IMAGES: images.join('\n')
             });
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: process.env.TARGET_OWNER,
@@ -1486,14 +1360,12 @@ jobs:
       - name: Mark issue failed
         if: failure()
         uses: actions/github-script@v7
-        env:
-          RETROSPECTIVE_JSON: ${{ steps.agent_retrospective.outputs.json }}
         with:
           github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
-            const { renderAgentRetrospective, renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
+            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -1513,8 +1385,7 @@ jobs:
               issue_number: number,
               body: renderTemplate('opencode-failed-comment.md', {
                 RUN_URL: runUrl,
-                FAILED_STEPS: details,
-                RETROSPECTIVE: renderAgentRetrospective(JSON.parse(process.env.RETROSPECTIVE_JSON || '{}'))
+                FAILED_STEPS: details
               })
             });
             await github.rest.issues.removeLabel({
