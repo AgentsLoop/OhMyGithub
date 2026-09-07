@@ -52,4 +52,4 @@ Before declaring the game complete:
    - final screenshots embedded in expandable blocks in the comment.
 
 The workflow may also publish a completion comment from the committed evidence.
-Do not create a pull request yourself; the workflow owns pull-request creation.
+The workflow owns the final immutable branch commit and project link.

@@ -29,7 +29,7 @@
 
 OMG (Oh My GitHub) is an automated GitHub Actions workflow for creating complete browser games and app projects from one natural-language prompt.
 
-Write what you want in an issue and add the `OpenCode` label. OpenCode checks out the project, uses the shared skills, builds the experience, runs tests, verifies the result, and opens a pull request with the finished work.
+Write what you want in an issue and add the `OpenCode` label. OpenCode checks out the project, uses the shared skills, builds the experience, runs tests, verifies the result, and publishes an immutable OmGithub project link from the finished commit.
 
 Yes, it creates the code. Yes, it runs the verification loop. Yes, it can expose the result in a temporary browser URL.
 
@@ -41,7 +41,7 @@ Yes, it creates the code. Yes, it runs the verification loop. Yes, it can expose
 4. Let GitHub Actions build, test, verify, and propose the result.
 
 ```text
-Your idea → GitHub issue → OpenCode → tests → verified app → pull request
+Your idea → GitHub issue → OpenCode → tests → immutable OmGithub project
 ```
 
 ## ⚡ Quick Start
@@ -59,11 +59,11 @@ Requirements:
 - Run tests and verify it in a browser
 ```
 
-That is the whole user-facing workflow. GitHub Actions handles the runner, OpenCode handles implementation, and the workflow handles the verification and pull request.
+That is the whole user-facing workflow. GitHub Actions handles the runner, OpenCode handles implementation, and the workflow handles verification plus the immutable project commit.
 
 To run against an existing non-default branch, end the issue title with a
-`branch: <name>` directive. The directive selects the checkout and pull-request
-base and is removed before the issue body is sent to OpenCode:
+`branch: <name>` directive. The directive selects the checkout and is removed
+before the issue body is sent to OpenCode:
 
 ```sh
 gh issue create \
@@ -101,7 +101,8 @@ the repository default branch remains the target.
 - 🧪 Runs a second verification prompt after implementation.
 - 🌐 Starts the app and checks the local runtime.
 - 🔗 Creates a temporary public preview URL when verification passes.
-- 🔀 Creates an `opencode/<run-id>` branch and pull request.
+- 🔀 Creates and pushes an `opencode/<run-id>` branch.
+- 🕹️ Adds an `Open Project` link backed by the full commit SHA.
 - 💬 Posts progress and access details back to the issue.
 - 🧹 Cleans up temporary tunnels and runner processes.
 
@@ -140,7 +141,7 @@ flowchart TD
     I --> H
 
     H -- Yes --> J[Commit and push]
-    J --> K[Create PR]
+    J --> K[Create immutable project link]
     K --> L[Publish report]
     L --> M[Complete]
 ```
@@ -160,7 +161,7 @@ flowchart TD
                               └─────────────────────┼─────────────────────┘
                                                     ▼
                                       ┌────────────────────────┐
-                                      │ PR + temporary preview │
+                                      │ Commit store + preview │
                                       └────────────────────────┘
 ```
 
@@ -170,7 +171,7 @@ flowchart TD
 - 🖥️ You do not need to operate a dedicated build server.
 - ☁️ Execution happens in GitHub Actions.
 - 🔒 Temporary SSH and preview access exists only for the workflow run.
-- 👀 Review the generated pull request before merging.
+- 👀 Review the generated commit before integrating it.
 - 🛡️ Restrict who can apply the `OpenCode` label in repositories that accept public issues.
 
 > “No servers needed” means no servers for you to provision or maintain. The workflow still uses GitHub-hosted Actions infrastructure and temporary workflow services.
@@ -210,7 +211,7 @@ Ideas, skills, game templates, verification improvements, and workflow fixes are
 
 1. Open an issue describing the improvement.
 2. Add the `OpenCode` label when you want the workflow to prototype it.
-3. Review the generated pull request carefully.
+3. Review the generated commit and Open Project page carefully.
 4. Add tests and runtime proof for workflow changes.
 
 ## ⭐ The Pitch
