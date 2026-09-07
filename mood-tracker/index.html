@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mood Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Mood Tracker</h1>
+      <p class="subtitle">Log how you feel each day.</p>
+    </header>
+
+    <section class="card" aria-labelledby="log-heading">
+      <h2 id="log-heading">How are you feeling today?</h2>
+      <div id="date-display" class="date-display"></div>
+
+      <form id="entry-form">
+        <div class="mood-options" role="radiogroup" aria-label="Mood">
+          <button type="button" class="mood-option" data-mood="great" aria-label="Great" aria-checked="false">
+            <span class="mood-emoji">😄</span>
+            <span class="mood-label">Great</span>
+          </button>
+          <button type="button" class="mood-option" data-mood="good" aria-label="Good" aria-checked="false">
+            <span class="mood-emoji">🙂</span>
+            <span class="mood-label">Good</span>
+          </button>
+          <button type="button" class="mood-option" data-mood="okay" aria-label="Okay" aria-checked="false">
+            <span class="mood-emoji">😐</span>
+            <span class="mood-label">Okay</span>
+          </button>
+          <button type="button" class="mood-option" data-mood="low" aria-label="Low" aria-checked="false">
+            <span class="mood-emoji">😔</span>
+            <span class="mood-label">Low</span>
+          </button>
+          <button type="button" class="mood-option" data-mood="awful" aria-label="Awful" aria-checked="false">
+            <span class="mood-emoji">😫</span>
+            <span class="mood-label">Awful</span>
+          </button>
+        </div>
+
+        <label for="note" class="visually-hidden">Note (optional)</label>
+        <input
+          type="text"
+          id="note"
+          placeholder="Add an optional note..."
+          maxlength="140"
+          autocomplete="off"
+        />
+
+        <button type="submit" id="save-btn" class="primary-btn" disabled>Save Entry</button>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="history-heading">
+      <h2 id="history-heading">History</h2>
+      <ul id="history-list" class="history-list"></ul>
+      <p id="empty-state" class="empty-state hidden">No entries yet. Log your first mood above!</p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
