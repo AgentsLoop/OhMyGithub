@@ -595,15 +595,12 @@ jobs:
               root $PROJECT_DIR;
               index __codex_no_automatic_index_file__;
               autoindex on;
-              location / {
-                try_files \$uri =404;
-              }
             }
           }
           EOF
           "$NGINX_BIN" -t -c "$NGINX_PREFIX/nginx.conf" -p "$NGINX_PREFIX"
           "$NGINX_BIN" -c "$NGINX_PREFIX/nginx.conf" -p "$NGINX_PREFIX"
-          if ! wait_for_http_response "http://127.0.0.1:$PROJECT_FILE_PORT/" 15; then
+          if ! wait_for_http "http://127.0.0.1:$PROJECT_FILE_PORT/" 15; then
             echo 'Nginx project file server did not become healthy; server log follows:' >&2
             sed -n '1,160p' "$NGINX_PREFIX/error.log" >&2 || true
             exit 1
