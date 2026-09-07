@@ -117,7 +117,14 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
 12. Creates a uniquely tagged GitHub release containing the final OpenCode
     response JSON and safe runner log files, then appends its link to that same
     live-progress comment.
-13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
+13. Generates an agent retrospective from the OpenCode transcript and workflow
+    outcome. The final, blocked, or failed issue comment includes a collapsible
+    postmortem with failures, root causes, improvements, and recommended skills
+    to add or improve. A failed retrospective never fails delivery.
+14. Loads bounded prompt-alignment notes from earlier retrospective comments
+    into the next run's generated `Agents.md`, scoped to the triggering issue
+    and treated as advisory guidance.
+15. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
    verification,
    then marks the comment closed and terminates both tunnels.
 

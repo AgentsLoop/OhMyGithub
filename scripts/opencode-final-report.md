@@ -9,3 +9,5 @@ OpenCode logs release: [@RELEASE_URL@](@RELEASE_URL@)
 @IMAGES@
 
 </details>
+
+@RETROSPECTIVE@
