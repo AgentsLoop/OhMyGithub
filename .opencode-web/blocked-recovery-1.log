@@ -1,0 +1,4 @@
+[0m
+> build · muse-spark-1.3-contributor-free
+[0m
+Goal flag parse failed: unsupported flag `--comments`. Supported flags are --max-turns, --max-minutes, --max-duration-ms, --max-tokens, --budget, --cooldown-ms, --no-progress-threshold, --no-progress-turns, --no-tool-turns, --success, --constraints, --mode (use `--flag value` or `--flag=value`, quote multi-word values).

@@ -1,0 +1,45 @@
+[2026/09/07 04:58:02:8943] N: ttyd 1.7.7-40e79c7 (libwebsockets 4.3.3-unknown)
+[2026/09/07 04:58:02:8943] N: tty configuration:
+[2026/09/07 04:58:02:8943] N:   start command: bash
+[2026/09/07 04:58:02:8943] N:   close signal: SIGHUP (1)
+[2026/09/07 04:58:02:8943] N:   terminal type: xterm-256color
+[2026/09/07 04:58:02:8944] N: The --writable option is not set, will start in readonly mode
+[2026/09/07 04:58:02:8944] N: lws_create_context: LWS: 4.3.3-unknown, MbedTLS-2.28.5 NET SRV H1 H2 WS ConMon IPV6-off
+[2026/09/07 04:58:02:8950] N: elops_init_pt_uv:  Using foreign event loop...
+[2026/09/07 04:58:02:8950] N: __lws_lc_tag:  ++ [wsi|0|pipe] (1)
+[2026/09/07 04:58:02:8951] N: __lws_lc_tag:  ++ [vh|0|netlink] (1)
+[2026/09/07 04:58:02:8951] N: __lws_lc_tag:  ++ [vh|1|default|127.0.0.1|127.0.0.1|38557] (2)
+[2026/09/07 04:58:02:8954] N: [vh|1|default|127.0.0.1|127.0.0.1|38557]: lws_socket_bind: source ads 127.0.0.1
+[2026/09/07 04:58:02:8954] N: __lws_lc_tag:  ++ [wsi|1|listen|default|127.0.0.1|38557] (2)
+[2026/09/07 04:58:02:8954] N:  Listening on port: 38557
+[2026/09/07 04:58:04:9018] N: __lws_lc_tag:  ++ [wsisrv|0|adopted] (1)
+[2026/09/07 04:58:04:9019] N: HTTP / - 127.0.0.1
+[2026/09/07 04:58:04:9066] N: __lws_lc_untag:  -- [wsisrv|0|adopted] (0) 4.837ms
+[2026/09/07 04:58:15:4795] N: __lws_lc_tag:  ++ [wsisrv|1|adopted] (1)
+[2026/09/07 04:58:15:4796] N: HTTP / - 127.0.0.1
+[2026/09/07 04:58:20:4853] N: __lws_lc_untag:  -- [wsisrv|1|adopted] (0) 5.005s
+[2026/09/07 04:58:24:1939] N: __lws_lc_tag:  ++ [wsisrv|2|adopted] (1)
+[2026/09/07 04:58:24:1941] N: HTTP / - 127.0.0.1
+[2026/09/07 04:58:29:1985] N: __lws_lc_untag:  -- [wsisrv|2|adopted] (0) 5.004s
+[2026/09/07 04:58:31:7792] N: __lws_lc_tag:  ++ [wsisrv|3|adopted] (1)
+[2026/09/07 04:58:31:7794] N: HTTP / - 127.0.0.1
+[2026/09/07 04:58:32:4377] N: HTTP /token - 127.0.0.1
+[2026/09/07 04:58:33:6139] N: __lws_lc_tag:  ++ [wsisrv|4|adopted] (2)
+[2026/09/07 04:58:33:6141] N: WS   /ws - 127.0.0.1, clients: 1
+[2026/09/07 04:58:34:1479] N: started process, pid: 5390
+[2026/09/07 04:58:37:4384] N: __lws_lc_untag:  -- [wsisrv|3|adopted] (1) 5.659s
+[2026/09/07 04:58:45:8911] N: __lws_lc_tag:  ++ [wsisrv|5|adopted] (2)
+[2026/09/07 04:58:45:8913] N: HTTP / - 127.0.0.1
+[2026/09/07 04:58:46:3433] N: WS closed from 127.0.0.1, clients: 0
+[2026/09/07 04:58:46:3434] N: killing process, pid: 5390
+[2026/09/07 04:58:46:3435] N: __lws_lc_untag:  -- [wsisrv|4|adopted] (1) 12.729s
+[2026/09/07 04:58:46:3439] N: process killed with signal 1, pid: 5390
+[2026/09/07 04:58:47:5624] N: HTTP /token - 127.0.0.1
+[2026/09/07 04:58:48:5947] N: __lws_lc_tag:  ++ [wsisrv|6|adopted] (2)
+[2026/09/07 04:58:48:5949] N: WS   /ws - 127.0.0.1, clients: 1
+[2026/09/07 04:58:48:9296] N: started process, pid: 5564
+[2026/09/07 04:58:52:5635] N: __lws_lc_untag:  -- [wsisrv|5|adopted] (1) 6.672s
+[2026/09/07 04:59:07:8420] N: WS closed from 127.0.0.1, clients: 0
+[2026/09/07 04:59:07:8421] N: killing process, pid: 5564
+[2026/09/07 04:59:07:8422] N: __lws_lc_untag:  -- [wsisrv|6|adopted] (0) 19.247s
+[2026/09/07 04:59:07:8428] N: process killed with signal 1, pid: 5564
