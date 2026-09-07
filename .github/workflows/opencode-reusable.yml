@@ -1367,6 +1367,7 @@ jobs:
           RETROSPECTIVE_GENERATOR: ${{ env.RUNTIME_DIR }}/.github/scripts/generate-agent-retrospective.sh
           ORIGINAL_SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
           VERIFICATION_SESSION_ID: ${{ steps.verification_fork.outputs.session_id }}
+          OPENCODE_SESSION_ID: ${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
           OPENCODE_RUN_OUTCOME: ${{ steps.opencode_run.outcome }}
           MOCK_PROJECT_OUTCOME: ${{ steps.mock_project.outcome }}
@@ -1437,7 +1438,12 @@ jobs:
             WORKFLOW_EVIDENCE_FILE="$evidence_file" \
             OPENCODE_TRANSCRIPT_FILE="$transcript_file" \
             OUTPUT_FILE="$output_file" \
-            OPENCODE_ZEN_MODEL="${OPENCODE_MODEL#opencode/}" \
+            OUTPUT_LOG_FILE="$OPENCODE_WEB_DIR/agent-retrospective.log" \
+            OPENCODE_BIN="$HOME/.opencode/bin/opencode" \
+            OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
+            PROJECT_DIR="$PROJECT_DIR" \
+            OPENCODE_SESSION_ID="$OPENCODE_SESSION_ID" \
+            OPENCODE_MODEL="$OPENCODE_MODEL" \
             "$RETROSPECTIVE_GENERATOR"; then
             jq -cn --arg reason 'The retrospective model call failed or returned invalid structured output.' \
               '{status:"unavailable",reason:$reason}' > "$output_file"
