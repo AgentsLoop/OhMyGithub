@@ -33,9 +33,8 @@ starts the normal App-dispatched flow.
 The `test` label runs the full workflow with a mock OpenCode-generated project
 and must be used alongside `OpenCode`. The App remains triggered only by the
 exact `OpenCode` label. Test mode skips OpenCode generation, copies the fixture
-from `.github/fixtures/test-project`, then runs local verification, normal branch
-and pull-request delivery when permitted, Vercel deployment when enabled by
-repository defaults, public verification, reporting, and issue completion.
+from `.github/fixtures/test-project`, then runs local verification, pushes the
+normal immutable branch, reports its OmGithub tree URL, and completes the issue.
 It also emits the normal live-progress comment, final report, lifecycle labels,
 and logs release from synthetic OpenCode session artifacts, so only the model
 generation itself is replaced.
@@ -44,7 +43,7 @@ The workflow uses the `macos-latest` GitHub-hosted runner by default for the
 entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
 
 An optional issue-title suffix in the exact form `branch: <existing-branch>`
-selects the checkout and pull-request base. The App removes that suffix from the
+selects the checkout. The App removes that suffix from the
 OpenCode request and validates the branch before dispatching the thin workflow
 wrapper.
 Invalid or missing branches receive an issue comment and do not start the build.
@@ -108,10 +107,10 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    remediation prompt to the forked verification session and retries up to three
    times. The completion report and screenshot evidence prompts also use that
    verification session. Detects both uncommitted generated files and commits already created
-   by OpenCode, then pushes the branch and creates the pull request in YAML.
+   by OpenCode, then pushes the immutable branch in YAML.
 11. Gives the verified public URL back to the worker, requests committed final
     browser screenshots, and appends immutable screenshot URLs with the game,
-    commit, and PR links to the oldest triggering-issue comment containing the
+    commit, and Open Project links to the oldest triggering-issue comment containing the
     `🟡 **OpenCode progress (live)**` marker. If screenshots are missing, it
     sends up to two follow-up prompts to the same OpenCode session before
     continuing delivery with a warning.
@@ -126,15 +125,15 @@ Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
 defaults to `true`. When set to `off` (or any value other than `true`), the
 workflow stops after the initial OpenCode prompt and temporary OpenCode Web
 trycloudflare exposure; app verification/remediation, completion and screenshot
-prompts, Git delivery, Vercel publication, release/report generation, and the
+prompts, Git delivery, immutable project publication, release/report generation, and the
 complete label are skipped. The temporary access session still sleeps for five
 hours before cleanup.
 
-After PR creation, the workflow builds `$PROJECT_DIR/dist` (or the static root
-entrypoint) and deploys it directly to Vercel. Each result receives an immutable
-deployment URL. Vite projects are rebuilt with a relative asset base before
-publication. Publishing defaults to enabled; set `VERCEL_PUBLISH_ENABLED=false`
-to skip it. Publication remains non-blocking.
+After the branch is pushed, the completion report links the full commit SHA to
+OmGithub. Opening that URL anonymously downloads the public commit, discovers
+root `index.html` or `dist/index.html` plus final screenshots, and creates the
+store page and playable deployment. There is no separate publishing credential
+or upload step.
 See [OmGithub publishing](omgithub.md).
 
 The OmGithub issue workspace polls issue comments every eight seconds. Its
@@ -161,9 +160,9 @@ The workflow uses the built-in OpenCode model path and does not require an
 `OPENCODE_API_KEY` secret. To authenticate an ephemeral worker with the Mac's
 OpenAI OAuth login, save the complete local OpenCode `auth.json` as the
 `OPENCODE_AUTH_JSON` repository secret; the workflow passes it through
-OpenCode's `OPENCODE_AUTH_CONTENT` environment variable. Branch creation,
-pushing, and pull-request creation are deliberately handled by the workflow
-rather than by OpenCode's GitHub integration.
+OpenCode's `OPENCODE_AUTH_CONTENT` environment variable. Branch creation and
+pushing are deliberately handled by the workflow rather than by OpenCode's
+GitHub integration.
 
 ## Findings: tracking the GitHub run in Web UI
 
@@ -195,8 +194,8 @@ so it cannot be included in the generated app commit.
 The workflow verifies the discovered skill list through OpenCode's `/skill`
 endpoint and synchronizes `model/<provider>/<name>` and `skill/<name>` labels
 in the repository.
-This keeps the regular OpenCode session while making branch and PR behavior
-explicit and reviewable in YAML.
+This keeps the regular OpenCode session while making branch and immutable
+commit behavior explicit and reviewable in YAML.
 Model labels are refreshed from the live OpenCode catalog on each run and are
 limited to models with zero input, output, and cache-read cost, plus the
 explicitly allowed `opencode/gpt-5.6-luna` and `openai/gpt-5.6-luna` models.
@@ -213,7 +212,7 @@ The workflow reads the repository variable `PROJECT_DIR` as a repository-relativ
 project home. It defaults to `./`.
 Absolute paths and parent-directory traversal are rejected. OpenCode Web and all
 OpenCode runs use the resolved directory, and skill checkout, Git delivery,
-publishing, and screenshot links use the same project home. OpenCode's server
+and screenshot links use the same project home. OpenCode's server
 also loads project instances per request using the `x-opencode-directory` header.
 A tunneled browser request does not know the runner's `$GITHUB_WORKSPACE`, so
 the UI can appear empty even while `opencode github run` is actively working.
@@ -244,7 +243,6 @@ requires a screenshot while the run is active.
 
 ## Repository settings
 
-- Actions must be allowed to create and approve pull requests.
 - For runner-side SSH access and verification, configure the
   `AGENTSWEB_SSH_PUBLIC_KEY` Actions secret with the public key matching the Mac
   private key described in [access.md](access.md). Without it, the workflow

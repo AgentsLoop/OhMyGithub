@@ -24,11 +24,6 @@ on:
         description: GitHub username that submitted the request
         required: true
         type: string
-      vercel_publish_enabled:
-        description: Whether to publish the verified result to Vercel
-        required: false
-        default: true
-        type: boolean
     secrets:
       OPENCODE_API_KEY:
         required: false
@@ -36,18 +31,15 @@ on:
         required: false
       AGENTSWEB_SSH_PUBLIC_KEY:
         required: false
-      VERCEL_TOKEN:
-        required: false
 jobs:
   opencode:
     # Ubuntu is the default; the mac label opts this run into macOS.
     runs-on: ${{ contains(inputs.labels_json, '"mac"') && 'macos-latest' || 'ubuntu-latest' }}
     permissions:
       contents: write
-      pull-requests: write
       issues: write
     env:
-      SSH_NAME: opencode-issue-${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
+      SSH_NAME: opencode-issue-${{ inputs.issue_number }}-${{ github.run_id }}-ssh
       SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
       SSH_PUBLIC_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519.pub
       SSH_DIR: ${{ github.workspace }}/.opencode-ssh
@@ -79,7 +71,6 @@ jobs:
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       RALPH_REQUEST: ${{ contains(inputs.labels_json, '"ralph"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
-      VERCEL_PUBLISH_ENABLED: ${{ inputs.vercel_publish_enabled && (vars.VERCEL_PUBLISH_ENABLED || 'true') || 'false' }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
       - name: Publish task link
@@ -1335,156 +1326,30 @@ jobs:
           printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"
           printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
 
-      - name: Create pull request
+      - name: Push project branch
         if: env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true'
         id: delivery
         shell: bash
         run: |
           set -euo pipefail
           BASE_BRANCH="$TARGET_REF"
-          # Dependencies are runtime-only and must never be included in the generated PR.
-          touch "$PROJECT_DIR/.gitignore"
+          # Dependencies are runtime-only and must never be included in the generated commit.
+          /usr/bin/time -p touch "$PROJECT_DIR/.gitignore"
           grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
             printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
-          git add -A -- "$PROJECT_PATH"
+          /usr/bin/time -p git add -A -- "$PROJECT_PATH"
           if ! git diff --cached --quiet; then
-            git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
+            /usr/bin/time -p git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
           fi
           if git diff --quiet "origin/$BASE_BRANCH..HEAD" -- "$PROJECT_PATH"; then
-            echo 'OpenCode made no changes; no pull request will be created.'
+            echo 'OpenCode made no changes; no project branch will be published.'
             exit 0
           fi
-          git push --set-upstream origin "$BRANCH_NAME"
+          /usr/bin/time -p git push --set-upstream origin "$BRANCH_NAME"
           FINAL_COMMIT="$(git rev-parse HEAD)"
-          TITLE="OpenCode: ${COMMENT_BODY%%$'\n'*}"
-          TITLE="${TITLE:0:120}"
-          if PR_URL="$(gh pr create --base "$BASE_BRANCH" --head "$BRANCH_NAME" \
-            --title "$TITLE" \
-            --body "Automated implementation requested in issue:\n\n$COMMENT_BODY")"; then
-            echo "Pull request created: $PR_URL"
-          else
-            PR_URL=''
-            echo 'Pull request creation was blocked; treating PR delivery as optional.' >&2
-          fi
-          printf 'commit=%s\npr_url=%s\n' "$FINAL_COMMIT" "$PR_URL" >> "$GITHUB_OUTPUT"
+          printf 'commit=%s\n' "$FINAL_COMMIT" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
-
-      - name: Prepare Vercel result
-        if: env.TEST_REQUEST == 'true' || (env.VALIDATION_ENABLED == 'true' && env.VERCEL_PUBLISH_ENABLED == 'true')
-        continue-on-error: ${{ env.TEST_REQUEST != 'true' }}
-        id: vercel_meta
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        env:
-          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
-        run: |
-          set -euo pipefail
-          [[ -n "$FINAL_COMMIT" ]]
-
-          # Vite emits root-relative asset URLs by default. A relative base keeps
-          # each build working from its isolated deployment.
-          if jq -e '((.dependencies // {}) + (.devDependencies // {})) | has("vite")' package.json >/dev/null 2>&1; then
-            npm run build -- --base=./
-          fi
-
-          publish_dir="$PROJECT_DIR/dist"
-          if [[ -f "$publish_dir/index.html" ]]; then
-            echo "Using built Vercel entrypoint at $publish_dir/index.html."
-          elif [[ -f "$PROJECT_DIR/index.html" ]]; then
-            publish_dir="$RUNNER_TEMP/vercel-build"
-            mkdir -p "$publish_dir"
-            rsync -a --exclude '.git' --exclude '.github' --exclude '.agents' \
-              --exclude 'node_modules' --exclude 'screenshots' "$PROJECT_DIR/" "$publish_dir/"
-            echo "Using static Vercel entrypoint copied from $PROJECT_DIR/index.html."
-          else
-            echo "No index.html found at $PROJECT_DIR/index.html or $PROJECT_DIR/dist/index.html." >&2
-            exit 1
-          fi
-          [[ -f "$publish_dir/index.html" ]]
-
-          printf 'publish_dir=%s\n' "$publish_dir" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy result to Vercel
-        if: steps.vercel_meta.outcome == 'success'
-        id: vercel_deploy
-        continue-on-error: ${{ env.TEST_REQUEST != 'true' }}
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        env:
-          PUBLISH_DIR: ${{ steps.vercel_meta.outputs.publish_dir }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          set -euo pipefail
-          [[ -n "$VERCEL_TOKEN" ]] || { echo 'VERCEL_TOKEN is required for Vercel publication.' >&2; exit 1; }
-          deployment_args=(deploy "$PUBLISH_DIR" --yes --token "$VERCEL_TOKEN")
-          if [[ "$TEST_REQUEST" == 'true' ]]; then
-            deployment_args+=(--prod)
-          fi
-          deployment_output="$(npx --yes vercel@latest "${deployment_args[@]}" 2>"$RUNNER_TEMP/vercel-deploy.log")"
-          deployment_url="$(tail -n 1 <<<"$deployment_output" | tr -d '\r')"
-          [[ "$deployment_url" == https://* ]] || { cat "$RUNNER_TEMP/vercel-deploy.log" >&2; echo "$deployment_output" >&2; exit 1; }
-          if [[ "$TEST_REQUEST" == 'true' ]]; then
-            inspect_json="$(npx --yes vercel@latest inspect "$deployment_url" --json --token "$VERCEL_TOKEN")"
-            production_alias="$(jq -r '(.aliases // .alias // []) | first // empty' <<<"$inspect_json")"
-            if [[ -n "$production_alias" ]]; then
-              deployment_url="https://${production_alias#https://}"
-            fi
-          fi
-          printf 'url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
-          echo "Published Vercel deployment: $deployment_url"
-
-      - name: Verify test deployment
-        if: env.TEST_REQUEST == 'true' && steps.vercel_deploy.outcome == 'success'
-        shell: bash
-        env:
-          VERCEL_URL: ${{ steps.vercel_deploy.outputs.url }}
-        run: |
-          set -euo pipefail
-          for _ in {1..30}; do
-            if page="$(curl --fail --silent --show-error --max-time 10 "$VERCEL_URL")"; then
-              grep -q 'mock-opencode-project' <<< "$page"
-              echo "APP_URL=$VERCEL_URL" >> "$GITHUB_ENV"
-              /usr/bin/time -p /usr/bin/printf '%s\n' \
-                "Public deployment verified at $VERCEL_URL." \
-                >> "$OPENCODE_WEB_DIR/verification.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Vercel deployment did not serve the mock project: $VERCEL_URL" >&2
-          exit 1
-
-      - name: Post mock OpenCode completion report
-        if: env.TEST_REQUEST == 'true' && env.APP_URL != ''
-        uses: actions/github-script@v7
-        env:
-          APP_URL: ${{ env.APP_URL }}
-          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
-          VERCEL_URL: ${{ steps.vercel_deploy.outputs.url }}
-          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
-            const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
-            await github.rest.issues.createComment({
-              owner: process.env.TARGET_OWNER,
-              repo: process.env.TARGET_REPO,
-              issue_number: number,
-              body: [
-                '✅ **OpenCode completion report**',
-                '',
-                'The mock OpenCode project completed the requested workflow checks.',
-                '',
-                `Public app: [${process.env.APP_URL}](${process.env.APP_URL})`,
-                `Vercel deployment: [${process.env.VERCEL_URL}](${process.env.VERCEL_URL})`,
-                `Final commit: [${process.env.FINAL_COMMIT}](${commitUrl})`,
-                `Actions run: [${process.env.RUN_URL}](${process.env.RUN_URL})`,
-                '',
-                'Generation was replaced by the committed fixture; validation, delivery, deployment, and reporting were executed by the real workflow.'
-              ].join('\n')
-            });
 
       - name: Create OpenCode logs release
         if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
@@ -1538,14 +1403,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Post final game report
-        if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true') && env.APP_URL != ''
+        if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         uses: actions/github-script@v7
         env:
-          APP_URL: ${{ env.APP_URL }}
-          VERCEL_URL: ${{ steps.vercel_deploy.outputs.url }}
-          VERCEL_PUBLISH_ENABLED: ${{ env.VERCEL_PUBLISH_ENABLED }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
-          PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json || steps.mock_project.outputs.screenshots_json }}
           PROJECT_PATH: ${{ env.PROJECT_PATH }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
@@ -1554,6 +1415,7 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
+            const projectUrl = `https://omgithub.com/${process.env.TARGET_REPOSITORY}/tree/${process.env.FINAL_COMMIT}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
             const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
@@ -1562,17 +1424,10 @@ jobs:
               const url = `https://raw.githubusercontent.com/${process.env.TARGET_REPOSITORY}/${process.env.FINAL_COMMIT}/${path}`;
               return `![Final game screenshot: ${name}](${url})`;
             });
-            const vercelLine = process.env.VERCEL_URL
-              ? `Vercel deployment: [${process.env.VERCEL_URL}](${process.env.VERCEL_URL})`
-              : (process.env.VERCEL_PUBLISH_ENABLED === 'true'
-                ? 'Vercel publication failed; inspect the workflow logs and Vercel project.'
-                : 'Vercel publishing: skipped (disabled by repository variable).');
             const body = renderTemplate('opencode-final-report.md', {
-              APP_URL: process.env.APP_URL,
-              DEPLOYMENT_LINE: vercelLine,
+              PROJECT_URL: projectUrl,
               FINAL_COMMIT: process.env.FINAL_COMMIT,
               COMMIT_URL: commitUrl,
-              PR_LINE: process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.',
               RELEASE_URL: process.env.OPENCODE_RELEASE_URL,
               IMAGES: images.join('\n')
             });

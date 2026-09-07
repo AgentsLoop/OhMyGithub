@@ -15,7 +15,7 @@ these checkpoints in order:
 3. `Verify AgentsWeb SSH availability` succeeds.
 4. `Run OpenCode` succeeds.
 5. `Mark SSH session closed` and `Clean up AgentsWeb SSH session` succeed.
-6. The expected branch and pull request exist.
+6. The expected branch and immutable commit exist.
 
 The verification loop must confirm a browser entrypoint before public-app and
 Pages checks: either `$PROJECT_DIR/index.html` or `$PROJECT_DIR/dist/index.html`
@@ -45,9 +45,9 @@ For a full workflow test, apply both the `OpenCode` and `test` labels to an
 issue. The App remains triggered only by the exact `OpenCode` label; `test`
 selects a deterministic mock-generation path. The workflow copies the fixture
 from `.github/fixtures/test-project` instead of invoking OpenCode, then verifies
-it locally, creates the normal branch and attempts pull-request delivery,
-deploys to Vercel when enabled by repository defaults, verifies the public page,
-reports the result, and completes the issue. The test path does not keep a
+it locally, creates and pushes the normal branch, reports the immutable
+OmGithub tree URL, and completes the issue. Opening that URL must generate the
+store page and playable deployment without credentials. The test path does not keep a
 temporary worker alive for five hours.
 The issue must still receive the normal live-progress comment and final report,
 plus the completion report comment,
@@ -57,9 +57,6 @@ transcript plus the real validation and delivery logs.
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
-
-The reusable workflow's Vercel deployment step must require `VERCEL_TOKEN`,
-capture the CLI deployment URL, and verify that URL before reporting it.
 
 For goal support, confirm the App checks the `OpenCode` label and dispatches the
 workflow once, while the workflow reads the forwarded `Goal` label without any
@@ -87,8 +84,7 @@ label. If both `Goal` and `ralph` are present, Ralph takes precedence.
 
 For custom-branch support, create an issue whose title ends with
 `branch: <existing-branch>`. Confirm the App strips the suffix from the
-OpenCode request and dispatches the workflow from that branch for checkout and
-pull-request base.
+OpenCode request and dispatches the workflow from that branch for checkout.
 A missing or syntactically invalid branch must receive an issue comment and must
 not start the reusable pipeline. The repository-local workflow must remain
 dispatch-only so the App is the sole issue-event router.
@@ -112,7 +108,7 @@ before verification, and sends up to two follow-up prompts to that verification
 session when no `screenshots/final-*` image exists, with three total
 evidence checks. Missing screenshots warn and do not block delivery; when present,
 a successful run must leave a final issue comment
-containing the public URL, final commit, PR, and embedded screenshots served
+containing the Open Project URL, final commit, and embedded screenshots served
 from that immutable commit.
 
 Watch a running workflow with live per-step logs using the same internal
