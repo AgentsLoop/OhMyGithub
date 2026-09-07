@@ -82,6 +82,17 @@ jobs:
       VERCEL_PUBLISH_ENABLED: ${{ inputs.vercel_publish_enabled && (vars.VERCEL_PUBLISH_ENABLED || 'true') || 'false' }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
+      - name: Publish task link
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue_url="https://github.com/${GITHUB_REPOSITORY}/issues/${TRIGGER_ISSUE_NUMBER}"
+          {
+            echo '## OpenCode task'
+            echo
+            echo "[Open triggering issue](${issue_url})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Export target token
         shell: bash
         run: echo "GH_TOKEN=${{ github.token }}" >> "$GITHUB_ENV"
