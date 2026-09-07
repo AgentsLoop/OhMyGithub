@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEON GRID RUNNER — Cyber Hover Drone</title>
+  <meta name="description" content="Neon cyberpunk endless-runner: pilot a hover-drone, dodge laser gates, collect energy cells." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon">◈</span>
+        <span class="brand-text">NEON_GRID</span>
+        <span class="brand-sub">RUNNER v1.0 // SECTOR-7</span>
+      </div>
+      <div class="hud" id="hud" aria-live="polite">
+        <div class="hud-item"><span class="hud-label">SCORE</span><span class="hud-value" id="score">0</span></div>
+        <div class="hud-item"><span class="hud-label">BEST</span><span class="hud-value" id="best">0</span></div>
+        <div class="hud-item"><span class="hud-label">CELLS</span><span class="hud-value" id="cells">0</span></div>
+        <div class="hud-item"><span class="hud-label">SPEED</span><span class="hud-value" id="speed">1.0x</span></div>
+      </div>
+    </header>
+
+    <main class="stage-wrap">
+      <div class="stage" id="stage">
+        <canvas id="game" width="960" height="540" aria-label="Neon Grid Runner game canvas" role="img"></canvas>
+
+        <!-- Start screen -->
+        <div class="overlay" id="overlay-start" role="dialog" aria-modal="true" aria-label="Start screen">
+          <div class="panel">
+            <h1 class="title">NEON GRID <span>RUNNER</span></h1>
+            <p class="tagline">Pilot the hover-drone. Slice through laser gates. Harvest energy cells.</p>
+            <div class="instructions">
+              <div class="inst-col">
+                <h3>CONTROLS</h3>
+                <ul>
+                  <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Move drone</li>
+                  <li><kbd>SPACE</kbd> — Start / Pause</li>
+                  <li><kbd>R</kbd> — Restart</li>
+                  <li><kbd>ESC</kbd> — Pause</li>
+                </ul>
+              </div>
+              <div class="inst-col">
+                <h3>OBJECTIVE</h3>
+                <ul>
+                  <li>Dodge <span class="neon-cyan">cyan</span> & <span class="neon-magenta">magenta</span> laser gates</li>
+                  <li>Collect <span class="neon-yellow">energy cells</span> = +50 pts</li>
+                  <li>Survive — speed & gate frequency increase</li>
+                  <li>Gap between gates shrinks over time</li>
+                </ul>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary" id="btn-play" autofocus>▶ INITIATE RUN</button>
+              <button class="btn btn-ghost" id="btn-how">HOW TO PLAY</button>
+            </div>
+            <p class="hint">Tip: Hold direction for smooth glide. Use micro-taps for precision near gates.</p>
+          </div>
+        </div>
+
+        <!-- Pause overlay -->
+        <div class="overlay hidden" id="overlay-pause" role="dialog" aria-modal="true" aria-label="Paused">
+          <div class="panel small">
+            <h2 class="subtitle">◐ PAUSED</h2>
+            <p>Drone hovering in standby.</p>
+            <div class="actions">
+              <button class="btn btn-primary" id="btn-resume">RESUME</button>
+              <button class="btn btn-ghost" id="btn-restart-pause">RESTART</button>
+            </div>
+            <p class="hint">Press <kbd>SPACE</kbd> or <kbd>ESC</kbd> to resume</p>
+          </div>
+        </div>
+
+        <!-- Game over -->
+        <div class="overlay hidden" id="overlay-over" role="dialog" aria-modal="true" aria-label="Game over">
+          <div class="panel">
+            <h2 class="subtitle glitch" data-text="SIGNAL LOST">SIGNAL LOST</h2>
+            <div class="stats-grid">
+              <div class="stat"><span class="stat-label">FINAL SCORE</span><span class="stat-value" id="final-score">0</span></div>
+              <div class="stat"><span class="stat-label">CELLS</span><span class="stat-value" id="final-cells">0</span></div>
+              <div class="stat"><span class="stat-label">TIME</span><span class="stat-value" id="final-time">0.0s</span></div>
+              <div class="stat"><span class="stat-label">BEST</span><span class="stat-value" id="final-best">0</span></div>
+            </div>
+            <p class="reason" id="crash-reason">Impact with laser gate detected</p>
+            <div class="actions">
+              <button class="btn btn-primary" id="btn-restart">↻ RESTART RUN</button>
+              <button class="btn btn-ghost" id="btn-menu">MAIN MENU</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="touch-controls" id="touch" aria-hidden="true">
+          <div class="touch-pad">
+            <button class="tbtn" data-dir="up" aria-label="Move up">▲</button>
+            <div class="tmid"><button class="tbtn" data-dir="left" aria-label="Move left">◀</button><button class="tbtn" data-dir="right" aria-label="Move right">▶</button></div>
+            <button class="tbtn" data-dir="down" aria-label="Move down">▼</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="foot">
+      <span>© 2026 NEON GRID SYSTEMS • Use keyboard for best experience • <a href="#" id="link-pause">Pause</a> • <a href="#" id="link-restart">Restart</a></span>
+    </footer>
+  </div>
+
+  <div id="sr-announce" class="sr-only" aria-live="polite"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
