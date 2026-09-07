@@ -30,11 +30,10 @@ out `github.ref_name` and bases its OpenCode branch on it, preserving the
 debugging worktree. This suffix is routing metadata, not prompt text. On `main`,
 omit it.
 
-If the request contains `#main`, treat it as routing metadata: use the supplied
-repository, or the current repository when none is supplied, and target its
-`main` branch. Do not substitute `AgentsLoop/PlayGround` for a request marked
-`#main`. Otherwise, use the supplied repository or `AgentsLoop/PlayGround` when
-the selected branch is `main`.
+If the request contains `#main`, use the supplied or current repository on its
+`main` branch; remove `#main` from the prompt and do not default to
+`AgentsLoop/PlayGround`. Otherwise, use the supplied repository or
+`AgentsLoop/PlayGround` when the selected branch is `main`.
 
 if other local skills mentioned verify they exist on https://github.com/agents-dev/skills/ or push them first
 
@@ -42,10 +41,9 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
 
 1. Check `git status --short` and the current branch; preserve unrelated work.
 2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
-   labels, and attach them with `OpenCode` and `Goal`. The `#main` marker is
-   branch-routing metadata, not a GitHub label; strip it from the issue prompt
-   after selecting the `main` branch. Verify labels with `gh issue view <number>
-   --json labels`. Comments, edits, and other labels are not triggers.
+   labels, and attach them with `OpenCode` and `Goal`. Do not create a label for
+   `#main`. Verify labels with `gh issue view <number> --json labels`. Comments,
+   edits, and other labels are not triggers.
 3. Confirm the newest run is matching `workflow_dispatch`, title, and current
    non-`main` branch (or `main`):
 
