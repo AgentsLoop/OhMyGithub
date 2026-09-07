@@ -15,16 +15,9 @@ Locate `Issue e2e` (or this skill's invocation):
 - Beginning: preserve the following request directly, with only necessary
   cleanup such as removing this invocation.
 - Middle/end: combine the text on both sides, reason about the desired result,
-  and rewrite a concise prompt in your own words.
+  and rewrite a concise prompt in your own words. Use
+  `/Users/igor/.codex/skills/gauntlet-loop/SKILL.md` to write the prompt.
 
-When the request explicitly names another skill, the issue prompt must preserve
-a direct instruction to use that skill at its exact supplied path and must
-include its exact Markdown link. In particular, every request naming
-`$gauntlet-loop` must include this required link verbatim:
-`[$gauntlet-loop](/Users/igor/.codex/skills/gauntlet-loop/SKILL.md)`. Do not
-paraphrase the named skill's instructions or replace the required link with a
-description. Remove only this skill's invocation, name/path, and link from the
-issue prompt. With no request, invent a small playable browser-game brief.
 
 Check `git branch --show-current`. If non-empty and not `main`, verify it and
 append ` branch: <current-branch>` to the title. The reusable workflow checks
