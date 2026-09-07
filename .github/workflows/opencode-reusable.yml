@@ -43,7 +43,6 @@ jobs:
     # macOS is the default; the linux label opts this run into Ubuntu.
     runs-on: ${{ contains(inputs.labels_json, '"linux"') && 'ubuntu-latest' || 'macos-latest' }}
     permissions:
-      id-token: write
       contents: write
       pull-requests: write
       issues: write
