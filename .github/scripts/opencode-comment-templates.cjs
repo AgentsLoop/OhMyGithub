@@ -1,6 +1,5 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { renderAgentRetrospective } = require('./agent-retrospective.cjs');
 
 function renderTemplate(name, values) {
   const localPath = path.join(__dirname, name);
@@ -17,4 +16,4 @@ function renderProgressComment(values) {
   return renderTemplate('opencode-progress-comment-template.md', values);
 }
 
-module.exports = { renderAgentRetrospective, renderProgressComment, renderTemplate };
+module.exports = { renderProgressComment, renderTemplate };
