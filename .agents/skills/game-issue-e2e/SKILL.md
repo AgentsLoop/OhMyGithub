@@ -12,10 +12,11 @@ and Action, then stop at the initial Web UI link; do not claim completion.
 
 Locate `Issue e2e` (or this skill's invocation):
 
-- Beginning: preserve the following request directly, with only necessary
-  cleanup such as removing this invocation.
-- Middle/end: combine the text on both sides, reason about the desired result,
-  and rewrite a concise prompt in your own words. Use
+- If the skill invocation begins the request, preserve the following request
+  directly, with only necessary cleanup such as removing this invocation.
+- If request text appears before the invocation, or the invocation is in the
+  middle, combine the text on both sides, reason about the desired result, and
+  rewrite a concise prompt in your own words; do not copy it verbatim. Use
   `/Users/igor/.codex/skills/gauntlet-loop/SKILL.md` to write the prompt.
 
 
