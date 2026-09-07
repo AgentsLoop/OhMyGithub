@@ -16,8 +16,10 @@ Locate `Issue e2e` (or this skill's invocation):
   directly, with only necessary cleanup such as removing this invocation.
 - If request text appears before the invocation, or the invocation is in the
   middle, combine the text on both sides, reason about the desired result, and
-  rewrite a concise prompt in your own words; do not copy it verbatim. Use
-  `/Users/igor/.codex/skills/gauntlet-loop/SKILL.md` to write the prompt.
+  rewrite a concise prompt in your own words; do not copy it verbatim. Read
+  `references/gauntlet-prompt-rubric.md` and apply its prompt-quality criteria.
+  This reuses the rubric only; do not execute the full Gauntlet Loop during
+  issue-e2e kickoff.
 
 
 Check `git branch --show-current`. If non-empty and not `main`, verify it and
