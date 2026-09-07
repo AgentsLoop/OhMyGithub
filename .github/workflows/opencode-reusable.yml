@@ -943,22 +943,6 @@ jobs:
             exit 1
           fi
 
-      - name: Mark issue validating
-        if: env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
-            await github.rest.issues.removeLabel({
-              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
-              issue_number: number, name: 'in progress'
-            }).catch((error) => { if (error.status !== 404) throw error; });
-            await github.rest.issues.addLabels({
-              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
-              issue_number: number, labels: ['validating']
-            });
-
       - name: Fork OpenCode session for verification
         id: verification_fork
         if: env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
@@ -988,6 +972,22 @@ jobs:
           printf '%s\n' "${{ steps.opencode_web.outputs.url }}/${DIRECTORY_B64}/session/${VERIFICATION_SESSION_ID}" \
             > "$OPENCODE_WEB_DIR/validation-session-url"
           echo "Verification fork: $VERIFICATION_SESSION_ID"
+
+      - name: Mark issue validating
+        if: env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            await github.rest.issues.removeLabel({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, name: 'in progress'
+            }).catch((error) => { if (error.status !== 404) throw error; });
+            await github.rest.issues.addLabels({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, labels: ['validating']
+            });
 
       - name: Verify app with forked OpenCode session
         if: env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
