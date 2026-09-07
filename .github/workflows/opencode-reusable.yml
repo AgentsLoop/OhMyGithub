@@ -24,8 +24,8 @@ on:
         description: GitHub username that submitted the request
         required: true
         type: string
-      pages_publish_enabled:
-        description: Whether to configure and publish GitHub Pages
+      vercel_publish_enabled:
+        description: Whether to publish the verified result to Vercel
         required: false
         default: true
         type: boolean
@@ -43,12 +43,8 @@ jobs:
     permissions:
       id-token: write
       contents: write
-      pages: write
       pull-requests: write
       issues: write
-    environment:
-      name: ${{ inputs.pages_publish_enabled && vars.PAGES_PUBLISH_ENABLED != 'false' && 'github-pages' || '' }}
-      url: ${{ steps.pages_deploy.outputs.page_url }}
     env:
       SSH_NAME: opencode-issue-${{ inputs.issue_number || github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}-ssh
       SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
@@ -78,11 +74,11 @@ jobs:
       TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number }}
       COMMENT_BODY: ${{ inputs.request }}
       LABELS_JSON: ${{ inputs.labels_json }}
-      TEST_GH_REQUEST: ${{ contains(inputs.labels_json, '"test-gh"') && contains(inputs.labels_json, '"OpenCode"') }}
+      TEST_VERCEL_REQUEST: ${{ contains(inputs.labels_json, '"test-vercel"') && contains(inputs.labels_json, '"OpenCode"') }}
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       RALPH_REQUEST: ${{ contains(inputs.labels_json, '"ralph"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
-      PAGES_PUBLISH_ENABLED: ${{ inputs.pages_publish_enabled && (vars.PAGES_PUBLISH_ENABLED || 'true') || 'false' }}
+      VERCEL_PUBLISH_ENABLED: ${{ inputs.vercel_publish_enabled && (vars.VERCEL_PUBLISH_ENABLED || 'true') || 'false' }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
       - name: Export target token
@@ -258,7 +254,7 @@ jobs:
               { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
               { name: 'ralph', color: '5319E7', description: 'Run OpenCode with the Ralph auto-continuation loop' },
               { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
-              { name: 'test-gh', color: '1D76DB', description: 'Bypass OpenCode and test GitHub Pages publication' },
+              { name: 'test-vercel', color: '1D76DB', description: 'Bypass OpenCode and test Vercel publication' },
               { name: 'mac', color: 'B60205', description: 'Run OpenCode on the macos-latest GitHub-hosted runner' },
               { name: 'linux', color: '1D76DB', description: 'Run OpenCode on the ubuntu-latest GitHub-hosted runner' },
               ...models.map((model) => ({
@@ -411,7 +407,7 @@ jobs:
 
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
-        if: env.TEST_GH_REQUEST != 'true'
+        if: env.TEST_VERCEL_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -647,8 +643,8 @@ jobs:
           git fetch origin "$BASE_BRANCH"
           git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
 
-      - name: Create test-gh Hello World branch
-        if: env.TEST_GH_REQUEST == 'true'
+      - name: Create test-vercel Hello World branch
+        if: env.TEST_VERCEL_REQUEST == 'true'
         id: test_delivery
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
@@ -656,7 +652,7 @@ jobs:
           set -euo pipefail
           BASE_BRANCH="$TARGET_REF"
           git fetch origin "$BASE_BRANCH"
-          TEST_BRANCH_NAME="test-gh/hello-world-${GITHUB_RUN_ID}-$(openssl rand -hex 8)"
+          TEST_BRANCH_NAME="test-vercel/hello-world-${GITHUB_RUN_ID}-$(openssl rand -hex 8)"
           git checkout -B "$TEST_BRANCH_NAME" "origin/$BASE_BRANCH"
           printf 'BRANCH_NAME=%s\n' "$TEST_BRANCH_NAME" >> "$GITHUB_ENV"
           mkdir -p dist
@@ -666,12 +662,12 @@ jobs:
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>Hello World — GitHub Pages smoke test</title>
+          <title>Hello World — Vercel smoke test</title>
             </head>
             <body>
               <main>
                 <h1>Hello World</h1>
-                <p>GitHub Pages publication smoke test passed.</p>
+                <p>Vercel publication smoke test passed.</p>
               </main>
             </body>
           </html>
@@ -685,7 +681,7 @@ jobs:
 
       - name: Resolve OpenCode model and skill labels
         id: opencode_labels
-        if: env.TEST_GH_REQUEST != 'true'
+        if: env.TEST_VERCEL_REQUEST != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -1330,10 +1326,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Prepare GitHub Pages result
-        if: env.TEST_GH_REQUEST == 'true' || (env.VALIDATION_ENABLED == 'true' && env.PAGES_PUBLISH_ENABLED == 'true')
-        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
-        id: pages_meta
+      - name: Prepare Vercel result
+        if: env.TEST_VERCEL_REQUEST == 'true' || (env.VALIDATION_ENABLED == 'true' && env.VERCEL_PUBLISH_ENABLED == 'true')
+        continue-on-error: ${{ env.TEST_VERCEL_REQUEST != 'true' }}
+        id: vercel_meta
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
@@ -1343,20 +1339,20 @@ jobs:
           [[ -n "$FINAL_COMMIT" ]]
 
           # Vite emits root-relative asset URLs by default. A relative base keeps
-          # each build working from its isolated Pages subdirectory.
+          # each build working from its isolated deployment.
           if jq -e '((.dependencies // {}) + (.devDependencies // {})) | has("vite")' package.json >/dev/null 2>&1; then
             npm run build -- --base=./
           fi
 
           publish_dir="$PROJECT_DIR/dist"
           if [[ -f "$publish_dir/index.html" ]]; then
-            echo "Using built Pages entrypoint at $publish_dir/index.html."
+            echo "Using built Vercel entrypoint at $publish_dir/index.html."
           elif [[ -f "$PROJECT_DIR/index.html" ]]; then
             publish_dir="$RUNNER_TEMP/pages-build"
             mkdir -p "$publish_dir"
             rsync -a --exclude '.git' --exclude '.github' --exclude '.agents' \
               --exclude 'node_modules' --exclude 'screenshots' "$PROJECT_DIR/" "$publish_dir/"
-            echo "Using static Pages entrypoint copied from $PROJECT_DIR/index.html."
+            echo "Using static Vercel entrypoint copied from $PROJECT_DIR/index.html."
           else
             echo "No index.html found at $PROJECT_DIR/index.html or $PROJECT_DIR/dist/index.html." >&2
             exit 1
@@ -1374,59 +1370,25 @@ jobs:
           fi
           printf 'destination=%s\npublish_dir=%s\nurl=%s/%s/\n' "$destination" "$publish_dir" "$pages_root" "$destination" >> "$GITHUB_OUTPUT"
 
-      - name: Publish branch result to GitHub Pages
-        if: steps.pages_meta.outcome == 'success'
-        id: pages_publish
-        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ github.token }}
-          publish_branch: gh-pages
-          publish_dir: ${{ steps.pages_meta.outputs.publish_dir }}
-          destination_dir: ${{ steps.pages_meta.outputs.destination }}
-          keep_files: true
-          commit_message: "Publish ${{ env.BRANCH_NAME }} at ${{ steps.delivery.outputs.commit || steps.test_delivery.outputs.commit }}"
-
-      - name: Assemble GitHub Pages site
-        if: steps.pages_publish.outcome == 'success'
-        id: pages_aggregate
-        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
-        uses: actions/checkout@v6
-        with:
-          ref: gh-pages
-          path: .pages-site
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Upload GitHub Pages artifact
-        if: steps.pages_aggregate.outcome == 'success'
-        id: pages_artifact
-        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ${{ github.workspace }}/.pages-site
-
-      - name: Deploy GitHub Pages site
-        if: steps.pages_artifact.outcome == 'success'
-        id: pages_deploy
-        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
-        uses: actions/deploy-pages@v4
-
-      - name: Record GitHub Pages URL
-        if: steps.pages_deploy.outcome == 'success'
-        id: pages_result
-        continue-on-error: ${{ env.TEST_GH_REQUEST != 'true' }}
+      - name: Deploy result to Vercel
+        if: steps.vercel_meta.outcome == 'success'
+        id: vercel_deploy
+        continue-on-error: ${{ env.TEST_VERCEL_REQUEST != 'true' }}
         shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
         env:
-          PAGES_SITE_URL: ${{ steps.pages_deploy.outputs.page_url }}
-          PAGES_DESTINATION: ${{ steps.pages_meta.outputs.destination }}
+          PUBLISH_DIR: ${{ steps.vercel_meta.outputs.publish_dir }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -euo pipefail
-          PAGES_URL="${PAGES_SITE_URL%/}/${PAGES_DESTINATION#/}/"
-          printf 'url=%s\n' "$PAGES_URL" >> "$GITHUB_OUTPUT"
-          echo "Published permanent branch result: $PAGES_URL"
+          [[ -n "$VERCEL_TOKEN" ]] || { echo 'VERCEL_TOKEN is required for Vercel publication.' >&2; exit 1; }
+          deployment_output="$(npx --yes vercel@latest deploy "$PUBLISH_DIR" --yes --token "$VERCEL_TOKEN" 2>"$RUNNER_TEMP/vercel-deploy.log")"
+          deployment_url="$(tail -n 1 <<<"$deployment_output" | tr -d '\r')"
+          [[ "$deployment_url" == https://* ]] || { cat "$RUNNER_TEMP/vercel-deploy.log" >&2; echo "$deployment_output" >&2; exit 1; }
+          printf 'url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "Published Vercel deployment: $deployment_url"
       - name: Create OpenCode logs release
-        if: success() && env.TEST_GH_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: success() && env.TEST_VERCEL_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: opencode_release
         shell: bash
         run: |
@@ -1475,8 +1437,8 @@ jobs:
         uses: actions/github-script@v7
         env:
           APP_URL: ${{ env.APP_URL }}
-          GITHUB_PAGES_URL: ${{ steps.pages_result.outputs.url }}
-          PAGES_PUBLISH_ENABLED: ${{ env.PAGES_PUBLISH_ENABLED }}
+          VERCEL_URL: ${{ steps.vercel_deploy.outputs.url }}
+          VERCEL_PUBLISH_ENABLED: ${{ env.VERCEL_PUBLISH_ENABLED }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           PR_URL: ${{ steps.delivery.outputs.pr_url }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json }}
@@ -1495,14 +1457,14 @@ jobs:
               const url = `https://raw.githubusercontent.com/${process.env.TARGET_REPOSITORY}/${process.env.FINAL_COMMIT}/${path}`;
               return `![Final game screenshot: ${name}](${url})`;
             });
-            const pagesLine = process.env.GITHUB_PAGES_URL
-              ? `GitHub Pages publication: [${process.env.GITHUB_PAGES_URL}](${process.env.GITHUB_PAGES_URL})`
-              : (process.env.PAGES_PUBLISH_ENABLED === 'true'
-                ? `GitHub Pages publishing could not be configured automatically. Enable it at [repository Settings → Pages](https://github.com/${process.env.TARGET_REPOSITORY}/settings/pages), choose **Deploy from a branch**, select **gh-pages** and **/(root)**, save, then rerun the issue.`
-                : 'GitHub Pages publishing: skipped (disabled by repository variable).');
+            const vercelLine = process.env.VERCEL_URL
+              ? `Vercel deployment: [${process.env.VERCEL_URL}](${process.env.VERCEL_URL})`
+              : (process.env.VERCEL_PUBLISH_ENABLED === 'true'
+                ? 'Vercel publication failed; inspect the workflow logs and Vercel project.'
+                : 'Vercel publishing: skipped (disabled by repository variable).');
             const body = renderTemplate('opencode-final-report.md', {
               APP_URL: process.env.APP_URL,
-              PAGES_LINE: pagesLine,
+              PAGES_LINE: vercelLine,
               FINAL_COMMIT: process.env.FINAL_COMMIT,
               COMMIT_URL: commitUrl,
               PR_LINE: process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.',
@@ -1529,11 +1491,11 @@ jobs:
               body: `${liveComment.body.trim()}\n\n${body}`
             });
 
-      - name: Post test-gh Pages report
-        if: success() && env.TEST_GH_REQUEST == 'true'
+      - name: Post test-vercel report
+        if: success() && env.TEST_VERCEL_REQUEST == 'true'
         uses: actions/github-script@v7
         env:
-          GITHUB_PAGES_URL: ${{ steps.pages_result.outputs.url }}
+          VERCEL_URL: ${{ steps.vercel_deploy.outputs.url }}
           TEST_BRANCH_NAME: ${{ steps.test_delivery.outputs.branch }}
           FINAL_COMMIT: ${{ steps.test_delivery.outputs.commit }}
         with:
@@ -1546,10 +1508,10 @@ jobs:
               owner: process.env.TARGET_OWNER,
               repo: process.env.TARGET_REPO,
               issue_number: number,
-              body: renderTemplate('opencode-test-gh-report.md', {
+              body: renderTemplate('opencode-test-vercel-report.md', {
                 TEST_BRANCH_NAME: process.env.TEST_BRANCH_NAME,
                 FINAL_COMMIT: process.env.FINAL_COMMIT,
-                PAGES_URL: process.env.GITHUB_PAGES_URL,
+                VERCEL_URL: process.env.VERCEL_URL,
                 RUN_NUMBER: context.runNumber,
                 RUN_URL: runUrl
               })
