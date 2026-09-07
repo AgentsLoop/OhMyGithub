@@ -5,75 +5,62 @@ set -euo pipefail
 : "${ORIGINAL_REQUEST:?ORIGINAL_REQUEST is required}"
 : "${AVAILABLE_SKILLS:?AVAILABLE_SKILLS is required}"
 : "${WORKFLOW_EVIDENCE_FILE:?WORKFLOW_EVIDENCE_FILE is required}"
-: "${OPENCODE_TRANSCRIPT_FILE:?OPENCODE_TRANSCRIPT_FILE is required}"
 : "${OUTPUT_FILE:?OUTPUT_FILE is required}"
+: "${OPENCODE_BIN:?OPENCODE_BIN is required}"
+: "${OPENCODE_WEB_PORT:?OPENCODE_WEB_PORT is required}"
+: "${PROJECT_DIR:?PROJECT_DIR is required}"
+: "${OPENCODE_SESSION_ID:?OPENCODE_SESSION_ID is required}"
+: "${OPENCODE_MODEL:?OPENCODE_MODEL is required}"
 
-ZEN_URL="${OPENCODE_ZEN_URL:-https://opencode.ai/zen/v1}"
-MODEL_PREFERENCE="${OPENCODE_ZEN_MODEL:-muse-spark-1.3-contributor-free}"
-REQUEST_ID="req_retrospective_$(date +%s)_$$"
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/opencode-retrospective.XXXXXX")"
 trap 'rm -rf "$work_dir"' EXIT
 
-models_file="$work_dir/models.json"
-response_file="$work_dir/response.json"
-request_file="$work_dir/request.json"
-
-curl --fail --silent --show-error --max-time 30 \
-  -H 'Authorization: Bearer public' \
-  -H 'User-Agent: opencode/1.4.3' \
-  -H 'X-Opencode-Client: cli' \
-  -H 'X-Opencode-Project: global' \
-  -H "X-Opencode-Request: $REQUEST_ID" \
-  "$ZEN_URL/models" > "$models_file"
-
-model="$(jq -r --arg preferred "$MODEL_PREFERENCE" '
-  [.data[]?.id // empty] as $ids
-  | if ($ids | index($preferred)) then $preferred
-    else ($ids | map(select(endswith("-free"))) | .[0] // empty)
-    end
-' "$models_file")"
-if [[ -z "$model" ]]; then
-  echo 'OpenCode Zen returned no usable free model.' >&2
-  exit 1
-fi
+prompt_file="$work_dir/prompt.txt"
+response_file="$work_dir/session-message.json"
+output_log_file="${OUTPUT_LOG_FILE:-$work_dir/opencode-retrospective.log}"
 
 template="$(< "$RETROSPECTIVE_TEMPLATE")"
 workflow_evidence="$(< "$WORKFLOW_EVIDENCE_FILE")"
-opencode_transcript="$(< "$OPENCODE_TRANSCRIPT_FILE")"
+
+# The full chat is already available in the OpenCode session. Keep only a
+# bounded workflow summary in the new prompt so the follow-up stays usable.
+if (( ${#workflow_evidence} > 30000 )); then
+  workflow_evidence="${workflow_evidence:0:7500}
+
+[...middle of workflow evidence omitted...]
+
+${workflow_evidence: -22500}"
+fi
+
 prompt="${template//@ORIGINAL_REQUEST@/$ORIGINAL_REQUEST}"
 prompt="${prompt//@AVAILABLE_SKILLS@/$AVAILABLE_SKILLS}"
 prompt="${prompt//@WORKFLOW_EVIDENCE@/$workflow_evidence}"
-prompt="${prompt//@OPENCODE_TRANSCRIPT@/$opencode_transcript}"
+prompt="${prompt//@OPENCODE_TRANSCRIPT@/The complete transcript is already in this OpenCode session. Inspect it directly, including tool calls, subagents, retries, and previous verification messages.}"
+prompt="$prompt
 
-jq -n \
-  --arg model "$model" \
-  --arg prompt "$prompt" \
-  '{model: $model, input: [{role: "user", content: [{type: "input_text", text: $prompt}]}], stream: false, store: false}' \
-  > "$request_file"
+This is a read-only retrospective follow-up inside the existing OpenCode session. Do not edit files, run implementation work, or claim completion. Return only the requested JSON object."
+printf '%s\n' "$prompt" > "$prompt_file"
 
-http_code="$(curl --silent --show-error --max-time 180 \
-  -o "$response_file" \
-  -w '%{http_code}' \
-  -X POST \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer public' \
-  -H 'User-Agent: opencode/1.4.3' \
-  -H 'X-Opencode-Client: cli' \
-  -H 'X-Opencode-Project: global' \
-  -H "X-Opencode-Request: $REQUEST_ID" \
-  --data-binary "@$request_file" \
-  "$ZEN_URL/responses")"
+"$OPENCODE_BIN" run \
+  --auto \
+  --dangerously-skip-permissions \
+  --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+  --dir "$PROJECT_DIR" \
+  --session "$OPENCODE_SESSION_ID" \
+  --model "$OPENCODE_MODEL" \
+  "$(< "$prompt_file")" \
+  > "$output_log_file" 2>&1
 
-if [[ ! "$http_code" =~ ^2 ]]; then
-  echo "OpenCode Zen returned HTTP $http_code:" >&2
-  sed -n '1,120p' "$response_file" >&2
-  exit 1
-fi
+curl --fail --silent --show-error \
+  -H "x-opencode-directory: $PROJECT_DIR" \
+  "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$OPENCODE_SESSION_ID/message" \
+  > "$response_file"
 
 generated="$(jq -r '
-  if (.output_text? | type) == "string" then .output_text
-  else ([.output[]?.content[]? | select(.type == "output_text") | .text] | join("\n\n"))
-  end
+  [.[]
+   | select(.info.role == "assistant")
+   | (.parts[]? | select(.type == "text") | .text)
+  ] | last // empty
 ' "$response_file")"
 generated="$(sed -e '/^[[:space:]]*```json[[:space:]]*$/d' -e '/^[[:space:]]*```[[:space:]]*$/d' <<<"$generated")"
 
@@ -92,13 +79,13 @@ jq -c '
   {
     status: "ok",
     summary_markdown: (.summary_markdown | .[0:1200]),
-    prompt_alignment: ([.prompt_alignment[] | select(type == "string") | .[0:1200]] | unique | .[0:5]),
+    prompt_alignment: ([.prompt_alignment[] | select(type == "string") | gsub("[\\r\\n]+"; " ") | .[0:1200]] | unique | .[0:5]),
     skill_recommendations: ([.skill_recommendations[] | {
-      name: (.name | .[0:240]),
+      name: (.name | gsub("[\\r\\n]+"; " ") | .[0:240]),
       action,
-      reason: (.reason | .[0:1200])
+      reason: (.reason | gsub("[\\r\\n]+"; " ") | .[0:1200])
     }] | unique_by((.name | ascii_downcase) + "\u0000" + (.action | ascii_downcase)) | .[0:5])
   }
 ' <<<"$generated" > "$OUTPUT_FILE"
 
-printf 'model=%s\nrequest_id=%s\noutput=%s\n' "$model" "$REQUEST_ID" "$OUTPUT_FILE"
+printf 'session=%s\nmodel=%s\noutput=%s\n' "$OPENCODE_SESSION_ID" "$OPENCODE_MODEL" "$OUTPUT_FILE"

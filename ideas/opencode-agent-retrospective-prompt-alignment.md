@@ -38,7 +38,10 @@ improve.
 ## Implementation notes
 
 - Add a strict retrospective prompt and machine-readable output schema with
-  separate `prompt_alignment` and `skill_recommendations` fields.
+  separate `prompt_alignment` and `skill_recommendations` fields, issued as a
+  read-only follow-up through the existing OpenCode session.
+- Read the follow-up result back from the local OpenCode session store; do not
+  make direct provider or Zen API calls for retrospective generation.
 - Validate skill recommendations against the skills already available to the
   workflow, distinguishing an existing skill that needs improvement from a
   genuinely missing skill.
