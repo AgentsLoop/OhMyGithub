@@ -43,9 +43,9 @@ The prompt must:
 - Include only observable product constraints, evidence requirements, and
   recovery behavior. Let the lead choose the tools and implementation.
 - Format the issue body as GitHub-flavored Markdown. Use concise headings for
-  the objective, quality bar, execution, verification, and progress; use
-  bullets for requirements and Markdown links for references. Keep the issue
-  title separate from the body and do not put routing metadata in the body.
+  the title, objective, quality bar, execution, verification, and progress;
+  use bullets for requirements and Markdown links for references. Do not put
+  routing metadata in the body.
 
 ## Prompt shape
 
