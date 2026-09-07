@@ -665,6 +665,24 @@ jobs:
             "$PROJECT_DIR/build.json" "$GITHUB_RUN_ID" "$TRIGGER_ISSUE_NUMBER" "$TARGET_REPOSITORY"
           /usr/bin/time -p test -f "$PROJECT_DIR/index.html"
           /usr/bin/time -p test -f "$PROJECT_DIR/package.json"
+          /usr/bin/time -p install -d "$OPENCODE_WEB_DIR"
+          /usr/bin/time -p /usr/bin/printf '%s\n' \
+            'Mock OpenCode generation started.' \
+            "Copied the committed fixture into $PROJECT_DIR." \
+            'Mock OpenCode generation completed successfully.' \
+            > "$OPENCODE_WEB_DIR/opencode-run.log"
+          /usr/bin/time -p /usr/bin/printf '%s\n' \
+            'Mock verification session completed successfully.' \
+            > "$OPENCODE_WEB_DIR/verification.log"
+          # shellcheck disable=SC2016
+          /usr/bin/time -p jq -n \
+            --arg id "ses_mock_${GITHUB_RUN_ID}" \
+            --arg request "$COMMENT_BODY" \
+            '[
+              {info:{role:"user"},parts:[{type:"text",text:$request}]},
+              {info:{role:"assistant"},parts:[{type:"text",text:"Mock OpenCode copied the fixture project and completed generation."}]}
+            ]' > "$OPENCODE_WEB_DIR/opencode-response.json"
+          printf 'MOCK_SESSION_ID=ses_mock_%s\n' "$GITHUB_RUN_ID" >> "$GITHUB_ENV"
 
       - name: Verify mock OpenCode project locally
         if: env.TEST_REQUEST == 'true'
@@ -815,7 +833,6 @@ jobs:
 
       - name: Post temporary access details
         id: access_comment
-        if: env.TEST_REQUEST != 'true'
         uses: actions/github-script@v7
         env:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
@@ -823,8 +840,8 @@ jobs:
           SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
           SSH_HOST: ${{ steps.agentsweb.outputs.host }}
           SSH_PORT: ${{ steps.agentsweb.outputs.port }}
-          OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
-          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
+          OPENCODE_WEB_URL: ${{ env.TEST_REQUEST == 'true' && format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) || steps.opencode_run.outputs.session_url }}
+          PROJECT_FILE_URL: ${{ env.TEST_REQUEST == 'true' && format('https://github.com/{0}/tree/{1}/workflow-test-project', github.repository, env.BRANCH_NAME) || steps.opencode_web.outputs.project_url }}
           PROGRESS_COMMENT_TEMPLATE: ${{ env.RUNTIME_DIR }}/.github/scripts/opencode-progress-comment-template.md
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
           RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
@@ -834,9 +851,11 @@ jobs:
             const { renderProgressComment } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const command = process.env.RALPH_REQUEST === 'true'
+            const command = process.env.TEST_REQUEST === 'true'
+              ? 'mock OpenCode'
+              : (process.env.RALPH_REQUEST === 'true'
               ? 'OpenCode with Ralph Loop'
-              : (process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode');
+              : (process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode'));
             const sshSection = process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true'
               ? [
                   '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
@@ -851,8 +870,12 @@ jobs:
               OPENCODE_WEB_URL: process.env.OPENCODE_WEB_URL,
               PROJECT_FILE_URL: process.env.PROJECT_FILE_URL || 'unavailable',
               VALIDATION_SESSION_SECTION: '',
-              PROGRESS_STATS: '- Waiting for live OpenCode progress statistics.',
-              ACCESS_NOTE: `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
+              PROGRESS_STATS: process.env.TEST_REQUEST === 'true'
+                ? '- Elapsed: under 1 minute\n- Token count: 0\n- Speed score: fixture copy\n- Tool calls: 0\n- Active tool calls: 0\n- Active subagents: 0\n- Total subagents executed: 0\n- Total failed subagents: 0\n- Image-context model calls: 0\n- Changed workspace files: fixture project'
+                : '- Waiting for live OpenCode progress statistics.',
+              ACCESS_NOTE: process.env.TEST_REQUEST === 'true'
+                ? 'This is a synthetic OpenCode session for the full workflow test. Generation is replaced only by the fixture copy; reporting and delivery continue normally.'
+                : `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
             });
             const comment = await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO, issue_number: number, body
@@ -861,7 +884,6 @@ jobs:
 
       - name: Start live OpenCode response comment
         id: response_comment
-        if: env.TEST_REQUEST != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -873,6 +895,14 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [[ "$TEST_REQUEST" == 'true' ]]; then
+            /usr/bin/time -p /usr/bin/printf '%s\n' \
+              'Progress comment created.' \
+              "Synthetic session: $MOCK_SESSION_ID" \
+              'Fixture generation is complete; downstream validation and delivery are running.' \
+              > "$OPENCODE_WEB_DIR/response-comment-tracker.log"
+            exit 0
+          fi
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
           install -m 700 "$RUNTIME_DIR/.github/scripts/opencode-progress-tracker.sh" "$TRACKER"
           # The tracker is intentionally independent of the step shell so it can poll
@@ -1379,9 +1409,20 @@ jobs:
         run: |
           set -euo pipefail
           [[ -n "$VERCEL_TOKEN" ]] || { echo 'VERCEL_TOKEN is required for Vercel publication.' >&2; exit 1; }
-          deployment_output="$(npx --yes vercel@latest deploy "$PUBLISH_DIR" --yes --token "$VERCEL_TOKEN" 2>"$RUNNER_TEMP/vercel-deploy.log")"
+          deployment_args=(deploy "$PUBLISH_DIR" --yes --token "$VERCEL_TOKEN")
+          if [[ "$TEST_REQUEST" == 'true' ]]; then
+            deployment_args+=(--prod)
+          fi
+          deployment_output="$(npx --yes vercel@latest "${deployment_args[@]}" 2>"$RUNNER_TEMP/vercel-deploy.log")"
           deployment_url="$(tail -n 1 <<<"$deployment_output" | tr -d '\r')"
           [[ "$deployment_url" == https://* ]] || { cat "$RUNNER_TEMP/vercel-deploy.log" >&2; echo "$deployment_output" >&2; exit 1; }
+          if [[ "$TEST_REQUEST" == 'true' ]]; then
+            inspect_json="$(npx --yes vercel@latest inspect "$deployment_url" --json --token "$VERCEL_TOKEN")"
+            production_alias="$(jq -r '(.aliases // .alias // []) | first // empty' <<<"$inspect_json")"
+            if [[ -n "$production_alias" ]]; then
+              deployment_url="https://${production_alias#https://}"
+            fi
+          fi
           printf 'url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
           echo "Published Vercel deployment: $deployment_url"
 
@@ -1395,6 +1436,10 @@ jobs:
           for _ in {1..30}; do
             if page="$(curl --fail --silent --show-error --max-time 10 "$VERCEL_URL")"; then
               grep -q 'mock-opencode-project' <<< "$page"
+              echo "APP_URL=$VERCEL_URL" >> "$GITHUB_ENV"
+              /usr/bin/time -p /usr/bin/printf '%s\n' \
+                "Public deployment verified at $VERCEL_URL." \
+                >> "$OPENCODE_WEB_DIR/verification.log"
               exit 0
             fi
             sleep 2
@@ -1403,7 +1448,7 @@ jobs:
           exit 1
 
       - name: Create OpenCode logs release
-        if: success() && env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         id: opencode_release
         shell: bash
         run: |
@@ -1413,10 +1458,16 @@ jobs:
 
           # Preserve machine-readable responses and execution logs without
           # publishing OpenCode configuration, credentials, or SSH material.
-          curl --fail --silent --show-error \
-            -H "x-opencode-directory: $PROJECT_DIR" \
-            "http://127.0.0.1:$OPENCODE_WEB_PORT/session/${{ steps.opencode_run.outputs.session_id }}/message" \
-            > "$release_dir/opencode-response.json"
+          if [[ "$TEST_REQUEST" == 'true' ]]; then
+            cp "$OPENCODE_WEB_DIR/opencode-response.json" "$release_dir/opencode-response.json"
+            printf '%s\n' 'Synthetic OpenCode session used the committed fixture; downstream workflow steps are real.' \
+              > "$release_dir/mock-session.txt"
+          else
+            curl --fail --silent --show-error \
+              -H "x-opencode-directory: $PROJECT_DIR" \
+              "http://127.0.0.1:$OPENCODE_WEB_PORT/session/${{ steps.opencode_run.outputs.session_id }}/message" \
+              > "$release_dir/opencode-response.json"
+          fi
           if [[ ! -s "$release_dir/opencode-response.json" ]]; then
             echo 'OpenCode response artifact is empty; refusing to create an incomplete release.' >&2
             exit 1
@@ -1448,7 +1499,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Post final game report
-        if: success() && env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true' && env.APP_URL != ''
+        if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true') && env.APP_URL != ''
         uses: actions/github-script@v7
         env:
           APP_URL: ${{ env.APP_URL }}
@@ -1504,34 +1555,6 @@ jobs:
               repo: process.env.TARGET_REPO,
               comment_id: liveComment.id,
               body: `${liveComment.body.trim()}\n\n${body}`
-            });
-
-      - name: Post test workflow report
-        if: success() && env.TEST_REQUEST == 'true'
-        uses: actions/github-script@v7
-        env:
-          VERCEL_URL: ${{ steps.vercel_deploy.outputs.url }}
-          TEST_BRANCH_NAME: ${{ env.BRANCH_NAME }}
-          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
-          PR_URL: ${{ steps.delivery.outputs.pr_url }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
-            const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
-            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
-            await github.rest.issues.createComment({
-              owner: process.env.TARGET_OWNER,
-              repo: process.env.TARGET_REPO,
-              issue_number: number,
-              body: renderTemplate('opencode-test-report.md', {
-                TEST_BRANCH_NAME: process.env.TEST_BRANCH_NAME,
-                FINAL_COMMIT: process.env.FINAL_COMMIT,
-                PR_URL: process.env.PR_URL || 'Not created',
-                VERCEL_URL: process.env.VERCEL_URL,
-                RUN_NUMBER: context.runNumber,
-                RUN_URL: runUrl
-              })
             });
 
       - name: Mark issue complete

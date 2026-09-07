@@ -49,6 +49,9 @@ it locally, creates the normal branch and attempts pull-request delivery,
 deploys to Vercel when enabled by repository defaults, verifies the public page,
 reports the result, and completes the issue. The test path does not keep a
 temporary worker alive for five hours.
+The issue must still receive the normal live-progress comment and final report,
+and the run must publish a logs release containing the synthetic OpenCode
+transcript plus the real validation and delivery logs.
 
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
