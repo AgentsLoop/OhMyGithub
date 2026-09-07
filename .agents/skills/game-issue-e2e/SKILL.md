@@ -37,15 +37,10 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
 ## Procedure
 
 1. Check `git status --short` and the current branch; preserve unrelated work.
-2. Parse hashtags in the supplied request before creating the issue. Treat every
-   standalone tag matching `#[A-Za-z0-9][A-Za-z0-9_-]*` (for example `#mac`)
-   as a GitHub label: remove the leading `#`, preserve the label spelling, and
-   attach it to the issue along with `OpenCode` and `Goal`. Do not leave the
-   hashtag token in the generated issue title or prompt unless the user clearly
-   intended it as visible content. Check the target repository's existing labels
-   first; create any requested tag label that is missing, then verify the final
-   label set with `gh issue view <number> --json labels`. Comments, edits, and
-   other labels are not triggers.
+2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
+   labels, and attach them with `OpenCode` and `Goal`. Verify labels with `gh
+   issue view <number> --json labels`. Comments, edits, and other labels are not
+   triggers.
 3. Confirm the newest run is matching `workflow_dispatch`, title, and current
    non-`main` branch (or `main`):
 
