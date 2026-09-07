@@ -30,12 +30,11 @@ When a human opens an issue without `OpenCode`, the App posts a reminder to add
 the label and stops; it does not dispatch a workflow. Adding `OpenCode` later
 starts the normal App-dispatched flow.
 
-The `test-gh` label is a deliberate Pages-only smoke-test mode and must be used
+The `test-vercel` label is a deliberate Vercel-only smoke-test mode and must be used
 alongside `OpenCode`. The App remains triggered only by the exact `OpenCode`
-label; `test-gh` changes the dispatched workflow path so it does not run
-OpenCode. It creates a unique `test-gh/hello-world-*` branch, commits a static
-Hello World page, and exercises the GitHub Pages publication and deployment
-steps.
+label; `test-vercel` changes the dispatched workflow path so it does not run
+OpenCode. It creates a unique `test-vercel/hello-world-*` branch, commits a static
+Hello World page, and exercises the Vercel publication and deployment steps.
 
 The workflow uses the `macos-latest` GitHub-hosted runner by default for the
 entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
@@ -123,22 +122,15 @@ Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
 defaults to `true`. When set to `off` (or any value other than `true`), the
 workflow stops after the initial OpenCode prompt and temporary OpenCode Web
 trycloudflare exposure; app verification/remediation, completion and screenshot
-prompts, Git delivery, GitHub Pages publication, release/report generation, and the
+prompts, Git delivery, Vercel publication, release/report generation, and the
 complete label are skipped. The temporary access session still sleeps for five
 hours before cleanup.
 
-After PR creation, the workflow publishes `$PROJECT_DIR/dist` into the target
-repository's `gh-pages` branch with `peaceiris/actions-gh-pages`. Every result
-uses `branches/<sanitized-opencode-branch>/<commit-prefix>/`, and `keep_files`
-preserves earlier branch results so they coexist. Vite projects are rebuilt
-with a relative asset base before publication. Publishing defaults to enabled;
-set `PAGES_PUBLISH_ENABLED=false` to skip it. After the first `gh-pages` push,
-the workflow assembles the complete branch site and deploys it with GitHub's
-Pages artifact/deployment actions, automatically provisioning the deployment
-without the Pages REST configuration API. Both built `dist/index.html` and
-static root `index.html` projects are supported. If deployment is denied, the
-final issue comment links directly to repository Settings → Pages and explains
-the required branch/source selection. Publication remains non-blocking.
+After PR creation, the workflow builds `$PROJECT_DIR/dist` (or the static root
+entrypoint) and deploys it directly to Vercel. Each result receives an immutable
+deployment URL. Vite projects are rebuilt with a relative asset base before
+publication. Publishing defaults to enabled; set `VERCEL_PUBLISH_ENABLED=false`
+to skip it. Publication remains non-blocking.
 See [OmGithub publishing](omgithub.md).
 
 The OmGithub issue workspace polls issue comments every eight seconds. Its

@@ -20,12 +20,15 @@ on:
       sender:
         description: GitHub username that submitted the request
         required: true
+      vercel_publish_enabled:
+        description: Whether to publish the verified result to Vercel
+        required: false
+        default: true
+        type: boolean
 permissions:
   contents: write
   issues: write
   pull-requests: write
-  pages: write
-  id-token: write
 
 jobs:
   opencode:
@@ -36,4 +39,5 @@ jobs:
       issue_title: ${{ inputs.issue_title }}
       labels_json: ${{ inputs.labels_json }}
       sender: ${{ inputs.sender }}
+      vercel_publish_enabled: ${{ inputs.vercel_publish_enabled }}
     secrets: inherit

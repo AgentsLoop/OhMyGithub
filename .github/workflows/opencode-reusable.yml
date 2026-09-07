@@ -36,6 +36,8 @@ on:
         required: false
       AGENTSWEB_SSH_PUBLIC_KEY:
         required: false
+      VERCEL_TOKEN:
+        required: false
 jobs:
   opencode:
     # macOS is the default; the linux label opts this run into Ubuntu.
@@ -673,7 +675,7 @@ jobs:
           </html>
           EOF
           git add dist/index.html
-          git commit -m "Test GitHub Pages publication with Hello World"
+          git commit -m "Test Vercel publication with Hello World"
           git push --set-upstream origin "$TEST_BRANCH_NAME"
           FINAL_COMMIT="$(git rev-parse HEAD)"
           printf 'commit=%s\nbranch=%s\n' "$FINAL_COMMIT" "$TEST_BRANCH_NAME" >> "$GITHUB_OUTPUT"
@@ -1348,7 +1350,7 @@ jobs:
           if [[ -f "$publish_dir/index.html" ]]; then
             echo "Using built Vercel entrypoint at $publish_dir/index.html."
           elif [[ -f "$PROJECT_DIR/index.html" ]]; then
-            publish_dir="$RUNNER_TEMP/pages-build"
+            publish_dir="$RUNNER_TEMP/vercel-build"
             mkdir -p "$publish_dir"
             rsync -a --exclude '.git' --exclude '.github' --exclude '.agents' \
               --exclude 'node_modules' --exclude 'screenshots' "$PROJECT_DIR/" "$publish_dir/"
@@ -1359,16 +1361,7 @@ jobs:
           fi
           [[ -f "$publish_dir/index.html" ]]
 
-          branch_slug="$(sed -E 's/[^[:alnum:]._-]+/-/g; s/^-+|-+$//g' <<<"$BRANCH_NAME" | tr '[:upper:]' '[:lower:]')"
-          destination="branches/${branch_slug}/${FINAL_COMMIT:0:12}"
-          owner_slug="$(tr '[:upper:]' '[:lower:]' <<<"$TARGET_OWNER")"
-          target_repo_slug="$(tr '[:upper:]' '[:lower:]' <<<"$TARGET_REPO")"
-          if [[ "$target_repo_slug" == "${owner_slug}.github.io" ]]; then
-            pages_root="https://${owner_slug}.github.io"
-          else
-            pages_root="https://${owner_slug}.github.io/$TARGET_REPO"
-          fi
-          printf 'destination=%s\npublish_dir=%s\nurl=%s/%s/\n' "$destination" "$publish_dir" "$pages_root" "$destination" >> "$GITHUB_OUTPUT"
+          printf 'publish_dir=%s\n' "$publish_dir" >> "$GITHUB_OUTPUT"
 
       - name: Deploy result to Vercel
         if: steps.vercel_meta.outcome == 'success'
@@ -1464,7 +1457,7 @@ jobs:
                 : 'Vercel publishing: skipped (disabled by repository variable).');
             const body = renderTemplate('opencode-final-report.md', {
               APP_URL: process.env.APP_URL,
-              PAGES_LINE: vercelLine,
+              DEPLOYMENT_LINE: vercelLine,
               FINAL_COMMIT: process.env.FINAL_COMMIT,
               COMMIT_URL: commitUrl,
               PR_LINE: process.env.PR_URL || 'Not created; PR delivery was blocked, but the generated commit is available.',

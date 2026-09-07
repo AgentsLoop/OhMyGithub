@@ -41,24 +41,20 @@ actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.ym
 git diff --check
 ```
 
-For a direct GitHub Pages smoke test, apply both the `OpenCode` and `test-gh`
+For a direct Vercel smoke test, apply both the `OpenCode` and `test-vercel`
 labels to an issue. The App remains triggered only by the exact `OpenCode`
-label; `test-gh` selects the Pages-only mode. The workflow skips OpenCode,
-creates and pushes a unique `test-gh/hello-world-*` branch containing a static
-Hello World page, and runs the Pages publication/deployment path strictly. A
-successful run comments with the source branch, commit, and published URL.
-The test path does not honor `PAGES_PUBLISH_ENABLED=false` and does not keep a
+label; `test-vercel` selects the Vercel-only mode. The workflow skips OpenCode,
+creates a static Hello World fixture, and runs the Vercel publication path
+strictly. A successful run comments with the commit and published URL.
+The test path does not honor `VERCEL_PUBLISH_ENABLED=false` and does not keep a
 temporary worker alive for five hours.
 
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
 
-The reusable workflow's Pages deployment job must declare the `github-pages`
-environment and expose `steps.pages_deploy.outputs.page_url` as its URL. Without
-that environment, `actions/deploy-pages` returns `400 Missing environment`; with
-non-blocking Pages steps this can appear as a green step while URL recording and
-the final Pages link are skipped.
+The reusable workflow's Vercel deployment step must require `VERCEL_TOKEN`,
+capture the CLI deployment URL, and verify that URL before reporting it.
 
 For goal support, confirm the App checks the `OpenCode` label and dispatches the
 workflow once, while the workflow reads the forwarded `Goal` label without any
