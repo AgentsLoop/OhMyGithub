@@ -31,22 +31,32 @@ out `github.ref_name` and bases its OpenCode branch on it, preserving the
 debugging worktree. This suffix is routing metadata, not prompt text. On `main`,
 omit it.
 
-If the request contains `#main`, use the supplied or current repository on its
-`main` branch; remove `#main` from the prompt and do not default to
-`AgentsLoop/PlayGround`. Otherwise, use the supplied repository or
-`AgentsLoop/PlayGround` when the selected branch is `main`.
+Resolve the target repository before creating the issue. A repository named or
+linked explicitly in the request always wins. If the request contains
+`#main`, use that supplied repository, or the current repository only when no
+repository was supplied, on its `main` branch; remove `#main` from the prompt
+and do not default to `AgentsLoop/PlayGround`. Otherwise, when the selected
+branch is `main` and no repository was supplied, target
+`AgentsLoop/PlayGround` explicitly, regardless of the current checkout's
+remote. For a non-`main` branch without a supplied repository, use the current
+repository and verify that the branch exists there. Record the resolved target
+repository and branch before issue creation; never infer the `main` default
+repository from `git remote`.
 
 if other local skills mentioned verify they exist on https://github.com/agents-dev/skills/ or push them first
 
 ## Procedure
 
 1. Check `git status --short` and the current branch; preserve unrelated work.
+   Resolve and record `<target-repo>` and `<target-branch>` using the routing
+   rules above before running any issue or workflow command. On the default
+   `main` path, verify that `<target-repo>` is exactly `AgentsLoop/PlayGround`.
 2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
    labels, and attach them with `OpenCode` and `Goal`. Do not create a label for
    `#main`. Verify labels with `gh issue view <number> --json labels`. Comments,
    edits, and other labels are not triggers.
-3. Confirm the newest run is matching `workflow_dispatch`, title, and current
-   non-`main` branch (or `main`):
+3. Confirm the newest run is matching `workflow_dispatch`, title, resolved
+   `<target-repo>`, and `<target-branch>`:
 
    ```sh
    gh run list --repo <owner>/<repo> --workflow opencode.yml --limit 5 \
