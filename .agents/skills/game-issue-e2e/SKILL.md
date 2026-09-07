@@ -32,7 +32,7 @@ debugging worktree. This suffix is routing metadata, not prompt text. On `main`,
 omit it.
 
 Resolve the target repository before creating the issue. An explicitly supplied
-repository wins. With `#main`, use the supplied or current repository on
+repository wins. With `#self`, use the supplied or current repository on
 `main`; otherwise, on `main` without a supplied repository, use
 `AgentsLoop/PlayGround` explicitly. On another branch, use the current
 repository. Never infer the default `main` repository from `git remote`.
@@ -46,7 +46,7 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
    command. Verify the default `main` target is `AgentsLoop/PlayGround`.
 2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
    labels, and attach them with `OpenCode` and `Goal`. Do not create a label for
-   `#main`. Verify labels with `gh issue view <number> --json labels`. Comments,
+   `#self`. Verify labels with `gh issue view <number> --json labels`. Comments,
    edits, and other labels are not triggers.
 3. Confirm the newest run is matching `workflow_dispatch`, title, resolved
    `<target-repo>`, and `<target-branch>`:
