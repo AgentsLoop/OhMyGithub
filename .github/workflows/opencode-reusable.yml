@@ -698,6 +698,7 @@ jobs:
             if page="$(curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT")"; then
               grep -q 'mock-opencode-project' <<< "$page"
               /usr/bin/time -p mkdir -p screenshots
+              /usr/bin/time -p npx --yes playwright@latest install chromium
               /usr/bin/time -p npx --yes playwright@latest screenshot \
                 --browser chromium \
                 --wait-for-selector='[data-testid="mock-opencode-project"]' \
