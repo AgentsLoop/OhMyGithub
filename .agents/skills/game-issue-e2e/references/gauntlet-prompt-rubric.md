@@ -37,6 +37,12 @@ The prompt must:
   sessions. Keep a canonical live progress page with references, decisions,
   completed work, evidence, blockers, current gaps, and the next exact action
   so another agent can resume without losing context.
+- Tell the spawned lead to act as the orchestrator for continuous multi-day
+  work. Make it own the full project, delegate and integrate the pieces,
+  research, implement, verify, and iterate ambitiously toward the complete
+  requested outcome. Treat prototypes, demos, and smoke tests as intermediate
+  milestones, never as completion; continue until the acceptance bar is met or
+  an explicit blocker requires the user.
 - Continue the build/verify/improve loop until the acceptance bar is met or
   the run is stopped with explicit evidence. Do not specify an arbitrary round
   count or stop after the first build or smoke test.
@@ -66,6 +72,9 @@ Deliver [project outcome] to production quality for [intended users]. Preserve
 
 ## Execution
 
+- Act as the orchestrator for continuous multi-day work. Own the complete
+  outcome and keep delegating, integrating, implementing, verifying, and
+  improving it; treat prototypes and demos as intermediate milestones.
 - Have the lead split the work into judgeable pieces.
 - Give each piece a builder and a fresh-context critic or verifier.
 - Work across as many days or sessions as necessary.
