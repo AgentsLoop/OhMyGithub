@@ -60,8 +60,9 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
 ## What the job does
 
 1. Checks out the repository with persisted `GITHUB_TOKEN` credentials.
-2. Copies `templates/agents.template.md` to `$PROJECT_DIR/Agents.md`, then
-   appends every `templates/*.md` file whose basename matches an issue label,
+2. Copies `.github/templates/agents.template.md` to `$PROJECT_DIR/Agents.md`,
+   then appends every `.github/templates/*.md` file whose basename matches an
+   issue label,
    excluding the base template itself. The worker therefore receives the
    shared issue-update, screenshot, and completion-report requirements plus all
    active label policies.

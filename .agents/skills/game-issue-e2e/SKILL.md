@@ -17,11 +17,12 @@ Locate `Issue e2e` (or this skill's invocation):
 - Middle/end: combine the text on both sides, reason about the desired result,
   and rewrite a concise prompt in your own words.
 
-When the request explicitly names another skill, preserve a direct instruction
-to use that skill at its exact supplied path, including its exact Markdown link
-when one is supplied (for example,
-`[$gauntlet-loop](/Users/igor/.codex/skills/gauntlet-loop/SKILL.md)`). Do not
-paraphrase the named skill's instructions or replace the link with a
+When the request explicitly names another skill, the issue prompt must preserve
+a direct instruction to use that skill at its exact supplied path and must
+include its exact Markdown link. In particular, every request naming
+`$gauntlet-loop` must include this required link verbatim:
+`[$gauntlet-loop](/Users/igor/.codex/skills/gauntlet-loop/SKILL.md)`. Do not
+paraphrase the named skill's instructions or replace the required link with a
 description. Remove only this skill's invocation, name/path, and link from the
 issue prompt. With no request, invent a small playable browser-game brief.
 
