@@ -1317,10 +1317,6 @@ jobs:
             PR_URL=''
             echo 'Pull request creation was blocked; treating PR delivery as optional.' >&2
           fi
-          if [[ "$TEST_REQUEST" == 'true' && -z "$PR_URL" ]]; then
-            echo 'Test mode requires pull-request delivery.' >&2
-            exit 1
-          fi
           printf 'commit=%s\npr_url=%s\n' "$FINAL_COMMIT" "$PR_URL" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}

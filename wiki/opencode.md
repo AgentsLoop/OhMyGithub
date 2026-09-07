@@ -34,8 +34,8 @@ The `test` label runs the full workflow with a mock OpenCode-generated project
 and must be used alongside `OpenCode`. The App remains triggered only by the
 exact `OpenCode` label. Test mode skips OpenCode generation, copies the fixture
 from `.github/fixtures/test-project`, then runs local verification, normal branch
-and pull-request delivery, Vercel deployment, public verification, reporting,
-and issue completion.
+and pull-request delivery when permitted, Vercel deployment when enabled by
+repository defaults, public verification, reporting, and issue completion.
 
 The workflow uses the `macos-latest` GitHub-hosted runner by default for the
 entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
