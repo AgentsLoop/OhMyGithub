@@ -36,6 +36,9 @@ exact `OpenCode` label. Test mode skips OpenCode generation, copies the fixture
 from `.github/fixtures/test-project`, then runs local verification, normal branch
 and pull-request delivery when permitted, Vercel deployment when enabled by
 repository defaults, public verification, reporting, and issue completion.
+It also emits the normal live-progress comment, final report, lifecycle labels,
+and logs release from synthetic OpenCode session artifacts, so only the model
+generation itself is replaced.
 
 The workflow uses the `macos-latest` GitHub-hosted runner by default for the
 entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
