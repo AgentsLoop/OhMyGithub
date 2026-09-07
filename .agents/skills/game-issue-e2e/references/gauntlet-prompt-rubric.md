@@ -1,62 +1,69 @@
 # Prompt-writing rubric
 
 Use this rubric when rewriting a sparse request into an issue prompt. Write
-the prompt in imperative English. Preserve the user's named game and desired
-experience. Remove invocation syntax and routing labels from the prompt.
+the prompt in imperative English. Preserve the user's subject, desired
+outcome, domain, and constraints. Remove invocation syntax and routing labels
+from the prompt.
 
 ## Required content
 
 The prompt must:
 
-- State the concrete recreation target and intended player experience.
-- Treat a named game as a fidelity target. Say that the result must closely
-  resemble the original game's recognizable camera, composition, environment,
-  player objects, effects, interface, and core interactions. Do not weaken the
-  target to a generic genre game.
-- Identify the required dimensionality. For a 3D source, explicitly require a
-  real 3D implementation with perspective, depth, geometry, lighting,
-  materials, and spatial interactions. Do not allow a flat or sprite-based
-  substitute for a three-dimensional source.
-- Require image research before coding. Search for real gameplay screenshots,
-  official gameplay footage, and useful interface views. Select at least six
-  anchor references spanning gameplay composition, camera, environment,
-  player objects, effects, and HUD or menus. Record the URLs and explain why
-  each anchor matters in the live progress page.
-- Define an inspectable visual bar. Compare the running result directly with
-  the selected references using side-by-side or blind A/B review whenever
-  practical. Judge silhouette, framing, scale, color, lighting, motion,
-  interface placement, and interaction feedback rather than accepting a
-  verbal claim of polish.
-- Require a lead to choose the route and divide the work into independently
+- State the concrete project outcome, intended users, and observable success
+  criteria.
+- Treat a recreation or named existing product as a fidelity target. Require
+  the recognizable visual language, interaction model, workflows, and quality
+  of the source. For new work, choose a concrete reference and justify it.
+- Preserve the requested output surface and dimensionality. Explicitly require
+  the real web, desktop, mobile, backend, data, document, visual, or 3D
+  behavior that the request needs. Do not allow a flatter substitute.
+- Require research before coding. For visual work, search real screenshots,
+  footage, and interface views, select at least six high-signal anchors, and
+  record their URLs and purpose. For other work, collect primary docs,
+  representative data, comparable products, or executable acceptance fixtures.
+- Require vision and direct inspection of the actual artifact whenever visual
+  judgment matters. Compare renders, captures, documents, diagrams, scenes,
+  or interfaces side by side or with blind A/B review whenever practical.
+- Set a production-quality bar. Require complete requested workflows, real
+  states, error and recovery behavior, polish, accessibility or operability,
+  and deployment or delivery evidence where applicable. Do not narrow the
+  work to a demo or temporary proof.
+- Require a lead to choose the route and divide the project into independently
   judgeable pieces. Do not prescribe the architecture or exact decomposition.
-- Require a separate builder and fresh-context critic for every important
-  piece. The critic must inspect the actual running output, identify the
-  largest remaining mismatch, and send the work back for improvement.
-- Continue the builder/critic loop until the result closely resembles the
-  references or the run is stopped. Do not specify an arbitrary round count.
-- Ask the lead to maintain a live progress page containing reference URLs,
-  screenshots or captures, current gaps, and the next improvement.
-- Include only observable product constraints: controls, core loop, feedback,
-  win/lose state, and restart behavior.
+- Require a separate builder and fresh-context critic or verifier for every
+  important piece. The verifier must inspect the actual artifact, compare it
+  with the bar, identify the largest remaining gap, and send the work back.
+- Assume substantial requests require sustained execution across many days or
+  sessions. Keep a canonical live progress page with references, decisions,
+  completed work, evidence, blockers, current gaps, and the next exact action
+  so another agent can resume without losing context.
+- Continue the build/verify/improve loop until the acceptance bar is met or
+  the run is stopped with explicit evidence. Do not specify an arbitrary round
+  count or stop after the first build or smoke test.
+- Include only observable product constraints, evidence requirements, and
+  recovery behavior. Let the lead choose the tools and implementation.
 
 ## Prompt shape
 
-Use this compact structure:
+Use this structure:
 
 ```text
-Recreate [named game or experience] as closely as practical. Preserve the
-source game's presentation dimensionality and [observable core loop]. Before
-coding, search for real reference images or gameplay footage, select visual
-anchors, and record their URLs. Have the lead split the work into judgeable
-pieces; give each piece a builder and a fresh-context critic. Compare the
-running result against the anchors, fix the largest mismatch, and repeat until
-the result closely resembles the original or the run stops. Maintain a live
-progress page with references, captures, gaps, and next actions.
+Deliver [project outcome] to production quality for [intended users]. Preserve
+[named source, output surface, dimensionality, or domain constraints]. Before
+coding, research authoritative references and record the selected anchors or
+acceptance fixtures. Have the lead split the work into judgeable pieces, give
+each piece a builder and a fresh-context critic or verifier, inspect the actual
+artifact with the relevant tools, fix the largest gap, and repeat until the
+acceptance bar is met. Work across as many days or sessions as necessary and
+maintain a resumable live progress page with references, evidence, decisions,
+blockers, gaps, and next actions.
 ```
 
-Replace bracketed text with the user's subject and only the necessary product
-constraints. Keep the prompt concise, but never omit the dimensionality,
-reference research, evidence, or iterative fidelity loop.
+Replace bracketed text with the user's subject and only the necessary project
+constraints. Keep the prompt concise, but never omit the production bar,
+research, direct inspection, persistence, evidence, or iterative verification
+loop. Add vision-specific inspection instructions whenever the artifact is
+visual; use the appropriate nonvisual evidence for other projects.
 
 This is prompt guidance only. The issue-e2e skill remains kickoff-only and
 does not run the full Gauntlet Loop.
