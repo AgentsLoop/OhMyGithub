@@ -41,13 +41,14 @@ actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.ym
 git diff --check
 ```
 
-For a direct Vercel smoke test, apply both the `OpenCode` and `test-vercel`
-labels to an issue. The App remains triggered only by the exact `OpenCode`
-label; `test-vercel` selects the Vercel-only mode. The workflow skips OpenCode,
-creates a static Hello World fixture, and runs the Vercel publication path
-strictly. A successful run comments with the commit and published URL.
-The test path does not honor `VERCEL_PUBLISH_ENABLED=false` and does not keep a
-temporary worker alive for five hours.
+For a full workflow test, apply both the `OpenCode` and `test` labels to an
+issue. The App remains triggered only by the exact `OpenCode` label; `test`
+selects a deterministic mock-generation path. The workflow copies the fixture
+from `.github/fixtures/test-project` instead of invoking OpenCode, then verifies
+it locally, creates the normal branch and pull request, deploys to Vercel,
+verifies the public page, reports the result, and completes the issue. The test
+path does not honor `VERCEL_PUBLISH_ENABLED=false` and does not keep a temporary
+worker alive for five hours.
 
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when

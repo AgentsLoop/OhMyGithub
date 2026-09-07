@@ -30,11 +30,12 @@ When a human opens an issue without `OpenCode`, the App posts a reminder to add
 the label and stops; it does not dispatch a workflow. Adding `OpenCode` later
 starts the normal App-dispatched flow.
 
-The `test-vercel` label is a deliberate Vercel-only smoke-test mode and must be used
-alongside `OpenCode`. The App remains triggered only by the exact `OpenCode`
-label; `test-vercel` changes the dispatched workflow path so it does not run
-OpenCode. It creates a unique `test-vercel/hello-world-*` branch, commits a static
-Hello World page, and exercises the Vercel publication and deployment steps.
+The `test` label runs the full workflow with a mock OpenCode-generated project
+and must be used alongside `OpenCode`. The App remains triggered only by the
+exact `OpenCode` label. Test mode skips OpenCode generation, copies the fixture
+from `.github/fixtures/test-project`, then runs local verification, normal branch
+and pull-request delivery, Vercel deployment, public verification, reporting,
+and issue completion.
 
 The workflow uses the `macos-latest` GitHub-hosted runner by default for the
 entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
