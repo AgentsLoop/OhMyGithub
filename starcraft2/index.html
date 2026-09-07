@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StarCraft 2 Mini-RTS — OhMyGithub</title>
+  <style>
+    :root { --bg:#05080d; --panel:#0d1420; --line:#1c2a44; --txt:#dbe7ff; --acc:#37e08b; --blue:#2f81f7; --red:#ff5d5d; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--txt); font-family: Inter, system-ui, sans-serif; }
+    header { display:flex; gap:16px; align-items:center; padding:10px 16px; background:linear-gradient(180deg,#0d1626,#070c14); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+    header h1 { font-size:18px; margin:0; letter-spacing:1px; }
+    header h1 span { color:var(--acc); }
+    .res { display:flex; gap:14px; font-variant-numeric: tabular-nums; font-size:14px; }
+    .res b { color:#fff; }
+    #layout { display:grid; grid-template-columns: 1fr 280px; gap:12px; padding:12px; max-width:1400px; margin:0 auto; }
+    #wrap { position:relative; }
+    canvas#game { width:100%; height:560px; background:#0a0f16; border:1px solid var(--line); border-radius:10px; display:block; }
+    #msg { min-height:22px; font-size:13px; color:#9fd8ff; margin:8px 2px; }
+    aside { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+    aside h2 { font-size:13px; margin:4px 0; color:#9fb4d8; text-transform:uppercase; letter-spacing:1px; }
+    button { background:#13233c; color:var(--txt); border:1px solid #2a4a7f; border-radius:8px; padding:9px 10px; cursor:pointer; font-size:13px; text-align:left; }
+    button:hover { border-color:var(--acc); }
+    button small { display:block; color:#9fb4d8; }
+    canvas#minimap { width:100%; height:150px; background:#05080d; border:1px solid var(--line); border-radius:8px; }
+    #overlay { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(3,6,10,0.72); border-radius:10px; }
+    #overlay .card { background:#0d1626; border:1px solid var(--line); padding:28px 36px; border-radius:12px; text-align:center; }
+    #overlay h2 { font-size:42px; margin:0 0 8px; letter-spacing:4px; color:var(--acc); }
+    #help { font-size:12.5px; color:#9fb4d8; line-height:1.6; }
+    kbd { background:#000; border:1px solid #333; border-radius:4px; padding:0 5px; font-size:11px; }
+    @media (max-width: 900px) { #layout { grid-template-columns:1fr; } canvas#game { height:420px; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>STARCRAFT <span>2</span> · MINI-RTS</h1>
+  <div class="res">
+    <div>⛏ Minerals <b id="minerals">0</b></div>
+    <div>🟢 Gas <b id="gas">0</b></div>
+    <div>🎖 Supply <b id="supply">0/0</b></div>
+    <div>🏭 Queue <b id="queue">idle</b></div>
+    <div>⏱ <b id="time">00:00</b></div>
+    <div>☠ Kills <b id="kills">0</b></div>
+  </div>
+</header>
+<div id="layout">
+  <div id="wrap">
+    <div id="msg"></div>
+    <canvas id="game"></canvas>
+    <div id="overlay"><div class="card">
+      <h2 id="result-title">VICTORY</h2>
+      <p id="result-sub"></p>
+      <button id="restart">↻ Play again</button>
+    </div></div>
+  </div>
+  <aside>
+    <h2>Command</h2>
+    <button data-train="scv">Train SCV <small>50 minerals · Command Center · key A</small></button>
+    <button data-train="marine">Train Marine <small>50 minerals · needs Barracks</small></button>
+    <button data-build="depot">Build Supply Depot <small>100 minerals · +8 supply · key S</small></button>
+    <button data-build="barracks">Build Barracks <small>150 minerals · unlocks Marines · key B</small></button>
+    <h2>Minimap</h2>
+    <canvas id="minimap" width="248" height="150"></canvas>
+    <h2>How to play</h2>
+    <div id="help">
+      Drag to select · <kbd>Right-click</kbd> mineral = harvest, enemy = attack, ground = move.<br/>
+      Win: destroy the red <b>Enemy Hive</b> top-right. Lose: lose your blue Command Center.<br/>
+      Enemy waves grow over time — expand supply, mass Marines, strike before you're overrun.
+    </div>
+  </aside>
+</div>
+<script type="module" src="./game.js"></script>
+</body>
+</html>
