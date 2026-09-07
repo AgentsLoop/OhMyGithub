@@ -19,8 +19,12 @@ The prompt must:
   behavior that the request needs. Do not allow a flatter substitute.
 - Require research before coding. For visual work, search real screenshots,
   footage, and interface views, select at least six high-signal anchors, and
-  record their URLs and purpose. For other work, collect primary docs,
-  representative data, comparable products, or executable acceptance fixtures.
+  download all screenshots or images selected or used as visual anchors into
+  the project under a clearly named reference-assets directory. Inspect the
+  downloaded files directly and record each source URL only as provenance
+  beside the local filename; do not substitute Markdown image links for the
+  downloaded assets. For other work, collect primary docs, representative
+  data, comparable products, or executable acceptance fixtures.
 - Require vision and direct inspection of the actual artifact whenever visual
   judgment matters. Compare renders, captures, documents, diagrams, scenes,
   or interfaces side by side or with blind A/B review whenever practical.
@@ -44,8 +48,9 @@ The prompt must:
   recovery behavior. Let the lead choose the tools and implementation.
 - Format the issue body as GitHub-flavored Markdown. Use concise headings for
   the title, objective, quality bar, execution, verification, and progress;
-  use bullets for requirements and Markdown links for references. Do not put
-  routing metadata in the body.
+  use bullets for requirements and local filenames plus plain source URLs for
+  reference provenance. Do not turn reference screenshots into Markdown image
+  links, and do not put routing metadata in the body.
 
 ## Prompt shape
 
@@ -59,8 +64,8 @@ Deliver [project outcome] to production quality for [intended users]. Preserve
 
 ## Quality bar
 
-- Research authoritative references and record selected anchors or acceptance
-  fixtures before coding.
+- Research authoritative references, download selected visual anchors into a
+  local reference-assets directory, and record their provenance before coding.
 - Inspect the real artifact with the relevant tools and compare it with the
   acceptance bar.
 
