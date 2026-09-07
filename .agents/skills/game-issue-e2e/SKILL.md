@@ -18,6 +18,8 @@ Locate `Issue e2e` (or this skill's invocation):
   middle, combine the text on both sides, reason about the desired result, and
   rewrite a concise prompt in your own words; do not copy it verbatim. Read
   `references/gauntlet-prompt-rubric.md` and apply its prompt-quality criteria.
+  The resulting issue prompt must remain short while carrying the full loop
+  contract from that rubric.
   This reuses the rubric only; do not execute the full Gauntlet Loop during
   issue-e2e kickoff.
 
