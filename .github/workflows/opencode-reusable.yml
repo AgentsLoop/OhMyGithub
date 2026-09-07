@@ -1447,6 +1447,37 @@ jobs:
           echo "Vercel deployment did not serve the mock project: $VERCEL_URL" >&2
           exit 1
 
+      - name: Post mock OpenCode completion report
+        if: env.TEST_REQUEST == 'true' && env.APP_URL != ''
+        uses: actions/github-script@v7
+        env:
+          APP_URL: ${{ env.APP_URL }}
+          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
+          VERCEL_URL: ${{ steps.vercel_deploy.outputs.url }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
+            await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER,
+              repo: process.env.TARGET_REPO,
+              issue_number: number,
+              body: [
+                '✅ **OpenCode completion report**',
+                '',
+                'The mock OpenCode project completed the requested workflow checks.',
+                '',
+                `Public app: [${process.env.APP_URL}](${process.env.APP_URL})`,
+                `Vercel deployment: [${process.env.VERCEL_URL}](${process.env.VERCEL_URL})`,
+                `Final commit: [${process.env.FINAL_COMMIT}](${commitUrl})`,
+                `Actions run: [${process.env.RUN_URL}](${process.env.RUN_URL})`,
+                '',
+                'Generation was replaced by the committed fixture; validation, delivery, deployment, and reporting were executed by the real workflow.'
+              ].join('\n')
+            });
+
       - name: Create OpenCode logs release
         if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         id: opencode_release
