@@ -20,6 +20,9 @@ Preserve the request and remove only invocation syntax and routing metadata.
 If request text surrounds the invocation, merge it before applying the
 canonical guide.
 
+Repeat the exact issue title as the first Markdown heading in the issue body.
+Keep the title as issue metadata too; the body must not omit or paraphrase it.
+
 Do not execute the full Gauntlet Loop during issue-e2e kickoff. The prompt
 should instruct the worker to perform the sustained project work after the
 issue starts.
@@ -32,7 +35,7 @@ debugging worktree. This suffix is routing metadata, not prompt text. On `main`,
 omit it.
 
 Resolve the target repository before creating the issue. An explicitly supplied
-repository wins. With `#self`, use the supplied or current repository on
+repository wins. With `#main`, use the supplied or current repository on
 `main`; otherwise, on `main` without a supplied repository, use
 `AgentsLoop/PlayGround` explicitly. On another branch, use the current
 repository. Never infer the default `main` repository from `git remote`.
