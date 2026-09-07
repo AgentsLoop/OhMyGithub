@@ -51,8 +51,14 @@ store page and playable deployment without credentials. The test path does not k
 temporary worker alive for five hours.
 The issue must still receive the normal live-progress comment and final report,
 plus the completion report comment,
-and the run must publish a logs release containing the synthetic OpenCode
+including the collapsible agent retrospective with its skill recommendation
+section, and the run must publish a logs release containing the synthetic OpenCode
 transcript plus the real validation and delivery logs.
+
+The retrospective test path must also verify that prior prompt-alignment notes
+are parsed from the hidden structured metadata in earlier comments, deduplicated,
+bounded, and appended to the next generated `Agents.md` without treating the
+notes as executable instructions.
 
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when

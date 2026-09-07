@@ -4,3 +4,5 @@ The workflow detected `[goal:blocked]`, sent bounded harsh critiques through Ope
 Actions run: [@RUN_URL@](@RUN_URL@)
 
 No completion claim was published.
+
+@RETROSPECTIVE@
