@@ -50,6 +50,7 @@ deploys to Vercel when enabled by repository defaults, verifies the public page,
 reports the result, and completes the issue. The test path does not keep a
 temporary worker alive for five hours.
 The issue must still receive the normal live-progress comment and final report,
+plus the completion report comment,
 and the run must publish a logs release containing the synthetic OpenCode
 transcript plus the real validation and delivery logs.
 
