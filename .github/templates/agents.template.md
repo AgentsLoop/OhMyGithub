@@ -21,7 +21,16 @@ Before implementation:
 4. Identify and install every npm package, CLI, browser tool, vision or image
    tool, test runner, asset tool, and deployment tool needed for the project.
    Prefer reproducible project-local dependencies and update the lockfile.
-5. Verify that every installed skill and tool works before relying on it.
+5. Validate every installed skill and tool with a real no-credential smoke
+   test before relying on it. Confirm that it loads, runs, and produces the
+   expected useful result without API keys, secrets, login, paid access,
+   manual approval, or another blocking requirement.
+6. If a skill fails validation or requires a blocking dependency, do not build
+   the project around it. Search for an alternative with `npx skills find`,
+   review and install the replacement, then repeat the no-credential smoke
+   test. Iterate until each required capability has a working unblocked path;
+   if none exists, continue with the best direct implementation and record the
+   limitation in the progress page.
 
 Make reasonable decisions autonomously. Do not wait for approval, clarification,
 or confirmation. Research, implement, inspect the real artifact, verify the
