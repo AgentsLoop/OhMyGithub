@@ -407,35 +407,32 @@ jobs:
             printf 'AGENTSWEB_COMMAND=%q\n' "$SSH_COMMAND"
           } | tee "$SSH_DIR/access.env" >> "$GITHUB_ENV"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
+          if [[ "$SSH_ONLY_REQUEST" == 'true' ]]; then
+            body=$'🔐 **SSH-only debugging session is ready.**\n\n'
+            body+="Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"$'\n'
+            body+="Host: \`${SSH_HOST}:${SSH_PORT}\`"$'\n\n'
+            body+=$'Connect while the job is active:\n\n```sh\n'
+            body+="${SSH_COMMAND}"$'\n```\n\n'
+            body+=$'This run skips OpenCode and holds the runner for five hours for interactive debugging.'
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${TRIGGER_ISSUE_NUMBER}/comments" \
+              --method POST --field body="$body" >/dev/null
+          fi
 
       - name: Post SSH-only access details
         id: ssh_access_comment
-        if: env.SSH_ONLY_REQUEST == 'true'
+        if: env.SSH_ONLY_REQUEST == 'true' && env.AGENTSWEB_SSH_ENABLED != 'true'
         uses: actions/github-script@v7
         env:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
-          SSH_ACCESS_FILE: ${{ env.SSH_DIR }}/access.env
         with:
           github-token: ${{ github.token }}
           script: |
-            const fs = require('node:fs');
-            const access = Object.fromEntries(fs.readFileSync(process.env.SSH_ACCESS_FILE, 'utf8').trim().split('\n').map((line) => {
-              const separator = line.indexOf('=');
-              return [line.slice(0, separator), line.slice(separator + 1)];
-            }));
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = process.env.AGENTSWEB_SSH_ENABLED === 'true'
-              ? [
-                  '🔐 **SSH-only debugging session is ready.**', '',
-                  `Run: ${run}`, `Host: \`${access.AGENTSWEB_HOST}:${access.AGENTSWEB_PORT}\``, '',
-                  'Connect while the job is active:', '', '```sh', access.AGENTSWEB_COMMAND, '```', '',
-                  'This run skips OpenCode and holds the runner for five hours for interactive debugging.'
-                ].join('\n')
-              : [
-                  '❌ **SSH-only debugging session could not start.**', '',
-                  `Run: ${run}`, 'The `AGENTSWEB_SSH_PUBLIC_KEY` secret is not configured.'
-                ].join('\n');
+            const body = [
+              '❌ **SSH-only debugging session could not start.**', '',
+              `Run: ${run}`, 'The `AGENTSWEB_SSH_PUBLIC_KEY` secret is not configured.'
+            ].join('\n');
             const comment = await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, body
