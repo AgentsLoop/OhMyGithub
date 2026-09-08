@@ -38,9 +38,9 @@ export async function prepare(env = process.env, fetcher = fetch) {
   try {
     const oidcResponse = await fetcher(oidcUrl, {
       headers: { Authorization: `Bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
-      signal: AbortSignal.timeout(30000), redirect: 'error',
+      signal: AbortSignal.timeout(30000),
     });
-    if (!oidcResponse.ok) throw new Error('Could not obtain workflow identity');
+    if (!oidcResponse.ok) throw new Error(`Could not obtain workflow identity (HTTP ${oidcResponse.status})`);
     const { value: token } = await oidcResponse.json();
     if (typeof token !== 'string' || !token) throw new Error('Missing workflow identity');
     const response = await fetcher(endpoint, {
@@ -59,6 +59,9 @@ export async function prepare(env = process.env, fetcher = fetch) {
     const outputs = validateOutputs(await response.json(), event.issue.number);
     appendFileSync(env.GITHUB_OUTPUT, outputText(outputs));
   } catch (error) {
+    const detail = String(error.message || 'Preparation failed').replace(/[\r\n\u0000-\u001f\u007f]/g, ' ').slice(0, 300);
+    const code = typeof error.cause?.code === 'string' ? error.cause.code : '';
+    console.error(`Preparation error: ${detail}${code ? ` (${code})` : ''}`);
     // Use fixed text: never reflect endpoint responses, issue text, or identity tokens.
     const body = `OpenCode preparation failed. Check authorization, App approval, and the selected branch. See [the preparation run](https://github.com/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}) for details.`;
     const api = env.GITHUB_API_URL || 'https://api.github.com';

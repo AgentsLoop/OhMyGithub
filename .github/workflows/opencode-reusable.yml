@@ -50,6 +50,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      actions: read
     env:
       SSH_NAME: opencode-issue-${{ inputs.issue_number }}-${{ github.run_id }}-ssh
       SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
