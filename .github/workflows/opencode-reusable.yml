@@ -1039,6 +1039,7 @@ jobs:
             AGENTSWEB_SSH_READY="${{ steps.agentsweb.outcome == 'success' }}" \
             SSH_COMMAND="$AGENTSWEB_COMMAND" \
             SSH_HOST="$AGENTSWEB_HOST" \
+            SSH_PORT="$AGENTSWEB_PORT" \
             RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
