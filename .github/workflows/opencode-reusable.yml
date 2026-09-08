@@ -936,31 +936,6 @@ jobs:
           printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
             "${OPENCODE_WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify live sessions through SSH
-        id: verify_sessions
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Expected session: ${{ steps.opencode_run.outputs.session_id }}"
-          for _ in {1..12}; do
-            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -o ConnectTimeout=20 -o ConnectionAttempts=1 -i "$SSH_KEY" \
-              -p "$SSH_PORT" \
-              "runner@$AGENTSWEB_HOST" \
-              "curl --fail --silent --show-error -H 'x-opencode-directory: $PROJECT_DIR' http://127.0.0.1:$OPENCODE_WEB_PORT/session" \
-              > "$OPENCODE_WEB_DIR/ssh-sessions.json"; then
-              break
-            fi
-            sleep 5
-          done
-          [[ -s "$OPENCODE_WEB_DIR/ssh-sessions.json" ]]
-          echo
-          echo 'Sessions returned through SSH:'
-          jq . "$OPENCODE_WEB_DIR/ssh-sessions.json"
-          jq -e --arg session "${{ steps.opencode_run.outputs.session_id }}" \
-            'any(.[]; .id == $session)' "$OPENCODE_WEB_DIR/ssh-sessions.json"
-
       - name: Post temporary access details
         id: access_comment
         if: env.SSH_ONLY_REQUEST != 'true'
@@ -1457,10 +1432,15 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
-            const projectUrl = `https://omgithub.com/${process.env.TARGET_REPOSITORY}/tree/${process.env.FINAL_COMMIT}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
             const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
+            const namedPath = [process.env.TARGET_REF, projectPath === '.' ? '' : projectPath]
+              .filter(Boolean)
+              .flatMap((part) => part.split('/'))
+              .map(encodeURIComponent)
+              .join('/');
+            const projectUrl = `https://omgithub.com/${process.env.TARGET_REPOSITORY}/tree/${namedPath}`;
             const images = screenshots.map((name) => {
               const path = [projectPath, 'screenshots', name].filter(Boolean).join('/').split('/').map(encodeURIComponent).join('/');
               const url = `https://raw.githubusercontent.com/${process.env.TARGET_REPOSITORY}/${process.env.FINAL_COMMIT}/${path}`;

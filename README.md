@@ -102,7 +102,7 @@ the repository default branch remains the target.
 - 🌐 Starts the app and checks the local runtime.
 - 🔗 Creates a temporary public preview URL when verification passes.
 - 🔀 Creates and pushes an `opencode/<run-id>` branch.
-- 🕹️ Adds an `Open Project` link backed by the full commit SHA.
+- 🕹️ Adds an `Open Project` link backed by the repository path, with full-commit links retained for compatibility.
 - 💬 Posts progress and access details back to the issue.
 - 🧹 Cleans up temporary tunnels and runner processes.
 

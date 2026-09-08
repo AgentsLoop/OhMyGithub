@@ -102,7 +102,7 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    by OpenCode, then pushes the immutable branch in YAML.
 11. Gives the verified public URL back to the worker, requests committed final
     browser screenshots, and appends immutable screenshot URLs with the game,
-    commit, and Open Project links to the oldest triggering-issue comment containing the
+    repository path, compatibility commit, and Open Project links to the oldest triggering-issue comment containing the
     `🟡 **OpenCode progress (live)**` marker. If screenshots are missing, it
     sends up to two follow-up prompts to the same OpenCode session before
     continuing delivery with a warning.
@@ -121,11 +121,12 @@ prompts, Git delivery, immutable project publication, release/report generation,
 complete label are skipped. The temporary access session still sleeps for five
 hours before cleanup.
 
-After the branch is pushed, the completion report links the full commit SHA to
-OmGithub. Opening that URL anonymously downloads the public commit, discovers
-root `index.html` or `dist/index.html` plus final screenshots, and creates the
-store page and playable deployment. There is no separate publishing credential
-or upload step.
+After the branch is pushed, the completion report links the repository path to
+OmGithub. Opening that URL anonymously resolves the named branch and optional
+project directory, discovers root `index.html` or `dist/index.html` plus final
+screenshots, and creates the store page and playable deployment. Keep the full
+commit-SHA URL working for compatibility. There is no separate publishing
+credential or upload step.
 See [OmGithub publishing](omgithub.md).
 
 The OmGithub issue workspace polls issue comments every eight seconds. Its
