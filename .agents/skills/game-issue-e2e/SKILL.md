@@ -23,6 +23,12 @@ canonical guide.
 Repeat the exact issue title as the first Markdown heading in the issue body.
 Keep the title as issue metadata too; the body must not omit or paraphrase it.
 
+Write the issue body to a temporary Markdown file and pass it with
+`gh issue create --body-file <path>` or `gh issue edit --body-file <path>`.
+Do not interpolate Markdown containing backticks, `$`, `$(...)`, or backslashes
+inside a shell double-quoted argument. Verify the saved body with
+`gh issue view <number> --json title,body,labels` before checking the run.
+
 Do not execute the full Gauntlet Loop during issue-e2e kickoff. The prompt
 should instruct the worker to perform the sustained project work after the
 issue starts.
