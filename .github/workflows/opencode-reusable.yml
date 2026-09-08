@@ -414,8 +414,9 @@ jobs:
             body+=$'Connect while the job is active:\n\n```sh\n'
             body+="${SSH_COMMAND}"$'\n```\n\n'
             body+=$'This run skips OpenCode and holds the runner for five hours for interactive debugging.'
-            gh api "repos/${GITHUB_REPOSITORY}/issues/${TRIGGER_ISSUE_NUMBER}/comments" \
-              --method POST --field body="$body" >/dev/null
+            jq -n --arg body "$body" '{body: $body}' \
+              | gh api "repos/${TARGET_REPOSITORY}/issues/${TRIGGER_ISSUE_NUMBER}/comments" \
+                --method POST --input - >/dev/null
           fi
 
       - name: Post SSH-only access details
@@ -441,7 +442,7 @@ jobs:
             if (process.env.AGENTSWEB_SSH_ENABLED !== 'true') core.setFailed('AGENTSWEB SSH is required for the ssh label.');
 
       - name: Hold SSH-only debugging session
-        if: env.SSH_ONLY_REQUEST == 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST == 'true' && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success'
         shell: bash
         run: sleep 18000
 
