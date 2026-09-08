@@ -1,5 +1,71 @@
 # Testing and verification
 
+## Test the `-rc` repository at a selected commit
+
+Use the release-candidate repository when you need to test the workflow against
+an older or experimental commit without changing the source repository.
+
+Set the repository and commit variables first:
+
+```sh
+repo=AgentsLoop/OhMyGithub-rc
+commit=<full-commit-sha>
+branch=rc-<short-commit-sha>
+```
+
+Create a branch from the exact commit and make it the GitHub default branch:
+
+```sh
+git push "https://github.com/$repo.git" "${commit}:refs/heads/$branch"
+gh repo edit "$repo" --default-branch "$branch"
+gh repo view "$repo" --json defaultBranchRef
+```
+
+Keep the existing `main` branch and older test branches. Use a new branch name
+for each commit so the tested revision remains clear and recoverable. The
+workflow checks out the GitHub default branch when the issue title has no
+`branch:` suffix.
+
+Create an SSH test issue with the required labels:
+
+```sh
+gh issue create --repo "$repo" \
+  --title "Check SSH connectivity on $branch" \
+  --body $'# Check SSH connectivity on <branch>\n\nVerify the temporary AgentsWeb SSH session, authentication, tunnel, and remote response. Record concrete evidence without exposing secrets.' \
+  --label OpenCode --label Goal --label ssh
+```
+
+The `OpenCode` label triggers one App-dispatched `workflow_dispatch` run. The
+`Goal` label selects goal mode. The `ssh` label requests an SSH-only check in
+the reusable workflow. Verify the issue labels and the selected checkout:
+
+```sh
+gh issue view <issue-number> --repo "$repo" --json labels
+gh run list --repo "$repo" --workflow opencode.yml --limit 5 \
+  --json databaseId,displayTitle,event,status,url,headBranch
+```
+
+Confirm `event` is `workflow_dispatch` and `headBranch` is the selected branch.
+Do not treat an issue event, comment, or edit as a successful dispatch.
+
+Discover and follow the temporary SSH connection with the repository helper:
+
+```sh
+bash scripts/ssh-run-log.sh <run-id> --repo "$repo"
+```
+
+Run the helper while the Actions job is active. It reports no command after the
+worker closes the tunnel. If it reports no command at the start, inspect the
+run steps and logs before changing the SSH secret. `AGENTSWEB_SSH_ENABLED:
+true` proves that GitHub received the public-key secret; it does not prove that
+the tunnel or SSH service started.
+
+After testing, restore the normal default branch if required:
+
+```sh
+gh repo edit "$repo" --default-branch main
+```
+
 Project acceptance testing is live production testing. Manually create a real
 GitHub issue with the required labels and prompt, then verify the resulting
 workflow dispatch, exactly one runner/session, and the completed production
