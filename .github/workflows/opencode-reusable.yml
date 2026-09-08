@@ -395,10 +395,17 @@ jobs:
             > "$SSH_DIR/tunnel.log" 2>&1 &
           echo $! > "$SSH_DIR/tunnel.pid"
           for _ in {1..45}; do
-            grep -q 'agentsweb.space' "$SSH_DIR/tunnel.log" && break
+            grep -q '^ssh://' "$SSH_DIR/tunnel.log" && break
+            if ! kill -0 "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null; then
+              break
+            fi
             sleep 1
           done
-          grep -q 'agentsweb.space' "$SSH_DIR/tunnel.log"
+          if ! grep -q '^ssh://' "$SSH_DIR/tunnel.log"; then
+            echo 'AgentsWeb tunnel did not register.' >&2
+            sed -n '1,160p' "$SSH_DIR/tunnel.log" >&2
+            exit 1
+          fi
           SSH_HOST="${SSH_NAME}.agentsweb.space"
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           {
