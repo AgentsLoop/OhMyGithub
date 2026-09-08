@@ -71,6 +71,7 @@ jobs:
       GOAL_REQUEST: ${{ contains(inputs.labels_json, '"Goal"') }}
       RALPH_REQUEST: ${{ contains(inputs.labels_json, '"ralph"') }}
       OMO_REQUEST: ${{ contains(inputs.labels_json, '"omo"') }}
+      SSH_ONLY_REQUEST: ${{ contains(inputs.labels_json, '"ssh"') }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
       - name: Publish task link
@@ -253,6 +254,7 @@ jobs:
               { name: 'test', color: '1D76DB', description: 'Run the full workflow with a mock OpenCode-generated project' },
               { name: 'mac', color: 'B60205', description: 'Run OpenCode on the macos-latest GitHub-hosted runner' },
               { name: 'linux', color: '1D76DB', description: 'Run OpenCode on the ubuntu-latest GitHub-hosted runner' },
+              { name: 'ssh', color: '5319E7', description: 'Start an SSH-only debugging session without OpenCode' },
               ...models.map((model) => ({
                 name: `model/opencode/${model}`,
                 color: '5319E7',
@@ -401,9 +403,46 @@ jobs:
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
 
+      - name: Post SSH-only access details
+        id: ssh_access_comment
+        if: env.SSH_ONLY_REQUEST == 'true'
+        uses: actions/github-script@v7
+        env:
+          AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
+          SSH_COMMAND: ${{ steps.agentsweb.outputs.command }}
+          SSH_HOST: ${{ steps.agentsweb.outputs.host }}
+          SSH_PORT: ${{ steps.agentsweb.outputs.port }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = process.env.AGENTSWEB_SSH_ENABLED === 'true'
+              ? [
+                  '🔐 **SSH-only debugging session is ready.**', '',
+                  `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
+                  'Connect while the job is active:', '', '```sh', process.env.SSH_COMMAND, '```', '',
+                  'This run skips OpenCode and holds the runner for five hours for interactive debugging.'
+                ].join('\n')
+              : [
+                  '❌ **SSH-only debugging session could not start.**', '',
+                  `Run: ${run}`, 'The `AGENTSWEB_SSH_PUBLIC_KEY` secret is not configured.'
+                ].join('\n');
+            const comment = await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number, body
+            });
+            core.setOutput('comment_id', comment.data.id);
+            if (process.env.AGENTSWEB_SSH_ENABLED !== 'true') core.setFailed('AGENTSWEB SSH is required for the ssh label.');
+
+      - name: Hold SSH-only debugging session
+        if: env.SSH_ONLY_REQUEST == 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
+        shell: bash
+        run: sleep 18000
+
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
-        if: env.TEST_REQUEST != 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -622,12 +661,14 @@ jobs:
           printf 'url=%s\nproject_url=%s\n' "$WEB_URL" "$PROJECT_URL" >> "$GITHUB_OUTPUT"
 
       - name: Configure Git identity
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           git config user.name 'opencode[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
       - name: Create OpenCode branch
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -697,7 +738,7 @@ jobs:
 
       - name: Resolve OpenCode model and skill labels
         id: opencode_labels
-        if: env.TEST_REQUEST != 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -726,7 +767,7 @@ jobs:
 
       - name: Run OpenCode and locate its web session
         id: opencode_run
-        if: env.TEST_REQUEST != 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
@@ -800,7 +841,7 @@ jobs:
 
       - name: Verify live sessions through SSH
         id: verify_sessions
-        if: env.TEST_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -825,6 +866,7 @@ jobs:
 
       - name: Post temporary access details
         id: access_comment
+        if: env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
         env:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
@@ -876,6 +918,7 @@ jobs:
 
       - name: Start live OpenCode response comment
         id: response_comment
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -914,7 +957,7 @@ jobs:
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
 
       - name: Verify Ralph completion promise
-        if: env.TEST_REQUEST != 'true' && env.RALPH_REQUEST == 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.RALPH_REQUEST == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
@@ -945,7 +988,7 @@ jobs:
 
       - name: Fork OpenCode session for verification
         id: verification_fork
-        if: env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -974,7 +1017,7 @@ jobs:
           echo "Verification fork: $VERIFICATION_SESSION_ID"
 
       - name: Mark issue validating
-        if: env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -990,7 +1033,7 @@ jobs:
             });
 
       - name: Verify app with forked OpenCode session
-        if: env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -1007,7 +1050,7 @@ jobs:
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
 
       - name: Verify browser entrypoint exists
-        if: env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -1042,7 +1085,7 @@ jobs:
           exit 1
 
       - name: Expose verified app
-        if: env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: app_tunnel
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
@@ -1151,7 +1194,7 @@ jobs:
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
 
       - name: Publish worker completion report
-        if: env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -1170,7 +1213,7 @@ jobs:
           touch "$OPENCODE_WEB_DIR/response-comment.done"
 
       - name: Request and verify final screenshots
-        if: env.TEST_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         id: final_evidence
         shell: bash
         run: |
@@ -1213,7 +1256,7 @@ jobs:
           printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
 
       - name: Push project branch
-        if: env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true'
+        if: env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         id: delivery
         shell: bash
         run: |
@@ -1238,7 +1281,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create OpenCode logs release
-        if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         id: opencode_release
         shell: bash
         run: |
@@ -1289,7 +1332,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Post final game report
-        if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         uses: actions/github-script@v7
         env:
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
@@ -1338,7 +1381,7 @@ jobs:
             });
 
       - name: Mark issue complete
-        if: success() && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: success() && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -1402,12 +1445,12 @@ jobs:
             });
 
       - name: Keep temporary access available for 5 hours
-        if: success() && env.TEST_REQUEST != 'true'
+        if: success() && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: sleep 18000
 
       - name: Append SSH session closed
-        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success' && steps.access_comment.outputs.comment_id != ''
+        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success' && (steps.access_comment.outputs.comment_id != '' || steps.ssh_access_comment.outputs.comment_id != '')
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
