@@ -67,5 +67,6 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
 
    An `issues` event or wrong branch is routing failure, not validation.
 4. Poll only until the initial Web UI URL appears; return issue, run, and session
-   links immediately. Do not `gh run watch` to completion or cancel/rerun an
-   active run without checking its current step.
+   links immediately. Also extract the SSH command from the temporary access
+   comment and return it with the links. Do not `gh run watch` to completion or
+   cancel/rerun an active run without checking its current step.
