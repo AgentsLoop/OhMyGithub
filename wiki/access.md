@@ -21,8 +21,9 @@ ssh -i ~/.ssh/aiplay-agentsweb -p <port> runner@<run-name>.agentsweb.space
 
 The command is valid only while that Actions job is running. When setup
 succeeds, the workflow verifies the same tunnel and removes the runner SSH
-authorization and tunnel during cleanup. A tunnel failure is non-fatal, so no
-SSH access comment is posted in that case.
+authorization and tunnel during cleanup. The issue access comment includes the
+SSH URL together with the OpenCode Web URL. If tunnel setup fails, the comment
+reports `SSH URL: not registered`.
 
 If the command stops working, check the Actions run first. A completed or
 cancelled run has already closed the tunnel.

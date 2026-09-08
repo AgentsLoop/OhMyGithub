@@ -406,17 +406,20 @@ jobs:
             sed -n '1,160p' "$SSH_DIR/tunnel.log" >&2
             exit 1
           fi
+          SSH_TUNNEL_URL="$(sed -n 's#^\(ssh://[^[:space:]]*\).*#\1#p' "$SSH_DIR/tunnel.log" | head -n 1)"
           SSH_HOST="${SSH_NAME}.agentsweb.space"
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           {
             printf 'AGENTSWEB_HOST=%q\n' "$SSH_HOST"
             printf 'AGENTSWEB_PORT=%q\n' "$SSH_PORT"
             printf 'AGENTSWEB_COMMAND=%q\n' "$SSH_COMMAND"
+            printf 'AGENTSWEB_TUNNEL_URL=%q\n' "$SSH_TUNNEL_URL"
           } | tee "$SSH_DIR/access.env" >> "$GITHUB_ENV"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
           if [[ "$SSH_ONLY_REQUEST" == 'true' ]]; then
             body=$'🔐 **SSH-only debugging session is ready.**\n\n'
             body+="Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"$'\n'
+            body+="SSH URL: \`${SSH_TUNNEL_URL}\`"$'\n'
             body+="Host: \`${SSH_HOST}:${SSH_PORT}\`"$'\n\n'
             body+=$'Connect while the job is active:\n\n```sh\n'
             body+="${SSH_COMMAND}"$'\n```\n\n'
@@ -886,6 +889,7 @@ jobs:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
           AGENTSWEB_SSH_READY: ${{ steps.agentsweb.outcome == 'success' }}
           SSH_ACCESS_FILE: ${{ env.SSH_DIR }}/access.env
+          SSH_TUNNEL_LOG: ${{ env.SSH_DIR }}/tunnel.log
           OPENCODE_WEB_URL: ${{ env.TEST_REQUEST == 'true' && format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) || steps.opencode_run.outputs.session_url }}
           PROJECT_FILE_URL: ${{ env.TEST_REQUEST == 'true' && format('https://github.com/{0}/tree/{1}/workflow-test-project', github.repository, env.BRANCH_NAME) || steps.opencode_web.outputs.project_url }}
           PROGRESS_COMMENT_TEMPLATE: ${{ env.RUNTIME_DIR }}/.github/scripts/opencode-progress-comment-template.md
@@ -895,10 +899,13 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const fs = require('node:fs');
-            const access = Object.fromEntries(fs.readFileSync(process.env.SSH_ACCESS_FILE, 'utf8').trim().split('\n').map((line) => {
+            const accessText = fs.existsSync(process.env.SSH_ACCESS_FILE) ? fs.readFileSync(process.env.SSH_ACCESS_FILE, 'utf8').trim() : '';
+            const access = Object.fromEntries(accessText ? accessText.split('\n').map((line) => {
               const separator = line.indexOf('=');
               return [line.slice(0, separator), line.slice(separator + 1)];
-            }));
+            }) : []);
+            const tunnelLog = fs.existsSync(process.env.SSH_TUNNEL_LOG) ? fs.readFileSync(process.env.SSH_TUNNEL_LOG, 'utf8') : '';
+            const tunnelUrl = access.AGENTSWEB_TUNNEL_URL || (tunnelLog.match(/^ssh:\/\/[^\s]+/m) || [])[0] || 'not registered';
             const { renderProgressComment } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -910,11 +917,13 @@ jobs:
             const sshSection = process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true'
               ? [
                   '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
-                  `Run: ${run}`, `Host: \`${access.AGENTSWEB_HOST}:${access.AGENTSWEB_PORT}\``, '',
+                  `Run: ${run}`, `SSH URL: \`${tunnelUrl}\``, `Host: \`${access.AGENTSWEB_HOST}:${access.AGENTSWEB_PORT}\``, '',
                   'Run this command while the job is active:', '',
                   '```sh', access.AGENTSWEB_COMMAND, '```'
                 ].join('\n')
-              : '';
+              : (process.env.AGENTSWEB_SSH_ENABLED === 'true'
+                ? ['⚠️ **AgentsWeb SSH tunnel setup failed.**', '', `Run: ${run}`, `SSH URL: \`${tunnelUrl}\``].join('\n')
+                : '');
             const body = renderProgressComment({
               SSH_SECTION: sshSection,
               UPDATED: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
