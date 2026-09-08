@@ -7,6 +7,8 @@ description: Find newly created browser games, especially Three.js and GPT-6 Ast
 
 Use this skill when the user asks to find new browser games, Three.js games, or games made with GPT-6 Astra.
 
+The skill registry is [games.json](games.json). Treat it as a durable append-only discovery list. Do not add a repository until verification accepts it.
+
 ## Define the date
 
 Use UTC for repository timestamps. Treat “today” as the current UTC date unless the user gives another date. Separate these meanings:
@@ -24,10 +26,10 @@ Use UTC for repository timestamps. Treat “today” as the current UTC date unl
    - `webgpu game in:description`
    - `"GPT-6 Astra" in:description`
    - `"GPT-Astra" in:description`
-2. Run `scripts/verify_github_games.py` on the result file. Keep only repositories with a non-empty tree and source evidence for Three.js.
+2. Run `scripts/verify_github_games.py` on the result file. Keep only repositories with a non-empty tree and source evidence for Three.js. The verifier automatically upserts accepted records into `games.json`.
 3. Inspect the README, package manifest, and a small set of source files. Require one of these markers: `THREE.`, `THREE.WebGLRenderer`, `from 'three'`, `three.module.js`, or `@react-three/`.
 4. Classify a project as a game only when its description, README, or source has game evidence such as a player, level, enemy, racer, shooter, physics game, or playable controls. Do not count museums, dashboards, prompt packs, catalogs, or generic Three.js demos as games.
-5. For ASTRA attribution, prefer an explicit repository description, README, or creator statement. Mark catalog-only attribution as lower confidence.
+5. For ASTRA, Opus, and Fable attribution, record the name only when the repository description or README mentions it. Do not infer model attribution from a repository name alone. Mark catalog-only attribution as lower confidence.
 
 ## Use these secondary searches
 
@@ -47,13 +49,30 @@ Do not rotate accounts to evade GitHub rate limits. Check the limit, stop or wai
 
 ## Report results
 
-For each accepted result, report the repository link, UTC creation time, game type, Three.js evidence, ASTRA evidence, and confidence. Report exclusions briefly when they explain a false positive, such as empty, Canvas 2D, Godot, catalog-only, or non-game.
+For each accepted result, report the repository link, UTC creation time, game type, star count, content language, programming language, engine, model attribution, Three.js evidence, and confidence. Report exclusions briefly when they explain a false positive, such as empty, Canvas 2D, Godot, catalog-only, or non-game.
+
+## Registry fields
+
+Write one object per accepted repository. Use these fields:
+
+- `date`: UTC repository creation date.
+- `repo`: `OWNER/REPO`.
+- `star_count`: GitHub star count at discovery time.
+- `language`: `Chinese`, `English`, `Other`, or `Unknown` for repository text.
+- `programming_language`: GitHub's primary language.
+- `engine`: canonical engine such as `Three.js`, `PlayCanvas`, `Godot`, `Unity`, `Unreal Engine`, `Babylon.js`, `Phaser`, or `Unknown`.
+- `created_with`: optional list containing only `Astra`, `Opus`, or `Fable` when evidence exists.
+- `evidence`: sampled paths and matching markers.
+
+Use `--no-save` only for a dry run. Normal verification must update the registry automatically.
 
 ## Helper scripts
 
 ```text
+python3 scripts/discover_games.py --date 2026-09-08 --output verified.json
 python3 scripts/search_github_games.py --date 2026-09-08 --output candidates.json
 python3 scripts/verify_github_games.py --input candidates.json --output verified.json
+python3 scripts/verify_github_games.py --repo OWNER/REPO --registry games.json
 python3 scripts/gh_archive_candidates.py --date 2026-09-08 --hour 3
 ```
 

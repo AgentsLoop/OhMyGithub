@@ -35,7 +35,10 @@ def run_search(query: str, date: str, limit: int, qualifier: str) -> tuple[list[
         "--json",
         "fullName,createdAt,pushedAt,description,url,language,size",
     ]
-    completed = subprocess.run(command, text=True, capture_output=True, check=False)
+    try:
+        completed = subprocess.run(command, text=True, capture_output=True, check=False, timeout=30)
+    except subprocess.TimeoutExpired:
+        return [], "gh search timed out after 30 seconds"
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout).strip()
         return [], detail
