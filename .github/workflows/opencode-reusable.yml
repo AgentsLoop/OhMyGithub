@@ -357,8 +357,7 @@ jobs:
           # makes every new repository's first OMG run contend for port 32001.
           # GITHUB_RUN_ID is globally unique and distributes runs across the
           # broker's 32000-32999 public-port range.
-          SSH_PORT=$((32000 + GITHUB_RUN_ID % 1000))
-          echo "SSH_PORT=$SSH_PORT" >> "$GITHUB_ENV"
+          REQUESTED_SSH_PORT=$((32000 + GITHUB_RUN_ID % 1000))
           if [[ "$RUNNER_OS" == 'Linux' ]]; then
             sudo apt-get update
             sudo apt-get install -y openssh-server tmux
@@ -391,7 +390,7 @@ jobs:
           is_listening
           nohup env PYTHONPATH="$GITHUB_WORKSPACE/.agentsweb" \
             python3 -m lolgames_tunnel client 127.0.0.1:2222 \
-            --server agentsweb.space --name "$SSH_NAME" --public-port "$SSH_PORT" \
+            --server agentsweb.space --name "$SSH_NAME" --public-port "$REQUESTED_SSH_PORT" \
             > "$SSH_DIR/tunnel.log" 2>&1 &
           echo $! > "$SSH_DIR/tunnel.pid"
           for _ in {1..45}; do
@@ -406,24 +405,54 @@ jobs:
             sed -n '1,160p' "$SSH_DIR/tunnel.log" >&2
             exit 1
           fi
-          SSH_HOST="${SSH_NAME}.agentsweb.space"
+          endpoint="$(sed -nE 's#^ssh://([^:[:space:]]+):([0-9]+).*$#\1 \2#p' "$SSH_DIR/tunnel.log" | head -n 1)"
+          if [[ -z "$endpoint" ]]; then
+            echo 'AgentsWeb tunnel registration did not contain a usable SSH endpoint.' >&2
+            sed -n '1,160p' "$SSH_DIR/tunnel.log" >&2
+            exit 1
+          fi
+          read -r SSH_HOST SSH_PORT <<<"$endpoint"
+          [[ -n "$SSH_HOST" && "$SSH_PORT" =~ ^[0-9]+$ ]]
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           {
-            printf 'AGENTSWEB_HOST=%q\n' "$SSH_HOST"
-            printf 'AGENTSWEB_PORT=%q\n' "$SSH_PORT"
-            printf 'AGENTSWEB_COMMAND=%q\n' "$SSH_COMMAND"
-          } | tee "$SSH_DIR/access.env" >> "$GITHUB_ENV"
+            printf 'AGENTSWEB_HOST=%s\n' "$SSH_HOST"
+            printf 'AGENTSWEB_PORT=%s\n' "$SSH_PORT"
+            printf 'AGENTSWEB_COMMAND=%s\n' "$SSH_COMMAND"
+          } >> "$GITHUB_ENV"
+          {
+            printf 'AGENTSWEB_HOST=%s\n' "$SSH_HOST"
+            printf 'AGENTSWEB_PORT=%s\n' "$SSH_PORT"
+            printf 'AGENTSWEB_COMMAND=%s\n' "$SSH_COMMAND"
+          } > "$SSH_DIR/access.env"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
           if [[ "$SSH_ONLY_REQUEST" == 'true' ]]; then
+            ssh_verified=''
+            for _ in {1..12}; do
+              if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                -o BatchMode=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 \
+                -i "$SSH_KEY" -p "$SSH_PORT" "runner@$SSH_HOST" true; then
+                ssh_verified='true'
+                break
+              fi
+              sleep 5
+            done
+            if [[ "$ssh_verified" != 'true' ]]; then
+              echo 'AgentsWeb registered, but the SSH endpoint is not reachable.' >&2
+              sed -n '1,160p' "$SSH_DIR/tunnel.log" >&2
+              exit 1
+            fi
             body=$'🔐 **SSH-only debugging session is ready.**\n\n'
             body+="Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"$'\n'
             body+="Host: \`${SSH_HOST}:${SSH_PORT}\`"$'\n\n'
             body+=$'Connect while the job is active:\n\n```sh\n'
             body+="${SSH_COMMAND}"$'\n```\n\n'
             body+=$'This run skips OpenCode and holds the runner for five hours for interactive debugging.'
-            jq -n --arg body "$body" '{body: $body}' \
+            comment_response="$(jq -n --arg body "$body" '{body: $body}' \
               | gh api "repos/${TARGET_REPOSITORY}/issues/${TRIGGER_ISSUE_NUMBER}/comments" \
-                --method POST --input - >/dev/null
+                --method POST --input -)"
+            comment_id="$(jq -r '.id // empty' <<<"$comment_response")"
+            [[ -n "$comment_id" ]]
+            printf 'comment_id=%s\n' "$comment_id" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Post SSH-only access details
@@ -451,7 +480,37 @@ jobs:
       - name: Hold SSH-only debugging session
         if: env.SSH_ONLY_REQUEST == 'true' && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success'
         shell: bash
-        run: sleep 18000
+        run: |
+          set -euo pipefail
+          tunnel_pid="$(<"$SSH_DIR/tunnel.pid")"
+          for _ in {1..18000}; do
+            if ! kill -0 "$tunnel_pid" 2>/dev/null; then
+              echo 'AgentsWeb tunnel exited during the SSH-only hold.' >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Report SSH-only startup failure
+        id: ssh_failure_comment
+        if: always() && env.SSH_ONLY_REQUEST == 'true' && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome != 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
+            const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const comment = await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: number,
+              body: [
+                '❌ **SSH-only debugging session could not start.**', '',
+                `Run: ${run}`,
+                'AgentsWeb registration or the SSH connectivity check failed. See the workflow logs for the tunnel output.'
+              ].join('\n')
+            });
+            core.setOutput('comment_id', comment.data.id);
+            core.setFailed('AgentsWeb registration or SSH connectivity check failed.');
 
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
@@ -858,7 +917,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source "$SSH_DIR/access.env"
           echo "Expected session: ${{ steps.opencode_run.outputs.session_id }}"
           for _ in {1..12}; do
             if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -895,10 +953,15 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const fs = require('node:fs');
-            const access = Object.fromEntries(fs.readFileSync(process.env.SSH_ACCESS_FILE, 'utf8').trim().split('\n').map((line) => {
-              const separator = line.indexOf('=');
-              return [line.slice(0, separator), line.slice(separator + 1)];
-            }));
+            const sshReady = process.env.AGENTSWEB_SSH_ENABLED === 'true' &&
+              process.env.AGENTSWEB_SSH_READY === 'true' &&
+              fs.existsSync(process.env.SSH_ACCESS_FILE);
+            const access = sshReady
+              ? Object.fromEntries(fs.readFileSync(process.env.SSH_ACCESS_FILE, 'utf8').trim().split('\n').map((line) => {
+                  const separator = line.indexOf('=');
+                  return [line.slice(0, separator), line.slice(separator + 1)];
+                }))
+              : {};
             const { renderProgressComment } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -907,7 +970,7 @@ jobs:
               : (process.env.RALPH_REQUEST === 'true'
               ? 'OpenCode with Ralph Loop'
               : (process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode'));
-            const sshSection = process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true'
+            const sshSection = sshReady
               ? [
                   '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
                   `Run: ${run}`, `Host: \`${access.AGENTSWEB_HOST}:${access.AGENTSWEB_PORT}\``, '',
@@ -957,7 +1020,6 @@ jobs:
           fi
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
           install -m 700 "$RUNTIME_DIR/.github/scripts/opencode-progress-tracker.sh" "$TRACKER"
-          source "$SSH_DIR/access.env"
           # The tracker is intentionally independent of the step shell so it can poll
           # while later workflow steps run; cleanup stops it at the end of the job.
           nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
@@ -1467,7 +1529,7 @@ jobs:
         run: sleep 18000
 
       - name: Append SSH session closed
-        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success' && (steps.access_comment.outputs.comment_id != '' || steps.ssh_access_comment.outputs.comment_id != '')
+        if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success' && (steps.agentsweb.outputs.comment_id != '' || steps.access_comment.outputs.comment_id != '' || steps.ssh_access_comment.outputs.comment_id != '')
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
