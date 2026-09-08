@@ -1,36 +1,41 @@
 name: OpenCode
-run-name: "OpenCode #${{ inputs.issue_number }} — ${{ inputs.issue_title }}"
+run-name: "OpenCode #${{ github.event.issue.number }} — ${{ github.event.issue.title }}"
 
 on:
-  workflow_dispatch:
-    inputs:
-      issue_number:
-        description: Issue containing the OpenCode label
-        required: true
-      request:
-        description: Exact issue request text
-        required: true
-      issue_title:
-        description: Issue title for the Actions run name
-        required: true
-      labels_json:
-        description: JSON array of issue label names
-        required: false
-        default: '[]'
-      sender:
-        description: GitHub username that submitted the request
-        required: true
+  issues:
+    types: [labeled]
+
 permissions:
   contents: write
   issues: write
+  actions: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.event.label.name == 'OpenCode' && format('opencode-issue-{0}-{1}', github.repository, github.event.issue.number) || format('opencode-skipped-{0}', github.run_id) }}
+  cancel-in-progress: false
 
 jobs:
-  opencode:
-    uses: ./.github/workflows/opencode-reusable.yml
+  prepare:
+    if: github.event.label.name == 'OpenCode'
+    uses: ./.github/workflows/opencode-prepare.yml
     with:
-      issue_number: ${{ inputs.issue_number }}
-      request: ${{ inputs.request }}
-      issue_title: ${{ inputs.issue_title }}
-      labels_json: ${{ inputs.labels_json }}
-      sender: ${{ inputs.sender }}
+      runtime_ref: ${{ github.workflow_sha }}
+  opencode:
+    needs: prepare
+    if: needs.prepare.outputs.approved == 'true'
+    uses: ./.github/workflows/opencode-reusable.yml
+    permissions:
+      contents: write
+      issues: write
+      actions: read
+    with:
+      runtime_ref: ${{ github.workflow_sha }}
+      issue_number: ${{ needs.prepare.outputs.issue_number }}
+      request: ${{ needs.prepare.outputs.request }}
+      issue_title: ${{ needs.prepare.outputs.issue_title }}
+      labels_json: ${{ needs.prepare.outputs.labels_json }}
+      sender: ${{ needs.prepare.outputs.sender }}
+      target_ref: ${{ needs.prepare.outputs.target_ref }}
+      target_sha: ${{ needs.prepare.outputs.target_sha }}
     secrets: inherit

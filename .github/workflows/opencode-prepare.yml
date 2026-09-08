@@ -1,0 +1,59 @@
+name: Prepare OpenCode issue
+
+on:
+  workflow_call:
+    inputs:
+      runtime_ref:
+        description: Approved central runtime commit matching this reusable workflow
+        required: true
+        type: string
+    outputs:
+      approved:
+        value: ${{ jobs.prepare.outputs.approved }}
+      issue_number:
+        value: ${{ jobs.prepare.outputs.issue_number }}
+      request:
+        value: ${{ jobs.prepare.outputs.request }}
+      issue_title:
+        value: ${{ jobs.prepare.outputs.issue_title }}
+      labels_json:
+        value: ${{ jobs.prepare.outputs.labels_json }}
+      sender:
+        value: ${{ jobs.prepare.outputs.sender }}
+      target_ref:
+        value: ${{ jobs.prepare.outputs.target_ref }}
+      target_sha:
+        value: ${{ jobs.prepare.outputs.target_sha }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+      id-token: write
+    outputs:
+      approved: ${{ steps.prepare.outputs.approved }}
+      issue_number: ${{ steps.prepare.outputs.issue_number }}
+      request: ${{ steps.prepare.outputs.request }}
+      issue_title: ${{ steps.prepare.outputs.issue_title }}
+      labels_json: ${{ steps.prepare.outputs.labels_json }}
+      sender: ${{ steps.prepare.outputs.sender }}
+      target_ref: ${{ steps.prepare.outputs.target_ref }}
+      target_sha: ${{ steps.prepare.outputs.target_sha }}
+    steps:
+      - name: Checkout trusted preparation code
+        uses: actions/checkout@v6
+        with:
+          repository: AgentsLoop/OhMyGithub
+          ref: ${{ inputs.runtime_ref }}
+          persist-credentials: false
+          sparse-checkout: scripts/opencode-prepare.mjs
+          sparse-checkout-cone-mode: false
+      - name: Validate and claim issue request
+        id: prepare
+        env:
+          OMG_APP_ORIGIN: ${{ vars.OMG_APP_ORIGIN || 'https://omgithub.com' }}
+          GH_TOKEN: ${{ github.token }}
+        run: /usr/bin/time -p node scripts/opencode-prepare.mjs

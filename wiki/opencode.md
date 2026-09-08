@@ -6,17 +6,15 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 ## Trigger
 
-The `OpenCode` issue label is the execution marker consumed by the Oh My Github
-App. The App dispatches `.github/workflows/opencode.yml`; the workflow itself
-accepts only `workflow_dispatch` and does not subscribe directly to issue
-events. The issue body, or title when the body is empty, supplies the request
-text. Comments and edits never trigger execution. An issue with the `Goal` label
-uses the installed `opencode-goal-plugin`, configures
-`noInterruptOnUserMessage: true`, and starts the runner with `opencode run
---command goal`; an issue without `Goal` uses the standard `opencode run`
-path. The `OpenCode` label asks the App to launch the workflow; add `Goal` to select
-persistent goal mode. This keeps
-one request event mapped to one OpenCode session.
+Create the issue with mode labels, then add the exact `OpenCode` label to start
+`.github/workflows/opencode.yml` through `issues.labeled`. Install this listener
+on the default branch first. Run `opencode-prepare.yml` to verify the Actions
+OIDC identity, user permission, request snapshot, and durable request claim.
+Pass validated outputs to `opencode-reusable.yml` only after approval.
+
+Use the issue body as the request, or its title when the body is empty. Add
+`Goal` to select `opencode run --command goal` with
+`noInterruptOnUserMessage: true`. Omit `Goal` for the standard invocation.
 
 An issue with the `ralph` label installs the standalone
 [`opencode-ralph-loop`](https://github.com/charfeng1/opencode-ralph-loop) plugin
@@ -26,13 +24,11 @@ safe to add `ralph` to the usual Goal-labeled issue. The workflow requires
 Ralph's `<promise>DONE</promise>` completion marker before validation and
 completion reporting.
 
-When a human opens an issue without `OpenCode`, the App posts a reminder to add
-the label and stops; it does not dispatch a workflow. Adding `OpenCode` later
-starts the normal App-dispatched flow.
+Open an unlabeled human issue to let the App install the listener and post a
+label reminder. Apply `OpenCode` after installation completes.
 
 The `test` label runs the full workflow with a mock OpenCode-generated project
-and must be used alongside `OpenCode`. The App remains triggered only by the
-exact `OpenCode` label. Test mode skips OpenCode generation, copies the fixture
+and must be used alongside `OpenCode`. Apply the exact `OpenCode` label after `test`. Test mode skips OpenCode generation, copies the fixture
 from `.github/fixtures/test-project`, then runs local verification, pushes the
 normal immutable branch, reports its OmGithub tree URL, and completes the issue.
 It also emits the normal live-progress comment, final report, lifecycle labels,
@@ -42,12 +38,11 @@ generation itself is replaced.
 The workflow uses the `macos-latest` GitHub-hosted runner by default for the
 entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
 
-An optional issue-title suffix in the exact form `branch: <existing-branch>`
-selects the checkout. The App removes that suffix from the
-OpenCode request and validates the branch before dispatching the thin workflow
-wrapper.
-Invalid or missing branches receive an issue comment and do not start the build.
-Without the directive, the repository default branch is used.
+Append `branch: <existing-branch>` to the title to select project checkout.
+Validate this branch during preparation and freeze its commit as `target_sha`.
+Use `target_ref` for the result base. Use the default branch when no suffix
+exists. Load workflow code from the default branch and installed central
+workflows from their pinned revision.
 
 See the dedicated [Oh My Github App documentation](oh-my-github-app.md) for
 App ownership, installation scope, permissions, events, and webhook details.

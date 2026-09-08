@@ -36,7 +36,7 @@ issue starts.
 
 Check `git branch --show-current`. If non-empty and not `main`, verify it and
 append ` branch: <current-branch>` to the title. The reusable workflow checks
-out `github.ref_name` and bases its OpenCode branch on it, preserving the
+out the validated `target_sha` and uses `target_ref` as its result base, preserving the
 debugging worktree. This suffix is routing metadata, not prompt text. On `main`,
 omit it.
 
@@ -54,18 +54,19 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
    Resolve `<target-repo>` and `<target-branch>` before any issue or workflow
    command. Verify the default `main` target is `AgentsLoop/PlayGround`.
 2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
-   labels, and attach them with `OpenCode` and `Goal`. Do not create a label for
+   labels, and create the issue with `Goal` and all mode labels. Verify the
+   default-branch listener exists, then add `OpenCode` separately. Do not create a label for
    `#self`. Verify labels with `gh issue view <number> --json labels`. Comments,
    edits, and other labels are not triggers.
-3. Confirm the newest run is matching `workflow_dispatch`, title, resolved
-   `<target-repo>`, and `<target-branch>`:
+3. Confirm the newest run is matching `issues`, title, resolved
+   `<target-repo>`, and the repository default branch:
 
    ```sh
    gh run list --repo <owner>/<repo> --workflow opencode.yml --limit 5 \
      --json databaseId,displayTitle,event,status,url,headBranch
    ```
 
-   An `issues` event or wrong branch is routing failure, not validation.
+   Check preparation outputs for `<target-branch>` and the frozen checkout SHA.
 4. Poll only until the initial Web UI URL appears; return issue, run, and session
    links immediately. Also extract the SSH command from the temporary access
    comment and return it with the links. Do not `gh run watch` to completion or

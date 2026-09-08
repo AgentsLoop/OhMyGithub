@@ -12,18 +12,14 @@
 
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
 
-The local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md) must
-stay aligned with this workflow. Its kickoff procedure creates a fresh issue
-with the `OpenCode` label, does not use comments as
-triggers, and waits only for the initial OpenCode session link.
-The GitHub App dispatches execution for an issue opened with `OpenCode` or when
-the `OpenCode` label is added to an existing issue. The workflow itself accepts
-only `workflow_dispatch`; edits, comments, and unrelated labels must not be
-documented as triggers. When a human opens an issue without `OpenCode`, the App
-ensures the repository label exists, leaves the issue unlabeled, and posts a
-reminder; it does not start the workflow automatically.
-An optional issue-title suffix `branch: <existing-branch>` selects the target
-checkout and pull-request base; without it, the default branch is used.
+Keep the local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md)
+aligned with this workflow. Create an issue with mode labels first, then apply
+`OpenCode` to start the native `issues.labeled` listener. Wait only for the
+initial OpenCode session link during E2E kickoff. Install the listener on the
+default branch before requesting execution. Use preparation to authenticate
+and freeze the request before starting the reusable execution job.
+Use `branch: <existing-branch>` at the end of the issue title to select the
+project checkout and result base. Load workflow code from the default branch.
 
 ## Literal instruction replacements
 
@@ -83,9 +79,8 @@ When mentioning a commit, append its relative age in hours or days.
 
 ## OpenCode GitHub Actions
 
-To execute an issue, open it with the `OpenCode` label, or add that label to an
-existing issue. The GitHub App converts that event into one workflow dispatch.
-Edits, comments, and other labels do not execute it.
+To execute an issue, create it with mode labels and then add `OpenCode`.
+Check for a native `issues` run and successful preparation.
 The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
 

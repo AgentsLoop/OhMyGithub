@@ -24,6 +24,18 @@ on:
         description: GitHub username that submitted the request
         required: true
         type: string
+      runtime_ref:
+        description: Approved central runtime commit matching this reusable workflow
+        required: true
+        type: string
+      target_ref:
+        description: Validated result base branch
+        required: true
+        type: string
+      target_sha:
+        description: Validated project commit
+        required: true
+        type: string
     secrets:
       OPENCODE_API_KEY:
         required: false
@@ -59,7 +71,8 @@ jobs:
       TARGET_REPO: ${{ github.event.repository.name }}
       TARGET_REPOSITORY: ${{ github.repository }}
       GH_REPO: ${{ github.repository }}
-      TARGET_REF: ${{ github.ref_name }}
+      TARGET_REF: ${{ inputs.target_ref }}
+      TARGET_SHA: ${{ inputs.target_sha }}
       RUNTIME_DIR: ${{ github.workspace }}/.omgithub-runtime
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
@@ -93,7 +106,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: ${{ github.repository }}
-          ref: ${{ github.ref_name }}
+          ref: ${{ inputs.target_sha }}
           token: ${{ github.token }}
           fetch-depth: 1
           persist-credentials: true
@@ -102,7 +115,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: AgentsLoop/OhMyGithub
-          ref: main
+          ref: ${{ inputs.runtime_ref }}
           path: .omgithub-runtime
           token: ${{ github.token }}
           fetch-depth: 1
@@ -769,9 +782,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BASE_BRANCH="$TARGET_REF"
-          git fetch origin "$BASE_BRANCH"
-          git checkout -B "$BRANCH_NAME" "origin/$BASE_BRANCH"
+          /usr/bin/time -p git checkout -B "$BRANCH_NAME" "$TARGET_SHA"
 
       - name: Generate mock OpenCode project
         if: env.TEST_REQUEST == 'true'
@@ -1350,7 +1361,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BASE_BRANCH="$TARGET_REF"
           # Dependencies are runtime-only and must never be included in the generated commit.
           /usr/bin/time -p touch "$PROJECT_DIR/.gitignore"
           grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
@@ -1359,7 +1369,7 @@ jobs:
           if ! git diff --cached --quiet; then
             /usr/bin/time -p git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
           fi
-          if git diff --quiet "origin/$BASE_BRANCH..HEAD" -- "$PROJECT_PATH"; then
+          if git diff --quiet "$TARGET_SHA..HEAD" -- "$PROJECT_PATH"; then
             echo 'OpenCode made no changes; no project branch will be published.'
             exit 0
           fi
@@ -1409,7 +1419,7 @@ jobs:
 
           tag="opencode-logs-${GITHUB_RUN_ID}"
           gh release create "$tag" "${release_assets[@]}" \
-            --target "${{ steps.delivery.outputs.commit || github.sha }}" \
+            --target "${{ steps.delivery.outputs.commit || inputs.target_sha }}" \
             --title "OpenCode logs for run #${GITHUB_RUN_NUMBER}" \
             --notes "Generated OpenCode response and execution logs for workflow run [#${GITHUB_RUN_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})." \
             --latest=false

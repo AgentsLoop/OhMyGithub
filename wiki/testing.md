@@ -32,10 +32,11 @@ Create an SSH test issue with the required labels:
 gh issue create --repo "$repo" \
   --title "Check SSH connectivity on $branch" \
   --body $'# Check SSH connectivity on <branch>\n\nVerify the temporary AgentsWeb SSH session, authentication, tunnel, and remote response. Record concrete evidence without exposing secrets.' \
-  --label OpenCode --label Goal --label ssh
+  --label Goal --label ssh
+gh issue edit <issue-number> --repo "$repo" --add-label OpenCode
 ```
 
-The `OpenCode` label triggers one App-dispatched `workflow_dispatch` run. The
+Apply `OpenCode` after listener installation to trigger one native `issues` run. The
 `Goal` label selects goal mode. The `ssh` label requests an SSH-only check in
 the reusable workflow. Verify the issue labels and the selected checkout:
 
@@ -45,8 +46,8 @@ gh run list --repo "$repo" --workflow opencode.yml --limit 5 \
   --json databaseId,displayTitle,event,status,url,headBranch
 ```
 
-Confirm `event` is `workflow_dispatch` and `headBranch` is the selected branch.
-Do not treat an issue event, comment, or edit as a successful dispatch.
+Confirm `event` is `issues` and `headBranch` is the default branch.
+Check preparation outputs for the selected `target_ref` and `target_sha`.
 
 Discover and follow the temporary SSH connection with the repository helper:
 
@@ -68,7 +69,7 @@ gh repo edit "$repo" --default-branch main
 
 Project acceptance testing is live production testing. Manually create a real
 GitHub issue with the required labels and prompt, then verify the resulting
-workflow dispatch, exactly one runner/session, and the completed production
+issue run, exactly one execution runner/session, and the completed production
 outcome. Do not use unit tests as the testing strategy; local checks such as
 `actionlint` and `git diff --check` are only static safeguards before the live
 test.
@@ -103,12 +104,12 @@ runs across the broker's `32000-32999` port range.
 Validate workflow edits locally with:
 
 ```sh
-actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.yml
+actionlint .github/workflows/opencode.yml .github/workflows/opencode-prepare.yml .github/workflows/opencode-reusable.yml
 git diff --check
 ```
 
 For a full workflow test, apply both the `OpenCode` and `test` labels to an
-issue. The App remains triggered only by the exact `OpenCode` label; `test`
+issue. Apply `OpenCode` after `test`; `test`
 selects a deterministic mock-generation path. The workflow copies the fixture
 from `.github/fixtures/test-project` instead of invoking OpenCode, then verifies
 it locally, creates and pushes the normal branch, reports the immutable
@@ -124,22 +125,10 @@ The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
 
-For goal support, confirm the App checks the `OpenCode` label and dispatches the
-workflow once, while the workflow reads the forwarded `Goal` label without any
-native `issues` subscription, installs and configures
-`opencode-goal-plugin`, and branches the
-initial invocation to `opencode run --command goal` only when that label is on
-the issue. An issue without `Goal` must retain the standard `opencode run`
-path. The configured
-`noInterruptOnUserMessage: true` option should remain visible in the generated
-OpenCode config.
-
-Verify that label synchronization creates `Goal`, and that `Mark issue in
-progress` preserves the label alongside `in progress`. `Goal` must be the only
-way an issue enters goal mode; arbitrary issue text must not trigger the workflow.
-Creating an issue with both `OpenCode` and `Goal` labels must start one
-`workflow_dispatch` run through the App, not separate `opened` and `labeled`
-runs.
+For goal support, create an issue with `Goal`, then add `OpenCode`. Verify one
+native `issues` run, successful preparation, and the Goal invocation. Verify
+that an issue without `Goal` uses the standard invocation. Preserve `Goal`
+when adding lifecycle labels.
 
 For Ralph support, create an issue with `OpenCode` and `ralph` labels and
 confirm the workflow installs `opencode-ralph-loop`, invokes
@@ -148,12 +137,10 @@ The build is accepted only when the session emits
 `<promise>DONE</promise>`; a missing promise must not receive the `complete`
 label. If both `Goal` and `ralph` are present, Ralph takes precedence.
 
-For custom-branch support, create an issue whose title ends with
-`branch: <existing-branch>`. Confirm the App strips the suffix from the
-OpenCode request and dispatches the workflow from that branch for checkout.
-A missing or syntactically invalid branch must receive an issue comment and must
-not start the reusable pipeline. The repository-local workflow must remain
-dispatch-only so the App is the sole issue-event router.
+For custom-branch support, append `branch: <existing-branch>` to the title.
+Verify preparation strips routing metadata, resolves the branch, and supplies
+a frozen commit to checkout. Reject invalid or missing branches before execution.
+Verify workflow code comes from the default branch.
 
 For the `omo` issue label, verify that an otherwise normal OpenCode issue causes
 the OpenCode startup step to install `oh-my-openagent` with Bun before starting

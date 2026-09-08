@@ -3,8 +3,8 @@
 ## Objective
 
 Move execution triggering from the GitHub App to `issues.labeled`. Keep the
-exact `OpenCode` label as the execution request. Implement the contracts below
-before enabling the new trigger; treat this document as a proposal.
+exact `OpenCode` label as the execution request. Use the implemented caller, preparation service, and execution workflow.
+Follow the migration sequence before enabling each installed repository.
 
 ## Request and authorization flow
 
@@ -25,7 +25,8 @@ before enabling the new trigger; treat this document as a proposal.
    authenticated submitter, repository, issue, and exact request snapshot.
 5. Store App approval records in App-controlled storage and retrieve them
    through an authenticated interface. Bind each record to the title, body,
-   label names, and selected branch. Reject missing or mismatched approval;
+   label names, and selected branch. Exclude the lifecycle labels `in progress`,
+   `complete`, and `failed` from the approval hash so a failed attempt can retry. Reject missing or mismatched approval;
    do not accept an editable issue field or comment as approval proof.
 6. Validate and freeze the event snapshot in preparation. Pass that snapshot
    to OpenCode. Do not fetch a newer body after validation. Reject an edited
@@ -73,6 +74,7 @@ it consumes `inputs.request`.
 | `issue_title` | Pass the validated title used for reporting. |
 | `sender` | Pass the authorized human identity; preserve issue-author semantics for direct human requests. |
 | `labels_json` | Pass an array of label-name strings; use `toJSON(github.event.issue.labels.*.name)` before validation. |
+| `runtime_ref` | Pin central runtime code to the same commit as the reusable workflow. |
 | `target_ref` | Add a required input for the validated branch name used as the result base. |
 | `target_sha` | Add a required input for the commit resolved from that branch during preparation. |
 
