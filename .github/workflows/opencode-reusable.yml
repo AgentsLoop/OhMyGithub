@@ -402,8 +402,8 @@ jobs:
           SSH_HOST="${SSH_NAME}.agentsweb.space"
           SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/aiplay-agentsweb -p ${SSH_PORT} runner@${SSH_HOST}"
           {
-            printf 'SSH_HOST=%s\n' "$SSH_HOST"
-            printf 'SSH_COMMAND=%s\n' "$SSH_COMMAND"
+            printf 'AGENTSWEB_HOST=%s\n' "$SSH_HOST"
+            printf 'AGENTSWEB_COMMAND=%s\n' "$SSH_COMMAND"
           } >> "$GITHUB_ENV"
           printf 'host=%s\nport=%s\ncommand=%s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_COMMAND" >> "$GITHUB_OUTPUT"
 
@@ -421,8 +421,8 @@ jobs:
             const body = process.env.AGENTSWEB_SSH_ENABLED === 'true'
               ? [
                   '🔐 **SSH-only debugging session is ready.**', '',
-                  `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
-                  'Connect while the job is active:', '', '```sh', process.env.SSH_COMMAND, '```', '',
+                  `Run: ${run}`, `Host: \`${process.env.AGENTSWEB_HOST}:${process.env.SSH_PORT}\``, '',
+                  'Connect while the job is active:', '', '```sh', process.env.AGENTSWEB_COMMAND, '```', '',
                   'This run skips OpenCode and holds the runner for five hours for interactive debugging.'
                 ].join('\n')
               : [
@@ -851,7 +851,7 @@ jobs:
             if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=20 -o ConnectionAttempts=1 -i "$SSH_KEY" \
               -p "$SSH_PORT" \
-              "runner@$SSH_HOST" \
+              "runner@$AGENTSWEB_HOST" \
               "curl --fail --silent --show-error -H 'x-opencode-directory: $PROJECT_DIR' http://127.0.0.1:$OPENCODE_WEB_PORT/session" \
               > "$OPENCODE_WEB_DIR/ssh-sessions.json"; then
               break
@@ -891,9 +891,9 @@ jobs:
             const sshSection = process.env.AGENTSWEB_SSH_ENABLED === 'true' && process.env.AGENTSWEB_SSH_READY === 'true'
               ? [
                   '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
-                  `Run: ${run}`, `Host: \`${process.env.SSH_HOST}:${process.env.SSH_PORT}\``, '',
+                  `Run: ${run}`, `Host: \`${process.env.AGENTSWEB_HOST}:${process.env.SSH_PORT}\``, '',
                   'Run this command while the job is active:', '',
-                  '```sh', process.env.SSH_COMMAND, '```'
+                  '```sh', process.env.AGENTSWEB_COMMAND, '```'
                 ].join('\n')
               : '';
             const body = renderProgressComment({
@@ -946,6 +946,8 @@ jobs:
             PROGRESS_COMMENT_TEMPLATE="$RUNTIME_DIR/.github/scripts/opencode-progress-comment-template.md" \
             AGENTSWEB_SSH_ENABLED="$AGENTSWEB_SSH_ENABLED" \
             AGENTSWEB_SSH_READY="${{ steps.agentsweb.outcome == 'success' }}" \
+            SSH_COMMAND="$AGENTSWEB_COMMAND" \
+            SSH_HOST="$AGENTSWEB_HOST" \
             RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
