@@ -221,3 +221,26 @@ bash scripts/ssh-run-log.sh <run-id>
 The helper checks the AgentsWeb broker `/api/registrations` endpoint first when
 `BROKER_API_TOKEN` is available (or when `../../sshworker/workers-dashboard/.env`
 contains it), then falls back to the workflow issue comments.
+
+## Test the local SSH tunnel service
+
+Run the raw tunnel health check from the `sshworker` checkout. Set `PYTHONPATH`
+to the checkout because the test imports the local `lolgames_tunnel` package:
+
+```sh
+PYTHONPATH=/Users/igor/Documents/sshworker \
+  /Users/igor/Documents/sshworker/tests/test-ssh-tunnel.sh
+```
+
+Interpret the output in this order:
+
+- `PASS control TCP` confirms that the local machine can reach the broker
+  control port.
+- `PASS local SSH listener` confirms that the local SSH service is listening.
+- `PASS registered` and `PASS SSH host-key exchange` confirm the complete
+  public tunnel path.
+
+If the test reports `No module named lolgames_tunnel`, set `PYTHONPATH` as
+shown above. Do not treat that error as a broker outage. If the module-path
+fix is present and registration still fails, inspect the client error output
+and then check the broker service.
