@@ -374,20 +374,29 @@ jobs:
           } > "$HOME/.ssh/authorized_keys"
           chmod 600 "$HOME/.ssh/authorized_keys"
           [[ "$RUNNER_OS" != 'Linux' ]] || sudo mkdir -p /run/sshd
-          sudo /usr/sbin/sshd -p 2222 -o PasswordAuthentication=no \
-            -o PermitRootLogin=no -o PubkeyAuthentication=yes
+          # shellcheck disable=SC2024
+          sudo /usr/sbin/sshd -D -e -p 2222 \
+            -o PasswordAuthentication=no -o PermitRootLogin=no \
+            -o PubkeyAuthentication=yes > "$SSH_DIR/sshd.log" 2>&1 &
+          echo $! > "$SSH_DIR/sshd.pid"
           is_listening() {
             if command -v ss >/dev/null 2>&1; then
               ss -ltn | grep -q ':2222 '
+            elif command -v lsof >/dev/null 2>&1; then
+              lsof -nP -a -iTCP:2222 -sTCP:LISTEN >/dev/null 2>&1
             else
-              lsof -nP -iTCP:2222 -sTCP:LISTEN >/dev/null 2>&1
+              nc -z 127.0.0.1 2222 >/dev/null 2>&1
             fi
           }
           for _ in {1..20}; do
             is_listening && break
             sleep 1
           done
-          is_listening
+          if ! is_listening; then
+            echo 'Local sshd did not start listening on port 2222.' >&2
+            sed -n '1,160p' "$SSH_DIR/sshd.log" >&2
+            exit 1
+          fi
           nohup env PYTHONPATH="$GITHUB_WORKSPACE/.agentsweb" \
             python3 -m lolgames_tunnel client 127.0.0.1:2222 \
             --server agentsweb.space --name "$SSH_NAME" --public-port "$REQUESTED_SSH_PORT" \
@@ -1559,6 +1568,7 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/app.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
           tmux kill-session -t app-server 2>/dev/null || true
           [[ -f "$SSH_DIR/tunnel.pid" ]] && kill "$(cat "$SSH_DIR/tunnel.pid")" 2>/dev/null || true
+          [[ -f "$SSH_DIR/sshd.pid" ]] && sudo kill "$(cat "$SSH_DIR/sshd.pid")" 2>/dev/null || true
           sudo pkill -f 'sshd.*2222' 2>/dev/null || true
           rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"
           rm -rf "$SSH_DIR" "$HOME/.ssh/authorized_keys"
