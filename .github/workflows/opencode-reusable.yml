@@ -380,7 +380,9 @@ jobs:
             -o PubkeyAuthentication=yes > "$SSH_DIR/sshd.log" 2>&1 &
           echo $! > "$SSH_DIR/sshd.pid"
           is_listening() {
-            if command -v ss >/dev/null 2>&1; then
+            if [[ "$RUNNER_OS" == 'macOS' ]] && command -v lsof >/dev/null 2>&1; then
+              lsof -nP -a -iTCP:2222 -sTCP:LISTEN >/dev/null 2>&1
+            elif command -v ss >/dev/null 2>&1; then
               ss -ltn | grep -q ':2222 '
             elif command -v lsof >/dev/null 2>&1; then
               lsof -nP -a -iTCP:2222 -sTCP:LISTEN >/dev/null 2>&1
