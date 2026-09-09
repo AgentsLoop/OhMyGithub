@@ -167,7 +167,8 @@ session when no `screenshots/final-*` image exists, with three total
 evidence checks. Missing screenshots warn and do not block delivery; when present,
 a successful run must leave a final issue comment
 containing the Open Project URL, final commit, and embedded screenshots served
-from that immutable commit.
+from the run release. Confirm that the generated branch history contains no
+screenshots, logs, or runner-state files.
 
 Watch a running workflow with live per-step logs using the same internal
 endpoints as the GitHub Actions web UI:

@@ -98,16 +98,17 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
 10. Verifies the app through the public tunnel. If verification fails, sends a
    remediation prompt to the forked verification session and retries up to three
    times. The completion report and screenshot evidence prompts also use that
-   verification session. Detects both uncommitted generated files and commits already created
-   by OpenCode, then pushes the immutable branch in YAML.
-11. Gives the verified public URL back to the worker, requests committed final
-    browser screenshots, and appends immutable screenshot URLs with the game,
+   verification session. Squash all generated work onto the selected base,
+   remove screenshots, logs, and runner state from the Git index, and push one
+   clean project commit to the immutable branch.
+11. Give the verified public URL back to the worker. Request uncommitted final
+    browser screenshots. Append immutable release screenshot URLs with the game,
     repository path, compatibility commit, and Open Project links to the oldest triggering-issue comment containing the
     `🟡 **OpenCode progress (live)**` marker. If screenshots are missing, it
     sends up to two follow-up prompts to the same OpenCode session before
     continuing delivery with a warning.
 12. Creates a uniquely tagged GitHub release containing the final OpenCode
-    response JSON and safe runner log files, then appends its link to that same
+    response JSON, screenshots, and safe runner log files. Append its link to that same
     live-progress comment.
 13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
    verification,
@@ -123,8 +124,8 @@ hours before cleanup.
 
 After the branch is pushed, the completion report links the repository path to
 OmGithub. Opening that URL anonymously resolves the named branch and optional
-project directory, discovers root `index.html` or `dist/index.html` plus final
-screenshots, and creates the store page and playable deployment. Keep the full
+project directory, discovers root `index.html` or `dist/index.html`, and creates
+the store page and playable deployment. Keep the full
 commit-SHA URL working for compatibility. There is no separate publishing
 credential or upload step.
 Read [OmGithub publishing](https://github.com/AgentsLoop/omsite/blob/main/wiki/omgithub.md).
