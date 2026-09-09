@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codex Workflow Smoke Test</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: #09111f;
+        color: #e8f0ff;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at 20% 15%, rgba(50, 199, 255, 0.2), transparent 35%),
+          radial-gradient(circle at 85% 80%, rgba(123, 92, 255, 0.2), transparent 40%),
+          #09111f;
+      }
+
+      main {
+        width: min(620px, 100%);
+        padding: clamp(28px, 6vw, 56px);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 28px;
+        background: rgba(12, 24, 43, 0.82);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+        text-align: center;
+        backdrop-filter: blur(16px);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 18px;
+        color: #a7dfff;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #40e89a;
+        box-shadow: 0 0 18px #40e89a;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 7vw, 4rem);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+      }
+
+      p {
+        margin: 22px auto 30px;
+        max-width: 42ch;
+        color: #aebdd3;
+        font-size: 1.05rem;
+        line-height: 1.7;
+      }
+
+      button {
+        min-width: 190px;
+        padding: 14px 24px;
+        border: 0;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #39cbff, #8a6cff);
+        color: #07111f;
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+        transition: transform 160ms ease, filter 160ms ease;
+      }
+
+      button:hover { filter: brightness(1.08); transform: translateY(-2px); }
+      button:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+      button[data-complete="true"] { background: #40e89a; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="badge"><span class="dot" aria-hidden="true"></span>System ready</div>
+      <h1>Codex workflow smoke test.</h1>
+      <p>The playable browser entrypoint is online. Run the interaction check to confirm the page responds.</p>
+      <button id="verify" type="button">Run interaction check</button>
+    </main>
+    <script>
+      const button = document.querySelector('#verify');
+      button.addEventListener('click', () => {
+        button.textContent = 'Interaction verified ✓';
+        button.dataset.complete = 'true';
+      });
+    </script>
+  </body>
+</html>
