@@ -20,6 +20,10 @@ Preserve the request and remove only invocation syntax and routing metadata.
 If request text surrounds the invocation, merge it before applying the
 canonical guide.
 
+If the invocation has no request text, invent a fresh random small playable
+browser-game brief. Do not substitute a generic workflow-validation task or
+ask the user for a game concept.
+
 Repeat the exact issue title as the first Markdown heading in the issue body.
 Keep the title as issue metadata too; the body must not omit or paraphrase it.
 
