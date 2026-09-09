@@ -1,0 +1,142 @@
+name: Codex reusable pipeline
+
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        description: Approved Codex issue
+        required: true
+        type: string
+      request:
+        description: Exact issue request text
+        required: true
+        type: string
+      issue_title:
+        description: Issue title for reporting
+        required: true
+        type: string
+      labels_json:
+        description: JSON array of issue label names
+        required: false
+        default: '[]'
+        type: string
+      sender:
+        description: GitHub username that submitted the request
+        required: true
+        type: string
+      runtime_ref:
+        description: Approved central runtime commit matching this reusable workflow
+        required: true
+        type: string
+      target_ref:
+        description: Validated result base branch
+        required: true
+        type: string
+      target_sha:
+        description: Validated project commit
+        required: true
+        type: string
+    secrets:
+      CODEX_WEB_CREDENTIAL:
+        required: false
+      CODEX_AUTH_JSON:
+        required: false
+      AGENTSWEB_SSH_PUBLIC_KEY:
+        required: false
+jobs:
+  codex:
+    runs-on: ${{ contains(inputs.labels_json, '"mac"') && 'macos-latest' || 'ubuntu-latest' }}
+    timeout-minutes: 360
+    permissions:
+      contents: write
+      issues: write
+      actions: read
+    env:
+      CODEX_STATE_DIR: ${{ runner.temp }}/codex-worker
+      CODEX_HOME: ${{ runner.temp }}/codex-worker/home
+      CODEX_ENDPOINT: ws://127.0.0.1:4097
+      RUNTIME_DIR: ${{ github.workspace }}/.omgithub-runtime
+      PROJECT_PATH: ${{ vars.PROJECT_DIR || './' }}
+      TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number }}
+      REQUEST: ${{ inputs.request }}
+      ISSUE_TITLE: ${{ inputs.issue_title }}
+      LABELS_JSON: ${{ inputs.labels_json }}
+      TARGET_SHA: ${{ inputs.target_sha }}
+      TEST_REQUEST: ${{ contains(inputs.labels_json, '"test"') }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout frozen project
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 0
+      - name: Checkout workflow runtime
+        uses: actions/checkout@v6
+        with:
+          repository: AgentsLoop/OhMyGithub
+          ref: ${{ inputs.runtime_ref }}
+          path: .omgithub-runtime
+          persist-credentials: false
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Checkout shared skills
+        if: env.TEST_REQUEST != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: agents-dev/skills
+          path: ${{ vars.PROJECT_DIR || './' }}/.agents
+          persist-credentials: false
+      - name: Checkout AgentsWeb client
+        if: env.TEST_REQUEST != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: agents-dev/agent-workspace
+          path: .agentsweb
+          sparse-checkout: lolgames_tunnel
+          persist-credentials: false
+      - name: Start Codex and browser terminal
+        env:
+          CODEX_AUTH_CONTENT: ${{ secrets.CODEX_AUTH_JSON }}
+          CODEX_WEB_CREDENTIAL: ${{ secrets.CODEX_WEB_CREDENTIAL }}
+          AGENTSWEB_PUBLIC_KEY: ${{ secrets.AGENTSWEB_SSH_PUBLIC_KEY }}
+        shell: bash
+        run: /usr/bin/time -p bash "$RUNTIME_DIR/scripts/codex-services.sh" start
+      - name: Run Codex and publish result
+        env:
+          CODEX_WEB_CREDENTIAL: ${{ secrets.CODEX_WEB_CREDENTIAL }}
+        shell: bash
+        run: /usr/bin/time -p node "$RUNTIME_DIR/scripts/codex-worker.mjs"
+      - name: Keep temporary access available
+        if: success() && env.TEST_REQUEST != 'true'
+        shell: bash
+        run: |
+          started=$(head -n 1 "$RUNNER_TEMP/codex-started")
+          remaining=$((21000 - $(date +%s) + started))
+          (( remaining <= 18000 )) || remaining=18000
+          if (( remaining > 0 )); then /usr/bin/time -p sleep "$remaining"; fi
+      - name: Report workflow failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER),
+              body: `Codex workflow failed. Inspect [the run log](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`
+            });
+      - name: Close temporary access
+        if: always()
+        shell: bash
+        run: /usr/bin/time -p bash "$RUNTIME_DIR/scripts/codex-services.sh" cleanup
+      - name: Report access closed
+        if: always() && env.TEST_REQUEST != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER),
+              body: `Codex temporary terminal and SSH access closed for [this run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`
+            });

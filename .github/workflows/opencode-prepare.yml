@@ -8,6 +8,8 @@ on:
         required: true
         type: string
     outputs:
+      agent:
+        value: ${{ jobs.prepare.outputs.agent }}
       approved:
         value: ${{ jobs.prepare.outputs.approved }}
       issue_number:
@@ -33,6 +35,7 @@ jobs:
       issues: write
       actions: write
     outputs:
+      agent: ${{ steps.prepare.outputs.agent }}
       approved: ${{ steps.prepare.outputs.approved }}
       issue_number: ${{ steps.prepare.outputs.issue_number }}
       request: ${{ steps.prepare.outputs.request }}

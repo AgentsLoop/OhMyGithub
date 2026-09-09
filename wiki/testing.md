@@ -236,3 +236,15 @@ If the test reports `No module named lolgames_tunnel`, set `PYTHONPATH` as
 shown above. Do not treat that error as a broker outage. If the module-path
 fix is present and registration still fails, inspect the client error output
 and then check the broker service.
+
+## Check Codex when testing is requested
+
+Open a new issue with `#codex` and confirm one Codex execution job after
+preparation. Check the selected branch and frozen checkout. Open the terminal,
+send input, reconnect, and confirm the same live task. Follow automatic
+validation and inspect the project, commit, and release links.
+
+Check terminal access with `CODEX_WEB_CREDENTIAL` set and absent. Check a
+missing `CODEX_AUTH_JSON`, an interrupted turn, and cleanup after cancellation.
+Check `Codex` with `test` for fixture delivery. Check OpenCode separately after
+changing shared preparation. Run no workflow when the user excludes testing.

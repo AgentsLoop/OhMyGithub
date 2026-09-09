@@ -1,12 +1,12 @@
 ---
 name: issue-e2e
-description: Start the issue-triggered workflow and return its initial OpenCode session link.
+description: Start the issue-triggered workflow and return its initial agent access link.
 ---
 
 # Issue E2E kickoff
 
 Use only for an explicitly requested issue-triggered E2E run. Create the issue
-and Action, then stop at the initial Web UI link. Do not claim implementation
+and Action, then stop at the initial agent access link. Do not claim implementation
 completion.
 
 ## Write the issue prompt
@@ -60,7 +60,9 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
    command. Verify the default `main` target is `AgentsLoop/PlayGround`.
 2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
    labels. Verify the default-branch listener exists, then create the issue
-   with `OpenCode`, `Goal`, and all mode labels already attached. Do not create a label for
+   with `Codex` for `#codex`, or `OpenCode` and `Goal` for OpenCode.
+   Attach all requested mode labels before creation. Use the Codex browser
+   terminal link for Codex requests. Do not create a label for
    `#self`. Verify labels with `gh issue view <number> --json labels`. Comments,
    edits, and other labels are not triggers.
 3. Confirm the newest run is matching `issues`, title, resolved
@@ -72,7 +74,7 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
    ```
 
    Check preparation outputs for `<target-branch>` and the frozen checkout SHA.
-4. Poll only until the initial Web UI URL appears; return issue, run, and session
+4. Poll only until the initial agent access URL appears; return issue, run, and session
    links immediately. Also extract the SSH command from the temporary access
    comment and return it with the links. Do not `gh run watch` to completion or
    cancel/rerun an active run without checking its current step.

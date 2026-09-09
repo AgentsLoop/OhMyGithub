@@ -5,12 +5,16 @@ Do not suggest, report, or propose security issues unless the user explicitly as
 ## Wiki index
 
 - [OpenCode workflow](wiki/opencode.md)
+- [Codex workflow](wiki/codex.md)
 - [Oh My Github App](https://github.com/AgentsLoop/omsite/blob/main/wiki/oh-my-github-app.md)
 - [Temporary Mac SSH access](wiki/access.md)
 - [Testing and verification](wiki/testing.md)
 - [OmGithub publishing](https://github.com/AgentsLoop/omsite/blob/main/wiki/omgithub.md)
 
 ## Main project file
+
+Use `#codex` in a new issue title or attach the `Codex` label to select Codex.
+Read [Codex workflow](wiki/codex.md) for credentials and browser terminal access.
 
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
 

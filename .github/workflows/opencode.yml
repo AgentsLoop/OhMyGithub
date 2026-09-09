@@ -1,5 +1,5 @@
-name: OpenCode
-run-name: "OpenCode #${{ github.event.issue.number || inputs.issue_number }}${{ github.event.issue.title && format(' — {0}', github.event.issue.title) || '' }}"
+name: Coding agents
+run-name: "Coding agent #${{ github.event.issue.number || inputs.issue_number }}${{ github.event.issue.title && format(' — {0}', github.event.issue.title) || '' }}"
 
 on:
   issues:
@@ -22,14 +22,32 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'OpenCode') || contains(github.event.issue.title, '/OpenCode')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'OpenCode') || contains(github.event.issue.title, '/OpenCode') || contains(github.event.issue.title, '#codex') || contains(github.event.issue.labels.*.name, 'Codex')
     uses: ./.github/workflows/opencode-prepare.yml
     with:
       runtime_ref: ${{ github.workflow_sha }}
   opencode:
     needs: prepare
-    if: needs.prepare.outputs.approved == 'true'
+    if: needs.prepare.outputs.approved == 'true' && needs.prepare.outputs.agent == 'opencode'
     uses: ./.github/workflows/opencode-reusable.yml
+    permissions:
+      contents: write
+      issues: write
+      actions: read
+    with:
+      runtime_ref: ${{ github.workflow_sha }}
+      issue_number: ${{ needs.prepare.outputs.issue_number }}
+      request: ${{ needs.prepare.outputs.request }}
+      issue_title: ${{ needs.prepare.outputs.issue_title }}
+      labels_json: ${{ needs.prepare.outputs.labels_json }}
+      sender: ${{ needs.prepare.outputs.sender }}
+      target_ref: ${{ needs.prepare.outputs.target_ref }}
+      target_sha: ${{ needs.prepare.outputs.target_sha }}
+    secrets: inherit
+  codex:
+    needs: prepare
+    if: needs.prepare.outputs.approved == 'true' && needs.prepare.outputs.agent == 'codex'
+    uses: ./.github/workflows/codex-reusable.yml
     permissions:
       contents: write
       issues: write
