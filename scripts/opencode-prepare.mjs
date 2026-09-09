@@ -40,7 +40,12 @@ export async function prepare(env = process.env, fetcher = fetch) {
       headers: { Authorization: `Bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
       signal: AbortSignal.timeout(30000),
     });
-    if (!oidcResponse.ok) throw new Error(`Could not obtain workflow identity (HTTP ${oidcResponse.status})`);
+    if (!oidcResponse.ok) {
+      const oidcFailure = (await oidcResponse.text())
+        .replace(/[\r\n\u0000-\u001f\u007f]/g, ' ')
+        .slice(0, 500);
+      throw new Error(`Could not obtain workflow identity (HTTP ${oidcResponse.status}): ${oidcFailure || 'No response detail'}`);
+    }
     const { value: token } = await oidcResponse.json();
     if (typeof token !== 'string' || !token) throw new Error('Missing workflow identity');
     const response = await fetcher(endpoint, {
