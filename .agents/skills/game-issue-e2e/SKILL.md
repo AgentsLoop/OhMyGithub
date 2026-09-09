@@ -57,6 +57,11 @@ debugging worktree. Default-branch preparation dispatches the listener at this
 branch. Treat the selected-branch run as the execution run. This suffix is
 routing metadata, not prompt text. On `main`, omit it.
 
+Treat the issue-generated result branch as the published project branch. Build
+every final `Open Project` URL from the workflow's generated `BRANCH_NAME`, not
+from the input `TARGET_REF` or repository default branch. Preserve any project
+subdirectory after that generated branch in the URL.
+
 Resolve the target repository before creating the issue. An explicitly supplied
 repository wins. With `#main`, use the supplied or current repository on
 `main`; otherwise, on `main` without a supplied repository, use
