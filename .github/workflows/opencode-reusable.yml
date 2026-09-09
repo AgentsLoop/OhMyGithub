@@ -1480,7 +1480,7 @@ jobs:
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
             const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
-            const namedPath = [process.env.TARGET_REF, projectPath === '.' ? '' : projectPath]
+            const namedPath = [process.env.BRANCH_NAME, projectPath === '.' ? '' : projectPath]
               .filter(Boolean)
               .flatMap((part) => part.split('/'))
               .map(encodeURIComponent)
