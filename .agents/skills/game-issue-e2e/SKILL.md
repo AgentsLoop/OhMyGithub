@@ -40,6 +40,15 @@ Do not execute the full Gauntlet Loop during issue-e2e kickoff. The prompt
 should instruct the worker to perform the sustained project work after the
 issue starts.
 
+Before writing the issue, list the target repository's `skill/*` labels and
+select only the skills that directly support the request. Add one short
+imperative sentence to the issue prompt that names the selected skills and
+requires the worker to load and use them where relevant. Attach every selected
+`skill/*` label when creating the issue so the workflow passes the same skill
+names to OpenCode. For visual recreation work, prefer an available image-search
+skill over generic web search. For 3D game work, select available 3D asset or
+runtime skills only when they match the requested implementation.
+
 
 Check `git branch --show-current`. If non-empty and not `main`, verify it and
 append ` branch: <current-branch>` to the title. The reusable workflow checks
@@ -54,7 +63,9 @@ repository wins. With `#main`, use the supplied or current repository on
 `AgentsLoop/PlayGround` explicitly. On another branch, use the current
 repository. Never infer the default `main` repository from `git remote`.
 
-if other local skills mentioned verify they exist on https://github.com/agents-dev/skills/ or push them first
+If the user mentions another local skill, verify it exists in
+`https://github.com/agents-dev/skills/` before selecting it. If it is absent,
+push it first.
 
 ## Procedure
 
@@ -62,11 +73,13 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
    Resolve `<target-repo>` and `<target-branch>` before any issue or workflow
    command. Verify the default `main` target is `AgentsLoop/PlayGround`.
 2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
-   labels. Verify the default-branch listener exists, then create the issue
-   with `OpenCode`, `Goal`, and all mode labels already attached. Always create
-   this new issue even when a matching issue or run already exists. Do not
-   create a label for `#self`. Verify labels with `gh issue view <number> --json
-   labels`. Comments, edits, and other labels are not triggers.
+   labels. List available `skill/*` labels, select the useful skills, and name
+   them in the generated prompt. Verify the default-branch listener exists,
+   then create the issue with `OpenCode`, `Goal`, all mode labels, and all
+   selected `skill/*` labels already attached. Always create this new issue
+   even when a matching issue or run already exists. Do not create a label for
+   `#self`. Verify labels with `gh issue view <number> --json labels`. Comments,
+   edits, and other labels are not triggers.
 3. Confirm the newest run is matching `issues`, title, resolved
    `<target-repo>`, and the repository default branch:
 

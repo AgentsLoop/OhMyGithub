@@ -30,9 +30,13 @@ constraints. Remove invocation syntax and routing labels.
 - Maintain a simple live progress page that shows the artifact changing over
   time through useful evidence such as screenshots, videos, test results, or
   drafts.
+- Name the useful skills selected from the target repository's available
+  `skill/*` labels. Instruct the worker to load and use them where relevant.
+  Keep this to one sentence and do not name unavailable or unrelated skills.
 - Keep only essential product constraints and observable completion evidence.
   Do not prescribe architecture, exact decomposition, tools, or a long feature
-  checklist unless the user supplied them.
+  checklist unless the user supplied them. Naming selected available skills is
+  not implementation prescription.
 
 ## Prompt shape
 
@@ -53,6 +57,8 @@ loses, fix the largest meaningful gap and repeat until it meets the bar or the
 user stops the run.
 
 Maintain a simple live progress page with concrete evidence of each round.
+
+Load and use these available skills where relevant: [selected skill names].
 ```
 
 Replace every bracketed phrase. Keep the final prompt close to this size. Add
