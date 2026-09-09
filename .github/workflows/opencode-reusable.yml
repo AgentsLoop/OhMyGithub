@@ -171,15 +171,19 @@ jobs:
           project_path="${project_path%/}"
           skills_path="${project_path:+/$project_path}/.agents/"
           ralph_state_path="${project_path:+/$project_path}/.opencode/ralph-loop.local.md"
+          screenshots_path="${project_path:+/$project_path}/screenshots/"
           grep -qxF "$skills_path" .git/info/exclude || echo "$skills_path" >> .git/info/exclude
           grep -qxF "$ralph_state_path" .git/info/exclude || echo "$ralph_state_path" >> .git/info/exclude
-
-          if [[ -z "$project_path" ]]; then
-            for runtime_path in '/.agentsweb/' '/.omgithub-runtime/' '/.opencode-ssh/' '/.opencode-web/' \
-              '/opencode-agentsweb-id_ed25519' '/opencode-agentsweb-id_ed25519.pub'; do
-              grep -qxF "$runtime_path" .git/info/exclude || echo "$runtime_path" >> .git/info/exclude
-            done
-          fi
+          grep -qxF "$screenshots_path" .git/info/exclude || echo "$screenshots_path" >> .git/info/exclude
+          for pattern in '*.log' '*.pid'; do
+            grep -qxF "$pattern" .git/info/exclude || echo "$pattern" >> .git/info/exclude
+          done
+          for relative_runtime_path in '.agentsweb/' '.omgithub-runtime/' '.opencode/goals/' \
+            '.opencode-ssh/' '.opencode-web/' 'opencode-agentsweb-id_ed25519' \
+            'opencode-agentsweb-id_ed25519.pub'; do
+            runtime_path="${project_path:+/$project_path}/$relative_runtime_path"
+            grep -qxF "$runtime_path" .git/info/exclude || echo "$runtime_path" >> .git/info/exclude
+          done
 
       - name: Install worker instructions
         if: env.TEST_REQUEST != 'true'
@@ -1366,6 +1370,29 @@ jobs:
           /usr/bin/time -p touch "$PROJECT_DIR/.gitignore"
           grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
             printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
+          # Agents can commit generated evidence and runner state before this
+          # delivery step. Remove both from the index even when already tracked.
+          generated_paths=(
+            "$PROJECT_DIR/.agents"
+            "$PROJECT_DIR/.agentsweb"
+            "$PROJECT_DIR/.omgithub-runtime"
+            "$PROJECT_DIR/.opencode/goals"
+            "$PROJECT_DIR/.opencode-ssh"
+            "$PROJECT_DIR/.opencode-web"
+            "$PROJECT_DIR/opencode-agentsweb-id_ed25519"
+            "$PROJECT_DIR/opencode-agentsweb-id_ed25519.pub"
+          )
+          for generated_path in "${generated_paths[@]}"; do
+            [[ -e "$generated_path" || -L "$generated_path" ]] || continue
+            /usr/bin/time -p git rm -r --cached --ignore-unmatch -- "$generated_path"
+          done
+          while IFS= read -r -d '' generated_file; do
+            case "$generated_file" in
+              *.log|*.pid|screenshots/*|*/screenshots/*)
+                /usr/bin/time -p git rm --cached --ignore-unmatch -- "$generated_file"
+                ;;
+            esac
+          done < <(git ls-files -z -- "$PROJECT_PATH")
           /usr/bin/time -p git add -A -- "$PROJECT_PATH"
           if ! git diff --cached --quiet; then
             /usr/bin/time -p git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
@@ -1410,6 +1437,11 @@ jobs:
             [[ "$(basename "$artifact")" == 'opencode.json' ]] && continue
             cp -f "$artifact" "$release_dir/"
           done
+          while IFS= read -r screenshot; do
+            cp -f "$screenshot" "$release_dir/$(basename "$screenshot")"
+          done < <(find "$PROJECT_DIR/screenshots" -type f \
+            \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
+            2>/dev/null | sort)
 
           release_assets=()
           for asset in "$release_dir"/*; do
@@ -1439,6 +1471,7 @@ jobs:
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json || steps.mock_project.outputs.screenshots_json }}
           PROJECT_PATH: ${{ env.PROJECT_PATH }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
+          OPENCODE_RELEASE_ASSETS: ${{ steps.opencode_release.outputs.assets_json }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -1453,11 +1486,11 @@ jobs:
               .map(encodeURIComponent)
               .join('/');
             const projectUrl = `https://omgithub.com/${process.env.TARGET_REPOSITORY}/tree/${namedPath}`;
-            const images = screenshots.map((name) => {
-              const path = [projectPath, 'screenshots', name].filter(Boolean).join('/').split('/').map(encodeURIComponent).join('/');
-              const url = `https://raw.githubusercontent.com/${process.env.TARGET_REPOSITORY}/${process.env.FINAL_COMMIT}/${path}`;
-              return `![Final game screenshot: ${name}](${url})`;
-            });
+            const releaseAssets = JSON.parse(process.env.OPENCODE_RELEASE_ASSETS || '[]');
+            const assetUrls = new Map(releaseAssets.map((asset) => [asset.name, asset.url]));
+            const images = screenshots
+              .filter((name) => assetUrls.has(name))
+              .map((name) => `![Final game screenshot: ${name}](${assetUrls.get(name)})`);
             const body = renderTemplate('opencode-final-report.md', {
               PROJECT_URL: projectUrl,
               FINAL_COMMIT: process.env.FINAL_COMMIT,
