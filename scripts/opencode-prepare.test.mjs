@@ -19,6 +19,7 @@ function fixture(options = {}) {
     else if (path.startsWith('/collaborators/')) data = { permission: options.permission || 'write' };
     else if (path === '/issues/42/timeline') data = [{ id: 88, event: 'labeled', label: { name: 'OpenCode' }, actor: { id: 7 }, created_at: event.issue.updated_at }];
     else if (path.startsWith('/branches/')) data = { commit: { sha: state.branch } };
+    else if (path === '/actions/workflows/opencode.yml/dispatches') data = {};
     else if (path === '/issues/42/comments' && request.method === 'POST') {
       data = { id: state.comments.length + 1, user: { login: 'github-actions[bot]', type: 'Bot' }, ...JSON.parse(request.body) };
       state.comments.push(data);
@@ -40,8 +41,8 @@ test('preserve multiline requests without output injection', () => {
   assert.equal(text, `request<<${delimiter}\n${value}\n${delimiter}\n`);
 });
 
-test('open once, authorize writers, and freeze the branch', async () => {
-  const f = fixture(); f.event.action = 'opened';
+test('open once on the selected branch, authorize writers, and freeze the branch', async () => {
+  const f = fixture({ env: { GITHUB_REF: 'refs/heads/feature' } }); f.event.action = 'opened';
   const result = await f.run();
   assert.equal(result.target_ref, 'feature');
   assert.equal(result.target_sha, 'a'.repeat(40));
@@ -52,7 +53,7 @@ test('open once, authorize writers, and freeze the branch', async () => {
 });
 
 test('reject outsiders by default and accept everyone when configured', async () => {
-  const f = fixture({ permission: 'read' }); f.event.action = 'opened';
+  const f = fixture({ permission: 'read', env: { GITHUB_REF: 'refs/heads/feature' } }); f.event.action = 'opened';
   await assert.rejects(f.run(), /author needs write/);
   f.env.OPENCODE_ACCESS = 'everyone';
   assert.equal((await f.run()).approved, 'true');
@@ -81,19 +82,26 @@ test('ignore later labels and unrelated titles', async () => {
 });
 
 test('manual start reads an existing issue with the same access checks', async () => {
-  const f = fixture({ env: { GITHUB_EVENT_NAME: 'workflow_dispatch' } });
+  const f = fixture({ env: { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/feature' } });
   f.event.inputs = { issue_number: '42' }; delete f.event.issue;
   assert.equal((await f.run()).approved, 'true');
 });
 
-test('reject invalid access, closed issues, pull requests, branches and workflow refs', async () => {
+test('default branch preparation forwards a selected branch and stops', async () => {
+  const f = fixture(); f.event.action = 'opened';
+  const result = await f.run();
+  assert.equal(result.approved, 'false');
+  const dispatch = f.state.calls.find(call => call.path === '/actions/workflows/opencode.yml/dispatches');
+  assert.deepEqual(JSON.parse(dispatch.request.body), { ref: 'feature', inputs: { issue_number: '42' } });
+});
+
+test('reject invalid access, closed issues, pull requests, and invalid branches', async () => {
   for (const change of [
     f => { f.env.OPENCODE_ACCESS = 'public'; },
     f => { f.state.current.state = 'closed'; },
     f => { f.state.current.pull_request = {}; },
     f => { f.state.current.title = 'Build branch: ../bad'; },
     f => { f.state.branch = ''; },
-    f => { f.env.GITHUB_REF = 'refs/heads/other'; },
   ]) {
     const f = fixture(); f.event.action = 'opened'; change(f);
     await assert.rejects(f.run());

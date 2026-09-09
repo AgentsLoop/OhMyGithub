@@ -44,8 +44,10 @@ entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
 Append `branch: <existing-branch>` to the title to select project checkout.
 Validate this branch during preparation and freeze its commit as `target_sha`.
 Use `target_ref` for the result base. Use the default branch when no suffix
-exists. Load workflow code from the default branch and installed central
-workflows from their pinned revision.
+exists. When the suffix selects another branch, let default-branch preparation
+dispatch `opencode.yml` at that branch and stop. Run preparation and OpenCode
+from the selected branch workflow. Use the central workflow revision pinned by
+that branch's caller.
 
 Read the [Oh My Github App documentation](https://github.com/AgentsLoop/omsite/blob/main/wiki/oh-my-github-app.md) for
 App ownership, installation scope, permissions, events, and webhook details.

@@ -22,7 +22,8 @@ Set repository variable `OPENCODE_ACCESS=everyone` to accept any issue author
 and enable `/OpenCode` in a newly created issue title. Keep the App as a setup
 helper. Use Actions concurrency to serialize each issue.
 Use `branch: <existing-branch>` at the end of the issue title to select the
-project checkout and result base. Load workflow code from the default branch.
+project checkout, result base, and workflow. Let default-branch preparation
+dispatch the selected branch. Run preparation and OpenCode in that branch run.
 
 ## Literal instruction replacements
 

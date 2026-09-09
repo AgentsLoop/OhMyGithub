@@ -31,7 +31,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      actions: read
+      actions: write
     outputs:
       approved: ${{ steps.prepare.outputs.approved }}
       issue_number: ${{ steps.prepare.outputs.issue_number }}

@@ -28,10 +28,9 @@ export async function prepareRequest(event, env, fetcher = fetch) {
       signal: AbortSignal.timeout(30000), redirect: 'error',
     });
     if (!response.ok) throw new Error(`GitHub request failed (HTTP ${response.status}) for ${path}.`);
-    return response.json();
+    return response.status === 204 ? null : response.json();
   };
   const [repo, issue] = await Promise.all([api(''), api(`/issues/${number}`)]);
-  if (env.GITHUB_REF !== `refs/heads/${repo.default_branch}`) throw new Error('Run the issue listener from the default branch.');
   if (issue.pull_request || issue.state !== 'open') throw new Error('Select an open issue.');
   const labels = (issue.labels || []).map(label => typeof label === 'string' ? label : label.name);
   if (!labels.includes('OpenCode') && !titleTag.test(issue.title)) return { approved: 'false' };
@@ -45,6 +44,13 @@ export async function prepareRequest(event, env, fetcher = fetch) {
   if (parsed.branchError || !parsed.request || !parsed.title) throw new Error(parsed.branchError || 'Supply an issue title and request.');
   const branch = await api(`/branches/${encodeURIComponent(parsed.targetRef)}`);
   if (!/^[a-f0-9]{40}$/.test(branch.commit?.sha || '')) throw new Error('The target branch has no valid commit.');
+  if (env.GITHUB_REF !== `refs/heads/${parsed.targetRef}`) {
+    await api('/actions/workflows/opencode.yml/dispatches', {
+      method: 'POST',
+      body: JSON.stringify({ ref: parsed.targetRef, inputs: { issue_number: String(number) } }),
+    });
+    return { approved: 'false' };
+  }
   if (!labels.includes('OpenCode')) {
     await api(`/issues/${number}/labels`, { method: 'POST', body: JSON.stringify({ labels: ['OpenCode'] }) });
     labels.push('OpenCode');
