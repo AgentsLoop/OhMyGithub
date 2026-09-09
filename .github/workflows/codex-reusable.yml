@@ -52,8 +52,8 @@ jobs:
       issues: write
       actions: read
     env:
-      CODEX_STATE_DIR: ${{ runner.temp }}/codex-worker
-      CODEX_HOME: ${{ runner.temp }}/codex-worker/home
+      CODEX_STATE_DIR: ${{ github.workspace }}/.codex-worker
+      CODEX_HOME: ${{ github.workspace }}/.codex-worker/home
       CODEX_ENDPOINT: ws://127.0.0.1:4097
       RUNTIME_DIR: ${{ github.workspace }}/.omgithub-runtime
       PROJECT_PATH: ${{ vars.PROJECT_DIR || './' }}
