@@ -41,8 +41,9 @@ issue starts.
 Check `git branch --show-current`. If non-empty and not `main`, verify it and
 append ` branch: <current-branch>` to the title. The reusable workflow checks
 out the validated `target_sha` and uses `target_ref` as its result base, preserving the
-debugging worktree. This suffix is routing metadata, not prompt text. On `main`,
-omit it.
+debugging worktree. Default-branch preparation dispatches the listener at this
+branch. Treat the selected-branch run as the execution run. This suffix is
+routing metadata, not prompt text. On `main`, omit it.
 
 Resolve the target repository before creating the issue. An explicitly supplied
 repository wins. With `#main`, use the supplied or current repository on
