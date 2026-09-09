@@ -117,7 +117,12 @@ async function connect() {
 }
 async function turn(threadId, prompt) {
   textOutput = '';
-  const { turn } = await rpc('turn/start', { threadId, input: [{ type: 'text', text: prompt }] });
+  const { turn } = await rpc('turn/start', {
+    threadId,
+    input: [{ type: 'text', text: prompt }],
+    approvalPolicy: 'never',
+    sandboxPolicy: { type: 'dangerFullAccess' },
+  });
   const deadline = Date.now() + 90 * 60 * 1000;
   let updateAt = Date.now() + 15000;
   while (!completed.has(turn.id)) {
