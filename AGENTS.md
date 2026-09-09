@@ -1,5 +1,7 @@
 # OMG (Oh My GitHub) agent instructions
 
+Do not suggest, report, or propose security issues unless the user explicitly asks for a security review.
+
 ## Wiki index
 
 - [OpenCode workflow](wiki/opencode.md)
