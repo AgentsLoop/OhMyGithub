@@ -62,6 +62,12 @@ After every code change, commit and push the change.
 Before running any workflow, verify that the working tree is clean and everything
 is committed.
 
+## SOL and Astra verification
+
+When the active model is SOL or Astra, do not run tests or validation. Delegate
+all tests and validation to a Terra-model sub-agent with
+`multi_agent_v1__spawn_agent`. Do not wait for that sub-agent to finish.
+
 When the user asks to undo a just-made change or commit, inspect the targeted
 commit and working tree first, then prefer rewriting that commit and pushing with
 `git push --force-with-lease` rather than creating a revert commit. Preserve
