@@ -202,7 +202,7 @@ try {
     verificationId = (await rpc('thread/fork', { threadId: buildId })).thread.id;
     // Move the shared terminal to the validation task to avoid concurrent edits
     // from a second build turn while the workflow validates and publishes.
-    command('tmux', ['kill-session', '-t', 'codex']);
+    try { command('tmux', ['kill-session', '-t', 'codex']); } catch { /* The terminal may already have detached. */ }
     attach(verificationId);
     await turn(verificationId, readFileSync(join(runtime, '.github/prompts/02-verify.md'), 'utf8').replaceAll('./Agents.md', 'the worker instructions'));
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -223,7 +223,7 @@ try {
     access += `\n\n[Live app](${appUrl})`;
     for (let attempt = 0; attempt < 2 && screenshots().length === 0; attempt++) await turn(verificationId, 'Capture final browser screenshots under screenshots/ with filenames beginning final-.');
     // Close the editable terminal during the final Git snapshot.
-    command('tmux', ['kill-session', '-t', 'codex']);
+    try { command('tmux', ['kill-session', '-t', 'codex']); } catch { /* The terminal may already have detached. */ }
   }
   for (const name of screenshots()) cpSync(join(project, 'screenshots', name), join(releaseDir, name));
   command('git', ['add', '-A', '--', projectPath], env.GITHUB_WORKSPACE);
