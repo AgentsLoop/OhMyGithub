@@ -11,14 +11,19 @@ completion.
 
 ## Write the issue prompt
 
-Read `references/gauntlet-prompt-rubric.md` before rewriting a sparse request.
-Treat that reference as the canonical prompt-writing and issue-formatting
-guide. Keep its detailed rules there; do not duplicate or summarize them in
-this file.
+First, locate the skill invocation in the user's message. If the skill
+invocation is the first non-whitespace content, remove only the invocation and
+leading routing metadata such as `#main`. Preserve every remaining request
+character as the worker prompt. Do not rewrite, expand, summarize, correct,
+reorder, or normalize that prompt. This exact-prompt rule takes priority over
+the prompt-writing rubric.
 
-Preserve the request and remove only invocation syntax and routing metadata.
-If request text surrounds the invocation, merge it before applying the
-canonical guide.
+If request text appears before the invocation or surrounds it, remove only the
+invocation syntax and routing metadata, merge the request text in its original
+order, and read `references/gauntlet-prompt-rubric.md` before rewriting a sparse
+request. Treat that reference as the canonical prompt-writing and
+issue-formatting guide for this case. Keep its detailed rules there; do not
+duplicate or summarize them in this file.
 
 If the invocation has no request text, invent a fresh random small playable
 browser-game brief. Do not substitute a generic workflow-validation task or
