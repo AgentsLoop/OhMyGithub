@@ -47,7 +47,7 @@ Use `target_ref` for the result base. Use the default branch when no suffix
 exists. Load workflow code from the default branch and installed central
 workflows from their pinned revision.
 
-See the dedicated [Oh My Github App documentation](oh-my-github-app.md) for
+Read the [Oh My Github App documentation](https://github.com/AgentsLoop/omsite/blob/main/wiki/oh-my-github-app.md) for
 App ownership, installation scope, permissions, events, and webhook details.
 
 An issue labeled `omo` additionally installs and configures the OpenCode Ultimate
@@ -125,7 +125,7 @@ project directory, discovers root `index.html` or `dist/index.html` plus final
 screenshots, and creates the store page and playable deployment. Keep the full
 commit-SHA URL working for compatibility. There is no separate publishing
 credential or upload step.
-See [OmGithub publishing](omgithub.md).
+Read [OmGithub publishing](https://github.com/AgentsLoop/omsite/blob/main/wiki/omgithub.md).
 
 The OmGithub issue workspace polls issue comments every eight seconds. Its
 header contains the four numbered workflow stages plus the currently executing

@@ -1,7 +1,7 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { parseIssueRequest } from '../site/server/issue-request.mjs';
+import { parseIssueRequest } from './issue-request.mjs';
 
 const statusLabels = new Set(['in progress', 'validating', 'complete', 'failed']);
 const names = issue => (issue.labels || []).map(label => typeof label === 'string' ? label : label.name).filter(name => !statusLabels.has(name)).sort();

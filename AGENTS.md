@@ -3,10 +3,10 @@
 ## Wiki index
 
 - [OpenCode workflow](wiki/opencode.md)
-- [Oh My Github App](wiki/oh-my-github-app.md)
+- [Oh My Github App](https://github.com/AgentsLoop/omsite/blob/main/wiki/oh-my-github-app.md)
 - [Temporary Mac SSH access](wiki/access.md)
 - [Testing and verification](wiki/testing.md)
-- [OmGithub publishing](wiki/omgithub.md)
+- [OmGithub publishing](https://github.com/AgentsLoop/omsite/blob/main/wiki/omgithub.md)
 
 ## Main project file
 

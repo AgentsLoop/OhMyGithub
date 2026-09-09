@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/opencode-prepare.mjs
-            site/server/issue-request.mjs
+            scripts/issue-request.mjs
           sparse-checkout-cone-mode: false
       - name: Validate and claim issue request
         id: prepare
