@@ -68,6 +68,13 @@ When the active model is SOL or Astra, do not run tests or validation. Delegate
 all tests and validation to a Terra-model sub-agent with
 `multi_agent_v1__spawn_agent`. Do not wait for that sub-agent to finish.
 
+To identify the model of the current chat, run:
+
+```sh
+rg -o '"model":"[^"]*"' "$(ls -t "$CODEX_HOME"/sessions/*/*/*.jsonl | head -n 1)" \
+  | tail -n 1
+```
+
 When the user asks to undo a just-made change or commit, inspect the targeted
 commit and working tree first, then prefer rewriting that commit and pushing with
 `git push --force-with-lease` rather than creating a revert commit. Preserve
