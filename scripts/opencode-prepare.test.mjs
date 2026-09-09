@@ -16,7 +16,7 @@ test('preserve multiline requests without output injection', () => {
   const delimiter = text.split('\n')[0].split('<<')[1];
   assert.equal(text, `request<<${delimiter}\nfirst\napproved=false\nEOF\nlast\n${delimiter}\n`);
 });
-test('bind OIDC audience and submit the exact event snapshot', async () => {
+test('use the default OIDC audience and submit the exact event snapshot', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'omg-prepare-'));
   try {
     const event = { action: 'labeled', label: { name: 'OpenCode' }, issue: { number: 42, body: 'original' } };
@@ -27,7 +27,7 @@ test('bind OIDC audience and submit the exact event snapshot', async () => {
       calls.push({ url: String(url), options });
       return { ok: true, json: async () => calls.length === 1 ? { value: 'oidc-token' } : approved };
     });
-    assert.equal(new URL(calls[0].url).searchParams.get('audience'), 'https://omgithub.com/api/opencode/prepare');
+    assert.equal(new URL(calls[0].url).searchParams.get('audience'), null);
     assert.deepEqual(JSON.parse(calls[1].options.body), { event });
     assert.equal(calls[1].options.headers.Authorization, 'Bearer oidc-token');
     assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /approved<<omg_/);

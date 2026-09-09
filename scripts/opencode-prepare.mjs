@@ -34,7 +34,6 @@ export async function prepare(env = process.env, fetcher = fetch) {
   const endpoint = new URL('/api/opencode/prepare', env.OMG_APP_ORIGIN);
   if (endpoint.protocol !== 'https:') throw new Error('Preparation requires HTTPS');
   const oidcUrl = new URL(env.ACTIONS_ID_TOKEN_REQUEST_URL);
-  oidcUrl.searchParams.set('audience', endpoint.href);
   try {
     const oidcResponse = await fetcher(oidcUrl, {
       headers: { Authorization: `Bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
