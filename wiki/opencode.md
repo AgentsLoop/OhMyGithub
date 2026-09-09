@@ -8,8 +8,8 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 Create the issue with mode labels, then add the exact `OpenCode` label to start
 `.github/workflows/opencode.yml` through `issues.labeled`. Install this listener
-on the default branch first. Run `opencode-prepare.yml` to verify the Actions
-OIDC identity, user permission, request snapshot, and durable request claim.
+on the default branch first. Run `opencode-prepare.yml` on the Actions runner
+to verify author access, the request snapshot, and GitHub request records.
 Pass validated outputs to `opencode-reusable.yml` only after approval.
 
 Use the issue body as the request, or its title when the body is empty. Add
@@ -24,8 +24,11 @@ safe to add `ralph` to the usual Goal-labeled issue. The workflow requires
 Ralph's `<promise>DONE</promise>` completion marker before validation and
 completion reporting.
 
-Open an unlabeled human issue to let the App install the listener and post a
-label reminder. Apply `OpenCode` after installation completes.
+Use the App installation helper or install the caller manually. Set repository
+variable `OPENCODE_ACCESS=everyone` to accept any issue author. In that mode,
+open an issue with `/OpenCode` in its title to run without applying a label.
+Let Actions add the label and continue the same run. Leave the variable unset
+to require write, maintain, or admin access for labeled issue authors.
 
 The `test` label runs the full workflow with a mock OpenCode-generated project
 and must be used alongside `OpenCode`. Apply the exact `OpenCode` label after `test`. Test mode skips OpenCode generation, copies the fixture

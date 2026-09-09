@@ -16,8 +16,11 @@ Keep the local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md)
 aligned with this workflow. Create an issue with mode labels first, then apply
 `OpenCode` to start the native `issues.labeled` listener. Wait only for the
 initial OpenCode session link during E2E kickoff. Install the listener on the
-default branch before requesting execution. Use preparation to authenticate
-and freeze the request before starting the reusable execution job.
+default branch before requesting execution. Validate author access and freeze
+the request inside Actions before starting the reusable execution job.
+Set repository variable `OPENCODE_ACCESS=everyone` to accept any issue author
+and enable `/OpenCode` in a newly created issue title. Keep the App as a setup
+helper. Keep request records in GitHub issue comments.
 Use `branch: <existing-branch>` at the end of the issue title to select the
 project checkout and result base. Load workflow code from the default branch.
 

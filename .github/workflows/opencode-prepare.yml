@@ -32,7 +32,6 @@ jobs:
       contents: read
       issues: write
       actions: read
-      id-token: write
     outputs:
       approved: ${{ steps.prepare.outputs.approved }}
       issue_number: ${{ steps.prepare.outputs.issue_number }}
@@ -49,11 +48,13 @@ jobs:
           repository: AgentsLoop/OhMyGithub
           ref: ${{ inputs.runtime_ref }}
           persist-credentials: false
-          sparse-checkout: scripts/opencode-prepare.mjs
+          sparse-checkout: |
+            scripts/opencode-prepare.mjs
+            site/server/issue-request.mjs
           sparse-checkout-cone-mode: false
       - name: Validate and claim issue request
         id: prepare
         env:
-          OMG_APP_ORIGIN: ${{ vars.OMG_APP_ORIGIN || 'https://omgithub.com' }}
+          OPENCODE_ACCESS: ${{ vars.OPENCODE_ACCESS || 'writers' }}
           GH_TOKEN: ${{ github.token }}
         run: /usr/bin/time -p node scripts/opencode-prepare.mjs

@@ -1,154 +1,75 @@
-# Issue-triggered OpenCode workflow
+# Standalone issue-triggered OpenCode workflow
 
-## Objective
+## Setup
 
-Move execution triggering from the GitHub App to `issues.labeled`. Keep the
-exact `OpenCode` label as the execution request. Use the implemented caller, preparation service, and execution workflow.
-Follow the migration sequence before enabling each installed repository.
+Install `.github/workflows/opencode.yml` on the repository default branch.
+Use the GitHub App as a setup helper for new installations and added repositories,
+or install the caller manually. Create the `OpenCode` label during setup.
+Pin the preparation and execution workflows to one central commit.
 
-## Request and authorization flow
+## Access and triggers
 
-1. Install the issue listener on the repository default branch before accepting
-   execution requests. Create App-submitted issues without execution labels.
-2. Authenticate the submitting user. Require write, maintain, or admin access
-   to the target repository. Move this check from the dispatch handler into
-   the App submission path before applying `OpenCode`; do not trust a supplied
-   username or the App bot's repository permission as user authorization.
-3. Validate the request and optional `branch: <existing-branch>` title suffix.
-   Use an App installation token to apply `OpenCode` after validation. Avoid
-   using a workflow `GITHUB_TOKEN` for this operation because its label events
-   do not start another workflow.
-4. Start a preparation job only for the exact `OpenCode` label. Repeat the
-   authorization check there before starting the privileged reusable job.
-   For direct human requests, preserve the current issue-author permission
-   policy. For App-created issues, verify an App approval record tied to the
-   authenticated submitter, repository, issue, and exact request snapshot.
-5. Store App approval records in App-controlled storage and retrieve them
-   through an authenticated interface. Bind each record to the title, body,
-   label names, and selected branch. Exclude the lifecycle labels `in progress`,
-   `complete`, and `failed` from the approval hash so a failed attempt can retry. Reject missing or mismatched approval;
-   do not accept an editable issue field or comment as approval proof.
-6. Validate and freeze the event snapshot in preparation. Pass that snapshot
-   to OpenCode. Do not fetch a newer body after validation. Reject an edited
-   App request until the App approves its new snapshot.
-7. Stop on authorization or validation failure. Publish a clear failure reason
-   without starting OpenCode or exposing model and tunnel secrets.
+Leave repository variable `OPENCODE_ACCESS` unset, or set it to `writers`, to
+require write, maintain, or admin access for the issue author. Apply `OpenCode`
+after creating the issue and its mode labels.
 
-## Trigger fragment
+Set `OPENCODE_ACCESS=everyone` to accept any issue author. Let visitors open an
+issue with `/OpenCode` in its title, such as `/OpenCode Build a maze game`.
+Use a separate word with the exact spelling. Add the execution label inside
+the opened-issue run with `GITHUB_TOKEN`, then continue the same run. Let the
+label event handle issues created with `OpenCode` already attached.
 
-Use this fragment in the caller. Add the preparation and reusable jobs described
-below; do not deploy this fragment alone.
+Ignore unrelated events. Use a separate concurrency group for skipped events.
+Serialize execution requests per repository and issue. Read the access variable
+from repository Actions settings; reject unsupported values.
 
-```yaml
-name: OpenCode issue
+## Preparation
 
-on:
-  issues:
-    types: [labeled]
+Run `scripts/opencode-prepare.mjs` on the Actions runner. Use its repository
+token for GitHub API calls. Check author access, compare the event snapshot
+with the current issue, resolve the branch, and record the request in a
+GitHub Actions bot comment before starting execution.
 
-permissions:
-  contents: write
-  issues: write
+Use the issue body as the request, or the title when the body is empty. Remove
+the `/OpenCode` marker and trailing `branch: <existing-branch>` directive from
+the title used as prompt text. Keep all other request text intact.
 
-concurrency:
-  group: opencode-issue-${{ github.repository }}-${{ github.event.issue.number }}
-  cancel-in-progress: false
-```
+Store the originating issue or label event ID, run ID, attempt, snapshot hash,
+and checkout SHA in the request comment. Read only records authored by
+`github-actions[bot]`. Compare previous run status through the GitHub API.
+Reject duplicate completed requests and requests submitted during active work.
+Retry failed runs explicitly and keep their frozen checkout SHA. Preserve
+these comments to preserve duplicate detection.
 
-Apply `if: github.event.label.name == 'OpenCode'` to the preparation job. Make
-execution depend on successful preparation and an explicit approval output.
-Give preparation only the permissions and credentials needed for validation.
-Pass model and tunnel secrets only to the execution job. Expect unrelated
-label events to create skipped workflow runs, without executing OpenCode.
+Ignore `in progress`, `validating`, `complete`, and `failed` when comparing
+request labels. Reject edited request content. Reapply the execution label
+to request another run with updated content.
 
-## Reusable workflow contract
+## Execution contract
 
-Keep the existing required inputs and supply them from validated preparation
-outputs. Do not assume the current reusable workflow retrieves the issue body;
-it consumes `inputs.request`.
+Pass validated `issue_number`, `request`, `issue_title`, `sender`, and
+`labels_json` from preparation. Pass label names as strings. Pass `target_ref`
+as the selected result-base branch and `target_sha` as its frozen checkout.
+Pass `runtime_ref` as the central workflow commit. Keep model and tunnel
+secrets in the execution job.
 
-| Input | Required handling |
-| --- | --- |
-| `issue_number` | Convert the triggering issue number to a string. |
-| `request` | Build the exact request from the validated snapshot; preserve current prompt construction and remove branch metadata. |
-| `issue_title` | Pass the validated title used for reporting. |
-| `sender` | Pass the authorized human identity; preserve issue-author semantics for direct human requests. |
-| `labels_json` | Pass an array of label-name strings; use `toJSON(github.event.issue.labels.*.name)` before validation. |
-| `runtime_ref` | Pin central runtime code to the same commit as the reusable workflow. |
-| `target_ref` | Add a required input for the validated branch name used as the result base. |
-| `target_sha` | Add a required input for the commit resolved from that branch during preparation. |
-
-Update checkout to use `target_sha`. Update `TARGET_REF` and result-base handling
-to use `target_ref`. Stop deriving the target checkout from `github.ref_name`.
-Resolve the default branch when the title has no branch suffix. Reject invalid
+Load workflow code from the default branch and project code from the selected
+commit. Resolve the default branch when no branch suffix exists. Reject invalid
 or missing branches before execution.
 
-Load workflow code from the default branch for repository-owned workflows.
-Record this deliberate change from the current selected-branch workflow
-behavior. Use the selected branch only for project checkout and the result
-base. Review callers and tests that currently depend on selected-branch
-workflow code.
+## Site submissions
 
-Keep the local reusable path in this repository. Generate installed-repository
-wrappers that call the central reusable workflow at an approved commit SHA;
-do not assume those repositories contain a local reusable file. Update the
-wrapper generator and both call paths together. Preserve caller write
-permissions because a reusable workflow cannot elevate its caller's token.
+Create site issues with the signed-in user's GitHub token and `/OpenCode` in
+the title. Request the mode and execution labels in the creation API call.
+Let GitHub enforce label permissions and let Actions enforce execution access.
+Install the listener before accepting submissions.
 
-## Execution and retry rules
+## Verification
 
-Use per-issue concurrency to prevent overlapping executions. Do not treat
-concurrency as duplicate-request detection or as a complete request queue.
-Reject a new request while that issue has an active execution, and define a
-persistent request identifier before adding automatic retry behavior.
-
-Use the originating label-event identity for request tracking. Keep a durable
-claim for each accepted request so repeated delivery cannot start it twice.
-Allow an explicit failed-run retry only after checking the prior execution
-state; keep this claim outside the runner workspace. Do not retry completed
-requests automatically.
-
-Document removal and reapplication of `OpenCode` as a new request. Revalidate
-its snapshot and permissions. Do not promise automatic workflow retries from
-GitHub event delivery alone.
-
-## Migration sequence
-
-1. Implement preparation, approval storage, request claims, and the new reusable
-   inputs. Update the App submission path and wrapper generator.
-2. Test in an isolated repository with App dispatch disabled for that repository.
-   Keep only one execution owner per repository.
-3. Pause new submissions for each production repository. Drain active runs and
-   record outstanding requests. Disable its App dispatch route before enabling
-   the issue listener on the default branch.
-4. Install and verify the listener and its reusable-workflow reference. Resume
-   submissions only after installation succeeds. Recover recorded requests
-   through explicit, validated label application.
-5. Remove dispatch-specific code and permission checks after all repositories
-   migrate. Retain permissions still required for wrapper installation or
-   other App operations; audit those operations before reducing permissions.
-6. Update `AGENTS.md`, the workflow wiki, and the issue E2E skill to match the
-   final trigger and request flow.
-7. Roll back by pausing submissions, disabling the listener, draining active
-   work, and restoring dispatch ownership before resuming requests.
-
-## Acceptance checks
-
-- Verify authorized App submissions and direct human label requests.
-- Reject unauthorized submitters, forged usernames, and label requests that
-  bypass App approval for App-created issues.
-- Reject App requests edited after approval. Execute only the validated snapshot.
-- Verify all required inputs and label-controlled modes with label-name arrays.
-- Verify default-branch and explicit-branch checkout, result-base selection,
-  missing-branch rejection, and the documented workflow-code revision policy.
-- Verify the local reusable call and a newly installed central-workflow wrapper.
-- Verify caller permissions, secret isolation, and clear validation failures.
-- Verify duplicate delivery, active-run requests, failed-run retry, and relabeling.
-- Verify that unrelated labels do not execute OpenCode.
-- Verify that migration and rollback cannot activate both execution paths.
-
-## References
-
-- Check [GitHub issue event rules](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#issues).
-- Check [workflow token trigger rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
-- Check [reusable workflow permission limits](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations).
+- Test restricted author access and `everyone` access.
+- Test `/OpenCode` issue creation without the execution label.
+- Test a labeled issue and skip duplicate opened-event execution.
+- Verify preparation calls only repository GitHub APIs.
+- Verify request edits, invalid branches, duplicate claims, and failed retries.
+- Verify pinned workflow code, frozen checkout, and result delivery.
+- Test the installed caller with the setup service unavailable.

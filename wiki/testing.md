@@ -1,5 +1,12 @@
 # Testing and verification
 
+## Test standalone issue access
+
+Test `/OpenCode` in a new issue title with `OPENCODE_ACCESS=everyone` and
+verify that Actions adds the execution label and starts one execution job.
+Restore the access variable after testing. Verify restricted access with the
+variable unset. Read request records from GitHub Actions bot comments.
+
 ## Test the `-rc` repository at a selected commit
 
 Use the release-candidate repository when you need to test the workflow against

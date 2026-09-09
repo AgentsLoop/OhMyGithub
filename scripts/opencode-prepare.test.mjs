@@ -1,52 +1,133 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { prepare, validateOutputs, outputText } from './opencode-prepare.mjs';
+import { prepareRequest, outputText } from './opencode-prepare.mjs';
 
-const approved = { approved: true, issue_number: '42', request: 'Build it\nwith details', issue_title: 'Build it', sender: 'owner', labels_json: '["OpenCode"]', target_ref: 'feature/game', target_sha: 'a'.repeat(40) };
-test('reject mismatched issue, missing commit, denied approval, and malformed labels', () => {
-  for (const change of [{ issue_number: '43' }, { target_sha: 'main' }, { approved: false }, { labels_json: '{}' }, { labels_json: '["test"]' }]) {
-    assert.throws(() => validateOutputs({ ...approved, ...change }, 42));
-  }
-});
+function fixture(options = {}) {
+  const issue = { id: 420, number: 42, title: 'Build a game branch: feature', body: 'Make it playable\nKeep controls simple.', state: 'open', user: { login: 'visitor', id: 7, type: 'User' }, labels: [{ name: 'OpenCode' }, { name: 'test' }], created_at: '2026-09-09T01:00:00Z', updated_at: '2026-09-09T01:00:10Z' };
+  const event = { action: 'labeled', label: { name: 'OpenCode' }, issue, repository: { full_name: 'owner/repo' }, sender: { id: 7 } };
+  const env = { GITHUB_REPOSITORY: 'owner/repo', GITHUB_EVENT_NAME: 'issues', GITHUB_RUN_ID: '100', GITHUB_RUN_ATTEMPT: '1', GITHUB_REF: 'refs/heads/main', GH_TOKEN: 'repository-token', ...options.env };
+  const state = { current: structuredClone(issue), comments: [], runs: { '100/attempts/1': { id: 100, event: 'issues', status: 'in_progress', created_at: '2026-09-09T01:00:11Z' } }, branch: 'a'.repeat(40), calls: [] };
+  const fetcher = async (url, request) => {
+    assert.equal(new URL(url).origin, 'https://api.github.com');
+    assert.equal(request.headers.Authorization, 'Bearer repository-token');
+    const path = new URL(url).pathname.replace('/repos/owner/repo', '');
+    state.calls.push({ path, request });
+    let data;
+    if (path === '') data = { default_branch: 'main' };
+    else if (path === '/issues/42') data = state.current;
+    else if (path.startsWith('/actions/runs/')) data = state.runs[path.slice('/actions/runs/'.length)];
+    else if (path.startsWith('/collaborators/')) data = { permission: options.permission || 'write' };
+    else if (path === '/issues/42/timeline') data = [{ id: 88, event: 'labeled', label: { name: 'OpenCode' }, actor: { id: 7 }, created_at: event.issue.updated_at }];
+    else if (path.startsWith('/branches/')) data = { commit: { sha: state.branch } };
+    else if (path === '/issues/42/comments' && request.method === 'POST') {
+      data = { id: state.comments.length + 1, user: { login: 'github-actions[bot]', type: 'Bot' }, ...JSON.parse(request.body) };
+      state.comments.push(data);
+    } else if (path === '/issues/42/comments') data = [...state.comments];
+    else if (path === '/issues/42/labels') {
+      state.current.labels.push({ name: 'OpenCode' });
+      data = state.current.labels;
+    } else throw new Error(`Unexpected path ${path}`);
+    if (!data) return { ok: false, status: 404 };
+    return { ok: true, status: 200, json: async () => structuredClone(data) };
+  };
+  return { event, env, state, run: () => prepareRequest(event, env, fetcher) };
+}
+
 test('preserve multiline requests without output injection', () => {
-  const text = outputText({ request: 'first\napproved=false\nEOF\nlast' });
+  const value = 'first\napproved=false\nEOF\nlast';
+  const text = outputText({ request: value });
   const delimiter = text.split('\n')[0].split('<<')[1];
-  assert.equal(text, `request<<${delimiter}\nfirst\napproved=false\nEOF\nlast\n${delimiter}\n`);
+  assert.equal(text, `request<<${delimiter}\n${value}\n${delimiter}\n`);
 });
-test('use the default OIDC audience and submit the exact event snapshot', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'omg-prepare-'));
-  try {
-    const event = { action: 'labeled', label: { name: 'OpenCode' }, issue: { number: 42, body: 'original' } };
-    const env = { GITHUB_EVENT_NAME: 'issues', GITHUB_EVENT_PATH: join(dir, 'event.json'), GITHUB_OUTPUT: join(dir, 'output'), OMG_APP_ORIGIN: 'https://omgithub.com', ACTIONS_ID_TOKEN_REQUEST_URL: 'https://oidc.example/token?x=1', ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'request-token' };
-    writeFileSync(env.GITHUB_EVENT_PATH, JSON.stringify(event));
-    const calls = [];
-    await prepare(env, async (url, options) => {
-      calls.push({ url: String(url), options });
-      return { ok: true, json: async () => calls.length === 1 ? { value: 'oidc-token' } : approved };
-    });
-    assert.equal(new URL(calls[0].url).searchParams.get('audience'), null);
-    assert.deepEqual(JSON.parse(calls[1].options.body), { event });
-    assert.equal(calls[1].options.headers.Authorization, 'Bearer oidc-token');
-    assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /approved<<omg_/);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+
+test('authorize writers and freeze branch/request using only repository GitHub API', async () => {
+  const f = fixture();
+  const result = await f.run();
+  assert.equal(result.target_ref, 'feature');
+  assert.equal(result.target_sha, 'a'.repeat(40));
+  assert.equal(result.issue_title, 'Build a game');
+  assert.equal(result.request, f.event.issue.body);
+  assert.equal(result.sender, 'visitor');
+  assert.deepEqual(JSON.parse(result.labels_json), ['OpenCode', 'test']);
+  assert.equal(f.state.comments.length, 1);
 });
-test('publish safe failure text and never write execution outputs on denial', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'omg-prepare-'));
-  try {
-    const env = { GITHUB_EVENT_NAME: 'issues', GITHUB_EVENT_PATH: join(dir, 'event.json'), GITHUB_OUTPUT: join(dir, 'output'), OMG_APP_ORIGIN: 'https://omgithub.com', ACTIONS_ID_TOKEN_REQUEST_URL: 'https://oidc.example/token', ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'secret', GITHUB_REPOSITORY: 'owner/repo', GITHUB_RUN_ID: '123', GH_TOKEN: 'github-secret' };
-    writeFileSync(env.GITHUB_EVENT_PATH, JSON.stringify({ action: 'labeled', label: { name: 'OpenCode' }, issue: { number: 42 } }));
-    const calls = [];
-    await assert.rejects(prepare(env, async (url, options) => {
-      calls.push({ url: String(url), options });
-      if (calls.length === 1) return { ok: true, json: async () => ({ value: 'private-oidc' }) };
-      return { ok: calls.length === 3, status: 403, json: async () => ({ error: 'Request is not approved' }) };
-    }));
-    assert.equal(calls.length, 3);
-    assert.match(calls[2].url, /issues\/42\/comments$/);
-    assert.doesNotMatch(calls[2].options.body, /private-oidc|github-secret/);
-    assert.throws(() => readFileSync(env.GITHUB_OUTPUT));
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+
+test('default access rejects an outsider even when someone else applies the label', async () => {
+  const f = fixture({ permission: 'read' });
+  await assert.rejects(f.run(), /author needs write/);
+  assert.equal(f.state.comments.length, 0);
+});
+
+test('everyone accepts outsider label requests without a collaborator lookup', async () => {
+  const f = fixture({ permission: 'read', env: { OPENCODE_ACCESS: 'everyone' } });
+  assert.equal((await f.run()).approved, 'true');
+  assert.equal(f.state.calls.some(call => call.path.startsWith('/collaborators/')), false);
+});
+
+test('everyone title marker adds the label and runs without a label permission', async () => {
+  const f = fixture({ permission: 'read', env: { OPENCODE_ACCESS: 'everyone' } });
+  f.event.action = 'opened';
+  delete f.event.label;
+  f.event.issue.title = '/OpenCode Build a game';
+  f.event.issue.labels = [];
+  f.state.current = structuredClone(f.event.issue);
+  const result = await f.run();
+  assert.equal(result.approved, 'true');
+  assert.equal(result.issue_title, 'Build a game');
+  assert.equal(result.target_ref, 'main');
+  assert.deepEqual(JSON.parse(result.labels_json), ['OpenCode']);
+  assert.equal(f.state.calls.filter(call => call.path.endsWith('/labels')).length, 1);
+});
+
+test('opened issues with an existing execution label leave execution to the label event', async () => {
+  const f = fixture({ env: { OPENCODE_ACCESS: 'everyone' } });
+  f.event.action = 'opened';
+  f.event.issue.title = '/OpenCode Build a game';
+  assert.equal((await f.run()).approved, 'false');
+  assert.equal(f.state.calls.length, 0);
+});
+
+test('title entry requires everyone and an exact marker; unrelated events skip', async () => {
+  for (const title of ['/OpenCodes Build', 'x/OpenCode Build', 'Build normally']) {
+    const f = fixture({ env: { OPENCODE_ACCESS: 'everyone' } });
+    f.event.action = 'opened'; f.event.issue.labels = []; f.event.issue.title = title;
+    assert.equal((await f.run()).approved, 'false');
+  }
+  const f = fixture();
+  f.event.action = 'opened'; f.event.issue.labels = []; f.event.issue.title = '/OpenCode Build';
+  assert.equal((await f.run()).approved, 'false');
+});
+
+test('invalid access value fails closed', async () => {
+  await assert.rejects(fixture({ env: { OPENCODE_ACCESS: 'public' } }).run(), /writers or everyone/);
+});
+
+test('reject changed requests and invalid or missing branches before a claim', async () => {
+  const f = fixture(); f.state.current.body = 'Changed';
+  await assert.rejects(f.run(), /changed/);
+  const g = fixture(); g.event.issue.title = 'Build branch: ../bad';
+  await assert.rejects(g.run(), /Invalid branch/);
+  const h = fixture(); h.state.branch = '';
+  await assert.rejects(h.run(), /valid commit/);
+});
+
+test('reject duplicate active/completed claims and preserve SHA on a failed retry', async () => {
+  const f = fixture();
+  await f.run();
+  await assert.rejects(f.run(), /active execution/);
+  const prior = f.state.runs['100/attempts/1'];
+  prior.status = 'completed'; prior.conclusion = 'success';
+  await assert.rejects(f.run(), /already ran/);
+  prior.conclusion = 'failure';
+  f.env.GITHUB_RUN_ATTEMPT = '2';
+  f.state.runs['100/attempts/2'] = { ...prior, status: 'in_progress' };
+  f.state.current.labels.push({ name: 'failed' });
+  f.state.branch = 'b'.repeat(40);
+  assert.equal((await f.run()).target_sha, 'a'.repeat(40));
+});
+
+test('ignore forged claim comments from an issue author', async () => {
+  const f = fixture();
+  f.state.comments.push({ user: { login: 'visitor', type: 'User' }, body: '<!-- opencode-request-v1\n{"key":"labeled:88","run":"999","attempt":"1"}\n-->' });
+  assert.equal((await f.run()).approved, 'true');
 });
