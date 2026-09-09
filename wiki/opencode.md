@@ -6,10 +6,10 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 ## Trigger
 
-Create the issue with mode labels, then add the exact `OpenCode` label to start
-`.github/workflows/opencode.yml` through `issues.labeled`. Install this listener
+Create the issue with `OpenCode` and all mode labels, or use `/OpenCode` in
+its title, to start `.github/workflows/opencode.yml` through `issues.opened`. Install this listener
 on the default branch first. Run `opencode-prepare.yml` on the Actions runner
-to verify author access, the request snapshot, and GitHub request records.
+to verify author access and resolve the target branch.
 Pass validated outputs to `opencode-reusable.yml` only after approval.
 
 Use the issue body as the request, or its title when the body is empty. Add
@@ -31,7 +31,7 @@ Let Actions add the label and continue the same run. Leave the variable unset
 to require write, maintain, or admin access for labeled issue authors.
 
 The `test` label runs the full workflow with a mock OpenCode-generated project
-and must be used alongside `OpenCode`. Apply the exact `OpenCode` label after `test`. Test mode skips OpenCode generation, copies the fixture
+and must be used alongside `OpenCode`. Attach both labels when creating the issue. Test mode skips OpenCode generation, copies the fixture
 from `.github/fixtures/test-project`, then runs local verification, pushes the
 normal immutable branch, reports its OmGithub tree URL, and completes the issue.
 It also emits the normal live-progress comment, final report, lifecycle labels,

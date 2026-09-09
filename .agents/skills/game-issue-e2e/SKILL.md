@@ -58,8 +58,8 @@ if other local skills mentioned verify they exist on https://github.com/agents-d
    Resolve `<target-repo>` and `<target-branch>` before any issue or workflow
    command. Verify the default `main` target is `AgentsLoop/PlayGround`.
 2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
-   labels, and create the issue with `Goal` and all mode labels. Verify the
-   default-branch listener exists, then add `OpenCode` separately. Do not create a label for
+   labels. Verify the default-branch listener exists, then create the issue
+   with `OpenCode`, `Goal`, and all mode labels already attached. Do not create a label for
    `#self`. Verify labels with `gh issue view <number> --json labels`. Comments,
    edits, and other labels are not triggers.
 3. Confirm the newest run is matching `issues`, title, resolved

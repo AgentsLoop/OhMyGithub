@@ -13,14 +13,14 @@
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
 
 Keep the local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md)
-aligned with this workflow. Create an issue with mode labels first, then apply
-`OpenCode` to start the native `issues.labeled` listener. Wait only for the
+aligned with this workflow. Create an issue with `OpenCode` and all mode labels already attached, or use
+`/OpenCode` in its title, to start the native `issues.opened` listener. Wait only for the
 initial OpenCode session link during E2E kickoff. Install the listener on the
 default branch before requesting execution. Validate author access and freeze
 the request inside Actions before starting the reusable execution job.
 Set repository variable `OPENCODE_ACCESS=everyone` to accept any issue author
 and enable `/OpenCode` in a newly created issue title. Keep the App as a setup
-helper. Keep request records in GitHub issue comments.
+helper. Use Actions concurrency to serialize each issue.
 Use `branch: <existing-branch>` at the end of the issue title to select the
 project checkout and result base. Load workflow code from the default branch.
 
@@ -82,7 +82,7 @@ When mentioning a commit, append its relative age in hours or days.
 
 ## OpenCode GitHub Actions
 
-To execute an issue, create it with mode labels and then add `OpenCode`.
+To execute an issue, create it with `OpenCode` and all mode labels already attached.
 Check for a native `issues` run and successful preparation.
 The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.

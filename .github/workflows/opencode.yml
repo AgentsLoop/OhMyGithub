@@ -3,7 +3,13 @@ run-name: "OpenCode #${{ github.event.issue.number }} — ${{ github.event.issue
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Existing issue to run
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,12 +17,12 @@ permissions:
   actions: read
 
 concurrency:
-  group: ${{ (github.event.label.name == 'OpenCode' || (github.event.action == 'opened' && vars.OPENCODE_ACCESS == 'everyone' && contains(github.event.issue.title, '/OpenCode') && !contains(github.event.issue.labels.*.name, 'OpenCode'))) && format('opencode-issue-{0}-{1}', github.repository, github.event.issue.number) || format('opencode-skipped-{0}', github.run_id) }}
+  group: opencode-issue-${{ github.repository }}-${{ github.event.issue.number || inputs.issue_number }}
   cancel-in-progress: false
 
 jobs:
   prepare:
-    if: github.event.label.name == 'OpenCode' || (github.event.action == 'opened' && vars.OPENCODE_ACCESS == 'everyone' && contains(github.event.issue.title, '/OpenCode') && !contains(github.event.issue.labels.*.name, 'OpenCode'))
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'OpenCode') || contains(github.event.issue.title, '/OpenCode')
     uses: ./.github/workflows/opencode-prepare.yml
     with:
       runtime_ref: ${{ github.workflow_sha }}

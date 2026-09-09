@@ -40,94 +40,62 @@ test('preserve multiline requests without output injection', () => {
   assert.equal(text, `request<<${delimiter}\n${value}\n${delimiter}\n`);
 });
 
-test('authorize writers and freeze branch/request using only repository GitHub API', async () => {
-  const f = fixture();
+test('open once, authorize writers, and freeze the branch', async () => {
+  const f = fixture(); f.event.action = 'opened';
   const result = await f.run();
   assert.equal(result.target_ref, 'feature');
   assert.equal(result.target_sha, 'a'.repeat(40));
   assert.equal(result.issue_title, 'Build a game');
   assert.equal(result.request, f.event.issue.body);
-  assert.equal(result.sender, 'visitor');
-  assert.deepEqual(JSON.parse(result.labels_json), ['OpenCode', 'test']);
-  assert.equal(f.state.comments.length, 1);
-});
-
-test('default access rejects an outsider even when someone else applies the label', async () => {
-  const f = fixture({ permission: 'read' });
-  await assert.rejects(f.run(), /author needs write/);
   assert.equal(f.state.comments.length, 0);
+  assert.equal(f.state.calls.some(call => /timeline|comments|actions/.test(call.path)), false);
 });
 
-test('everyone accepts outsider label requests without a collaborator lookup', async () => {
-  const f = fixture({ permission: 'read', env: { OPENCODE_ACCESS: 'everyone' } });
+test('reject outsiders by default and accept everyone when configured', async () => {
+  const f = fixture({ permission: 'read' }); f.event.action = 'opened';
+  await assert.rejects(f.run(), /author needs write/);
+  f.env.OPENCODE_ACCESS = 'everyone';
   assert.equal((await f.run()).approved, 'true');
-  assert.equal(f.state.calls.some(call => call.path.startsWith('/collaborators/')), false);
 });
 
-test('everyone title marker adds the label and runs without a label permission', async () => {
-  const f = fixture({ permission: 'read', env: { OPENCODE_ACCESS: 'everyone' } });
-  f.event.action = 'opened';
-  delete f.event.label;
-  f.event.issue.title = '/OpenCode Build a game';
-  f.event.issue.labels = [];
-  f.state.current = structuredClone(f.event.issue);
-  const result = await f.run();
-  assert.equal(result.approved, 'true');
-  assert.equal(result.issue_title, 'Build a game');
-  assert.equal(result.target_ref, 'main');
-  assert.deepEqual(JSON.parse(result.labels_json), ['OpenCode']);
-  assert.equal(f.state.calls.filter(call => call.path.endsWith('/labels')).length, 1);
+test('title trigger adds the execution label in either access mode', async () => {
+  for (const access of ['writers', 'everyone']) {
+    const f = fixture({ env: { OPENCODE_ACCESS: access } }); f.event.action = 'opened';
+    f.state.current.title = '/OpenCode Build a game'; f.state.current.labels = [];
+    const result = await f.run();
+    assert.equal(result.approved, 'true');
+    assert.equal(result.issue_title, 'Build a game');
+    assert.deepEqual(JSON.parse(result.labels_json), ['OpenCode']);
+  }
 });
 
-test('opened issues with an existing execution label leave execution to the label event', async () => {
-  const f = fixture({ env: { OPENCODE_ACCESS: 'everyone' } });
-  f.event.action = 'opened';
-  f.event.issue.title = '/OpenCode Build a game';
+test('ignore later labels and unrelated titles', async () => {
+  const f = fixture();
   assert.equal((await f.run()).approved, 'false');
   assert.equal(f.state.calls.length, 0);
-});
-
-test('title entry requires everyone and an exact marker; unrelated events skip', async () => {
+  f.event.action = 'opened'; f.state.current.labels = [];
   for (const title of ['/OpenCodes Build', 'x/OpenCode Build', 'Build normally']) {
-    const f = fixture({ env: { OPENCODE_ACCESS: 'everyone' } });
-    f.event.action = 'opened'; f.event.issue.labels = []; f.event.issue.title = title;
+    f.state.current.title = title;
     assert.equal((await f.run()).approved, 'false');
   }
-  const f = fixture();
-  f.event.action = 'opened'; f.event.issue.labels = []; f.event.issue.title = '/OpenCode Build';
-  assert.equal((await f.run()).approved, 'false');
 });
 
-test('invalid access value fails closed', async () => {
-  await assert.rejects(fixture({ env: { OPENCODE_ACCESS: 'public' } }).run(), /writers or everyone/);
-});
-
-test('reject changed requests and invalid or missing branches before a claim', async () => {
-  const f = fixture(); f.state.current.body = 'Changed';
-  await assert.rejects(f.run(), /changed/);
-  const g = fixture(); g.event.issue.title = 'Build branch: ../bad';
-  await assert.rejects(g.run(), /Invalid branch/);
-  const h = fixture(); h.state.branch = '';
-  await assert.rejects(h.run(), /valid commit/);
-});
-
-test('reject duplicate active/completed claims and preserve SHA on a failed retry', async () => {
-  const f = fixture();
-  await f.run();
-  await assert.rejects(f.run(), /active execution/);
-  const prior = f.state.runs['100/attempts/1'];
-  prior.status = 'completed'; prior.conclusion = 'success';
-  await assert.rejects(f.run(), /already ran/);
-  prior.conclusion = 'failure';
-  f.env.GITHUB_RUN_ATTEMPT = '2';
-  f.state.runs['100/attempts/2'] = { ...prior, status: 'in_progress' };
-  f.state.current.labels.push({ name: 'failed' });
-  f.state.branch = 'b'.repeat(40);
-  assert.equal((await f.run()).target_sha, 'a'.repeat(40));
-});
-
-test('ignore forged claim comments from an issue author', async () => {
-  const f = fixture();
-  f.state.comments.push({ user: { login: 'visitor', type: 'User' }, body: '<!-- opencode-request-v1\n{"key":"labeled:88","run":"999","attempt":"1"}\n-->' });
+test('manual start reads an existing issue with the same access checks', async () => {
+  const f = fixture({ env: { GITHUB_EVENT_NAME: 'workflow_dispatch' } });
+  f.event.inputs = { issue_number: '42' }; delete f.event.issue;
   assert.equal((await f.run()).approved, 'true');
+});
+
+test('reject invalid access, closed issues, pull requests, branches and workflow refs', async () => {
+  for (const change of [
+    f => { f.env.OPENCODE_ACCESS = 'public'; },
+    f => { f.state.current.state = 'closed'; },
+    f => { f.state.current.pull_request = {}; },
+    f => { f.state.current.title = 'Build branch: ../bad'; },
+    f => { f.state.branch = ''; },
+    f => { f.env.GITHUB_REF = 'refs/heads/other'; },
+  ]) {
+    const f = fixture(); f.event.action = 'opened'; change(f);
+    await assert.rejects(f.run());
+  }
 });

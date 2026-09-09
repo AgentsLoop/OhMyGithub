@@ -5,7 +5,7 @@
 Test `/OpenCode` in a new issue title with `OPENCODE_ACCESS=everyone` and
 verify that Actions adds the execution label and starts one execution job.
 Restore the access variable after testing. Verify restricted access with the
-variable unset. Read request records from GitHub Actions bot comments.
+variable unset. Verify one Actions run for each new issue.
 
 ## Test the `-rc` repository at a selected commit
 
@@ -39,11 +39,10 @@ Create an SSH test issue with the required labels:
 gh issue create --repo "$repo" \
   --title "Check SSH connectivity on $branch" \
   --body $'# Check SSH connectivity on <branch>\n\nVerify the temporary AgentsWeb SSH session, authentication, tunnel, and remote response. Record concrete evidence without exposing secrets.' \
-  --label Goal --label ssh
-gh issue edit <issue-number> --repo "$repo" --add-label OpenCode
+  --label Goal --label ssh --label OpenCode
 ```
 
-Apply `OpenCode` after listener installation to trigger one native `issues` run. The
+Create the issue after listener installation to trigger one native `issues` run. The
 `Goal` label selects goal mode. The `ssh` label requests an SSH-only check in
 the reusable workflow. Verify the issue labels and the selected checkout:
 
@@ -115,8 +114,7 @@ actionlint .github/workflows/opencode.yml .github/workflows/opencode-prepare.yml
 git diff --check
 ```
 
-For a full workflow test, apply both the `OpenCode` and `test` labels to an
-issue. Apply `OpenCode` after `test`; `test`
+For a full workflow test, create an issue with both `OpenCode` and `test`. Use `test` to
 selects a deterministic mock-generation path. The workflow copies the fixture
 from `.github/fixtures/test-project` instead of invoking OpenCode, then verifies
 it locally, creates and pushes the normal branch, reports the immutable
@@ -132,7 +130,7 @@ The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
 `actionlint` succeeds.
 
-For goal support, create an issue with `Goal`, then add `OpenCode`. Verify one
+For goal support, create an issue with both `Goal` and `OpenCode`. Verify one
 native `issues` run, successful preparation, and the Goal invocation. Verify
 that an issue without `Goal` uses the standard invocation. Preserve `Goal`
 when adding lifecycle labels.
