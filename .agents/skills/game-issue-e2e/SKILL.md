@@ -12,26 +12,23 @@ initial Web UI link. Do not claim implementation completion.
 
 ## Write the issue prompt
 
-First, locate the skill invocation in the user's message. If the skill
-invocation is the first non-whitespace content, remove only the invocation and
-leading routing metadata such as `#main`. Preserve every remaining request
-character as the worker prompt. Do not rewrite, expand, summarize, correct,
-reorder, or normalize that prompt. This exact-prompt rule takes priority over
-the prompt-writing rubric.
+Locate the skill invocation in the user's message. Remove only the invocation
+syntax and routing metadata such as `#main` and mode labels. Merge surrounding
+request text in its original order.
 
-If request text appears before the invocation or surrounds it, remove only the
-invocation syntax and routing metadata, merge the request text in its original
-order, and read `references/gauntlet-prompt-rubric.md` before rewriting a sparse
-request. Treat that reference as the canonical prompt-writing and
-issue-formatting guide for this case. Keep its detailed rules there; do not
-duplicate or summarize them in this file.
+Read `references/gauntlet-prompt-rubric.md` whenever the remaining request is
+sparse, names only a product or concept, lacks a concrete quality bar, or does
+not state the required output surface and dimensionality. Rewrite that request
+as a concise Gauntlet Loop prompt. Preserve a detailed request exactly when it
+already supplies the goal, concrete bar, and essential constraints. Never let
+invocation placement bypass the rubric.
 
 If the invocation has no request text, invent a fresh random small playable
 browser-game brief. Do not substitute a generic workflow-validation task or
 ask the user for a game concept.
 
 Repeat the exact issue title as the first Markdown heading in the issue body.
-Keep the title as issue metadata too; the body must not omit or paraphrase it.
+Keep the title as issue metadata too; the body must not omit it.
 
 Write the issue body to a temporary Markdown file and pass it with
 `gh issue create --body-file <path>` or `gh issue edit --body-file <path>`.

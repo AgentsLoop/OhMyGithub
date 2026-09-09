@@ -1,96 +1,63 @@
-# Prompt-writing rubric
+# Gauntlet Loop prompt rubric
 
-Use this rubric when rewriting a sparse request into an issue prompt. Write
-the prompt in imperative English. Preserve the user's subject, desired
-outcome, domain, and constraints. Remove invocation syntax and routing labels
-from the prompt.
+Use this rubric to convert a sparse request into a short agent goal. Follow the
+method described in [How to Run a Gauntlet Loop](https://somethingbig.ai/gauntlet-loop).
+Write imperative English. Preserve the user's subject, outcome, domain, and
+constraints. Remove invocation syntax and routing labels.
 
-## Required content
+## Build the prompt
 
-The prompt must:
-
-- State the concrete project outcome, intended users, and observable success
-  criteria.
-- Treat a recreation or named existing product as a fidelity target. Require
-  the recognizable visual language, interaction model, workflows, and quality
-  of the source. For new work, choose a concrete reference and justify it.
-- Preserve the requested output surface and dimensionality. Explicitly require
-  the real web, desktop, mobile, backend, data, document, visual, or 3D
-  behavior that the request needs. Do not allow a flatter substitute.
-- Require research before coding. For visual work, search real screenshots,
-  footage, and interface views, select at least six high-signal anchors, and
-  download all screenshots or images selected or used as visual anchors into
-  the project under a clearly named reference-assets directory. Inspect the
-  downloaded files directly and record each source URL only as provenance
-  beside the local filename; do not substitute Markdown image links for the
-  downloaded assets. For other work, collect primary docs, representative
-  data, comparable products, or executable acceptance fixtures.
-- Require vision and direct inspection of the actual artifact whenever visual
-  judgment matters. Compare renders, captures, documents, diagrams, scenes,
-  or interfaces side by side or with blind A/B review whenever practical.
-- Set a production-quality bar. Require complete requested workflows, real
-  states, error and recovery behavior, polish, accessibility or operability,
-  and deployment or delivery evidence where applicable. Do not narrow the
-  work to a demo or temporary proof.
-- Require a lead to choose the route and divide the project into independently
-  judgeable pieces. Do not prescribe the architecture or exact decomposition.
-- Require a separate builder and fresh-context critic or verifier for every
-  important piece. The verifier must inspect the actual artifact, compare it
-  with the bar, identify the largest remaining gap, and send the work back.
-- Assume substantial requests require sustained execution across many days or
-  sessions. Keep a canonical live progress page with references, decisions,
-  completed work, evidence, blockers, current gaps, and the next exact action
-  so another agent can resume without losing context.
-- Continue the build/verify/improve loop until the acceptance bar is met or
-  the run is stopped with explicit evidence. Do not specify an arbitrary round
-  count or stop after the first build or smoke test.
-- Include only observable product constraints, evidence requirements, and
-  recovery behavior. Let the lead choose the tools and implementation.
-- Format the issue body as GitHub-flavored Markdown. Use concise headings for
-  the title, objective, quality bar, execution, verification, and progress;
-  use bullets for requirements and local filenames plus plain source URLs for
-  reference provenance. Do not turn reference screenshots into Markdown image
-  links, and do not put routing metadata in the body.
+- State the destination, not a detailed implementation plan.
+- Name the strongest concrete quality bar that the agent can inspect. For a
+  recreation, use the named product and real screenshots, footage, and gameplay
+  as the bar. For new work, choose a specific comparable product, fixture, or
+  measurable target and explain its value in one sentence.
+- Preserve the required surface and dimensionality. Infer intrinsic properties
+  of a named reference when omission would permit a materially flatter
+  substitute. For example, require a browser recreation of a 3D game to remain
+  a real 3D browser game.
+- Require the lead agent to choose the approach and divide the work into the
+  smallest pieces that can be built and judged independently.
+- Assign every important piece to a builder and a separate fresh-context
+  critic. Give the critic the goal, bar, rules, and real artifact, but do not
+  give it the builder's history or justification.
+- Require each critic to inspect the real output and compare it directly with
+  the bar. Use blind A/B comparison when practical. When the result loses,
+  identify the largest meaningful gap and return it for another build round.
+- Continue until the output meets the bar or the user stops the run. Do not add
+  arbitrary time, token, auto-continue, agent-count, or round limits to the
+  prompt.
+- Maintain a simple live progress page that shows the artifact changing over
+  time through useful evidence such as screenshots, videos, test results, or
+  drafts.
+- Keep only essential product constraints and observable completion evidence.
+  Do not prescribe architecture, exact decomposition, tools, or a long feature
+  checklist unless the user supplied them.
 
 ## Prompt shape
 
-Use this structure for the issue body:
+Write the title heading, then one short paragraph or a few compact paragraphs.
+Do not force boilerplate sections. Use this pattern:
 
 ```markdown
-## Objective
+# [Exact issue title]
 
-Deliver [project outcome] to production quality for [intended users]. Preserve
-[named source, output surface, dimensionality, or domain constraints].
+Build [specific outcome and required surface or dimensionality] at [named,
+inspectable quality bar]. Use real [references or measurements] as the bar and
+compare the running result directly against them.
 
-## Quality bar
+Act as the lead. Choose the approach and split the work into the smallest
+independently judgeable pieces. For each important piece, use a builder and a
+separate fresh-context critic that inspects the real artifact. When our output
+loses, fix the largest meaningful gap and repeat until it meets the bar or the
+user stops the run.
 
-- Research authoritative references, download selected visual anchors into a
-  local reference-assets directory, and record their provenance before coding.
-- Inspect the real artifact with the relevant tools and compare it with the
-  acceptance bar.
-
-## Execution
-
-- Have the lead split the work into judgeable pieces.
-- Give each piece a builder and a fresh-context critic or verifier.
-- Work across as many days or sessions as necessary.
-
-## Verification
-
-- Fix the largest remaining gap and repeat until the acceptance bar is met.
-- Record concrete evidence for behavior, quality, and delivery.
-
-## Progress
-
-Maintain a resumable live progress page with references, evidence, decisions,
-blockers, gaps, and next actions.
+Maintain a simple live progress page with concrete evidence of each round.
 ```
 
-Replace bracketed text with the user's subject and only the necessary project
-constraints. Keep the prompt concise, but never omit the production bar,
-research, direct inspection, persistence, evidence, or iterative verification
-loop. Add vision-specific inspection instructions whenever the artifact is
-visual; use the appropriate nonvisual evidence for other projects.
+Replace every bracketed phrase. Keep the final prompt close to this size. Add
+only constraints needed to preserve the user's intent or make the quality bar
+observable.
 
-This is prompt guidance only. The issue-e2e skill remains kickoff-only and
-does not run the full Gauntlet Loop.
+This rubric guides issue text only. The issue-e2e skill starts the workflow and
+stops after returning the initial session link.
