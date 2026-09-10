@@ -237,3 +237,10 @@ If the test reports `No module named lolgames_tunnel`, set `PYTHONPATH` as
 shown above. Do not treat that error as a broker outage. If the module-path
 fix is present and registration still fails, inspect the client error output
 and then check the broker service.
+
+## Verify generated-file exclusions
+
+Check that project `.gitignore` rules exist before OpenCode starts. Check both
+root and nested projects. Stage a nested `.agents` repository, change its HEAD,
+and confirm that delivery removes its index entry without deleting worker files.
+Confirm that prompts leave source changes uncommitted for workflow delivery.

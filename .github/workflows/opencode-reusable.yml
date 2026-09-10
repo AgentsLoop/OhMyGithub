@@ -154,6 +154,19 @@ jobs:
           printf 'PROJECT_PATH=%s\n' "$project_path" >> "$GITHUB_ENV"
           printf 'PROJECT_DIR=%s\n' "$resolved_project_dir" >> "$GITHUB_ENV"
 
+      - name: Ignore generated project files before OpenCode
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p mkdir -p "$PROJECT_DIR"
+          /usr/bin/time -p touch "$PROJECT_DIR/.gitignore"
+          for pattern in 'screenshots/' '*.log' '*.pid' '.agents/' '.agentsweb/' \
+            '.omgithub-runtime/' '.opencode-ssh/' '.opencode-web/' 'node_modules/'; do
+            if ! /usr/bin/time -p grep -qxF "$pattern" "$PROJECT_DIR/.gitignore"; then
+              /usr/bin/time -p printf '\n%s\n' "$pattern" >> "$PROJECT_DIR/.gitignore"
+            fi
+          done
+
       - name: Checkout shared OpenCode skills
         if: env.TEST_REQUEST != 'true'
         uses: actions/checkout@v6
@@ -169,6 +182,7 @@ jobs:
           set -euo pipefail
           project_path="${PROJECT_PATH#./}"
           project_path="${project_path%/}"
+          [[ "$project_path" != '.' ]] || project_path=''
           skills_path="${project_path:+/$project_path}/.agents/"
           ralph_state_path="${project_path:+/$project_path}/.opencode/ralph-loop.local.md"
           screenshots_path="${project_path:+/$project_path}/screenshots/"
@@ -1401,12 +1415,12 @@ jobs:
           )
           for generated_path in "${generated_paths[@]}"; do
             [[ -e "$generated_path" || -L "$generated_path" ]] || continue
-            /usr/bin/time -p git rm -r --cached --ignore-unmatch -- "$generated_path"
+            /usr/bin/time -p git rm -r -f --cached --ignore-unmatch -- "$generated_path"
           done
           while IFS= read -r -d '' generated_file; do
             case "$generated_file" in
               *.log|*.pid|screenshots/*|*/screenshots/*)
-                /usr/bin/time -p git rm --cached --ignore-unmatch -- "$generated_file"
+                /usr/bin/time -p git rm -f --cached --ignore-unmatch -- "$generated_file"
                 ;;
             esac
           done < <(git ls-files -z -- "$PROJECT_PATH")
