@@ -1487,7 +1487,7 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
-            const commitUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/commit/${process.env.FINAL_COMMIT}`;
+            const branchUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/tree/${process.env.BRANCH_NAME.split('/').map(encodeURIComponent).join('/')}`;
             const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
             const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
@@ -1504,8 +1504,8 @@ jobs:
               .map((name) => `![Final game screenshot: ${name}](${assetUrls.get(name)})`);
             const body = renderTemplate('opencode-final-report.md', {
               PROJECT_URL: projectUrl,
-              FINAL_COMMIT: process.env.FINAL_COMMIT,
-              COMMIT_URL: commitUrl,
+              BRANCH_NAME: process.env.BRANCH_NAME,
+              BRANCH_URL: branchUrl,
               RELEASE_URL: process.env.OPENCODE_RELEASE_URL,
               IMAGES: images.join('\n')
             });
