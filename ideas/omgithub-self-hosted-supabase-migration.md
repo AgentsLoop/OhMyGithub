@@ -1,119 +1,106 @@
 # Migrate OmGithub from Firebase to self-hosted Supabase on a2
 
-Status: proposal only. Do not change production until the Firebase export is complete and verified.
+Status: proposal only. Keep Firebase active until the data export succeeds.
 
 ## Goal
 
 Run Supabase on a2 with Docker Compose. Keep OmGithub catalog data, ratings,
-comments, and play history on a2. Do not use Supabase Cloud or external backup
-storage.
+comments, and play history on a2. Do not use Supabase Cloud.
 
 Keep GitHub sign-in, public URLs, Actions builds, upload callbacks, and game
 files unchanged.
 
+Prefer a simple setup that is easy to understand and repair. Accept that a
+single-server installation can lose data if a2 and its local backups fail
+together.
+
 ## Deploy Supabase
 
 1. Create `/home/ubuntu/projects/omgithub-supabase` on a2.
-2. Use the official Supabase Docker Compose deployment. Pin the upstream release
-   and every image digest. Verify ARM64 support before installation.
-3. Create dedicated Docker volumes for PostgreSQL, Supabase Storage, and backup
-   data. Do not bind PostgreSQL, Kong, Studio, or Storage ports to the public
-   network.
-4. Put Supabase and OmGithub on a private Docker network. Connect the Node
-   server through a PostgreSQL connection pool.
-5. Reach Studio only through an SSH tunnel. Store generated secrets in KeePass
-   and materialize them only in the a2 deployment environment.
-6. Record pinned versions, ports, volume names, image digests, and health checks
-   in the deployment documentation.
+2. Use the official Supabase Docker Compose files and ARM64-compatible images.
+3. Keep the Compose file, `.env`, database volume, and backup directory in the
+   same project structure.
+4. Expose only the Supabase API required by OmGithub. Protect Supabase Studio
+   with one password if it is exposed.
+5. Connect OmGithub to PostgreSQL with a normal connection string.
+6. Record the directory, ports, version, start command, stop command, and
+   restore command in the deployment documentation.
 
 ## Replace Firebase access
 
-1. Add versioned SQL migrations for `projects`, social totals, ratings,
-   comments, and play records.
-2. Preserve Firestore document IDs, timestamps, status, catalog metadata, and
-   JSON fields. Use JSONB for flexible project metadata.
-3. Add indexes for project ID, slug, source key, public path, publication time,
-   comment project ID, and social identity keys.
+1. Add SQL migrations for projects, social totals, ratings, comments, and play
+   records.
+2. Preserve Firestore IDs, timestamps, status, catalog metadata, and JSON
+   fields. Store flexible project metadata as JSONB.
+3. Add indexes for fields used by catalog, project, comment, rating, and play
+   queries.
 4. Replace Firestore calls with parameterized PostgreSQL queries. Keep the
-   existing server API responses and local JSON storage for development.
-5. Preserve partial project updates, catalog ordering, rating seeds, moderation
-   state, canonical social identities, and the rolling 24-hour play-count rule.
-6. Use transactions and row locks for ratings, comments, and plays. Do not lose
-   concurrent writes or count one visitor twice in a 24-hour period.
-7. Update catalog import and star-backfill commands to use the PostgreSQL
-   adapter. Fail production startup when the database configuration is missing
-   or invalid.
+   existing API responses and local JSON storage for development.
+5. Preserve partial project updates, catalog ordering, rating seeds,
+   moderation state, social identities, and the 24-hour play-count rule.
+6. Use database transactions where a rating, comment, or play update changes
+   more than one row.
+7. Update catalog import and star-backfill commands to use PostgreSQL.
 
 ## Export and import data
 
 1. Export every Firebase document from `omgithub_projects`, `project_social`,
-   `project_ratings`, `project_comments`, and `project_plays` to a2.
-2. Use pagination and resumable checkpoints. Do not use the catalog's
-   200-record display limit.
-3. Save immutable export files, collection counts, and checksums under
+   `project_ratings`, `project_comments`, and `project_plays`.
+2. Save the export and collection counts under
    `/home/ubuntu/backups/omgithub-supabase/firebase-export`.
-4. Import with ID-based upserts. Preserve timestamps and source IDs.
-5. Verify each collection count and canonical record checksum after import.
-6. Stop the migration when Firebase quota errors prevent a complete export.
-   Keep Firebase authoritative until a later full export succeeds.
+3. Import records with their original IDs and timestamps.
+4. Compare collection counts and check representative projects, ratings,
+   comments, and play records.
+5. Stop the migration if Firebase quota errors prevent a complete export.
 
-## Cut over and roll back
+## Cut over
 
-1. Schedule a short maintenance window.
-2. Block new writes and wait for active publication jobs and upload callbacks.
-3. Take the final Firebase export and import it into Supabase.
-4. Compare final counts, checksums, catalog routes, and social summaries.
-5. Deploy OmGithub with Supabase only after all checks pass.
-6. Keep Firebase credentials, exports, the a1 migration backup, and the stopped
-   Firebase-capable image for seven days.
-7. If Supabase fails before accepting writes, restart the Firebase version.
-8. If Supabase has accepted writes, freeze writes, export complete Supabase data
-   back to Firebase, verify it, then restore the Firebase version.
-9. Do not delete Firebase data automatically.
-
-## Backups
-
-1. Store backups under `/home/ubuntu/backups/omgithub-supabase` on a2.
-2. Run PostgreSQL logical backups every hour. Keep 48 hourly backups, 14 daily
-   backups, and 4 weekly backups.
-3. Back up database roles, Supabase configuration, Docker Compose files, and
-   game files every day. Create a full pre-change backup before each deployment
-   or database migration.
-4. Write each backup to a temporary path, verify it, then rename it into place.
-   Never remove the last verified backup.
-5. Run a weekly restore into an isolated PostgreSQL database on a2. Check schema,
-   record counts, checksums, and representative OmGithub queries.
-6. Accept the single-host limit: a2 disk loss loses all local copies. Target at
-   most one hour of data loss and a one-hour database restore. Measure restore
-   time in the weekly test.
-
-## Monitoring and updates
-
-1. Use systemd timers for backups and monitoring.
-2. Check every minute: OmGithub health, Supabase container health, PostgreSQL
-   connectivity, restart counts, disk use, free memory, and newest backup age.
-3. Save monitoring results locally. Mark a failure after three consecutive failed
-   checks. Flag disk use above 80 percent and a database backup older than two
-   hours.
-4. Check upstream Supabase releases each month. Record candidate releases and
-   review release notes before updates.
-5. Update only during a maintenance window. Pin new images, take a verified
-   backup, test the updated stack against a restored database, then reopen
-   writes.
-6. Retain the prior Compose configuration and images. Roll back application-only
-   failures to the prior image. Restore the matching database backup when a
-   database update cannot be reversed safely.
-
-## Verify before delivery
-
-1. Test catalog lookups, partial project updates, exports, imports, and metadata
-   preservation.
-2. Test concurrent ratings, comments, deletion, moderation, play
-   deduplication, and transaction rollback.
-3. Test backup creation, failed backup detection, restore, container restart,
-   and rollback.
-4. Verify the public catalog, existing game subdomains, GitHub sign-in, and one
+1. Start a short maintenance window and block new writes.
+2. Wait for active publication jobs and upload callbacks.
+3. Run the final Firebase export and import it into Supabase.
+4. Compare record counts and test catalog routes and social summaries.
+5. Deploy OmGithub with the PostgreSQL connection.
+6. Test the public catalog, existing game subdomains, GitHub sign-in, and one
    complete Actions publication with its upload callback.
-5. Run `npm test`, `npm run build`, and `git diff --check`.
-6. Commit and push the code, scripts, migrations, and documentation with the
+7. Reopen writes after the checks pass.
+
+## Back up
+
+1. Run one daily PostgreSQL dump with cron.
+2. Store the latest seven dumps under
+   `/home/ubuntu/backups/omgithub-supabase` on a2.
+3. Include the Compose file, `.env`, and SQL migrations in the backup.
+4. Take an extra database dump before an application, schema, or Supabase
+   update.
+5. Test the restore command once during the migration and after a backup script
+   change.
+
+## Monitor and update
+
+1. Add Docker restart policies to the OmGithub and Supabase containers.
+2. Use the existing `/health` endpoint to confirm that OmGithub can reach the
+   database.
+3. Add one daily cron check for container state, free disk space, and the newest
+   backup date. Write failures to a local log.
+4. Check Supabase releases manually when maintenance is planned. Read the
+   release notes, take a database dump, update the Compose image versions, and
+   restart the stack.
+5. Keep the previous Compose file and database dump until the updated stack has
+   worked correctly.
+
+## Roll back
+
+1. Keep Firebase credentials, the Firebase export, the previous OmGithub image,
+   and the a1 migration backup for seven days.
+2. Restart the Firebase version if Supabase fails before it accepts new writes.
+3. If Supabase accepts new writes, stop writes and export the changed PostgreSQL
+   records before returning to Firebase.
+4. Restore the pre-update database dump and previous Compose file if a Supabase
+   update fails.
+5. Do not delete Firebase data during this migration.
+
+## Deliver
+
+1. Run `npm test`, `npm run build`, and `git diff --check`.
+2. Commit and push the code, scripts, migrations, and documentation with the
    migration reason, validation results, and current task ID.
