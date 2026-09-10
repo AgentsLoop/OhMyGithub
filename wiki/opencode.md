@@ -100,7 +100,8 @@ Light `ulw-loop` component is not recreated or registered for OpenCode.
    times. The completion report and screenshot evidence prompts also use that
    verification session. Squash all generated work onto the selected base,
    remove screenshots, logs, and runner state from the Git index, and push one
-   clean project commit to the immutable branch.
+   clean project commit to the immutable branch. Record the remote branch tip
+   before rewriting it. Reject the push if that tip changes.
 11. Give the verified public URL back to the worker. Request uncommitted final
     browser screenshots. Append immutable release screenshot URLs with the game,
     repository path, compatibility commit, and Open Project links to the oldest triggering-issue comment containing the

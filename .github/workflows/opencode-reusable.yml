@@ -1366,6 +1366,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          remote_branch_ref="refs/heads/$BRANCH_NAME"
+          expected_remote_sha="$(
+            /usr/bin/time -p git ls-remote --heads origin "$remote_branch_ref" |
+              awk 'NR == 1 { print $1 }'
+          )"
           # Collapse agent-created commits so excluded evidence and runner files do
           # not remain reachable through the published branch history.
           /usr/bin/time -p git reset --mixed "$TARGET_SHA"
@@ -1412,7 +1417,9 @@ jobs:
             echo 'OpenCode made no changes; no project branch will be published.'
             exit 0
           fi
-          /usr/bin/time -p git push --set-upstream origin "$BRANCH_NAME"
+          /usr/bin/time -p git push --set-upstream \
+            --force-with-lease="$remote_branch_ref:$expected_remote_sha" \
+            origin "$BRANCH_NAME:$remote_branch_ref"
           FINAL_COMMIT="$(git rev-parse HEAD)"
           printf 'commit=%s\n' "$FINAL_COMMIT" >> "$GITHUB_OUTPUT"
         env:
