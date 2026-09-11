@@ -74,8 +74,10 @@ from the input `TARGET_REF` or repository default branch. Preserve any project
 subdirectory after that generated branch in the URL.
 
 Resolve the target repository before creating the issue. An explicitly supplied
-repository wins. With `#main`, use the supplied or current repository on
-`main`; otherwise, on `main` without a supplied repository, use
+repository wins. With `#main`, use the current checkout repository on `main`.
+Resolve that repository before listing labels or creating the issue. Do not use
+the `AgentsLoop/PlayGround` fallback when `#main` is present. Otherwise, on
+`main` without a supplied repository, use
 `AgentsLoop/PlayGround` explicitly. On another branch, use the current
 repository. Never infer the default `main` repository from `git remote`.
 
@@ -92,8 +94,9 @@ push it first.
    labels. Do not create a label for `#c`. List available `skill/*` labels,
    select the useful skills, and name them in the generated prompt unless
    `#c` is present. Verify the default-branch listener exists,
-   then create an issue whose title starts with `/OpenCode `. Attach all mode
-   labels and all selected `skill/*` labels already attached. Always create this
+   then create an issue whose title starts with `/OpenCode `. Attach only mode
+   labels explicitly requested by the user and all selected `skill/*` labels.
+   Never add another mode label by default. Always create this
    new issue even when a matching issue or run already exists. Do not create a
    label for `#self`. Verify labels with `gh issue view <number> --json labels`.
    Comments, edits, and other labels are not triggers.

@@ -15,7 +15,7 @@ Do not suggest, report, or propose security issues unless the user explicitly as
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
 
 Keep the local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md)
-aligned with this workflow. Create an issue with `OpenCode` and all mode labels already attached, or use
+aligned with this workflow. Create an issue with `OpenCode` and only user-requested mode labels already attached, or use
 `/OpenCode` in its title, to start the native `issues.opened` listener. Wait only for the
 initial OpenCode session link during E2E kickoff. Install the listener on the
 default branch before requesting execution. Validate author access and freeze
@@ -98,7 +98,7 @@ When mentioning a commit, append its relative age in hours or days.
 
 ## OpenCode GitHub Actions
 
-To execute an issue, create it with `OpenCode` and all mode labels already attached.
+To execute an issue, create it with `OpenCode` and only mode labels explicitly requested by the user.
 Check for a native `issues` run and successful preparation.
 The workflow starts a temporary AgentsWeb SSH session,
 verifies it, runs OpenCode, and cleans up the SSH session afterward.
