@@ -119,15 +119,9 @@ Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
 defaults to `true`. When set to `off` (or any value other than `true`), the
 workflow stops after the initial OpenCode prompt and temporary OpenCode Web
 trycloudflare exposure; app verification/remediation, completion and screenshot
-prompts, release/report generation, and the complete label are skipped. Push
-OpenCode changes to the generated branch and add the branch link to the live
-issue comment. The temporary access session still sleeps for five hours before
-cleanup.
-
-Set the repository variable `PULL_REQUEST_ENABLED=true` to create a pull request
-from each generated branch into the selected target branch. Add the pull request
-link to the live issue comment. Leave the variable unset or set it to another
-value to publish only the branch.
+prompts, Git delivery, immutable project publication, release/report generation, and the
+complete label are skipped. The temporary access session still sleeps for five
+hours before cleanup.
 
 After the branch is pushed, the completion report links the repository path to
 OmGithub. Opening that URL anonymously resolves the named branch and optional

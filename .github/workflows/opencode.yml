@@ -14,7 +14,6 @@ on:
 permissions:
   contents: write
   issues: write
-  pull-requests: write
   actions: write
 
 concurrency:
@@ -34,7 +33,6 @@ jobs:
     permissions:
       contents: write
       issues: write
-      pull-requests: write
       actions: read
     with:
       runtime_ref: ${{ github.workflow_sha }}
