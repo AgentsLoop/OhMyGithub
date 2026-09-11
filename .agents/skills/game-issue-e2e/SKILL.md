@@ -17,8 +17,9 @@ syntax and routing metadata such as `#main` and mode labels. Merge surrounding
 request text in its original order.
 
 When the request includes `#c`, remove `#c` and all routing metadata, then
-copy the remaining request text exactly as both the issue title and body. Do
-not read the rubric, rewrite the text, add a heading, or add a skills sentence.
+copy the remaining request text exactly as the issue body. Start the issue title
+with `/OpenCode `, then add the remaining request text exactly. Do not read the
+rubric, rewrite the text, add a heading, or add a skills sentence.
 
 Read `references/gauntlet-prompt-rubric.md` whenever the remaining request is
 sparse, names only a product or concept, lacks a concrete quality bar, or does
@@ -33,6 +34,9 @@ ask the user for a game concept.
 Unless `#c` is present, repeat the exact issue title as the first Markdown
 heading in the issue body. Keep the title as issue metadata too; the body must
 not omit it.
+
+Start every issue title with `/OpenCode `. Keep this prefix in the title when
+you append routing metadata.
 
 Write the issue body to a temporary Markdown file and pass it with
 `gh issue create --body-file <path>` or `gh issue edit --body-file <path>`.
@@ -88,11 +92,11 @@ push it first.
    labels. Do not create a label for `#c`. List available `skill/*` labels,
    select the useful skills, and name them in the generated prompt unless
    `#c` is present. Verify the default-branch listener exists,
-   then create the issue with `OpenCode`, `Goal`, all mode labels, and all
-   selected `skill/*` labels already attached. Always create this new issue
-   even when a matching issue or run already exists. Do not create a label for
-   `#self`. Verify labels with `gh issue view <number> --json labels`. Comments,
-   edits, and other labels are not triggers.
+   then create an issue whose title starts with `/OpenCode `. Attach all mode
+   labels and all selected `skill/*` labels already attached. Always create this
+   new issue even when a matching issue or run already exists. Do not create a
+   label for `#self`. Verify labels with `gh issue view <number> --json labels`.
+   Comments, edits, and other labels are not triggers.
 3. Confirm the newest run is matching `issues`, title, resolved
    `<target-repo>`, and the repository default branch:
 

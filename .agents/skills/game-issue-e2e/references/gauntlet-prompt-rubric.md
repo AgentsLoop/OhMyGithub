@@ -1,6 +1,6 @@
 # Gauntlet Loop prompt rubric
 
-Use this rubric to convert a sparse request into a short agent goal. Follow the
+Use this rubric to convert a sparse request into a short agent brief. Follow the
 method described in [How to Run a Gauntlet Loop](https://somethingbig.ai/gauntlet-loop).
 Write imperative English. Preserve the user's subject, outcome, domain, and
 constraints. Remove invocation syntax and routing labels.
@@ -19,7 +19,7 @@ constraints. Remove invocation syntax and routing labels.
 - Require the lead agent to choose the approach and divide the work into the
   smallest pieces that can be built and judged independently.
 - Assign every important piece to a builder and a separate fresh-context
-  critic. Give the critic the goal, bar, rules, and real artifact, but do not
+  critic. Give the critic the brief, bar, rules, and real artifact, but do not
   give it the builder's history or justification.
 - Require each critic to inspect the real output and compare it directly with
   the bar. Use blind A/B comparison when practical. When the result loses,
