@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COD: OPERATION VEIL — Three.js FPS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Orbitron:wght@600;800&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-DLh3WFz0.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-D_4TrBbw.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="c"></canvas>
+
+    <!-- HUD Overlay -->
+    <div id="hud">
+      <div id="top-bar">
+        <div id="objective"><span class="obj-label">OBJECTIVE</span><span id="obj-text">ELIMINATE HOSTILES • 0 / 12</span></div>
+        <div id="timer">04:00</div>
+        <div id="score-panel"><span id="score">0</span><span class="score-label">SCORE</span></div>
+      </div>
+
+      <div id="crosshair">
+        <div class="ch-h"></div><div class="ch-v"></div>
+        <div class="ch-dot"></div>
+      </div>
+      <div id="hitmarker" class="hidden"></div>
+      <div id="damage-vignette"></div>
+
+      <div id="bottom-hud">
+        <div id="weapon-panel">
+          <div id="weapon-name">M4A1 <span>CQBR</span></div>
+          <div id="ammo-row"><span id="ammo">30</span><span id="ammo-sep">/</span><span id="reserve">90</span></div>
+          <div id="fire-mode">AUTO • 5.56</div>
+        </div>
+        <div id="health-panel">
+          <div id="health-bar-wrap"><div id="health-bar"></div></div>
+          <div id="health-text"><span id="health">100</span> HP</div>
+          <div id="armor-text">ARMOR 50</div>
+        </div>
+        <div id="minimap-wrap">
+          <canvas id="minimap" width="140" height="140"></canvas>
+          <div id="compass">N</div>
+        </div>
+      </div>
+
+      <div id="killfeed"></div>
+      <div id="center-msg"></div>
+      <div id="hit-indicator" class="hidden">HIT</div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen">
+      <div class="start-bg"></div>
+      <div class="start-content">
+        <div class="cod-logo">CALL<span>DUTY</span></div>
+        <h1>OPERATION: VEIL</h1>
+        <p class="subtitle">Three.js Tactical FPS • Inspired by Modern Warfare II / Black Ops 6</p>
+        <div class="bar-desc">Bar: Call of Duty: Black Ops 6 — direct visual + gameplay reference. Built for blind A/B: which looks more AAA?</div>
+        <div class="controls-hint">
+          <span><b>WASD</b> Move</span><span><b>MOUSE</b> Look</span><span><b>CLICK</b> Fire</span><span><b>R</b> Reload</span><span><b>SHIFT</b> Sprint</span><span><b>RIGHT CLICK</b> ADS</span>
+        </div>
+        <button id="play-btn">DEPLOY [ CLICK TO LOCK ]</button>
+        <div class="small-note">Tip: Allow pointer lock. Headshots ×2. Frag simulation on [G]. Browser FPS optimized for 60fps.</div>
+        <div class="attr">Weapon: <b>Low-poly M4 assault rifle</b> by <b>szaw</b> (Sketchfab CC Attribution) — <code>fb85c455cf374675a1db7988def2d926</code></div>
+      </div>
+    </div>
+
+    <div id="pause-screen" class="hidden">
+      <h2>PAUSED</h2>
+      <button id="resume-btn">RESUME</button>
+      <button id="restart-btn">RESTART</button>
+    </div>
+
+    <div id="death-screen" class="hidden">
+      <h2 id="death-title">KIA</h2>
+      <p id="death-desc">Hostiles neutralized you.</p>
+      <button id="respawn-btn">RESPAWN</button>
+    </div>
+
+    <div id="win-screen" class="hidden">
+      <h2>MISSION COMPLETE</h2>
+      <p id="win-stats"></p>
+      <button id="again-btn">PLAY AGAIN</button>
+    </div>
+
+    <div id="ads-overlay" class="hidden"></div>
+  </div>
+
+</body>
+</html>
