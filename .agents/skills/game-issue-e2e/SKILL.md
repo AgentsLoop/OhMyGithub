@@ -16,19 +16,23 @@ Locate the skill invocation in the user's message. Remove only the invocation
 syntax and routing metadata such as `#main` and mode labels. Merge surrounding
 request text in its original order.
 
+When the request includes `#c`, remove `#c` and all routing metadata, then
+copy the remaining request text exactly as both the issue title and body. Do
+not read the rubric, rewrite the text, add a heading, or add a skills sentence.
+
 Read `references/gauntlet-prompt-rubric.md` whenever the remaining request is
 sparse, names only a product or concept, lacks a concrete quality bar, or does
 not state the required output surface and dimensionality. Rewrite that request
-as a concise Gauntlet Loop prompt. Preserve a detailed request exactly when it
-already supplies the goal, concrete bar, and essential constraints. Never let
-invocation placement bypass the rubric.
+as a concise Gauntlet Loop prompt. Never let invocation placement bypass the
+rubric.
 
 If the invocation has no request text, invent a fresh random small playable
 browser-game brief. Do not substitute a generic workflow-validation task or
 ask the user for a game concept.
 
-Repeat the exact issue title as the first Markdown heading in the issue body.
-Keep the title as issue metadata too; the body must not omit it.
+Unless `#c` is present, repeat the exact issue title as the first Markdown
+heading in the issue body. Keep the title as issue metadata too; the body must
+not omit it.
 
 Write the issue body to a temporary Markdown file and pass it with
 `gh issue create --body-file <path>` or `gh issue edit --body-file <path>`.
@@ -48,6 +52,9 @@ requires the worker to load and use them where relevant. Attach every selected
 names to OpenCode. For visual recreation work, prefer an available image-search
 skill over generic web search. For 3D game work, select available 3D asset or
 runtime skills only when they match the requested implementation.
+
+With `#c`, still attach selected `skill/*` labels but do not alter the copied
+title or body to name them.
 
 
 Check `git branch --show-current`. If non-empty and not `main`, verify it and
@@ -78,8 +85,9 @@ push it first.
    Resolve `<target-repo>` and `<target-branch>` before any issue or workflow
    command. Verify the default `main` target is `AgentsLoop/PlayGround`.
 2. Treat request tags like `#mac` as GitHub labels: strip `#`, create missing
-   labels. List available `skill/*` labels, select the useful skills, and name
-   them in the generated prompt. Verify the default-branch listener exists,
+   labels. Do not create a label for `#c`. List available `skill/*` labels,
+   select the useful skills, and name them in the generated prompt unless
+   `#c` is present. Verify the default-branch listener exists,
    then create the issue with `OpenCode`, `Goal`, all mode labels, and all
    selected `skill/*` labels already attached. Always create this new issue
    even when a matching issue or run already exists. Do not create a label for
