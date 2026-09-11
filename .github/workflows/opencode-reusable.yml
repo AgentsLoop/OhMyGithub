@@ -1484,7 +1484,7 @@ jobs:
 
           release_json="$(gh release view "$tag" --json url,assets)"
           printf 'url=%s\n' "$(jq -r '.url' <<<"$release_json")" >> "$GITHUB_OUTPUT"
-          printf 'assets_json=%s\n' "$(jq -c '[.assets[] | {name, url: .browserDownloadUrl}]' <<<"$release_json")" >> "$GITHUB_OUTPUT"
+          printf 'assets_json=%s\n' "$(jq -c '[.assets[] | {name, url: .url}]' <<<"$release_json")" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -1492,6 +1492,7 @@ jobs:
         if: success() && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         uses: actions/github-script@v7
         env:
+          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
           SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json || steps.mock_project.outputs.screenshots_json }}
           PROJECT_PATH: ${{ env.PROJECT_PATH }}
@@ -1518,6 +1519,8 @@ jobs:
               .map((name) => `![Final game screenshot: ${name}](${assetUrls.get(name)})`);
             const body = renderTemplate('opencode-final-report.md', {
               PROJECT_URL: projectUrl,
+              APP_URL: process.env.APP_URL || '',
+              FILES_URL: process.env.PROJECT_FILE_URL || '',
               BRANCH_NAME: process.env.BRANCH_NAME,
               BRANCH_URL: branchUrl,
               RELEASE_URL: process.env.OPENCODE_RELEASE_URL,
