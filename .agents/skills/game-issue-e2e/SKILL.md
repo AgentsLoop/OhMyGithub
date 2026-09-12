@@ -73,8 +73,8 @@ every final `Open Project` URL from the workflow's generated `BRANCH_NAME`, not
 from the input `TARGET_REF` or repository default branch. Preserve any project
 subdirectory after that generated branch in the URL.
 
-Resolve the target repository before creating the issue. An explicitly supplied
-repository wins. With `#main`, use the current checkout repository on `main`.
+Resolve the target repository before creating the issue. With `#main`, use the
+current checkout repository on `main`.
 Resolve that repository before listing labels or creating the issue. Do not use
 the `AgentsLoop/PlayGround` fallback when `#main` is present. Otherwise, on
 `main` without a supplied repository, use
