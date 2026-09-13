@@ -776,8 +776,8 @@ jobs:
             > "$OPENCODE_WEB_DIR/project-cloudflared.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/project-cloudflared.pid"
           for _ in {1..60}; do
-            WEB_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
-            PROJECT_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' "$OPENCODE_WEB_DIR/project-cloudflared.log" | head -n 1)"
+            WEB_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
+            PROJECT_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/project-cloudflared.log" | head -n 1)"
             [[ -n "$WEB_URL" && -n "$PROJECT_URL" ]] && break
             sleep 1
           done
@@ -1263,7 +1263,7 @@ jobs:
               echo $! > "$OPENCODE_WEB_DIR/app-cloudflared.pid"
               APP_URL=''
               for _ in {1..60}; do
-                APP_URL="$(sed -nE 's#.*(https://[a-z0-9-]+\.trycloudflare\.com).*#\1#p' \
+                APP_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' \
                   "$OPENCODE_WEB_DIR/app-cloudflared.log" | head -n 1)"
                 [[ -n "$APP_URL" ]] && break
                 sleep 1
@@ -1332,7 +1332,17 @@ jobs:
             --model "${{ steps.opencode_labels.outputs.model }}" \
             "$completion_prompt" \
             > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
-          touch "$OPENCODE_WEB_DIR/response-comment.done"
+          /usr/bin/time -p touch "$OPENCODE_WEB_DIR/response-comment.done"
+          tracker_pid="$(cat "$OPENCODE_WEB_DIR/response-comment-tracker.pid")"
+          # Wait for any in-flight PATCH before another writer edits the comment.
+          for _ in {1..60}; do
+            kill -0 "$tracker_pid" 2>/dev/null || break
+            /usr/bin/time -p sleep 1
+          done
+          if kill -0 "$tracker_pid" 2>/dev/null; then
+            echo 'Progress tracker did not stop; refusing a concurrent final comment update.' >&2
+            exit 1
+          fi
 
       - name: Request and verify final screenshots
         if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
@@ -1589,12 +1599,13 @@ jobs:
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
             const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
+            const warn = (error) => core.warning(error.message);
             const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: context.runId,
               per_page: 100
-            });
+            }).catch((error) => { warn(error); return []; });
             const failedSteps = jobs
               .flatMap((job) => (job.steps || [])
                 .filter((step) => step.conclusion === 'failure')
@@ -1610,19 +1621,19 @@ jobs:
                 RUN_URL: runUrl,
                 FAILED_STEPS: details
               })
-            });
+            }).catch(warn);
             await github.rest.issues.removeLabel({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, name: 'in progress'
-            }).catch((error) => { if (error.status !== 404) throw error; });
+            }).catch((error) => { if (error.status !== 404) warn(error); });
             await github.rest.issues.removeLabel({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, name: 'validating'
-            }).catch((error) => { if (error.status !== 404) throw error; });
+            }).catch((error) => { if (error.status !== 404) warn(error); });
             await github.rest.issues.addLabels({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: number, labels: ['failed']
-            });
+            }).catch(warn);
 
       - name: Keep temporary access available for 5 hours
         if: success() && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'

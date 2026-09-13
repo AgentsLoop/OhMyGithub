@@ -40,13 +40,13 @@ vision_calls() {
 }
 
 while :; do
-  payload="$(curl --fail --silent --show-error \
+  payload="$(curl --connect-timeout 5 --max-time 15 --fail --silent --show-error \
     -H "x-opencode-directory: $PROJECT_DIR" \
     "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$SESSION_ID/message" 2>/dev/null || true)"
-  sessions_payload="$(curl --fail --silent --show-error \
+  sessions_payload="$(curl --connect-timeout 5 --max-time 15 --fail --silent --show-error \
     -H "x-opencode-directory: $PROJECT_DIR" \
     "http://127.0.0.1:$OPENCODE_WEB_PORT/session" 2>/dev/null || true)"
-  status_payload="$(curl --fail --silent --show-error \
+  status_payload="$(curl --connect-timeout 5 --max-time 15 --fail --silent --show-error \
     -H "x-opencode-directory: $PROJECT_DIR" \
     "http://127.0.0.1:$OPENCODE_WEB_PORT/session/status" 2>/dev/null || true)"
   if jq -e 'type == "array"' >/dev/null 2>&1 <<<"$payload" && \
@@ -121,7 +121,7 @@ while :; do
     vision_count="$(vision_calls <<<"$payload")"
     while IFS= read -r subagent_id; do
       [[ -n "$subagent_id" ]] || continue
-      subagent_payload="$(curl --fail --silent --show-error \
+      subagent_payload="$(curl --connect-timeout 5 --max-time 15 --fail --silent --show-error \
         -H "x-opencode-directory: $PROJECT_DIR" \
         "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$subagent_id/message" 2>/dev/null || true)"
       if jq -e 'type == "array"' >/dev/null 2>&1 <<<"$subagent_payload"; then

@@ -253,3 +253,9 @@ Retry status updates three times. Treat exhausted status-update failures as warn
 ## Check live progress startup
 
 Run the tracker with SSH disabled. Default optional SSH variables to empty strings before starting the background process. Check that the process stays alive after launch.
+
+## Check reporting failure paths
+
+Extract Cloudflare URLs only from the tunnel-ready box. Reject API URLs from error lines.
+Wait for the progress tracker to exit before appending final results. Bound local API requests.
+Attempt failure comments and each status-label update independently when GitHub requests fail.
