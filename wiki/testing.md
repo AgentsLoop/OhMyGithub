@@ -244,3 +244,8 @@ Check that project `.gitignore` rules exist before OpenCode starts. Check both
 root and nested projects. Stage a nested `.agents` repository, change its HEAD,
 and confirm that delivery removes its index entry without deleting worker files.
 Confirm that prompts leave source changes uncommitted for workflow delivery.
+
+## Recover failed issue runs
+
+Create a new issue with the same title and body after installing the fix. Attach the original execution and requested mode labels. Omit status labels.
+Retry status updates three times. Treat exhausted status-update failures as warnings so validation and delivery can continue.

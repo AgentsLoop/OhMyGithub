@@ -341,11 +341,13 @@ jobs:
             core.info(`Synchronized ${labels.length} labels from the live OpenCode catalog and shared skills`);
 
       - name: Mark issue in progress
+        continue-on-error: true
         uses: actions/github-script@v7
         env:
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
           RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
         with:
+          retries: 3
           github-token: ${{ github.token }}
           script: |
             const fs = require('node:fs');
@@ -1130,8 +1132,10 @@ jobs:
 
       - name: Mark issue validating
         if: env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
+          retries: 3
           github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
@@ -1548,8 +1552,10 @@ jobs:
 
       - name: Mark issue complete
         if: success() && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
+          retries: 3
           github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
@@ -1568,8 +1574,10 @@ jobs:
 
       - name: Mark issue failed
         if: failure()
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
+          retries: 3
           github-token: ${{ github.token }}
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
