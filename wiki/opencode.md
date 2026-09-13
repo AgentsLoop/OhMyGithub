@@ -240,3 +240,12 @@ requires a screenshot while the run is active.
   `AGENTSWEB_SSH_PUBLIC_KEY` Actions secret with the public key matching the Mac
   private key described in [access.md](access.md). Without it, the workflow
   skips SSH setup and verification but still exposes the OpenCode Web session.
+
+## Verify OpenCode installation
+
+Install OpenCode with the official `https://opencode.ai/install` script and
+the selected release version. Add `$HOME/.opencode/bin` to the current shell
+and `GITHUB_PATH`. Link the installed binary at `/usr/local/bin/opencode`
+for fresh SSH shells. Verify `opencode --version` after installation and
+from a new Bash process. Do not depend on installer changes to shell profiles
+for non-interactive Actions or SSH commands.

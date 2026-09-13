@@ -584,6 +584,12 @@ jobs:
             | bash -s -- --version "$OPENCODE_VERSION"
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           [[ -x "$OPENCODE_BIN" ]]
+          # The installer runs in a child shell; publish PATH for Actions and fresh SSH shells.
+          export PATH="$HOME/.opencode/bin:$PATH"
+          printf '%s\n' "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+          /usr/bin/time -p sudo -n ln -sfn "$OPENCODE_BIN" /usr/local/bin/opencode
+          /usr/bin/time -p opencode --version
+          /usr/bin/time -p env PATH=/usr/local/bin:/usr/bin:/bin /bin/bash -c 'command -v opencode; opencode --version'
           install -d -m 700 "$HOME/.config/opencode"
           cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
           {
