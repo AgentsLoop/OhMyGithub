@@ -28,3 +28,8 @@ test('completion waits for tracker exit and refuses concurrent final writes', ()
   assert.match(block, /for _ in \{1\.\.60\}/);
   assert.match(block, /if kill -0 "\$tracker_pid"[\s\S]*exit 1/);
 });
+
+test('runtime does not require pull-request permission to execute or deliver branches', () => {
+  assert.doesNotMatch(workflow, /pull-requests:\s*write/);
+  assert.doesNotMatch(workflow, /gh pr create/);
+});
