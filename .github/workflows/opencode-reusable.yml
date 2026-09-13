@@ -1058,17 +1058,23 @@ jobs:
           # while later workflow steps run; cleanup stops it at the end of the job.
           nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
             OPENCODE_WEB_DIR="$OPENCODE_WEB_DIR" SESSION_ID="$SESSION_ID" \
+            OPENCODE_WEB_URL="$OPENCODE_WEB_URL" \
             PROJECT_FILE_URL="${{ steps.opencode_web.outputs.project_url }}" \
             PROGRESS_COMMENT_TEMPLATE="$RUNTIME_DIR/.github/scripts/opencode-progress-comment-template.md" \
             AGENTSWEB_SSH_ENABLED="$AGENTSWEB_SSH_ENABLED" \
             AGENTSWEB_SSH_READY="${{ steps.agentsweb.outcome == 'success' }}" \
-            SSH_COMMAND="$AGENTSWEB_COMMAND" \
-            SSH_HOST="$AGENTSWEB_HOST" \
-            SSH_PORT="$AGENTSWEB_PORT" \
+            SSH_COMMAND="${AGENTSWEB_COMMAND:-}" \
+            SSH_HOST="${AGENTSWEB_HOST:-}" \
+            SSH_PORT="${AGENTSWEB_PORT:-}" \
             RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
+          sleep 1
+          if ! kill -0 "$(cat "$OPENCODE_WEB_DIR/response-comment-tracker.pid")" 2>/dev/null; then
+            cat "$OPENCODE_WEB_DIR/response-comment-tracker.log" >&2
+            exit 1
+          fi
 
       - name: Verify Ralph completion promise
         if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.RALPH_REQUEST == 'true'

@@ -249,3 +249,7 @@ Confirm that prompts leave source changes uncommitted for workflow delivery.
 
 Create a new issue with the same title and body after installing the fix. Attach the original execution and requested mode labels. Omit status labels.
 Retry status updates three times. Treat exhausted status-update failures as warnings so validation and delivery can continue.
+
+## Check live progress startup
+
+Run the tracker with SSH disabled. Default optional SSH variables to empty strings before starting the background process. Check that the process stays alive after launch.
