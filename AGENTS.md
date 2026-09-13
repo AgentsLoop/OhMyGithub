@@ -27,20 +27,6 @@ Use `branch: <existing-branch>` at the end of the issue title to select the
 project checkout, result base, and workflow. Let default-branch preparation
 dispatch the selected branch. Run preparation and OpenCode in that branch run.
 
-## Literal instruction replacements
-
-When a user asks to replace one mode, label, command, or behavior with another,
-interpret “instead of” literally. Remove every reference to the old option from
-the affected instruction and replace its behavior with the new option. Do not
-keep the old option as a prohibition, exception, fallback, precedence note, or
-documentation example unless the user explicitly asks to preserve it. Verify
-the result with a case-insensitive search for the old option before reporting
-completion.
-
-When a user asks to remove a requirement or behavior, delete that instruction
-without adding a replacement prohibition, disclaimer, or alternate behavior
-unless the user explicitly requests one.
-
 ## Shell timing
 
 When writing shell scripts,
