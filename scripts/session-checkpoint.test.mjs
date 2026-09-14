@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore } from './session-checkpoint.mjs'
+import { parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore, exportSession } from './session-checkpoint.mjs'
 const session = { info: { id: 'ses_checkpoint', directory: '/old/project' }, messages: [{ info: { id: 'msg_one', role: 'user' }, parts: [{ id: 'prt_one', type: 'text', text: 'Build a castle' }] }] }
 const source = { source_repository: 'alice/game', source_issue: 6 }
 const base = { version: 1, repository: 'alice/game', issue_number: 6, run_id: 123, commit: 'a'.repeat(40), branch: 'opencode-checkpoints/6', project_dir: '', opencode_version: '1.2.3', session, public_history: true }
@@ -101,13 +101,21 @@ test('real OpenCode imports and exports a complete portable conversation', { ski
     const data = {
       info: { id: sid, slug: 'checkpoint-roundtrip', version: '1.18.30', projectID: 'global', directory: cwd, title: 'Checkpoint round-trip', time: { created: now, updated: now } },
       messages: [{ info: { id: mid, sessionID: sid, role: 'user', time: { created: now }, agent: 'build', model: { providerID: 'opencode', modelID: 'test' } },
-        parts: [{ id: pid, sessionID: sid, messageID: mid, type: 'text', text: 'Retain the castle. Next add water.' }] }]
+        parts: [{ id: pid, sessionID: sid, messageID: mid, type: 'text', text: 'Retain the castle. Next add water. '.repeat(12000) }] }]
     }
     const input = join(directory, 'session.json'); writeFileSync(input, JSON.stringify(data))
     const env = { ...process.env, HOME: directory, XDG_DATA_HOME: join(directory, 'data'), XDG_CONFIG_HOME: join(directory, 'config'), XDG_CACHE_HOME: join(directory, 'cache'), XDG_STATE_HOME: join(directory, 'state') }
     const run = (...args) => execFileSync(binary, args, { cwd, env, encoding: 'utf8', timeout: 120000, maxBuffer: 10 * 1024 * 1024 })
     run('import', input)
-    const exported = JSON.parse(run('export', sid))
+    const previousEnv = { ...process.env }
+    let exported
+    try {
+      Object.assign(process.env, env)
+      exported = exportSession(binary, sid, cwd, directory)
+    } finally {
+      for (const key of Object.keys(process.env)) if (!(key in previousEnv)) delete process.env[key]
+      Object.assign(process.env, previousEnv)
+    }
     assert.equal(exported.info.id, sid)
     assert.equal(realpathSync(exported.info.directory), realpathSync(cwd))
     assert.equal(exported.messages.length, 1)

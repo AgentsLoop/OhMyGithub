@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, openSync, closeSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,10 +8,21 @@ const env = process.env
 const digest = value => createHash('sha256').update(value).digest('hex')
 export function command(file, args, options = {}) {
   const start = Date.now()
-  try { return execFileSync(file, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'], ...options }).trim() }
+  try { return (execFileSync(file, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'], ...options }) || '').trim() }
   catch (error) { throw new Error(`${file} ${args[0] || ''} failed (exit ${error.status ?? 'timeout'}).`) }
   finally { process.stderr.write(`[timing] ${file} ${args[0] || ''}: ${Date.now() - start} ms\n`) }
 }
+// OpenCode can exit before a piped stdout buffer drains. A regular file descriptor
+// makes large JSON exports synchronous at the CLI boundary instead of truncating them.
+export function exportSession(binary, sessionId, cwd, temporaryDirectory) {
+  const file = join(temporaryDirectory, `session-export-${randomUUID()}.json`)
+  const fd = openSync(file, 'wx', 0o600)
+  try {
+    command(binary, ['export', sessionId], { cwd, stdio: ['ignore', fd, 'pipe'] })
+    return JSON.parse(readFileSync(file, 'utf8'))
+  } finally { closeSync(fd); rmSync(file, { force: true }) }
+}
+
 export function parseResume(request) {
   const matches = [...String(request).matchAll(/<!-- omgithub-resume:v1 (\{[^\n]*\}) -->/g)]
   if (!matches.length) {
@@ -89,7 +100,7 @@ export function restore() {
   try {
     command(binary, ['import', file], { cwd: env.PROJECT_DIR })
     // Some CLI import errors exit zero. Prove all messages survived before submitting work.
-    const restored = JSON.parse(command(binary, ['export', session.info.id], { cwd: env.PROJECT_DIR }))
+    const restored = exportSession(binary, session.info.id, env.PROJECT_DIR, env.RUNNER_TEMP)
     if (restored.info?.id !== session.info.id || restored.messages?.length !== session.messages.length ||
         session.messages.some(m => !restored.messages.some(r => r.info.id === m.info.id && r.parts.length === m.parts.length))) throw new Error('The saved conversation could not be restored completely.')
     setEnv('RESUME_SESSION_ID', session.info.id)
@@ -110,7 +121,7 @@ export function saveCheckpoint() {
   // Authentication JSON can contain individual secrets echoed separately in tool output.
   const leaves = value => typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(leaves) : []
   try { secrets.push(...leaves(JSON.parse(env.OPENCODE_AUTH_CONTENT || '{}'))) } catch {}
-  const session = redactSession(JSON.parse(command(binary, ['export', sessionId], { cwd: project })), secrets)
+  const session = redactSession(exportSession(binary, sessionId, project, env.RUNNER_TEMP), secrets)
   const issue = Number(env.TRIGGER_ISSUE_NUMBER), run = Number(env.GITHUB_RUN_ID)
   const branch = `opencode-checkpoints/${issue}`
   const source = { source_repository: env.GITHUB_REPOSITORY, source_issue: issue }
