@@ -262,3 +262,6 @@ Import the complete conversation and submit only the next requested change.
 Use a new issue and result branch. Keep the source game's publication unchanged.
 Mark games without complete checkpoints as **Resume unavailable**.
 Run `node --test scripts/session-checkpoint.test.mjs` to verify the checkpoint cycle.
+
+Preserve transcript text and tool results when importing. Remove provider-bound replay IDs, encrypted reasoning, and signatures before submitting to a new runner's provider session.
+Set `OPENCODE_DEBUG_HOLD=true` only in a debugging repository to retain failed live runners for the normal five-hour access period. Use `scripts/ssh-run-log.sh` to inspect the live worker. Remove the variable after debugging.

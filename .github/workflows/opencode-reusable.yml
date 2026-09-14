@@ -929,6 +929,9 @@ jobs:
           skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
           prompt_template="$(< "$RUNTIME_DIR/.github/prompts/01-build.md")"
           request_text="$COMMENT_BODY"
+          if [[ -n "${RESUME_SESSION_ID:-}" ]]; then
+            request_text=$'Continue the saved conversation on a NEW Actions runner. The saved files and conversation are restored, but old processes, terminals, dependencies and tunnel URLs are not running. Use the current project directory, start the app again, and verify the next change.\n\n'"$request_text"
+          fi
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
           prompt="${prompt//@SKILL_TEXT@/$skill_text}"
@@ -1669,7 +1672,7 @@ jobs:
             }).catch(warn);
 
       - name: Keep temporary access available for 5 hours
-        if: success() && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
+        if: (success() || (failure() && vars.OPENCODE_DEBUG_HOLD == 'true' && steps.opencode_web.outcome == 'success')) && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: sleep 18000
 

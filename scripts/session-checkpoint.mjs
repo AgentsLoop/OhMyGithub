@@ -43,6 +43,21 @@ export function validateCheckpoint(c, source) {
       Array.isArray(c.session?.messages) && c.session.messages.length > 0 && c.session.messages.every(m => m.info?.id && ['user', 'assistant'].includes(m.info.role) && Array.isArray(m.parts)))) throw new Error('No complete saved session is available.')
   return c
 }
+export function portableSession(value) {
+  const session = structuredClone(value)
+  for (const message of session.messages || []) {
+    message.parts = message.parts.flatMap(part => {
+      // Provider replay IDs, signatures and encrypted reasoning belong to the old
+      // caller. Keep all readable transcript/tool content, not those opaque tokens.
+      delete part.metadata
+      if (part.type !== 'reasoning') return [part]
+      if (!part.text?.trim()) return []
+      return [{ id: part.id, sessionID: part.sessionID, messageID: part.messageID, type: 'text', text: part.text }]
+    })
+  }
+  return session
+}
+
 export function redactSession(session, secrets = []) {
   function clean(value) {
     if (typeof value === 'string') {
@@ -92,7 +107,7 @@ export function restore() {
   const binary = env.OPENCODE_BIN || join(env.HOME, '.opencode/bin/opencode')
   const version = command(binary, ['--version'])
   if (version !== checkpoint.opencode_version) throw new Error('Install the saved OpenCode version before importing.')
-  const session = structuredClone(checkpoint.session)
+  const session = portableSession(checkpoint.session)
   session.info.directory = resolve(env.PROJECT_DIR)
   delete session.info.parentID
   const file = join(env.RUNNER_TEMP, 'omgithub-session-import.json')
@@ -121,7 +136,7 @@ export function saveCheckpoint() {
   // Authentication JSON can contain individual secrets echoed separately in tool output.
   const leaves = value => typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(leaves) : []
   try { secrets.push(...leaves(JSON.parse(env.OPENCODE_AUTH_CONTENT || '{}'))) } catch {}
-  const session = redactSession(exportSession(binary, sessionId, project, env.RUNNER_TEMP), secrets)
+  const session = portableSession(redactSession(exportSession(binary, sessionId, project, env.RUNNER_TEMP), secrets))
   const issue = Number(env.TRIGGER_ISSUE_NUMBER), run = Number(env.GITHUB_RUN_ID)
   const branch = `opencode-checkpoints/${issue}`
   const source = { source_repository: env.GITHUB_REPOSITORY, source_issue: issue }

@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore, exportSession } from './session-checkpoint.mjs'
+import { parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore, exportSession, portableSession } from './session-checkpoint.mjs'
 const session = { info: { id: 'ses_checkpoint', directory: '/old/project' }, messages: [{ info: { id: 'msg_one', role: 'user' }, parts: [{ id: 'prt_one', type: 'text', text: 'Build a castle' }] }] }
 const source = { source_repository: 'alice/game', source_issue: 6 }
 const base = { version: 1, repository: 'alice/game', issue_number: 6, run_id: 123, commit: 'a'.repeat(40), branch: 'opencode-checkpoints/6', project_dir: '', opencode_version: '1.2.3', session, public_history: true }
@@ -121,4 +121,23 @@ test('real OpenCode imports and exports a complete portable conversation', { ski
     assert.equal(exported.messages.length, 1)
     assert.equal(exported.messages[0].parts[0].text, data.messages[0].parts[0].text)
   } finally { rmSync(directory, { recursive: true, force: true }) }
+})
+
+
+test('makes a full conversation portable without caller-bound provider replay tokens', () => {
+  const source = { info: { id: 'ses_old' }, messages: [{ info: { id: 'msg_old', role: 'assistant' }, parts: [
+    { id: 'p1', type: 'reasoning', text: '', metadata: { openai: { reasoningEncryptedContent: 'old-caller-ciphertext' } } },
+    { id: 'p2', type: 'reasoning', text: 'Saved readable summary', metadata: { anthropic: { signature: 'old-signature' } } },
+    { id: 'p3', type: 'text', text: 'Castle is ready', metadata: { openai: { itemId: 'old-item' } } },
+    { id: 'p4', type: 'tool', tool: 'bash', state: { status: 'completed', output: 'Verified game', metadata: { exit: 0 } } }
+  ] }] }
+  const portable = portableSession(source)
+  assert.equal(portable.messages[0].info.id, 'msg_old')
+  assert.deepEqual(portable.messages[0].parts.map(p => p.id), ['p2', 'p3', 'p4'])
+  assert.equal(portable.messages[0].parts[0].type, 'text')
+  assert.equal(portable.messages[0].parts[0].text, 'Saved readable summary')
+  assert.equal(portable.messages[0].parts[2].state.output, 'Verified game')
+  assert.equal(portable.messages[0].parts[2].state.metadata.exit, 0)
+  assert.equal(JSON.stringify(portable).includes('old-caller'), false)
+  assert.equal(source.messages[0].parts.length, 4, 'leave the live session unchanged')
 })
