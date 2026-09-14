@@ -569,6 +569,13 @@ jobs:
             core.setOutput('comment_id', comment.data.id);
             core.setFailed('AgentsWeb registration or SSH connectivity check failed.');
 
+      - name: Configure Mac Playwright CLI with Metal
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p bash "$RUNTIME_DIR/scripts/setup-mac-playwright.sh"
+
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
         if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
