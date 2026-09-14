@@ -11,9 +11,6 @@ Do not implement, suggest, report, or propose security issues unless the user ex
 - [OmGithub publishing](https://github.com/AgentsLoop/omsite/blob/main/wiki/omgithub.md)
 
 
-Delegate all tests and validation to a Terra-model sub-agent with `multi_agent_v1__spawn_agent`.
-
-
 ## Main project file
 
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
