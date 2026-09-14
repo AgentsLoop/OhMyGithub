@@ -1,5 +1,47 @@
 # Testing and verification
 
+## Capture WebGPU on a hosted Mac
+
+Use full Chromium with the Metal backend. Keep Playwright's other launch defaults. Test
+headed mode first; use `--headless` only after comparing the actual captures.
+Install Playwright and its full Chromium build in a separate runtime directory:
+
+```sh
+npm install --prefix /tmp/gpu-capture-runtime playwright@1.63.0
+/tmp/gpu-capture-runtime/node_modules/.bin/playwright install chromium
+PLAYWRIGHT_ROOT=/tmp/gpu-capture-runtime node scripts/gpu-capture.mjs \
+  http://127.0.0.1:8000/ --canvas '#wgpu' \
+  --require-metal --out /tmp/game-capture
+```
+
+Replace the URL and canvas selector with the running game's values. Start the
+game before capture if it requires user input. Read `diagnostic.json`,
+`canvas.png`, and `page.png` from the output directory. Require an available
+WebGPU device, no page errors, and painted canvas pixels. Exclude CSS borders
+from the pixel check. Accept a flat triangle with two interior colours; reject
+a uniform interior even when its border has another colour.
+
+Use `--baseline` to test full Chromium without extra flags. Use `--headless`
+to test the same full browser headlessly. Do not substitute the separate
+headless shell. Preserve failed diagnostics; do not silently skip absent
+adapters. Keep Vulkan flags out of the macOS Metal capture path.
+
+Use the verified flags: `--enable-gpu`, `--ignore-gpu-blocklist`,
+`--enable-unsafe-webgpu`, and `--use-angle=metal`. Check `chrome://gpu` in a
+separate headed page. Interpret `Apple Paravirtual device` as a virtual Metal
+adapter, not proof of a physical GPU model or hardware performance.
+
+Refer to [Playwright's browser documentation](https://playwright.dev/docs/browsers#opt-in-to-new-headless-mode)
+for the full-browser/headless-shell distinction. Reproduce the evidence from
+[issue #110](https://github.com/AgentsLoop/PlayGround/issues/110) and
+[run 34801504801](https://github.com/AgentsLoop/PlayGround/actions/runs/34801504801).
+Use the 2026-09-14 result as a reference, not a promise for later runner images:
+Playwright 1.63.0 / Chromium 153.0.8010.12 acquired vendor `apple`,
+`isFallbackAdapter=false`, and a usable WebGPU device. Both headed and headless
+Metal captures visibly showed the green triangle; pure headed baseline also
+succeeded. Run `node --test scripts/gpu-capture.test.mjs` for the pixel and
+symlink-entry regressions, then repeat the live screenshot test.
+
 ## Test standalone issue access
 
 Test `/OpenCode` in a new issue title with `OPENCODE_ACCESS=everyone` and
