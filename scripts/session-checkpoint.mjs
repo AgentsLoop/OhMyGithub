@@ -33,6 +33,7 @@ export function parseResume(request) {
   const source = JSON.parse(matches[0][1])
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(source.source_repository) || !Number.isSafeInteger(source.source_issue) || source.source_issue < 1 ||
       !new RegExp(`^opencode-checkpoint-${source.source_issue}-[1-9]\\d*-\\d+$`).test(source.checkpoint_tag)) throw new Error('Invalid checkpoint source.')
+  if (typeof source.user_prompt === 'string') return { ...source, prompt: source.user_prompt }
   return { ...source, prompt: String(request).replace(matches[0][0], '').replace(/<!-- omgithub-resume-request:[a-f0-9]+ -->/g, '').replace(/^Continue from https:\/\/github\.com\/[^\n]+\n?/gm, '').trim() }
 }
 export function validateCheckpoint(c, source) {
@@ -84,7 +85,7 @@ function setEnv(name, value) {
 export function prepare() {
   const source = parseResume(env.COMMENT_BODY || '')
   if (!source) return
-  if (!source.prompt) throw new Error('Enter the next game change.')
+  if (!source.prompt.trim()) throw new Error('Enter the next game change.')
   const repository = JSON.parse(api(`repos/${source.source_repository}`))
   if (repository.private) throw new Error('Only public checkpoints can be copied.')
   const release = JSON.parse(api(`repos/${source.source_repository}/releases/tags/${source.checkpoint_tag}`))

@@ -145,3 +145,9 @@ test('makes a full conversation portable without caller-bound provider replay to
 test('rejects a saved verification fork instead of converting it into a main session', () => {
   assert.throws(() => validateCheckpoint({ ...base, session: { ...session, info: { ...session.info, parentID: 'ses_main' } } }, source), /verification fork/)
 })
+
+test('preserves the exact resume prompt including whitespace and marker-like text', () => {
+  const prompt = '  Keep @SKILL_TEXT@ and "quotes".\n\n'
+  const metadata = { ...source, checkpoint_tag: 'opencode-checkpoint-6-123-1000', user_prompt: prompt }
+  assert.equal(parseResume(`display text\n<!-- omgithub-resume:v1 ${JSON.stringify(metadata)} -->`).prompt, prompt)
+})

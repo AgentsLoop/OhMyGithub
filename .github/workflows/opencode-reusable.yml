@@ -957,13 +957,13 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! -f startup.sh ]]; then
-            echo 'Saved project has no startup.sh. Ask the main session to create it.'
+            echo 'Saved project has no startup.sh. Run verification after the user request.'
             echo 'RESUME_STARTUP_STATUS=missing' >> "$GITHUB_ENV"
           elif /usr/bin/time -p bash "$RUNTIME_DIR/scripts/start-project.sh"; then
             echo 'RESUME_STARTUP_STATUS=ready' >> "$GITHUB_ENV"
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           else
-            echo 'Saved startup failed. Ask the main session to repair it; keep chat available.'
+            echo 'Saved startup failed. Run verification after the user request.'
             echo 'RESUME_STARTUP_STATUS=failed' >> "$GITHUB_ENV"
           fi
 
@@ -1000,38 +1000,43 @@ jobs:
           PROMPT_FILE="$OPENCODE_WEB_DIR/prompt.txt"
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
-          skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
-          prompt_template="$(< "$RUNTIME_DIR/.github/prompts/01-build.md")"
-          request_text="$COMMENT_BODY"
           if [[ -n "${RESUME_SESSION_ID:-}" ]]; then
-            request_text=$'Continue the main conversation on a NEW Actions runner with the restored project files. Read startup.sh and reuse the running app when available. If startup.sh is missing or failed, create or repair it and start the app on port 3000. Apply the requested change and verify that change in this main session; no separate verification fork will run. Keep startup.sh working and capture fresh screenshots/final-*.png after changes. For a resume-only request, keep the app running without repeating browser verification. Leave changes uncommitted.\n\n'"Startup status: ${RESUME_STARTUP_STATUS:-unknown}."$'\n\n'"$request_text"
-          fi
-          prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
-          prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
-          prompt="${prompt//@SKILL_TEXT@/$skill_text}"
-          if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
-            prompt=$'ulw\n\n'"$prompt"
-          fi
-          printf '%s\n' "$prompt" > "$PROMPT_FILE"
-          if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
-            cat >> "$PROMPT_FILE" <<'EOF'
-
-            This request has the `omo` issue label. Use oh-my-openagent Ultimate's native Goal system for the persistent objective and `ulw` for full OMO orchestration. Keep the objective active through verified implementation iterations and do not stop after the first successful pass. Preserve the workflow's evidence, commit, and push requirements.
-          EOF
-          fi
-          if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
-            echo 'OpenCode invocation mode: omo-goal-ulw'
-          elif [[ "$RALPH_REQUEST" == 'true' ]]; then
-            echo 'OpenCode invocation mode: ralph-loop'
+            printf '%s' "$COMMENT_BODY" > "$PROMPT_FILE"
           else
-            echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
+            skill_text="$(jq -r 'if length == 0 then "(none)" else join(", ") end' <<<"$OPENCODE_SKILLS")"
+            prompt_template="$(< "$RUNTIME_DIR/.github/prompts/01-build.md")"
+            request_text="$COMMENT_BODY"
+            prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
+            prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
+            prompt="${prompt//@SKILL_TEXT@/$skill_text}"
+            if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
+              prompt=$'ulw\n\n'"$prompt"
+            fi
+            printf '%s\n' "$prompt" > "$PROMPT_FILE"
+            if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
+              cat >> "$PROMPT_FILE" <<'EOF'
+
+              This request has the `omo` issue label. Use oh-my-openagent Ultimate's native Goal system for the persistent objective and `ulw` for full OMO orchestration. Keep the objective active through verified implementation iterations and do not stop after the first successful pass. Preserve the workflow's evidence, commit, and push requirements.
+          EOF
+            fi
+            if [[ "$OMO_REQUEST" == 'true' && "$RALPH_REQUEST" != 'true' ]]; then
+              echo 'OpenCode invocation mode: omo-goal-ulw'
+            elif [[ "$RALPH_REQUEST" == 'true' ]]; then
+              echo 'OpenCode invocation mode: ralph-loop'
+            else
+              echo "OpenCode invocation mode: $([[ "$GOAL_REQUEST" == 'true' ]] && echo goal || echo standard)"
+            fi
           fi
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
           nohup bash -c '
             resume_args=()
             [[ -n "${RESUME_SESSION_ID:-}" ]] && resume_args=(--session "$RESUME_SESSION_ID")
-            if [[ "$9" == true ]]; then
+            if [[ -n "${RESUME_SESSION_ID:-}" ]]; then
+              exact_prompt="$(cat "$3"; printf .)"
+              exact_prompt="${exact_prompt%.}"
+              "$1" run --session "$RESUME_SESSION_ID" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" "$exact_prompt" > "$4" 2>&1
+            elif [[ "$9" == true ]]; then
               "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" --command ralph-loop "$(cat "$3")" > "$4" 2>&1
             elif [[ "$8" == true ]]; then
               "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
@@ -1186,7 +1191,7 @@ jobs:
           fi
 
       - name: Verify Ralph completion promise
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.RALPH_REQUEST == 'true'
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.RALPH_REQUEST == 'true' && env.RESUME_SESSION_ID == ''
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
@@ -1229,7 +1234,7 @@ jobs:
 
       - name: Fork OpenCode session for verification
         id: verification_fork
-        if: env.RESUME_SESSION_ID == '' && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: (env.RESUME_SESSION_ID == '' || env.RESUME_STARTUP_STATUS != 'ready') && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -1258,7 +1263,7 @@ jobs:
           echo "Verification fork: $VERIFICATION_SESSION_ID"
 
       - name: Mark issue validating
-        if: env.RESUME_SESSION_ID == '' && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: (env.RESUME_SESSION_ID == '' || env.RESUME_STARTUP_STATUS != 'ready') && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -1276,7 +1281,7 @@ jobs:
             });
 
       - name: Verify app with forked OpenCode session
-        if: env.RESUME_SESSION_ID == '' && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: (env.RESUME_SESSION_ID == '' || env.RESUME_STARTUP_STATUS != 'ready') && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -1357,7 +1362,7 @@ jobs:
           completion_prompt="$(< "$RUNTIME_DIR/.github/prompts/04-completion-report.md")"
           completion_prompt="${completion_prompt//@APP_URL@/$APP_URL}"
           completion_prompt="${completion_prompt//@TRIGGER_ISSUE_NUMBER@/$TRIGGER_ISSUE_NUMBER}"
-          if [[ -z "${RESUME_SESSION_ID:-}" ]]; then
+          if [[ -z "${RESUME_SESSION_ID:-}" || "${RESUME_STARTUP_STATUS:-}" != ready ]]; then
             "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
               --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
               --dir "$PROJECT_DIR" \
@@ -1403,7 +1408,7 @@ jobs:
             fi
 
             # The resumed main session owns verification of its changes.
-            [[ -z "${RESUME_SESSION_ID:-}" ]] || break
+            [[ -z "${RESUME_SESSION_ID:-}" || "${RESUME_STARTUP_STATUS:-}" != ready ]] || break
             echo "No final screenshots found under $PROJECT_PATH/screenshots/ (attempt $attempt/3)."
             if [[ "$attempt" -lt 3 ]]; then
               echo "Sending OpenCode screenshot remediation prompt before retry $((attempt + 1))/3."

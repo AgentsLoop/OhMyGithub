@@ -50,3 +50,32 @@ test('asks OpenCode to generate and test the portable startup script during veri
   assert.match(prompt, /Generate `startup.sh`/);
   assert.match(prompt, /no installed project dependencies/);
 });
+
+test('passes exact resumed text to OpenCode without command wrappers', async () => {
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'exact-resume-'));
+  try {
+    const prompt = '  Keep @SKILL_TEXT@ and $HOME exactly.\n\n';
+    const input = join(dir, 'prompt'), capture = join(dir, 'args'), binary = join(dir, 'oc');
+    writeFileSync(input, prompt);
+    writeFileSync(binary, '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.CAPTURE, JSON.stringify(process.argv.slice(2)))\n', { mode: 0o755 });
+    const block = workflow.split('name: Run OpenCode and locate its web session')[1].split('      - name:')[0];
+    const script = block.match(/nohup bash -c '([\s\S]*?)' \\/)[1];
+    execFileSync('bash', ['-c', script, '_', binary, '3000', input, join(dir, 'log'), join(dir, 'exit'), 'model', 'true', 'true', 'true'], {
+      env: { ...process.env, RESUME_SESSION_ID: 'ses_main', PROJECT_DIR: dir, CAPTURE: capture }
+    });
+    const args = JSON.parse(readFileSync(capture, 'utf8'));
+    assert.equal(args.at(-1), prompt);
+    assert.equal(args.includes('--command'), false);
+    assert.equal(args[args.indexOf('--session') + 1], 'ses_main');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+test('runs verification only for a fresh build or unsuccessful resumed startup', () => {
+  for (const name of ['Fork OpenCode session for verification', 'Verify app with forked OpenCode session']) {
+    const block = workflow.split(`name: ${name}`)[1].split('      - name:')[0];
+    assert.match(block, /env.RESUME_SESSION_ID == '' \|\| env.RESUME_STARTUP_STATUS != 'ready'/);
+  }
+  assert.doesNotMatch(workflow, /Continue the main conversation on a NEW Actions runner/);
+});
