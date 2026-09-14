@@ -1,5 +1,30 @@
 # Testing and verification
 
+## Capture the Linux WebGPU triangle
+
+Install Playwright 1.63.0 and its full Chromium browser as below. Install
+`mesa-vulkan-drivers`, `vulkan-tools`, and `xvfb` on Ubuntu. Serve
+`tests/fixtures/webgpu-triangle.html` over localhost HTTP. Run:
+
+```sh
+PLAYWRIGHT_ROOT=/tmp/gpu-runtime xvfb-run -a node scripts/gpu-capture.mjs \
+  http://127.0.0.1:8000/webgpu-triangle.html --canvas '#wgpu' \
+  --backend swiftshader --require-green-triangle --out /tmp/linux-triangle
+```
+
+Require green triangle pixels, a usable device, `scene.webgpu.rendered=true`,
+and no page errors. Inspect the image. Treat SwiftShader and Mesa llvmpipe as
+CPU rendering, not GPU hardware acceleration. Use the headed Xvfb result on
+[run 34908797646](https://github.com/AgentsLoop/PlayGround/actions/runs/34908797646)
+as the verified 2026-09-15 reference. Do not accept the headless result from
+that run: its initial generic pixel check falsely accepted background pixels.
+Retain the fixture's GPU reference. Preserve failed diagnostics when investigating
+`A valid external Instance reference no longer exists`. Do not infer a single
+root cause from the combined driver-installation and fixture changes.
+Use `--backend vulkan` for native-driver experiments, `--backend swangle` for
+ANGLE SwiftShader experiments, and `--executable` to select another browser.
+Keep the default Metal path for the Mac test.
+
 ## Capture WebGPU on a hosted Mac
 
 Use full Chromium with the Metal backend. Keep Playwright's other launch defaults. Test

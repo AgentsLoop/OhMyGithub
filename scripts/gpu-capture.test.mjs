@@ -48,3 +48,9 @@ test('execute CLI when invoked through a symlink instead of silently succeeding'
     assert.match(r.stderr, /Supply one HTTP\(S\) game URL/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+ test('require green triangle pixels, not background or transparency', async () => {
+  const { hasGreenTriangle } = await import('./gpu-capture.mjs');
+  assert.equal(hasGreenTriangle(image([0,0,0], (x,y) => x>5 && x<15 ? [26,230,89] : null)), true);
+  assert.equal(hasGreenTriangle(image([0,0,0], (x,y) => x>5 ? [24,32,44] : null)), false);
+ });

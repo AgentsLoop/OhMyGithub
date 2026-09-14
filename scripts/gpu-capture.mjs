@@ -24,6 +24,14 @@ export function analysePixels({ width, height, data }) {
   return { width, height, distinctInteriorColors: colors.size, variance, nonblank: colors.size > 1 && variance > 1 };
 }
 
+export function hasGreenTriangle({ width, height, data }) {
+  let green = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 255 && data[i + 1] > 150 && data[i] < 80 && data[i + 2] < 130) green++;
+  }
+  return green / (width * height) > 0.15;
+}
+
 export function decodePng(buf) {
   if (!buf.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error('Not a PNG');
   let width, height, channels, pos = 8;
@@ -83,6 +91,9 @@ async function main() {
     canvas: { type: 'string', default: 'canvas' },
     headless: { type: 'boolean', default: false },
     baseline: { type: 'boolean', default: false },
+    'require-green-triangle': { type: 'boolean', default: false },
+    executable: { type: 'string' },
+    backend: { type: 'string', default: 'metal' },
     'require-metal': { type: 'boolean', default: false },
   } });
   if (positionals.length !== 1 || !/^https?:\/\//.test(positionals[0])) throw new Error('Supply one HTTP(S) game URL');
@@ -90,18 +101,28 @@ async function main() {
   await fs.mkdir(out, { recursive: true });
   const require = createRequire(import.meta.url);
   const { chromium } = require(require.resolve('playwright', { paths: [process.env.PLAYWRIGHT_ROOT || process.cwd()] }));
-  const args = values.baseline ? [] : ['--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu', '--use-angle=metal'];
+  const backends = {
+    metal: ['--use-angle=metal'],
+    vulkan: ['--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface'],
+    swangle: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+    swiftshader: ['--use-angle=vulkan', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--disable-vulkan-surface'],
+  };
+  if (!backends[values.backend]) throw new Error('Unknown backend');
+  const args = values.baseline ? [] : ['--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu', ...backends[values.backend]];
   const report = { url: positionals[0], headless: values.headless, channel: 'chromium', args, startedAt: new Date().toISOString(), console: [], pageErrors: [] };
   let browser;
   try {
     // Full Chromium, not the separate headless shell. Keep GPU sandbox defaults.
-    browser = await step('launch', () => chromium.launch({ channel: 'chromium', headless: values.headless, args, timeout: 30000 }));
+    browser = await step('launch', () => chromium.launch({ channel: 'chromium', executablePath: values.executable, headless: values.headless, args, timeout: 30000 }));
     report.browserVersion = browser.version();
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     page.on('console', msg => report.console.push(`[${msg.type()}] ${msg.text()}`));
     page.on('pageerror', error => report.pageErrors.push(error.message));
     await step('navigate', () => page.goto(positionals[0], { waitUntil: 'load', timeout: 30000 }));
     await page.locator(values.canvas).first().waitFor({ state: 'visible', timeout: 15000 });
+    if (values.canvas === '#wgpu') {
+      await page.waitForFunction(() => window.__scene?.webgpu?.rendered || !window.__scene, null, { timeout: 15000 });
+    }
     report.gpu = await step('adapter probe', () => page.evaluate(async () => {
       const bounded = (p, name) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timeout`)), 8000))]);
       const result = { secureContext: isSecureContext, hasGpu: !!navigator.gpu };
@@ -125,7 +146,12 @@ async function main() {
     await step('paint and capture', async () => {
       do {
         const shot = await page.locator(values.canvas).first().screenshot({ timeout: Math.max(1, deadline - Date.now()) });
-        report.canvas = analysePixels(decodePng(shot));
+        const pixels = decodePng(shot);
+        report.canvas = analysePixels(pixels);
+        if (values['require-green-triangle']) {
+          report.canvas.greenTriangle = hasGreenTriangle(pixels);
+          report.canvas.nonblank &&= report.canvas.greenTriangle;
+        }
         await fs.writeFile(path.join(out, 'canvas.png'), shot);
         if (report.canvas.nonblank) break;
         await page.evaluate(() => new Promise(resolve => {
