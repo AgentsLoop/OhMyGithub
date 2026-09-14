@@ -1,6 +1,6 @@
 # OMG (Oh My GitHub) agent instructions
 
-Do not suggest, report, or propose security issues unless the user explicitly asks for a security review.
+Do not implement, suggest, report, or propose security issues unless the user explicitly asks for a security review.
 
 ## Wiki index
 
@@ -9,6 +9,10 @@ Do not suggest, report, or propose security issues unless the user explicitly as
 - [Temporary Mac SSH access](wiki/access.md)
 - [Testing and verification](wiki/testing.md)
 - [OmGithub publishing](https://github.com/AgentsLoop/omsite/blob/main/wiki/omgithub.md)
+
+
+Delegate all tests and validation to a Terra-model sub-agent with `multi_agent_v1__spawn_agent`.
+
 
 ## Main project file
 
@@ -42,35 +46,8 @@ Store durable implementation ideas as individual Markdown files under
 `./ideas/`, using descriptive kebab-case filenames such as
 `ideas/opencode-oauth-env-auth.md`.
 
-## Git delivery
 
-After every code change, commit and push the change.
-Before running any workflow, verify that the working tree is clean and everything
-is committed.
 
-## SOL and Astra verification
-
-When the active model is SOL or Astra, do not run tests or validation. Delegate
-all tests and validation to a Terra-model sub-agent with
-`multi_agent_v1__spawn_agent`. Do not wait for that sub-agent to finish.
-
-To identify the model of the current chat, run:
-
-```sh
-rg -o '"model":"[^"]*"' "$(ls -t "$CODEX_HOME"/sessions/*/*/*.jsonl | head -n 1)" \
-  | tail -n 1
-```
-
-When the user asks to undo a just-made change or commit, inspect the targeted
-commit and working tree first, then prefer rewriting that commit and pushing with
-`git push --force-with-lease` rather than creating a revert commit. Preserve
-unrelated changes and stop if the remote branch has advanced unexpectedly. Use
-`git revert` when the change is already shared broadly or when history rewriting
-would be unsafe.
-
-## Git Commits
-- Write evidence-rich commit messages, not short subject-only messages. Use a specific subject and a body that records the motivating symptom or context, root cause, decision rationale and alternatives considered, material changes, verification performed, discovered Throughput bottlenecks or Hung commands, relevant Pitfalls and Gotchas, and known caveats or follow-up. Preserve the durable reasoning summary needed for diagnosis, rollback, and future extension.
-- Always include the current Codex chat/task ID in the commit message, using a clear field such as `Chat-ID: <chat-id>` in the body.
 
 ## Links in handoffs
 

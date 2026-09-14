@@ -13,13 +13,13 @@ initial Web UI link. Do not claim implementation completion.
 ## Write the issue prompt
 
 Locate the skill invocation in the user's message. Remove only the invocation
-syntax and routing metadata such as `#main` and mode labels. Merge surrounding
+syntax and routing metadata such as `#main` and mode labels. Keep the surrounding
 request text in its original order.
 
-When the request includes `#c`, remove `#c` and all routing metadata, then
-copy the remaining request text exactly as the issue body. Start the issue title
-with `/OpenCode `, then add the remaining request text exactly. Do not read the
-rubric, rewrite the text, add a heading, or add a skills sentence.
+If `#c` is present, drop `#c` and all routing metadata, then copy the remaining
+request text exactly as the issue body. Set the issue title to `/OpenCode `
+followed by the same remaining text exactly. Do not read the rubric, rewrite the
+text, add a heading, or add a skills sentence.
 
 Read `references/gauntlet-prompt-rubric.md` whenever the remaining request is
 sparse, names only a product or concept, lacks a concrete quality bar, or does
@@ -67,11 +67,6 @@ out the validated `target_sha` and uses `target_ref` as its result base, preserv
 debugging worktree. Default-branch preparation dispatches the listener at this
 branch. Treat the selected-branch run as the execution run. This suffix is
 routing metadata, not prompt text. On `main`, omit it.
-
-Treat the issue-generated result branch as the published project branch. Build
-every final `Open Project` URL from the workflow's generated `BRANCH_NAME`, not
-from the input `TARGET_REF` or repository default branch. Preserve any project
-subdirectory after that generated branch in the URL.
 
 Resolve the target repository before creating the issue. With `#main`, use the
 current checkout repository on `main`.
