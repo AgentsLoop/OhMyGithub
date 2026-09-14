@@ -33,3 +33,20 @@ test('runtime does not require pull-request permission to execute or deliver bra
   assert.doesNotMatch(workflow, /pull-requests:\s*write/);
   assert.doesNotMatch(workflow, /gh pr create/);
 });
+
+test('keeps checkpoints on main and starts restored preview before model execution', () => {
+  assert.equal((workflow.match(/> "\$OPENCODE_WEB_DIR\/checkpoint-session-id"/g) || []).length, 1);
+  assert.doesNotMatch(workflow, /"\$VERIFICATION_SESSION_ID" > "\$OPENCODE_WEB_DIR\/checkpoint-session-id"/);
+  assert.ok(workflow.indexOf('name: Start saved app before OpenCode') < workflow.indexOf('name: Run OpenCode and locate'));
+  assert.ok(workflow.indexOf('name: Publish restored preview') < workflow.indexOf('name: Run OpenCode and locate'));
+  for (const name of ['Fork OpenCode session for verification', 'Verify app with forked OpenCode session']) {
+    assert.match(workflow.split(`name: ${name}`)[1].split('      - name:')[0], /env.RESUME_SESSION_ID == ''/);
+  }
+  assert.match(workflow, /name: Wait for main OpenCode completion/);
+  assert.equal((workflow.match(/echo \$! > "\$OPENCODE_WEB_DIR\/app-cloudflared.pid"/g) || []).length, 1);
+});
+test('asks OpenCode to generate and test the portable startup script during verification', () => {
+  const prompt = readFileSync(new URL('../.github/prompts/02-verify.md', import.meta.url), 'utf8');
+  assert.match(prompt, /Generate `startup.sh`/);
+  assert.match(prompt, /no installed project dependencies/);
+});

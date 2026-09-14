@@ -141,3 +141,7 @@ test('makes a full conversation portable without caller-bound provider replay to
   assert.equal(JSON.stringify(portable).includes('old-caller'), false)
   assert.equal(source.messages[0].parts.length, 4, 'leave the live session unchanged')
 })
+
+test('rejects a saved verification fork instead of converting it into a main session', () => {
+  assert.throws(() => validateCheckpoint({ ...base, session: { ...session, info: { ...session.info, parentID: 'ses_main' } } }, source), /verification fork/)
+})

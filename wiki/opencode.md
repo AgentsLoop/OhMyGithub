@@ -265,3 +265,9 @@ Run `node --test scripts/session-checkpoint.test.mjs` to verify the checkpoint c
 
 Preserve transcript text and tool results when importing. Remove provider-bound replay IDs, encrypted reasoning, and signatures before submitting to a new runner's provider session.
 Set `OPENCODE_DEBUG_HOLD=true` only in a debugging repository to retain failed live runners for the normal five-hour access period. Use `scripts/ssh-run-log.sh` to inspect the live worker. Remove the variable after debugging.
+
+## Restore the main session and preview
+
+Keep `checkpoint-session-id` set to the main session. Save the latest workspace files with that conversation. Skip the verification fork on restored runs. Verify requested changes in the main session. Reject saved child sessions instead of importing them as main conversations.
+
+Instruct OpenCode to generate and test `startup.sh` during initial verification. Install dependencies, build when required, and serve port 3000 in the foreground. Test from a stopped app without installed dependencies. Start three tunnels during worker setup. Run the saved script before submitting resumed work. Publish the restored preview only after local and public HTTP checks pass. Reuse the app tunnel for delivery. Ask the main session to repair missing or failed startup scripts. Inspect `app.log` for startup failures.

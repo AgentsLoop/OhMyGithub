@@ -801,13 +801,18 @@ jobs:
           nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$PROJECT_FILE_PORT" \
             > "$OPENCODE_WEB_DIR/project-cloudflared.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/project-cloudflared.pid"
+          nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$APP_PORT" \
+            > "$OPENCODE_WEB_DIR/app-cloudflared.log" 2>&1 &
+          echo $! > "$OPENCODE_WEB_DIR/app-cloudflared.pid"
           for _ in {1..60}; do
             WEB_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
             PROJECT_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/project-cloudflared.log" | head -n 1)"
-            [[ -n "$WEB_URL" && -n "$PROJECT_URL" ]] && break
+            APP_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/app-cloudflared.log" | head -n 1)"
+            [[ -n "$WEB_URL" && -n "$PROJECT_URL" && -n "$APP_URL" ]] && break
             sleep 1
           done
-          [[ -n "${WEB_URL:-}" && -n "${PROJECT_URL:-}" ]]
+          [[ -n "${WEB_URL:-}" && -n "${PROJECT_URL:-}" && -n "${APP_URL:-}" ]]
+          echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
           printf 'url=%s\nproject_url=%s\n' "$WEB_URL" "$PROJECT_URL" >> "$GITHUB_OUTPUT"
 
       - name: Configure Git identity
@@ -919,6 +924,63 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: /usr/bin/time -p node "$RUNTIME_DIR/scripts/session-checkpoint.mjs" restore
 
+      - name: Publish restored workspace
+        if: env.RESUME_SESSION_ID != '' && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
+        uses: actions/github-script@v7
+        env:
+          OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
+          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const saved = JSON.parse(fs.readFileSync(process.env.RESUME_CHECKPOINT_FILE, 'utf8'));
+            const shotsDir = path.join(process.env.PROJECT_DIR, 'screenshots');
+            const shots = fs.existsSync(shotsDir)
+              ? fs.readdirSync(shotsDir).filter(name => /^final-.*\.(png|jpe?g|webp)$/i.test(name)) : [];
+            const rawRoot = `https://raw.githubusercontent.com/${saved.repository}/${saved.commit}`;
+            const projectPath = saved.project_dir ? `/${saved.project_dir.split('/').map(encodeURIComponent).join('/')}` : '';
+            const body = [
+              `OpenCode Web UI: ${process.env.OPENCODE_WEB_URL}/${Buffer.from(process.env.PROJECT_DIR).toString('base64url')}/session/${process.env.RESUME_SESSION_ID}`,
+              `Project files: ${process.env.PROJECT_FILE_URL}`,
+              ...shots.map(name => `![Previous screenshot](${rawRoot}${projectPath}/screenshots/${encodeURIComponent(name)})`)
+            ].join('\n');
+            await github.rest.issues.createComment({ owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER), body });
+
+      - name: Start saved app before OpenCode
+        id: resume_app
+        if: env.RESUME_SESSION_ID != '' && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f startup.sh ]]; then
+            echo 'Saved project has no startup.sh. Ask the main session to create it.'
+            echo 'RESUME_STARTUP_STATUS=missing' >> "$GITHUB_ENV"
+          elif /usr/bin/time -p bash "$RUNTIME_DIR/scripts/start-project.sh"; then
+            echo 'RESUME_STARTUP_STATUS=ready' >> "$GITHUB_ENV"
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Saved startup failed. Ask the main session to repair it; keep chat available.'
+            echo 'RESUME_STARTUP_STATUS=failed' >> "$GITHUB_ENV"
+          fi
+
+      - name: Publish restored preview
+        if: steps.resume_app.outputs.ready == 'true'
+        uses: actions/github-script@v7
+        env:
+          OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
+              issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER),
+              body: `OpenCode Web UI: ${process.env.OPENCODE_WEB_URL}/${Buffer.from(process.env.PROJECT_DIR).toString('base64url')}/session/${process.env.RESUME_SESSION_ID}\nPlayable preview: ${process.env.APP_URL}\n\nRestored app is ready. New changes are not yet verified.`
+            });
+
       - name: Run OpenCode and locate its web session
         id: opencode_run
         if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
@@ -942,7 +1004,7 @@ jobs:
           prompt_template="$(< "$RUNTIME_DIR/.github/prompts/01-build.md")"
           request_text="$COMMENT_BODY"
           if [[ -n "${RESUME_SESSION_ID:-}" ]]; then
-            request_text=$'Continue the saved conversation on a NEW Actions runner. The saved files and conversation are restored, but old processes, terminals, dependencies and tunnel URLs are not running. Use the current project directory, start the app again, and verify the next change.\n\n'"$request_text"
+            request_text=$'Continue the main conversation on a NEW Actions runner with the restored project files. Read startup.sh and reuse the running app when available. If startup.sh is missing or failed, create or repair it and start the app on port 3000. Apply the requested change and verify that change in this main session; no separate verification fork will run. Keep startup.sh working and capture fresh screenshots/final-*.png after changes. For a resume-only request, keep the app running without repeating browser verification. Leave changes uncommitted.\n\n'"Startup status: ${RESUME_STARTUP_STATUS:-unknown}."$'\n\n'"$request_text"
           fi
           prompt="${prompt_template//@COMMENT_BODY@/$request_text}"
           prompt="${prompt//@OPENCODE_MODEL@/$OPENCODE_MODEL}"
@@ -1153,9 +1215,21 @@ jobs:
             exit 1
           fi
 
+      - name: Wait for main OpenCode completion
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in {1..21600}; do
+            [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]] && break
+            /usr/bin/time -p sleep 1
+          done
+          [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]]
+          [[ "$(cat "$OPENCODE_WEB_DIR/opencode-run.exit")" == 0 ]]
+
       - name: Fork OpenCode session for verification
         id: verification_fork
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: env.RESUME_SESSION_ID == '' && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -1176,7 +1250,6 @@ jobs:
             "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$BUILD_SESSION_ID/fork" \
             | jq -r '.id // empty')"
           [[ "$VERIFICATION_SESSION_ID" == ses_* ]]
-          /usr/bin/time -p printf '%s\n' "$VERIFICATION_SESSION_ID" > "$OPENCODE_WEB_DIR/checkpoint-session-id"
           DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')"
           printf 'session_id=%s\nsession_url=%s\n' "$VERIFICATION_SESSION_ID" \
             "${{ steps.opencode_web.outputs.url }}/${DIRECTORY_B64}/session/${VERIFICATION_SESSION_ID}" >> "$GITHUB_OUTPUT"
@@ -1185,7 +1258,7 @@ jobs:
           echo "Verification fork: $VERIFICATION_SESSION_ID"
 
       - name: Mark issue validating
-        if: env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: env.RESUME_SESSION_ID == '' && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -1203,7 +1276,7 @@ jobs:
             });
 
       - name: Verify app with forked OpenCode session
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
+        if: env.RESUME_SESSION_ID == '' && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -1214,7 +1287,7 @@ jobs:
             --dangerously-skip-permissions \
             --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
             --dir "$PROJECT_DIR" \
-            --session "${{ steps.verification_fork.outputs.session_id }}" \
+            --session "${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}" \
             --model "${{ steps.opencode_labels.outputs.model }}" \
             "$(< "$RUNTIME_DIR/.github/prompts/02-verify.md")" \
             > "$OPENCODE_WEB_DIR/verification.log" 2>&1
@@ -1226,7 +1299,7 @@ jobs:
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.verification_fork.outputs.session_id }}'
+          SESSION_ID='${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}'
           ENTRYPOINT_PROMPT='The browser verifier cannot find a playable HTML entrypoint. Ensure the requested app has a working index.html at the project root or dist/index.html, make the app server serve that entrypoint on port 3000, and verify it in the browser before replying.'
 
           for attempt in 1 2 3; do
@@ -1261,107 +1334,18 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.verification_fork.outputs.session_id }}'
-          FIX_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/03-public-app-fix.md")"
-
-          pin_tunnel_dns() {
-            local url="$1"
-            local host
-            local ips
-            host="${url#https://}"
-            host="${host%%/*}"
-            ips="$(dig @1.1.1.1 +short A "$host" | awk '/^[0-9]+(\.[0-9]+){3}$/ { print }')"
-            if [[ -z "$ips" ]]; then
-              echo "Authoritative DNS lookup failed for $host."
-              return 1
-            fi
-            while IFS= read -r ip; do
-              [[ -z "$ip" ]] && continue
-              if ! grep -Eq "^[[:space:]]*${ip}[[:space:]]+${host}[[:space:]]*$" /etc/hosts; then
-                echo "$ip $host" | sudo tee -a /etc/hosts >/dev/null
-              fi
-            done <<< "$ips"
-          }
-
           for attempt in 1 2 3; do
-            echo "Starting public app verification attempt $attempt/3."
-            [[ ! -f "$OPENCODE_WEB_DIR/app.pid" ]] || kill "$(cat "$OPENCODE_WEB_DIR/app.pid")" 2>/dev/null || true
-            [[ ! -f "$OPENCODE_WEB_DIR/app-cloudflared.pid" ]] || kill "$(cat "$OPENCODE_WEB_DIR/app-cloudflared.pid")" 2>/dev/null || true
-            : > "$OPENCODE_WEB_DIR/app.log"
-            : > "$OPENCODE_WEB_DIR/app-cloudflared.log"
-
-            PORT="$APP_PORT" npm run start -- --port "$APP_PORT" >> "$OPENCODE_WEB_DIR/app.log" 2>&1 &
-            echo $! > "$OPENCODE_WEB_DIR/app.pid"
-            local_ok=''
-            for _ in {1..30}; do
-              if curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT" >/dev/null; then
-                local_ok='yes'
-                break
-              fi
-              sleep 1
-            done
-
-            if [[ "$local_ok" != 'yes' ]]; then
-              echo "Local app health check failed on attempt $attempt."
-            else
-              "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate \
-                --url "http://127.0.0.1:$APP_PORT" \
-                > "$OPENCODE_WEB_DIR/app-cloudflared.log" 2>&1 &
-              echo $! > "$OPENCODE_WEB_DIR/app-cloudflared.pid"
-              APP_URL=''
-              for _ in {1..60}; do
-                APP_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' \
-                  "$OPENCODE_WEB_DIR/app-cloudflared.log" | head -n 1)"
-                [[ -n "$APP_URL" ]] && break
-                sleep 1
-              done
-              public_app_ok=''
-              if [[ -n "$APP_URL" ]]; then
-                dns_ok=''
-                for _ in {1..90}; do
-                  if pin_tunnel_dns "$APP_URL"; then
-                    dns_ok='yes'
-                    break
-                  fi
-                  sleep 2
-                done
-                if [[ "$dns_ok" != 'yes' ]]; then
-                  echo "Public app DNS did not propagate for $APP_URL."
-                  continue
-                fi
-                for _ in {1..60}; do
-                  if curl --fail --silent --show-error --max-time 10 "$APP_URL" >/dev/null; then
-                    public_app_ok='yes'
-                    break
-                  fi
-                  sleep 2
-                done
-              fi
-              if [[ "$public_app_ok" == 'yes' ]]; then
-                echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
-                echo "Public app verified at $APP_URL."
-                exit 0
-              fi
-              echo "Public app health check failed on attempt $attempt ($APP_URL)."
+            if /usr/bin/time -p bash "$RUNTIME_DIR/scripts/start-project.sh"; then
+              exit 0
             fi
-
-            if [[ "$attempt" -lt 3 ]]; then
-              echo "Sending OpenCode remediation prompt before retry $((attempt + 1))/3."
-              "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
-                --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-                --dir "$PROJECT_DIR" \
-                --session "$SESSION_ID" \
-                --model "$OPENCODE_MODEL" \
-                "$FIX_PROMPT" \
-                >> "$OPENCODE_WEB_DIR/verification-fix-$attempt.log" 2>&1
-            fi
+            [[ "$attempt" -lt 3 ]] || exit 1
+            /usr/bin/time -p "$HOME/.opencode/bin/opencode" run --auto --dangerously-skip-permissions \
+              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" --dir "$PROJECT_DIR" \
+              --session "${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}" \
+              --model "${{ steps.opencode_labels.outputs.model }}" \
+              "Repair startup.sh and the app so bash startup.sh serves the playable entrypoint on port $APP_PORT. Read $OPENCODE_WEB_DIR/app.log. Keep the existing app tunnel. Test the script and leave the server running." \
+              > "$OPENCODE_WEB_DIR/verification-fix-$attempt.log" 2>&1
           done
-
-          echo 'Public app verification failed after 3 attempts.'
-          exit 1
-        env:
-          OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
 
       - name: Publish worker completion report
         if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
@@ -1373,13 +1357,15 @@ jobs:
           completion_prompt="$(< "$RUNTIME_DIR/.github/prompts/04-completion-report.md")"
           completion_prompt="${completion_prompt//@APP_URL@/$APP_URL}"
           completion_prompt="${completion_prompt//@TRIGGER_ISSUE_NUMBER@/$TRIGGER_ISSUE_NUMBER}"
-          "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
-            --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-            --dir "$PROJECT_DIR" \
-            --session "${{ steps.verification_fork.outputs.session_id }}" \
-            --model "${{ steps.opencode_labels.outputs.model }}" \
-            "$completion_prompt" \
-            > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
+          if [[ -z "${RESUME_SESSION_ID:-}" ]]; then
+            "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
+              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+              --dir "$PROJECT_DIR" \
+              --session "${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}" \
+              --model "${{ steps.opencode_labels.outputs.model }}" \
+              "$completion_prompt" \
+              > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
+          fi
           /usr/bin/time -p touch "$OPENCODE_WEB_DIR/response-comment.done"
           tracker_pid="$(cat "$OPENCODE_WEB_DIR/response-comment-tracker.pid")"
           # Wait for any in-flight PATCH before another writer edits the comment.
@@ -1399,7 +1385,7 @@ jobs:
         run: |
           set -euo pipefail
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.verification_fork.outputs.session_id }}'
+          SESSION_ID='${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}'
           SCREENSHOT_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/05-screenshot-evidence.md")"
 
           for attempt in 1 2 3; do
@@ -1416,6 +1402,8 @@ jobs:
               exit 0
             fi
 
+            # The resumed main session owns verification of its changes.
+            [[ -z "${RESUME_SESSION_ID:-}" ]] || break
             echo "No final screenshots found under $PROJECT_PATH/screenshots/ (attempt $attempt/3)."
             if [[ "$attempt" -lt 3 ]]; then
               echo "Sending OpenCode screenshot remediation prompt before retry $((attempt + 1))/3."
@@ -1431,7 +1419,7 @@ jobs:
             fi
           done
 
-          echo 'Final screenshots are still missing after three remediation attempts; continuing with delivery.'
+          echo 'Final screenshots are missing; continuing with delivery.'
           printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"
           printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
 

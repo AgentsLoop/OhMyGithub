@@ -41,6 +41,7 @@ export function validateCheckpoint(c, source) {
       typeof c.project_dir === 'string' && !c.project_dir.startsWith('/') && !c.project_dir.includes('\\') && !/[\r\n\0]/.test(c.project_dir) && !c.project_dir.split('/').includes('..') &&
       /^\d+\.\d+\.\d+$/.test(c.opencode_version) && c.public_history === true && /^ses_[a-zA-Z0-9]+$/.test(c.session?.info?.id || '') &&
       Array.isArray(c.session?.messages) && c.session.messages.length > 0 && c.session.messages.every(m => m.info?.id && ['user', 'assistant'].includes(m.info.role) && Array.isArray(m.parts)))) throw new Error('No complete saved session is available.')
+  if (c.session.info.parentID) throw new Error('This checkpoint contains a verification fork. Select an earlier main-session checkpoint or start a new build.')
   return c
 }
 export function portableSession(value) {
@@ -104,6 +105,7 @@ export function prepare() {
 export function restore() {
   if (!env.RESUME_CHECKPOINT_FILE) return
   const checkpoint = JSON.parse(readFileSync(env.RESUME_CHECKPOINT_FILE, 'utf8'))
+  if (checkpoint.session?.info?.parentID) throw new Error('Cannot resume a verification fork. Select a main-session checkpoint.')
   const binary = env.OPENCODE_BIN || join(env.HOME, '.opencode/bin/opencode')
   const version = command(binary, ['--version'])
   if (version !== checkpoint.opencode_version) throw new Error('Install the saved OpenCode version before importing.')
