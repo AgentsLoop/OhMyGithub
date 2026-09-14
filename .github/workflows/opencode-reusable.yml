@@ -211,9 +211,7 @@ jobs:
           set -euo pipefail
           install -d "$PROJECT_DIR"
           template_dir="$RUNTIME_DIR/.github/templates"
-          [[ -d "$template_dir" ]] || template_dir="$RUNTIME_DIR/templates"
           base_template="$template_dir/agents.template.md"
-          echo "Loading worker templates from $template_dir for labels: $LABELS_JSON"
           if [[ "$RUNNER_OS" == 'macOS' ]]; then
             [[ -s "$template_dir/mac.md" ]] || { echo 'Missing required Mac worker instructions: mac.md' >&2; exit 1; }
           fi
@@ -234,7 +232,7 @@ jobs:
             template_name="${template##*/}"
             template_stem="${template_name%.md}"
             if jq -e --arg name "$template_stem" \
-              'any(.[]; ((ascii_downcase | gsub("^[[:space:]]+|[[:space:]]+$"; "")) == ($name | ascii_downcase)))' \
+              'any(.[]; (ascii_downcase == ($name | ascii_downcase)))' \
               <<< "$LABELS_JSON" >/dev/null; then
               append_template "$template"
             fi
