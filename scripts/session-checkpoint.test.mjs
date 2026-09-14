@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -89,4 +89,28 @@ if (path.basename(process.argv[1]) === 'opencode') {
     Object.assign(process.env, original)
     rmSync(directory, { recursive: true, force: true })
   }
+})
+
+test('real OpenCode imports and exports a complete portable conversation', { skip: !process.env.OPENCODE_REAL_BIN }, () => {
+  const directory = mkdtempSync(join(tmpdir(), 'checkpoint-real-cli-'))
+  const binary = process.env.OPENCODE_REAL_BIN
+  try {
+    execFileSync('git', ['init', directory], { stdio: 'pipe' })
+    const cwd = join(directory, 'game'); mkdirSync(cwd)
+    const now = Date.now(), sid = 'ses_abcdef1234567890abcdef123456', mid = 'msg_abcdef1234567890abcdef123456', pid = 'prt_abcdef1234567890abcdef123456'
+    const data = {
+      info: { id: sid, slug: 'checkpoint-roundtrip', version: '1.18.30', projectID: 'global', directory: cwd, title: 'Checkpoint round-trip', time: { created: now, updated: now } },
+      messages: [{ info: { id: mid, sessionID: sid, role: 'user', time: { created: now }, agent: 'build', model: { providerID: 'opencode', modelID: 'test' } },
+        parts: [{ id: pid, sessionID: sid, messageID: mid, type: 'text', text: 'Retain the castle. Next add water.' }] }]
+    }
+    const input = join(directory, 'session.json'); writeFileSync(input, JSON.stringify(data))
+    const env = { ...process.env, HOME: directory, XDG_DATA_HOME: join(directory, 'data'), XDG_CONFIG_HOME: join(directory, 'config'), XDG_CACHE_HOME: join(directory, 'cache'), XDG_STATE_HOME: join(directory, 'state') }
+    const run = (...args) => execFileSync(binary, args, { cwd, env, encoding: 'utf8', timeout: 120000, maxBuffer: 10 * 1024 * 1024 })
+    run('import', input)
+    const exported = JSON.parse(run('export', sid))
+    assert.equal(exported.info.id, sid)
+    assert.equal(realpathSync(exported.info.directory), realpathSync(cwd))
+    assert.equal(exported.messages.length, 1)
+    assert.equal(exported.messages[0].parts[0].text, data.messages[0].parts[0].text)
+  } finally { rmSync(directory, { recursive: true, force: true }) }
 })
