@@ -1,0 +1,92 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore } from './session-checkpoint.mjs'
+const session = { info: { id: 'ses_checkpoint', directory: '/old/project' }, messages: [{ info: { id: 'msg_one', role: 'user' }, parts: [{ id: 'prt_one', type: 'text', text: 'Build a castle' }] }] }
+const source = { source_repository: 'alice/game', source_issue: 6 }
+const base = { version: 1, repository: 'alice/game', issue_number: 6, run_id: 123, commit: 'a'.repeat(40), branch: 'opencode-checkpoints/6', project_dir: '', opencode_version: '1.2.3', session, public_history: true }
+test('requires a complete versioned checkpoint and rejects legacy data', () => {
+  assert.equal(validateCheckpoint(base, source), base)
+  for (const patch of [{ version: 0 }, { session: {} }, { repository: 'other/game' }, { project_dir: '../outside' }, { opencode_version: 'latest' }, { public_history: false }]) assert.throws(() => validateCheckpoint({ ...base, ...patch }, source), /complete/)
+})
+test('extracts only the next request and validates its checkpoint selector', () => {
+  const metadata = { ...source, checkpoint_tag: 'opencode-checkpoint-6-123-1000' }
+  const request = `Add water\n\nContinue from https://github.com/alice/game/issues/6\n<!-- omgithub-resume:v1 ${JSON.stringify(metadata)} -->\n<!-- omgithub-resume-request:abcdef -->`
+  assert.equal(parseResume(request).prompt, 'Add water')
+  assert.equal(parseResume('New game'), null)
+  assert.throws(() => parseResume('<!-- omgithub-resume:v1 bad -->'), /Invalid/)
+  assert.throws(() => parseResume(request + request), /Ambiguous/)
+})
+test('retains conversation text but removes credentials and excludes runtime files', () => {
+  const secret = 'super-secret-api-value'
+  const clean = redactSession({ text: `Build a game ${secret}`, nested: { apiKey: 'another' } }, [secret])
+  assert.equal(clean.text, 'Build a game [credential removed]')
+  assert.equal(clean.nested.apiKey, '[credential removed]')
+  for (const file of ['.env', 'game/.env.production', '.opencode-web/checkpoint.json', 'game/node_modules/lib.js', 'game/auth.json', 'opencode-agentsweb-id_ed25519']) assert.equal(excludedPath(file), true, file)
+  assert.equal(excludedPath('game/index.html'), false)
+})
+test('save, late edit, shutdown checkpoint, and restore preserve code and full conversation', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'checkpoint-cycle-'))
+  const original = { ...process.env }
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim()
+  const root = join(directory, 'game'), remote = join(directory, 'remote.git'), bin = join(directory, 'bin'), state = join(directory, 'state')
+  try {
+    for (const path of [root, bin, state]) mkdirSync(path)
+    execFileSync('git', ['init', '--bare', remote], { stdio: 'pipe' })
+    git('init'); git('config', 'user.name', 'Test'); git('config', 'user.email', 'test@example.test')
+    git('remote', 'add', 'origin', remote)
+    writeFileSync(join(root, 'index.html'), '<h1>Castle</h1>')
+    git('add', '.'); git('commit', '-m', 'Initial game')
+    const head = git('rev-parse', 'HEAD')
+    mkdirSync(join(root, '.opencode-web'))
+    writeFileSync(join(root, '.opencode-web/checkpoint-session-id'), session.info.id)
+    writeFileSync(join(state, 'session.json'), JSON.stringify(session))
+    const fake = `#!/usr/bin/env node
+const fs = require('node:fs'), path = require('node:path'); const args=process.argv.slice(2), state=process.env.FAKE_STATE;
+if (path.basename(process.argv[1]) === 'opencode') {
+ if(args[0]==='--version') process.stdout.write('1.2.3');
+ else if(args[0]==='export') process.stdout.write(fs.readFileSync(path.join(state,'session.json')));
+ else if(args[0]==='import') fs.copyFileSync(args[1],path.join(state,'session.json'));
+ else process.exit(1);
+} else {
+ if(args[0]==='release' && args[1]==='create') {
+   fs.copyFileSync(args[3],path.join(state,args[2]+'.json'));
+   fs.appendFileSync(path.join(state,'releases'),args[2]+'\\n');
+ } else if(args[0]==='release' && args[1]==='edit') {}
+ else if(args[0]==='api') process.stdout.write(JSON.stringify({private:false})); else process.exit(1);
+}
+`
+    for (const name of ['opencode', 'gh']) writeFileSync(join(bin, name), fake, { mode: 0o755 })
+    Object.assign(process.env, { PATH: `${bin}:${original.PATH}`, OPENCODE_BIN: join(bin, 'opencode'), FAKE_STATE: state, GITHUB_WORKSPACE: root, PROJECT_DIR: root,
+      OPENCODE_WEB_DIR: join(root, '.opencode-web'), RUNNER_TEMP: state, GITHUB_ENV: join(state, 'github-env'), GITHUB_REPOSITORY: 'alice/game', TRIGGER_ISSUE_NUMBER: '6', GITHUB_RUN_ID: '123' })
+    writeFileSync(join(root, '.env'), 'SECRET=never-save')
+    const first = saveCheckpoint()
+    assert.equal(git('rev-parse', 'HEAD'), head, 'checkpoint leaves the working branch unchanged')
+    assert.equal(git('show', `${first.commit}:index.html`), '<h1>Castle</h1>')
+    assert.throws(() => git('show', `${first.commit}:.env`))
+    assert.deepEqual(saveCheckpoint(), first, 'unchanged checkpoint does not create another release')
+    writeFileSync(join(root, 'index.html'), '<h1>Castle and water</h1>')
+    const updated = structuredClone(session)
+    updated.messages.push({ info: { id: 'msg_two', role: 'user' }, parts: [{ id: 'prt_two', type: 'text', text: 'Add water' }] })
+    writeFileSync(join(state, 'session.json'), JSON.stringify(updated))
+    const second = saveCheckpoint()
+    assert.notEqual(second.commit, first.commit)
+    assert.equal(existsSync(join(state, first.tag + '.json')), true, 'previous complete checkpoint remains')
+    assert.equal(git('show', `${second.commit}:index.html`), '<h1>Castle and water</h1>')
+    process.env.RESUME_CHECKPOINT_FILE = join(state, second.tag + '.json')
+    writeFileSync(join(state, 'session.json'), '{}')
+    restore()
+    const restored = JSON.parse(readFileSync(join(state, 'session.json')))
+    assert.equal(restored.messages.length, 2)
+    assert.equal(restored.messages[1].parts[0].text, 'Add water')
+    assert.equal(restored.info.directory, root)
+    assert.match(readFileSync(process.env.GITHUB_ENV, 'utf8'), /RESUME_SESSION_ID/)
+  } finally {
+    for (const key of Object.keys(process.env)) if (!(key in original)) delete process.env[key]
+    Object.assign(process.env, original)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})

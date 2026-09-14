@@ -249,3 +249,16 @@ and `GITHUB_PATH`. Link the installed binary at `/usr/local/bin/opencode`
 for fresh SSH shells. Verify `opencode --version` after installation and
 from a new Bash process. Do not depend on installer changes to shell profiles
 for non-interactive Actions or SSH commands.
+
+## Resume saved games
+
+Save code and the active public conversation every five minutes with `scripts/session-checkpoint.mjs`.
+Save again before closing temporary access. Keep the five-hour access period.
+Store complete checkpoints as immutable release assets. Publish each release only after pushing its code and uploading `checkpoint.json`.
+Retain earlier complete releases. Exclude credentials, dependencies, and runner files.
+
+Restore only version 1 checkpoints with matching repository, issue, commit, and OpenCode version.
+Import the complete conversation and submit only the next requested change.
+Use a new issue and result branch. Keep the source game's publication unchanged.
+Mark games without complete checkpoints as **Resume unavailable**.
+Run `node --test scripts/session-checkpoint.test.mjs` to verify the checkpoint cycle.
