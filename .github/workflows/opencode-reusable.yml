@@ -212,6 +212,9 @@ jobs:
           install -d "$PROJECT_DIR"
           template_dir="$RUNTIME_DIR/.github/templates"
           base_template="$template_dir/agents.template.md"
+          if [[ "$RUNNER_OS" == 'macOS' ]]; then
+            [[ -s "$template_dir/mac.md" ]] || { echo 'Missing required Mac worker instructions: mac.md' >&2; exit 1; }
+          fi
           [[ -f "$base_template" ]] || { echo "Missing worker base template: $base_template" >&2; exit 1; }
           cp "$base_template" "$PROJECT_DIR/Agents.md"
 
