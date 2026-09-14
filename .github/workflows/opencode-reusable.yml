@@ -214,9 +214,6 @@ jobs:
           [[ -d "$template_dir" ]] || template_dir="$RUNTIME_DIR/templates"
           base_template="$template_dir/agents.template.md"
           echo "Loading worker templates from $template_dir for labels: $LABELS_JSON"
-          if [[ "$RUNNER_OS" == 'macOS' ]]; then
-            [[ -s "$template_dir/mac.md" ]] || { echo 'Missing required Mac worker instructions: mac.md' >&2; exit 1; }
-          fi
           [[ -f "$base_template" ]] || { echo "Missing worker base template: $base_template" >&2; exit 1; }
           cp "$base_template" "$PROJECT_DIR/Agents.md"
 
@@ -227,15 +224,18 @@ jobs:
             cat "$template" >> "$PROJECT_DIR/Agents.md"
           }
 
-          # Append every label-matched template except the base template. This
-          # keeps new templates convention-based: .github/templates/foo.md is selected
-          # automatically by a foo issue label.
+          # Match issue labels and request hashtags to template stems generically.
+          template_keys="$(node -e '
+            const labels = JSON.parse(process.env.LABELS_JSON || "[]");
+            const tags = [...(process.env.COMMENT_BODY || "").matchAll(/(?:^|[^A-Za-z0-9_])#([A-Za-z0-9_-]+)/g)].map(match => match[1]);
+            process.stdout.write(JSON.stringify([...labels, ...tags]));
+          ')"
           while IFS= read -r template; do
             template_name="${template##*/}"
             template_stem="${template_name%.md}"
             if jq -e --arg name "$template_stem" \
               'any(.[]; ((ascii_downcase | gsub("^[[:space:]]+|[[:space:]]+$"; "")) == ($name | ascii_downcase)))' \
-              <<< "$LABELS_JSON" >/dev/null; then
+              <<< "$template_keys" >/dev/null; then
               append_template "$template"
             fi
           done < <(find "$template_dir" -maxdepth 1 -type f -name '*.md' ! -name 'agents.template.md' -print | sort)
