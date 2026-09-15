@@ -59,10 +59,10 @@ test('reject outsiders by default and accept everyone when configured', async ()
   assert.equal((await f.run()).approved, 'true');
 });
 
-test('title trigger adds the execution label in either access mode', async () => {
+test('execution label starts clean titles in either access mode', async () => {
   for (const access of ['writers', 'everyone']) {
     const f = fixture({ env: { OPENCODE_ACCESS: access } }); f.event.action = 'opened';
-    f.state.current.title = '/OpenCode Build a game'; f.state.current.labels = [];
+    f.state.current.title = 'Build a game'; f.state.current.labels = ['OpenCode'];
     const result = await f.run();
     assert.equal(result.approved, 'true');
     assert.equal(result.issue_title, 'Build a game');

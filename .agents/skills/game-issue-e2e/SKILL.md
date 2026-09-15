@@ -17,8 +17,7 @@ syntax and routing metadata such as `#main` and mode labels. Keep the surroundin
 request text in its original order.
 
 If `#c` is present, drop `#c` and all routing metadata, then copy the remaining
-request text exactly as the issue body. Set the issue title to `/OpenCode `
-followed by the same remaining text exactly. Do not read the rubric, rewrite the
+request text exactly as the issue body. Set the issue title to the remaining text. Attach `OpenCode`. Do not read the rubric, rewrite the
 text, add a heading, or add a skills sentence.
 
 Read `references/gauntlet-prompt-rubric.md` whenever the remaining request is
@@ -31,12 +30,8 @@ If the invocation has no request text, invent a fresh random small playable
 browser-game brief. Do not substitute a generic workflow-validation task or
 ask the user for a game concept.
 
-Unless `#c` is present, repeat the exact issue title as the first Markdown
-heading in the issue body. Keep the title as issue metadata too; the body must
-not omit it.
-
-Start every issue title with `/OpenCode `. Keep this prefix in the title when
-you append routing metadata.
+Keep the title and visible body limited to the user request. Attach `OpenCode`.
+Store branch routing in an `omgithub-request:v1` JSON HTML comment.
 
 Write the issue body to a temporary Markdown file and pass it with
 `gh issue create --body-file <path>` or `gh issue edit --body-file <path>`.
@@ -62,7 +57,7 @@ title or body to name them.
 
 
 Check `git branch --show-current`. If non-empty and not `main`, verify it and
-append ` branch: <current-branch>` to the title. The reusable workflow checks
+set `branch` in the hidden request metadata. The reusable workflow checks
 out the validated `target_sha` and uses `target_ref` as its result base, preserving the
 debugging worktree. Default-branch preparation dispatches the listener at this
 branch. Treat the selected-branch run as the execution run. This suffix is
@@ -89,7 +84,7 @@ push it first.
    labels. Do not create a label for `#c`. List available `skill/*` labels,
    select the useful skills, and name them in the generated prompt unless
    `#c` is present. Verify the default-branch listener exists,
-   then create an issue whose title starts with `/OpenCode `. Attach only mode
+   then create an issue with the `OpenCode` label. Attach only mode
    labels explicitly requested by the user and all selected `skill/*` labels.
    Never add another mode label by default. Always create this
    new issue even when a matching issue or run already exists. Do not create a

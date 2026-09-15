@@ -683,7 +683,7 @@ jobs:
           PORTS="$(node --input-type=module -e '
             import net from "node:net";
             const ports = [];
-            for (let index = 0; index < 2; index += 1) {
+            for (let index = 0; index < 3; index += 1) {
               const server = net.createServer();
               await new Promise((resolve, reject) => {
                 server.once("error", reject);
@@ -694,11 +694,12 @@ jobs:
             }
             console.log(ports.join(" "));
           ')"
-          read -r OPENCODE_WEB_PORT PROJECT_FILE_PORT <<< "$PORTS"
+          read -r OPENCODE_WEB_PORT PROJECT_FILE_PORT OPENCODE_CONTROL_PORT <<< "$PORTS"
           [[ "$OPENCODE_WEB_PORT" =~ ^[0-9]+$ && "$PROJECT_FILE_PORT" =~ ^[0-9]+$ ]]
           {
             printf 'OPENCODE_WEB_PORT=%s\n' "$OPENCODE_WEB_PORT"
             printf 'PROJECT_FILE_PORT=%s\n' "$PROJECT_FILE_PORT"
+            printf 'OPENCODE_CONTROL_PORT=%s\n' "$OPENCODE_CONTROL_PORT"
           } >> "$GITHUB_ENV"
           echo "Allocated OpenCode port: $OPENCODE_WEB_PORT"
           echo "Allocated project file server port: $PROJECT_FILE_PORT"
@@ -804,7 +805,11 @@ jobs:
               "https://github.com/cloudflare/cloudflared/releases/latest/download/$CLOUDFLARED_ASSET"
           fi
           chmod 755 "$OPENCODE_WEB_DIR/cloudflared"
-          nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_WEB_PORT" \
+          export OPENCODE_CONTROL_PORT OPENCODE_WEB_PORT
+          export GH_TOKEN='${{ github.token }}'
+          nohup node "$RUNTIME_DIR/scripts/session-lifecycle.mjs" > "$OPENCODE_WEB_DIR/lifecycle.log" 2>&1 &
+          printf '%s\n' "$!" > "$OPENCODE_WEB_DIR/lifecycle.pid"
+          nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_CONTROL_PORT" \
             > "$OPENCODE_WEB_DIR/cloudflared.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/cloudflared.pid"
           nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$PROJECT_FILE_PORT" \
@@ -1009,6 +1014,7 @@ jobs:
           PROMPT_FILE="$OPENCODE_WEB_DIR/prompt.txt"
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
           RUN_EXIT="$OPENCODE_WEB_DIR/opencode-run.exit"
+          printf '%s\n' "$OPENCODE_MODEL" > "$OPENCODE_WEB_DIR/main-model"
           if [[ -n "${RESUME_SESSION_ID:-}" ]]; then
             printf '%s' "$COMMENT_BODY" > "$PROMPT_FILE"
           else
@@ -1072,17 +1078,11 @@ jobs:
           done
           [[ "$SESSION_ID" == ses_* ]]
           /usr/bin/time -p printf '%s\n' "$SESSION_ID" > "$OPENCODE_WEB_DIR/checkpoint-session-id"
+          /usr/bin/time -p curl --fail --silent "http://127.0.0.1:$OPENCODE_CONTROL_PORT/omgithub/reconcile"
           DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')"
           printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
             "${OPENCODE_WEB_URL}/${DIRECTORY_B64}/session/${SESSION_ID}" >> "$GITHUB_OUTPUT"
 
-      - name: Start saved-session checkpoints
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          nohup node "$RUNTIME_DIR/scripts/session-checkpoint.mjs" watch > "$OPENCODE_WEB_DIR/checkpoints.log" 2>&1 &
-          printf '%s\n' "$!" > "$OPENCODE_WEB_DIR/checkpoints.pid"
 
       - name: Post temporary access details
         id: access_comment
@@ -1241,204 +1241,8 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]]
           [[ "$(cat "$OPENCODE_WEB_DIR/opencode-run.exit")" == 0 ]]
 
-      - name: Fork OpenCode session for verification
-        id: verification_fork
-        if: (env.RESUME_SESSION_ID == '' || env.RESUME_STARTUP_STATUS != 'ready') && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          for _ in {1..21600}; do
-            [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]] && break
-            sleep 1
-          done
-          [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]]
-          code="$(cat "$OPENCODE_WEB_DIR/opencode-run.exit")"
-          echo "OpenCode exited with code $code"
-          [[ "$code" == 0 ]]
-
-          BUILD_SESSION_ID='${{ steps.opencode_run.outputs.session_id }}'
-          VERIFICATION_SESSION_ID="$(curl --fail --silent --show-error \
-            -X POST \
-            -H "x-opencode-directory: $PROJECT_DIR" \
-            "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$BUILD_SESSION_ID/fork" \
-            | jq -r '.id // empty')"
-          [[ "$VERIFICATION_SESSION_ID" == ses_* ]]
-          DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')"
-          printf 'session_id=%s\nsession_url=%s\n' "$VERIFICATION_SESSION_ID" \
-            "${{ steps.opencode_web.outputs.url }}/${DIRECTORY_B64}/session/${VERIFICATION_SESSION_ID}" >> "$GITHUB_OUTPUT"
-          printf '%s\n' "${{ steps.opencode_web.outputs.url }}/${DIRECTORY_B64}/session/${VERIFICATION_SESSION_ID}" \
-            > "$OPENCODE_WEB_DIR/validation-session-url"
-          echo "Verification fork: $VERIFICATION_SESSION_ID"
-
-      - name: Mark issue validating
-        if: (env.RESUME_SESSION_ID == '' || env.RESUME_STARTUP_STATUS != 'ready') && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
-        continue-on-error: true
-        uses: actions/github-script@v7
-        with:
-          retries: 3
-          github-token: ${{ github.token }}
-          script: |
-            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
-            await github.rest.issues.removeLabel({
-              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
-              issue_number: number, name: 'in progress'
-            }).catch((error) => { if (error.status !== 404) throw error; });
-            await github.rest.issues.addLabels({
-              owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
-              issue_number: number, labels: ['validating']
-            });
-
-      - name: Verify app with forked OpenCode session
-        if: (env.RESUME_SESSION_ID == '' || env.RESUME_STARTUP_STATUS != 'ready') && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          "$OPENCODE_BIN" run \
-            --auto \
-            --dangerously-skip-permissions \
-            --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-            --dir "$PROJECT_DIR" \
-            --session "${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}" \
-            --model "${{ steps.opencode_labels.outputs.model }}" \
-            "$(< "$RUNTIME_DIR/.github/prompts/02-verify.md")" \
-            > "$OPENCODE_WEB_DIR/verification.log" 2>&1
-
-      - name: Verify browser entrypoint exists
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}'
-          ENTRYPOINT_PROMPT='The browser verifier cannot find a playable HTML entrypoint. Ensure the requested app has a working index.html at the project root or dist/index.html, make the app server serve that entrypoint on port 3000, and verify it in the browser before replying.'
-
-          for attempt in 1 2 3; do
-            if [[ -f "$PROJECT_DIR/index.html" || -f "$PROJECT_DIR/dist/index.html" ]]; then
-              if [[ -f "$PROJECT_DIR/index.html" ]]; then
-                echo "Browser entrypoint found at $PROJECT_PATH/index.html."
-              else
-                echo "Browser entrypoint found at $PROJECT_PATH/dist/index.html."
-              fi
-              exit 0
-            fi
-
-            echo "No browser entrypoint found under $PROJECT_PATH (attempt $attempt/3)."
-            if [[ "$attempt" -lt 3 ]]; then
-              "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
-                --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-                --dir "$PROJECT_DIR" \
-                --session "$SESSION_ID" \
-                --model "$OPENCODE_MODEL" \
-                "$ENTRYPOINT_PROMPT" \
-                >> "$OPENCODE_WEB_DIR/entrypoint-fix-$attempt.log" 2>&1
-            fi
-          done
-
-          echo "Browser verification cannot continue without index.html or dist/index.html." >&2
-          exit 1
-
-      - name: Expose verified app
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
-        id: app_tunnel
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            if /usr/bin/time -p bash "$RUNTIME_DIR/scripts/start-project.sh"; then
-              exit 0
-            fi
-            [[ "$attempt" -lt 3 ]] || exit 1
-            /usr/bin/time -p "$HOME/.opencode/bin/opencode" run --auto --dangerously-skip-permissions \
-              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" --dir "$PROJECT_DIR" \
-              --session "${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}" \
-              --model "${{ steps.opencode_labels.outputs.model }}" \
-              "Repair startup.sh and the app so bash startup.sh serves the playable entrypoint on port $APP_PORT. Read $OPENCODE_WEB_DIR/app.log. Keep the existing app tunnel. Test the script and leave the server running." \
-              > "$OPENCODE_WEB_DIR/verification-fix-$attempt.log" 2>&1
-          done
-
-      - name: Publish worker completion report
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          completion_prompt="$(< "$RUNTIME_DIR/.github/prompts/04-completion-report.md")"
-          completion_prompt="${completion_prompt//@APP_URL@/$APP_URL}"
-          completion_prompt="${completion_prompt//@TRIGGER_ISSUE_NUMBER@/$TRIGGER_ISSUE_NUMBER}"
-          if [[ -z "${RESUME_SESSION_ID:-}" || "${RESUME_STARTUP_STATUS:-}" != ready ]]; then
-            "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
-              --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-              --dir "$PROJECT_DIR" \
-              --session "${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}" \
-              --model "${{ steps.opencode_labels.outputs.model }}" \
-              "$completion_prompt" \
-              > "$OPENCODE_WEB_DIR/completion-report.log" 2>&1
-          fi
-          /usr/bin/time -p touch "$OPENCODE_WEB_DIR/response-comment.done"
-          tracker_pid="$(cat "$OPENCODE_WEB_DIR/response-comment-tracker.pid")"
-          # Wait for any in-flight PATCH before another writer edits the comment.
-          for _ in {1..60}; do
-            kill -0 "$tracker_pid" 2>/dev/null || break
-            /usr/bin/time -p sleep 1
-          done
-          if kill -0 "$tracker_pid" 2>/dev/null; then
-            echo 'Progress tracker did not stop; refusing a concurrent final comment update.' >&2
-            exit 1
-          fi
-
-      - name: Request and verify final screenshots
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && env.VALIDATION_ENABLED == 'true'
-        id: final_evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          OPENCODE_BIN="$HOME/.opencode/bin/opencode"
-          SESSION_ID='${{ steps.verification_fork.outputs.session_id || steps.opencode_run.outputs.session_id }}'
-          SCREENSHOT_PROMPT="$(< "$RUNTIME_DIR/.github/prompts/05-screenshot-evidence.md")"
-
-          for attempt in 1 2 3; do
-            screenshots=()
-            while IFS= read -r screenshot; do
-              screenshots+=("$screenshot")
-            done < <(find "$PROJECT_DIR/screenshots" -type f \
-              \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
-              -exec basename {} \; 2>/dev/null | sort)
-            if [[ "${#screenshots[@]}" -gt 0 ]]; then
-              printf '%s\n' "${screenshots[@]}"
-              printf 'screenshots_json=%s\n' "$(printf '%s\n' "${screenshots[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
-              printf 'screenshots_status=present\n' >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            # The resumed main session owns verification of its changes.
-            [[ -z "${RESUME_SESSION_ID:-}" || "${RESUME_STARTUP_STATUS:-}" != ready ]] || break
-            echo "No final screenshots found under $PROJECT_PATH/screenshots/ (attempt $attempt/3)."
-            if [[ "$attempt" -lt 3 ]]; then
-              echo "Sending OpenCode screenshot remediation prompt before retry $((attempt + 1))/3."
-              if ! "$OPENCODE_BIN" run --auto --dangerously-skip-permissions \
-                --attach "http://127.0.0.1:$OPENCODE_WEB_PORT" \
-                --dir "$PROJECT_DIR" \
-                --session "$SESSION_ID" \
-                --model '${{ steps.opencode_labels.outputs.model }}' \
-                "$SCREENSHOT_PROMPT" \
-                > "$OPENCODE_WEB_DIR/screenshot-fix-$attempt.log" 2>&1; then
-                echo "OpenCode screenshot remediation failed on attempt $attempt; continuing to the next evidence check."
-              fi
-            fi
-          done
-
-          echo 'Final screenshots are missing; continuing with delivery.'
-          printf 'screenshots_json=[]\n' >> "$GITHUB_OUTPUT"
-          printf 'screenshots_status=missing\n' >> "$GITHUB_OUTPUT"
-
       - name: Push project branch
-        if: env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: success() && env.TEST_REQUEST == 'true' && env.SSH_ONLY_REQUEST != 'true'
         id: delivery
         shell: bash
         run: |
@@ -1503,7 +1307,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create OpenCode logs release
-        if: success() && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: always() && env.SSH_ONLY_REQUEST != 'true' && steps.opencode_run.outcome == 'success'
         id: opencode_release
         shell: bash
         run: |
@@ -1527,16 +1331,11 @@ jobs:
             echo 'OpenCode response artifact is empty; refusing to create an incomplete release.' >&2
             exit 1
           fi
-          for artifact in "$OPENCODE_WEB_DIR"/*.log "$OPENCODE_WEB_DIR"/*.json; do
+          for artifact in "$OPENCODE_WEB_DIR"/*.log; do
             [[ -f "$artifact" && -s "$artifact" ]] || continue
             [[ "$(basename "$artifact")" == 'opencode.json' ]] && continue
             cp -f "$artifact" "$release_dir/"
           done
-          while IFS= read -r screenshot; do
-            cp -f "$screenshot" "$release_dir/$(basename "$screenshot")"
-          done < <(find "$PROJECT_DIR/screenshots" -type f \
-            \( -iname 'final-*.png' -o -iname 'final-*.jpg' -o -iname 'final-*.jpeg' -o -iname 'final-*.webp' \) \
-            2>/dev/null | sort)
 
           release_assets=()
           for asset in "$release_dir"/*; do
@@ -1559,12 +1358,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Post final game report
-        if: success() && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: success() && env.TEST_REQUEST == 'true' && env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
         env:
           PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
           FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
-          SCREENSHOTS_JSON: ${{ steps.final_evidence.outputs.screenshots_json || steps.mock_project.outputs.screenshots_json }}
+          SCREENSHOTS_JSON: ${{ steps.mock_project.outputs.screenshots_json }}
           PROJECT_PATH: ${{ env.PROJECT_PATH }}
           OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
           OPENCODE_RELEASE_ASSETS: ${{ steps.opencode_release.outputs.assets_json }}
@@ -1617,7 +1416,7 @@ jobs:
             });
 
       - name: Mark issue complete
-        if: success() && env.SSH_ONLY_REQUEST != 'true' && (env.TEST_REQUEST == 'true' || env.VALIDATION_ENABLED == 'true')
+        if: success() && env.TEST_REQUEST == 'true' && env.SSH_ONLY_REQUEST != 'true'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -1695,19 +1494,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f "$OPENCODE_WEB_DIR/checkpoints.pid" ]]; then
-            checkpoint_pid="$(cat "$OPENCODE_WEB_DIR/checkpoints.pid")"
-            /usr/bin/time -p kill "$checkpoint_pid" 2>/dev/null || true
+          if [[ -f "$OPENCODE_WEB_DIR/lifecycle.pid" ]]; then
+            /usr/bin/time -p kill "$(cat "$OPENCODE_WEB_DIR/lifecycle.pid")" 2>/dev/null || true
             for _ in {1..130}; do
-              kill -0 "$checkpoint_pid" 2>/dev/null || break
-              sleep 1
+              kill -0 "$(cat "$OPENCODE_WEB_DIR/lifecycle.pid")" 2>/dev/null || exit 0
+              /usr/bin/time -p sleep 1
             done
-            if kill -0 "$checkpoint_pid" 2>/dev/null; then
-              echo 'Checkpoint worker has not stopped; preserve its in-flight save.' >&2
-              exit 1
-            fi
+            exit 1
           fi
-          /usr/bin/time -p node "$RUNTIME_DIR/scripts/session-checkpoint.mjs" save
+          /usr/bin/time -p node "$RUNTIME_DIR/scripts/session-checkpoint.mjs" shutdown
 
       - name: Append SSH session closed
         if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success' && (steps.agentsweb.outputs.comment_id != '' || steps.access_comment.outputs.comment_id != '' || steps.ssh_access_comment.outputs.comment_id != '')
@@ -1730,7 +1525,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          [[ -f "$OPENCODE_WEB_DIR/checkpoints.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/checkpoints.pid")" 2>/dev/null || true
+          [[ -f "$OPENCODE_WEB_DIR/lifecycle.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/lifecycle.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/cloudflared.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/project-cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/project-cloudflared.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/nginx/nginx.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/nginx/nginx.pid")" 2>/dev/null || true

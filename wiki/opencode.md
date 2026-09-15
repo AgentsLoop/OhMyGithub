@@ -6,8 +6,7 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 ## Trigger
 
-Create the issue with `OpenCode` and all mode labels, or use `/OpenCode` in
-its title, to start `.github/workflows/opencode.yml` through `issues.opened`. Install this listener
+Create the issue with `OpenCode` and requested mode labels, to start `.github/workflows/opencode.yml` through `issues.opened`. Install this listener
 on the default branch first. Run `opencode-prepare.yml` on the Actions runner
 to verify author access and resolve the target branch.
 Pass validated outputs to `opencode-reusable.yml` only after approval.
@@ -25,10 +24,9 @@ Ralph's `<promise>DONE</promise>` completion marker before validation and
 completion reporting.
 
 Use the App installation helper or install the caller manually. Set repository
-variable `OPENCODE_ACCESS=everyone` to accept any issue author. In that mode,
-open an issue with `/OpenCode` in its title to run without applying a label.
-Let Actions add the label and continue the same run. Leave the variable unset
-to require write, maintain, or admin access for labeled issue authors.
+variable `OPENCODE_ACCESS=everyone` to accept any issue author.
+Attach the execution label when creating the issue. Leave the variable unset
+to require write, maintain, or admin access.
 
 The `test` label runs the full workflow with a mock OpenCode-generated project
 and must be used alongside `OpenCode`. Attach both labels when creating the issue. Test mode skips OpenCode generation, copies the fixture
@@ -41,10 +39,10 @@ generation itself is replaced.
 The workflow uses the `macos-latest` GitHub-hosted runner by default for the
 entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
 
-Append `branch: <existing-branch>` to the title to select project checkout.
+Store `branch` in an `omgithub-request:v1` JSON HTML comment to select project checkout.
 Validate this branch during preparation and freeze its commit as `target_sha`.
-Use `target_ref` for the result base. Use the default branch when no suffix
-exists. When the suffix selects another branch, let default-branch preparation
+Use `target_ref` for the result base. Use the default branch when no branch metadata
+exists. When the metadata selects another branch, let default-branch preparation
 dispatch `opencode.yml` at that branch and stop. Run preparation and OpenCode
 from the selected branch workflow. Use the central workflow revision pinned by
 that branch's caller.
@@ -252,12 +250,12 @@ for non-interactive Actions or SSH commands.
 
 ## Resume saved games
 
-Save code and the active public conversation every five minutes with `scripts/session-checkpoint.mjs`.
+Save code and the main public conversation after each completed response with `scripts/session-checkpoint.mjs`.
 Save again before closing temporary access. Keep the five-hour access period.
-Store complete checkpoints as immutable release assets. Publish each release only after pushing its code and uploading `checkpoint.json`.
+Reuse one checkpoint release per issue. Upload separate conversation and manifest assets. Switch the manifest pointer after verifying uploads.
 Retain earlier complete releases. Exclude credentials, dependencies, and runner files.
 
-Restore only version 1 checkpoints with matching repository, issue, commit, and OpenCode version.
+Restore supported version 1 and version 2 checkpoints with matching repository, issue, commit, and OpenCode version.
 Import the complete conversation and submit only the next requested change.
 Use a new issue and result branch. Keep the source game's publication unchanged.
 Mark games without complete checkpoints as **Resume unavailable**.
@@ -268,6 +266,14 @@ Set `OPENCODE_DEBUG_HOLD=true` only in a debugging repository to retain failed l
 
 ## Restore the main session and preview
 
-Keep `checkpoint-session-id` set to the main session. Save the latest workspace files with that conversation. Submit the exact user prompt to the restored main session. Preserve whitespace and bypass command wrappers. Run the verification fork when Actions cannot start the saved app. Skip repeated verification when startup succeeds. Reject saved child sessions instead of importing them as main conversations.
+Keep `checkpoint-session-id` set to the main session. Save the latest workspace files with that conversation. Submit the exact user prompt to the restored main session. Preserve whitespace and bypass command wrappers. Validate each completed response in an isolated fork. Reject saved child sessions instead of importing them as main conversations.
 
 Instruct OpenCode to generate and test `startup.sh` during initial verification. Install dependencies, build when required, and serve port 3000 in the foreground. Test from a stopped app without installed dependencies. Start three tunnels during worker setup. Run the saved script before submitting resumed work. Publish the restored preview only after local and public HTTP checks pass. Reuse the app tunnel for delivery. Run verification to generate or repair missing or failed startup scripts. Inspect `app.log` for startup failures.
+
+## Save and deploy main-session responses
+
+Run `scripts/session-lifecycle.mjs` once before exposing the web tunnel. Route browser requests through its control port. Read `main-model` after execution-label resolution. Register the main session before reconciling idle events.
+
+Save each completed main response through `scripts/session-checkpoint.mjs`. Keep one issue release and separate JSON assets. Validate through `scripts/session-deploy.mjs` in an isolated worktree. Cancel validation before forwarding new web messages. Preserve the last successful deployment and reject obsolete generations. Save changed state during shutdown without starting validation.
+
+Run `node --test scripts/session-lifecycle.test.mjs scripts/session-checkpoint.test.mjs scripts/opencode-prepare.test.mjs scripts/opencode-reporting.test.mjs`. Run `actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.yml`.

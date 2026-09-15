@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { parseIssueRequest } from './issue-request.mjs';
 
-const titleTag = /(?:^|\s)\/OpenCode(?=\s|$)/;
 
 export function outputText(values) {
   return Object.entries(values).map(([key, value]) => {
@@ -33,14 +32,14 @@ export async function prepareRequest(event, env, fetcher = fetch) {
   const [repo, issue] = await Promise.all([api(''), api(`/issues/${number}`)]);
   if (issue.pull_request || issue.state !== 'open') throw new Error('Select an open issue.');
   const labels = (issue.labels || []).map(label => typeof label === 'string' ? label : label.name);
-  if (!labels.includes('OpenCode') && !titleTag.test(issue.title)) return { approved: 'false' };
+  if (!labels.includes('OpenCode')) return { approved: 'false' };
   const sender = issue.user?.login;
   if (!sender) throw new Error('The issue has no author.');
   if (access !== 'everyone') {
     const permission = await api(`/collaborators/${encodeURIComponent(sender)}/permission`);
     if (!['write', 'maintain', 'admin'].includes(permission.permission)) throw new Error('The issue author needs write, maintain, or admin access. Set OPENCODE_ACCESS=everyone to accept all authors.');
   }
-  const parsed = parseIssueRequest({ ...issue, title: issue.title.replace(titleTag, '').trim() }, repo.default_branch);
+  const parsed = parseIssueRequest(issue, repo.default_branch);
   if (parsed.branchError || !parsed.request || !parsed.title) throw new Error(parsed.branchError || 'Supply an issue title and request.');
   const branch = await api(`/branches/${encodeURIComponent(parsed.targetRef)}`);
   if (!/^[a-f0-9]{40}$/.test(branch.commit?.sha || '')) throw new Error('The target branch has no valid commit.');
@@ -50,10 +49,6 @@ export async function prepareRequest(event, env, fetcher = fetch) {
       body: JSON.stringify({ ref: parsed.targetRef, inputs: { issue_number: String(number) } }),
     });
     return { approved: 'false' };
-  }
-  if (!labels.includes('OpenCode')) {
-    await api(`/issues/${number}/labels`, { method: 'POST', body: JSON.stringify({ labels: ['OpenCode'] }) });
-    labels.push('OpenCode');
   }
   return { approved: 'true', issue_number: String(number), request: parsed.request, issue_title: parsed.title, sender, labels_json: JSON.stringify(labels), target_ref: parsed.targetRef, target_sha: branch.commit.sha };
 }

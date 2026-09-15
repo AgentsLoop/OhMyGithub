@@ -16,15 +16,14 @@ Do not implement, suggest, report, or propose security issues unless the user ex
 The main project file is [.github/workflows/opencode.yml](.github/workflows/opencode.yml).
 
 Keep the local [game issue E2E skill](.agents/skills/game-issue-e2e/SKILL.md)
-aligned with this workflow. Create an issue with `OpenCode` and only user-requested mode labels already attached, or use
-`/OpenCode` in its title, to start the native `issues.opened` listener. Wait only for the
+aligned with this workflow. Create an issue with `OpenCode` and only user-requested mode labels already attached, to start the native `issues.opened` listener. Wait only for the
 initial OpenCode session link during E2E kickoff. Install the listener on the
 default branch before requesting execution. Validate author access and freeze
 the request inside Actions before starting the reusable execution job.
 Set repository variable `OPENCODE_ACCESS=everyone` to accept any issue author
-and enable `/OpenCode` in a newly created issue title. Keep the App as a setup
+for labeled issues. Keep the App as a setup
 helper. Use Actions concurrency to serialize each issue.
-Use `branch: <existing-branch>` at the end of the issue title to select the
+Store `branch` in an `omgithub-request:v1` JSON HTML comment to select the
 project checkout, result base, and workflow. Let default-branch preparation
 dispatch the selected branch. Run preparation and OpenCode in that branch run.
 

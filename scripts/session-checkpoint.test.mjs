@@ -52,11 +52,24 @@ if (path.basename(process.argv[1]) === 'opencode') {
  else if(args[0]==='import') fs.copyFileSync(args[1],path.join(state,'session.json'));
  else process.exit(1);
 } else {
+ const file=path.join(state,'release-state.json');
+ let release=fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):null;
  if(args[0]==='release' && args[1]==='create') {
-   fs.copyFileSync(args[3],path.join(state,args[2]+'.json'));
-   fs.appendFileSync(path.join(state,'releases'),args[2]+'\\n');
- } else if(args[0]==='release' && args[1]==='edit') {}
- else if(args[0]==='api') process.stdout.write(JSON.stringify({private:false})); else process.exit(1);
+   release={id:1,tag_name:args[2],assets:[],draft:true,body:''};
+ } else if(args[0]==='release' && args[1]==='upload') {
+   for(const p of args.slice(3,args.indexOf('--repo'))) {
+     const name=path.basename(p); fs.copyFileSync(p,path.join(state,name));
+     release.assets.push({id:Date.now()+release.assets.length,name,state:'uploaded',size:fs.statSync(p).size});
+   }
+ } else if(args[0]==='release' && args[1]==='edit') {
+   release.body=args[args.indexOf('--notes')+1];release.draft=false;
+ } else if(args[0]==='api') {
+   if(args.includes('DELETE')) release.assets=release.assets.filter(a=>!args[1].endsWith('/'+a.id));
+   else if(args[1].includes('/releases?')) process.stdout.write(JSON.stringify(release?[release]:[]));
+   else if(args[1].includes('/releases/tags/')) process.stdout.write(JSON.stringify(release));
+   else process.stdout.write(JSON.stringify({private:false}));
+ } else process.exit(1);
+ if(release) fs.writeFileSync(file,JSON.stringify(release));
 }
 `
     for (const name of ['opencode', 'gh']) writeFileSync(join(bin, name), fake, { mode: 0o755 })
@@ -74,9 +87,16 @@ if (path.basename(process.argv[1]) === 'opencode') {
     writeFileSync(join(state, 'session.json'), JSON.stringify(updated))
     const second = saveCheckpoint()
     assert.notEqual(second.commit, first.commit)
-    assert.equal(existsSync(join(state, first.tag + '.json')), true, 'previous complete checkpoint remains')
+    assert.equal(first.tag, second.tag, 'reuse the issue release')
+    const release = JSON.parse(readFileSync(join(state, 'release-state.json')))
+    assert.equal(release.assets.filter(a => a.name.startsWith('checkpoint-')).length, 1)
     assert.equal(git('show', `${second.commit}:index.html`), '<h1>Castle and water</h1>')
-    process.env.RESUME_CHECKPOINT_FILE = join(state, second.tag + '.json')
+    const manifest = JSON.parse(readFileSync(join(state, second.manifestName)))
+    assert.equal(manifest.session, undefined)
+    assert.equal(manifest.version, 2)
+    const exported = JSON.parse(readFileSync(join(state, manifest.session_asset)))
+    process.env.RESUME_CHECKPOINT_FILE = join(state, 'restore.json')
+    writeFileSync(process.env.RESUME_CHECKPOINT_FILE, JSON.stringify({ ...manifest, session: exported }))
     writeFileSync(join(state, 'session.json'), '{}')
     restore()
     const restored = JSON.parse(readFileSync(join(state, 'session.json')))

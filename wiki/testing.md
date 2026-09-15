@@ -97,8 +97,8 @@ symlink-entry regressions, then repeat the live screenshot test.
 
 ## Test standalone issue access
 
-Test `/OpenCode` in a new issue title with `OPENCODE_ACCESS=everyone` and
-verify that Actions adds the execution label and starts one execution job.
+Create an issue with the `OpenCode` label and `OPENCODE_ACCESS=everyone`.
+Verify that Actions starts one execution job.
 Restore the access variable after testing. Verify restricted access with the
 variable unset. Verify one Actions run for each new issue.
 
@@ -237,7 +237,7 @@ The build is accepted only when the session emits
 `<promise>DONE</promise>`; a missing promise must not receive the `complete`
 label. If both `Goal` and `ralph` are present, Ralph takes precedence.
 
-For custom-branch support, append `branch: <existing-branch>` to the title.
+For custom-branch support, set `branch` in hidden `omgithub-request:v1` metadata.
 Verify preparation strips routing metadata, resolves the branch, and supplies
 a frozen commit to checkout. Reject invalid or missing branches before execution.
 Verify workflow code comes from the default branch.

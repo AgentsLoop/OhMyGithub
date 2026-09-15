@@ -22,11 +22,9 @@ test('failure reporting attempts every operation despite earlier API failures', 
   await run(github, { warning() {} }, { repo: { owner: 'o', repo: 'r' }, runId: 1 }, () => ({ renderTemplate: () => 'failure' }));
   assert.deepEqual(calls, ['jobs', 'comment', 'remove', 'remove', 'add']);
 });
-test('completion waits for tracker exit and refuses concurrent final writes', () => {
-  const block = workflow.split('      - name: Publish worker completion report')[1].split('      - name:')[0];
-  assert.match(block, /response-comment.done/);
-  assert.match(block, /for _ in \{1\.\.60\}/);
-  assert.match(block, /if kill -0 "\$tracker_pid"[\s\S]*exit 1/);
+test('routes live validation through one lifecycle controller', () => {
+  assert.match(workflow, /scripts\/session-lifecycle.mjs/);
+  assert.match(workflow, /OPENCODE_CONTROL_PORT/);
 });
 
 test('runtime does not require pull-request permission to execute or deliver branches', () => {
@@ -39,9 +37,6 @@ test('keeps checkpoints on main and starts restored preview before model executi
   assert.doesNotMatch(workflow, /"\$VERIFICATION_SESSION_ID" > "\$OPENCODE_WEB_DIR\/checkpoint-session-id"/);
   assert.ok(workflow.indexOf('name: Start saved app before OpenCode') < workflow.indexOf('name: Run OpenCode and locate'));
   assert.ok(workflow.indexOf('name: Publish restored preview') < workflow.indexOf('name: Run OpenCode and locate'));
-  for (const name of ['Fork OpenCode session for verification', 'Verify app with forked OpenCode session']) {
-    assert.match(workflow.split(`name: ${name}`)[1].split('      - name:')[0], /env.RESUME_SESSION_ID == ''/);
-  }
   assert.match(workflow, /name: Wait for main OpenCode completion/);
   assert.equal((workflow.match(/echo \$! > "\$OPENCODE_WEB_DIR\/app-cloudflared.pid"/g) || []).length, 1);
 });
@@ -72,10 +67,8 @@ test('passes exact resumed text to OpenCode without command wrappers', async () 
     assert.equal(args[args.indexOf('--session') + 1], 'ses_main');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-test('runs verification only for a fresh build or unsuccessful resumed startup', () => {
-  for (const name of ['Fork OpenCode session for verification', 'Verify app with forked OpenCode session']) {
-    const block = workflow.split(`name: ${name}`)[1].split('      - name:')[0];
-    assert.match(block, /env.RESUME_SESSION_ID == '' \|\| env.RESUME_STARTUP_STATUS != 'ready'/);
-  }
-  assert.doesNotMatch(workflow, /Continue the main conversation on a NEW Actions runner/);
+test('validates every main completion through the lifecycle worker', () => {
+  assert.match(workflow, /session-lifecycle.mjs/);
+  assert.match(workflow, /checkpoint-session-id/);
+  assert.match(workflow, /omgithub\/reconcile/);
 });

@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'OpenCode') || contains(github.event.issue.title, '/OpenCode')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'OpenCode')
     uses: ./.github/workflows/opencode-prepare.yml
     with:
       runtime_ref: ${{ github.workflow_sha }}
