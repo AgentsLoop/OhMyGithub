@@ -7,8 +7,8 @@ CLI, Chromium, Mesa Vulkan drivers, and a persistent Xvfb display. Let the reusa
 workflow run this before publishing SSH access. Use `playwright-cli` from Actions
 or a fresh SSH shell; let the wrapper supply DISPLAY and the Linux configuration.
 Use `playwright-cli -s=check open <url>`, `eval`, `screenshot`, and `close` without
-manual browser flags. Load `.github/templates/linux.md` through the existing
-`linux` label or hashtag convention. Recheck the actual screenshot after upgrades.
+manual browser flags. Load `.github/templates/linux.md` by default. Select `mac.md` instead when
+a `mac` label or `#mac` hashtag is present. Match case insensitively. Recheck the actual screenshot after upgrades.
 
 ## Capture the Linux WebGPU triangle
 

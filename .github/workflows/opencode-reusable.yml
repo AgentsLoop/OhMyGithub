@@ -235,7 +235,9 @@ jobs:
           template_keys="$(node -e '
             const labels = JSON.parse(process.env.LABELS_JSON || "[]");
             const tags = [...(process.env.COMMENT_BODY || "").matchAll(/(?:^|[^A-Za-z0-9_])#([A-Za-z0-9_-]+)/g)].map(match => match[1]);
-            process.stdout.write(JSON.stringify([...labels, ...tags]));
+            const keys = [...labels, ...tags].map(key => key.trim().toLowerCase());
+            const platform = keys.includes("mac") ? "mac" : "linux";
+            process.stdout.write(JSON.stringify([...keys.filter(key => key !== "mac" && key !== "linux"), platform]));
           ')"
           while IFS= read -r template; do
             template_name="${template##*/}"
