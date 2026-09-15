@@ -171,3 +171,9 @@ test('preserves the exact resume prompt including whitespace and marker-like tex
   const metadata = { ...source, checkpoint_tag: 'opencode-checkpoint-6-123-1000', user_prompt: prompt }
   assert.equal(parseResume(`display text\n<!-- omgithub-resume:v1 ${JSON.stringify(metadata)} -->`).prompt, prompt)
 })
+
+test('prepare fetches checkpoint history from its source rather than the destination origin', () => {
+  const runtime = readFileSync(new URL('./session-checkpoint.mjs', import.meta.url), 'utf8')
+  assert.ok(runtime.includes("['fetch', '--no-tags', `https://github.com/${source.source_repository}.git`, checkpoint.commit]"))
+  assert.ok(!runtime.includes("['fetch', '--no-tags', 'origin', checkpoint.commit]"))
+})

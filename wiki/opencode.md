@@ -277,3 +277,9 @@ Run `scripts/session-lifecycle.mjs` once before exposing the web tunnel. Route b
 Save each completed main response through `scripts/session-checkpoint.mjs`. Keep one issue release and separate JSON assets. Validate through `scripts/session-deploy.mjs` in an isolated worktree. Cancel validation before forwarding new web messages. Preserve the last successful deployment and reject obsolete generations. Save changed state during shutdown without starting validation.
 
 Run `node --test scripts/session-lifecycle.test.mjs scripts/session-checkpoint.test.mjs scripts/opencode-prepare.test.mjs scripts/opencode-reporting.test.mjs`. Run `actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.yml`.
+
+## Restore cross-repository checkpoints
+
+- Fetch the saved checkpoint commit from the metadata source repository before restoring it.
+- Keep the destination origin for result pushes. Do not require source checkpoint branches in the destination.
+- Test cross-repository restore when a copied game branch does not contain the separate checkpoint commit.

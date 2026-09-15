@@ -102,7 +102,7 @@ export function prepare() {
   const checkpoint = validateCheckpoint({ ...payload, version: 1 }, source)
   if (payload.version !== 2 && (release.target_commitish !== checkpoint.commit || !source.checkpoint_tag.startsWith(`opencode-checkpoint-${source.source_issue}-${checkpoint.run_id}-`))) throw new Error('Checkpoint release does not match saved code.')
   if (source.source_commit && source.source_commit !== checkpoint.commit) throw new Error('The selected checkpoint has been replaced. Select the current saved version.')
-  command('git', ['fetch', '--no-tags', 'origin', checkpoint.commit], { cwd: env.GITHUB_WORKSPACE })
+  command('git', ['fetch', '--no-tags', `https://github.com/${source.source_repository}.git`, checkpoint.commit], { cwd: env.GITHUB_WORKSPACE })
   // Preparation has already selected the compatible caller. Restore code before installing runtime-only files.
   command('git', ['checkout', '--detach', checkpoint.commit], { cwd: env.GITHUB_WORKSPACE })
   writeFileSync(checkpointPath(), JSON.stringify(checkpoint), { mode: 0o600 })
