@@ -20,7 +20,13 @@ export class Lifecycle {
   async complete(messageID) {
     if (this.stopping || !messageID || messageID === this.lastMessage) return
     this.lastMessage = messageID
-    const generation = await this.busy()
+    let generation
+    try { generation = await this.busy() }
+    catch (error) {
+      if (this.lastMessage === messageID) this.lastMessage = ''
+      await Promise.resolve(this.status('failed', this.generation, error.message)).catch(() => {})
+      throw error
+    }
     if (generation !== this.generation || this.stopping) return
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && generation === this.generation && !this.stopping

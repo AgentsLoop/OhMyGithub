@@ -66,7 +66,8 @@ if (path.basename(process.argv[1]) === 'opencode') {
  } else if(args[0]==='api') {
    if(args.includes('DELETE')) release.assets=release.assets.filter(a=>!args[1].endsWith('/'+a.id));
    else if(args[1].includes('/releases?')) process.stdout.write(JSON.stringify(release?[release]:[]));
-   else if(args[1].includes('/releases/tags/')) process.stdout.write(JSON.stringify(release));
+   else if(args[1].includes('/releases/tags/')) { if(release?.draft) process.exit(1); process.stdout.write(JSON.stringify(release)); }
+   else if(args[1].endsWith('/releases/1')) process.stdout.write(JSON.stringify(release));
    else process.stdout.write(JSON.stringify({private:false}));
  } else process.exit(1);
  if(release) fs.writeFileSync(file,JSON.stringify(release));

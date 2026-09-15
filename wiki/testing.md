@@ -354,3 +354,7 @@ Run the tracker with SSH disabled. Default optional SSH variables to empty strin
 Extract Cloudflare URLs only from the tunnel-ready box. Reject API URLs from error lines.
 Wait for the progress tracker to exit before appending final results. Bound local API requests.
 Attempt failure comments and each status-label update independently when GitHub requests fail.
+
+## Test completion recovery
+
+Reproduce registration failures with an Actions installation token. Retry the same completion after registration recovers. Model draft-release tag lookups as unavailable; read the draft by its release ID. Confirm checkpoint creation, validation screenshots, and draft deployment on a live runner, not only with fixture tests.

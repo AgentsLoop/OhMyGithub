@@ -35,3 +35,14 @@ test('new input during asynchronous generation registration prevents stale save'
   release(); await completion
   assert.deepEqual(calls, [])
 })
+test('retry completion after registration failure instead of silently deduplicating it', async () => {
+  let broken = true
+  const calls = []
+  const lifecycle = new Lifecycle({ save: async () => { calls.push('save'); return {} }, deploy: async () => calls.push('deploy'), status: async state => {
+    if (state === 'working' && broken) throw new Error('registration unavailable')
+  } })
+  await assert.rejects(lifecycle.complete('m1'), /registration unavailable/)
+  broken = false
+  await lifecycle.complete('m1')
+  assert.deepEqual(calls, ['save', 'deploy'])
+})

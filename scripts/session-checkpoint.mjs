@@ -188,10 +188,11 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     let release = releases.find(r => r.tag_name === tag)
     if (!release) {
       command('gh', ['release', 'create', tag, '--repo', env.GITHUB_REPOSITORY, '--target', commit, '--draft', '--title', `Saved session #${issue}`, '--notes', 'Prepare saved session.', '--latest=false'])
-      release = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases/tags/${tag}`))
+      release = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases?per_page=100`, ['--paginate', '--slurp'])).flat().find(r => r.tag_name === tag)
+      if (!release) throw new Error('Created checkpoint release is unavailable.')
     }
     command('gh', ['release', 'upload', tag, sessionPath, path, '--repo', env.GITHUB_REPOSITORY])
-    const uploaded = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases/tags/${tag}`))
+    const uploaded = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases/${release.id}`))
     if (![sessionName, manifestName].every(name => uploaded.assets.some(a => a.name === name && a.state === 'uploaded' && a.size > 0))) throw new Error('Checkpoint upload incomplete.')
     // Publish the pointer only after both files exist. Readers use the manifest commit, not the mutable tag.
     command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--draft=false', '--latest=false', '--notes', `Restore saved code and conversation.\n<!-- checkpoint-asset:${manifestName} -->${uploaded.body?.match(/\n<!-- deployment:v1 .*? -->/)?.[0] || ''}`])
