@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-function run(t, mode, script = 'exit 0\n') {
+function run(t, mode, script = 'exit 0\n', restart = false) {
   const root = mkdtempSync(join(tmpdir(), 'startup-test-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const bin = join(root, 'bin')
@@ -24,7 +24,7 @@ function run(t, mode, script = 'exit 0\n') {
   `)
   const result = spawnSync('bash', [fileURLToPath(new URL('./start-project.sh', import.meta.url))], {
     encoding: 'utf8', timeout: 20000,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, PROJECT_DIR: root, OPENCODE_WEB_DIR: root, APP_URL: 'https://public.test', APP_PORT: '3000', TEST_MODE: mode }
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, PROJECT_DIR: root, OPENCODE_WEB_DIR: root, APP_URL: 'https://public.test', APP_PORT: '3000', TEST_MODE: mode, RESTART_APP: String(restart) }
   })
   return { ...result, calls: readFileSync(join(root, 'calls'), 'utf8') }
 }
@@ -45,4 +45,11 @@ test('rejects missing or malformed startup scripts', t => {
 test('fails closed for local and public startup failures', t => {
   assert.match(run(t, 'local-failure').stderr, /Local startup failed/)
   assert.match(run(t, 'public-failure').stderr, /Public preview did not become ready/)
+})
+
+test('restart current server after completion to rebuild the latest source', t => {
+  const result = run(t, 'running', 'exit 0\n', true)
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.calls, /kill-session/)
+  assert.match(result.calls, /new-session/)
 })

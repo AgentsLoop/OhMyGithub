@@ -361,4 +361,4 @@ Reproduce registration failures with an Actions installation token. Retry the sa
 
 ## Verify live preview priority
 
-Start the main workspace with `scripts/start-project.sh` after checkpointing a completed response. Publish its `Playable preview` tunnel link once. Keep validation in the isolated worktree. Confirm the issue iframe selects the healthy live tunnel ahead of its deployed draft, and inspect the latest workspace change there.
+Start the main workspace with `scripts/start-project.sh` after checkpointing a completed response. Publish its `Playable preview` tunnel link once. Keep validation on the shared live server. Confirm the issue iframe selects the healthy live tunnel ahead of its deployed draft, and inspect the latest workspace change there.

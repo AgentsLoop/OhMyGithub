@@ -274,7 +274,7 @@ Instruct the main OpenCode session to generate and test `startup.sh` during init
 
 Run `scripts/session-lifecycle.mjs` once before exposing the web tunnel. Route browser requests through its control port. Read `main-model` after execution-label resolution. Register the main session before reconciling idle events.
 
-Save each completed main response through `scripts/session-checkpoint.mjs`. Keep one issue release and separate JSON assets. Validate through `scripts/session-deploy.mjs` in an isolated worktree. Cancel validation before forwarding new web messages. Preserve the last successful deployment and reject obsolete generations. Save changed state during shutdown without starting validation.
+Save each completed main response through `scripts/session-checkpoint.mjs`. Keep one issue release and separate JSON assets. Validate through `scripts/session-deploy.mjs` in the main workspace against the shared live server. Cancel validation before forwarding new web messages. Preserve the last successful deployment and reject obsolete generations. Save changed state during shutdown without starting validation.
 
 Run `node --test scripts/session-lifecycle.test.mjs scripts/session-checkpoint.test.mjs scripts/opencode-prepare.test.mjs scripts/opencode-reporting.test.mjs`. Run `actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.yml`.
 
@@ -283,3 +283,7 @@ Run `node --test scripts/session-lifecycle.test.mjs scripts/session-checkpoint.t
 - Fetch the saved checkpoint commit from the metadata source repository before restoring it.
 - Keep the destination origin for result pushes. Do not require source checkpoint branches in the destination.
 - Test cross-repository restore when a copied game branch does not contain the separate checkpoint commit.
+
+## Recover shared preview startup
+
+Let the controller restart the main app through `startup.sh` after each checkpoint. Accept `PORT`, change to the script directory, and serve in the foreground. Check local and tunnel HTTP readiness before validation. Send startup logs to the main session for at most two repairs, then save the repaired checkpoint. Keep source unchanged during fork validation. Capture new evidence outside the workspace and package it only after source comparison passes. Retain the last successful draft on failure. Store SSH connectivity-test keys in `runner.temp` and retain the Mac authorized key.

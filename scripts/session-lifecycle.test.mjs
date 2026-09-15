@@ -46,3 +46,13 @@ test('retry completion after registration failure instead of silently deduplicat
   await lifecycle.complete('m1')
   assert.deepEqual(calls, ['save', 'deploy'])
 })
+test('invalidate remote deployment before waiting for a cancelled worker', async () => {
+  const calls = []
+  const lifecycle = new Lifecycle({ save: async () => ({}), status: async state => calls.push(state), deploy: ({signal}) => new Promise(resolve => {
+    signal.addEventListener('abort', () => setImmediate(() => { calls.push('drained'); resolve() }))
+  }) })
+  const completion = lifecycle.complete('m1'); await tick()
+  calls.length = 0
+  await lifecycle.busy(); await completion
+  assert.deepEqual(calls, ['working', 'drained'])
+})

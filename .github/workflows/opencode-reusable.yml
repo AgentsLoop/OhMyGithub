@@ -53,8 +53,6 @@ jobs:
       actions: read
     env:
       SSH_NAME: opencode-issue-${{ inputs.issue_number }}-${{ github.run_id }}-ssh
-      SSH_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519
-      SSH_PUBLIC_KEY: ${{ github.workspace }}/opencode-agentsweb-id_ed25519.pub
       SSH_DIR: ${{ github.workspace }}/.opencode-ssh
       OPENCODE_WEB_PORT: 4096
       OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
@@ -411,6 +409,9 @@ jobs:
             command -v tmux >/dev/null 2>&1 || brew install tmux
           fi
           install -d -m 700 "$SSH_DIR"
+          SSH_KEY="$RUNNER_TEMP/opencode-agentsweb-id_ed25519"
+          SSH_PUBLIC_KEY="$SSH_KEY.pub"
+          printf 'SSH_KEY=%s\nSSH_PUBLIC_KEY=%s\n' "$SSH_KEY" "$SSH_PUBLIC_KEY" >> "$GITHUB_ENV"
           ssh-keygen -t ed25519 -f "$SSH_KEY" -N '' -q
           chmod 600 "$SSH_KEY"
           install -d -m 700 "$HOME/.ssh"

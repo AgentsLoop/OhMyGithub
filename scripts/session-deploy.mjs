@@ -1,12 +1,12 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
-import { join, relative } from 'node:path'
-import { command } from './session-checkpoint.mjs'
+import { join } from 'node:path'
+import { command, excludedPath } from './session-checkpoint.mjs'
 import { child } from './session-lifecycle.mjs'
 
 const env = process.env
-const directory = join(env.RUNNER_TEMP, `validation-${env.CHECKPOINT_GENERATION}`)
+const evidence = join(env.RUNNER_TEMP, `validation-${env.CHECKPOINT_GENERATION}`)
 const root = env.GITHUB_WORKSPACE
-const project = join(directory, relative(root, env.PROJECT_DIR))
+const project = env.PROJECT_DIR
 const base = `http://127.0.0.1:${env.OPENCODE_WEB_PORT}`
 const main = readFileSync(join(env.OPENCODE_WEB_DIR, 'checkpoint-session-id'), 'utf8').trim()
 const api = async (path, options = {}, workingDirectory = env.PROJECT_DIR) => {
@@ -14,40 +14,54 @@ const api = async (path, options = {}, workingDirectory = env.PROJECT_DIR) => {
   if (!response.ok) throw new Error(`OpenCode HTTP ${response.status}`)
   return response.json()
 }
+function assertSource() {
+  const index = join(env.RUNNER_TEMP, `validate-index-${process.pid}`)
+  const options = { cwd: root, env: { ...env, GIT_INDEX_FILE: index } }
+  try {
+    command('git', ['read-tree', env.CHECKPOINT_COMMIT], options)
+    command('git', ['add', '-A', '--', '.'], options)
+    const excluded = command('git', ['ls-files', '-z'], options).split('\0').filter(excludedPath)
+    if (excluded.length) command('git', ['update-index', '--force-remove', '-z', '--stdin'], { ...options, input: excluded.join('\0') + '\0' })
+    const tree = command('git', ['write-tree'], options)
+    if (tree !== command('git', ['rev-parse', `${env.CHECKPOINT_COMMIT}^{tree}`], { cwd: root })) throw new Error('Source no longer matches checkpoint')
+  } finally { rmSync(index, { force: true }) }
+}
 let fork
 async function abort() { if (fork) await api(`/session/${fork.id}/abort`, { method: 'POST' }, project) }
 const controller = new AbortController()
 for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => { controller.abort(); void abort().catch(console.error) })
 try {
-  command('git', ['worktree', 'add', '--detach', directory, env.CHECKPOINT_COMMIT], { cwd: root })
+  mkdirSync(evidence, { recursive: true })
+  assertSource()
   fork = await api(`/session/${main}/fork`, { method: 'POST', body: JSON.stringify({ messageID: env.MAIN_MESSAGE_ID }) })
   if (!fork.id?.startsWith('ses_')) throw new Error('No validation fork created')
   writeFileSync(join(env.OPENCODE_WEB_DIR, 'active-validation.json'), JSON.stringify({ id: fork.id, directory: project }))
-  const prompt = `Validate the app in ${project}, an isolated snapshot. Keep tracked source files unchanged. Do not edit, fix, commit, push, or publish source. Install dependencies and build if needed. Start the preview on a free port, not port 3000. Run browser checks. Capture final screenshots in ${project}/screenshots/final-desktop.png and final-mobile.png. Stop any server you start before finishing. Return validation failed if the app does not work. Write ${project}/screenshots/validation.json with JSON {"passed":true} only when browser checks pass. Do not change the main session or its workspace.`
+  const prompt = `Validate the shared live app at ${env.APP_URL}. Its main workspace is ${project}. Use this exact URL for browser checks at desktop and mobile widths. Keep source unchanged. The controller owns the running app server. Capture final screenshots in ${evidence}/final-desktop.png and ${evidence}/final-mobile.png. Write ${evidence}/validation.json with JSON {"passed":true} only when browser rendering and interaction checks pass. Leave the server running. Report failure if the preview does not work.`
   await child(env.OPENCODE_BIN || join(env.HOME, '.opencode/bin/opencode'), ['run', '--auto', '--dangerously-skip-permissions', '--attach', base, '--dir', project, '--session', fork.id, '--model', readFileSync(join(env.OPENCODE_WEB_DIR, 'main-model'), 'utf8').trim(), prompt], { signal: controller.signal, cwd: project })
   if (controller.signal.aborted) throw new Error('Cancelled')
-  if (command('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: directory })) throw new Error('Validation changed tracked source')
-  if (JSON.parse(readFileSync(join(project, 'screenshots/validation.json'), 'utf8')).passed !== true) throw new Error('Browser validation did not pass')
-  const screenshots = readdirSync(join(project, 'screenshots')).filter(name => /^final-.*\.(png|jpe?g|webp)$/i.test(name))
-  if (!screenshots.length) throw new Error('Validation produced no screenshots')
+  assertSource()
+  if (JSON.parse(readFileSync(join(evidence, 'validation.json'), 'utf8')).passed !== true) throw new Error('Browser validation did not pass')
+  const screenshots = readdirSync(evidence).filter(name => /^final-.*\.(png|jpe?g|webp)$/i.test(name))
+  if (!['final-desktop.png', 'final-mobile.png'].every(name => screenshots.includes(name))) throw new Error('Validation produced no screenshots')
   const archive = join(env.RUNNER_TEMP, `deployment-${env.CHECKPOINT_GENERATION}.zip`)
   // Package generated dist when present, otherwise the static project. Exclude
   // dependencies and runner state; materialization selects the HTML entrypoint.
   command('python3', ['-c', `import os,sys,zipfile
-root,out=sys.argv[1:]
+root,out,evidence=sys.argv[1:]
 source=root
 if os.path.isfile(os.path.join(root,'dist','index.html')): root=os.path.join(root,'dist')
 with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
  for base,dirs,files in os.walk(root):
-  dirs[:]=[d for d in dirs if d not in ['node_modules','.git','.opencode','.agents','.opencode-web']]
+  dirs[:]=[d for d in dirs if d not in ['node_modules','.git','.opencode','.agents','.opencode-web','.omgithub-runtime','.opencode-ssh','screenshots']]
   for name in files:
-   if name.startswith('.env') or name.endswith(('.log','.pid')): continue
+   if name.startswith(('.env','opencode-agentsweb-')) or name.endswith(('.log','.pid')): continue
    p=os.path.join(base,name)
    if not os.path.islink(p): z.write(p,os.path.relpath(p,root))
- if root!=source:
-  for name in os.listdir(os.path.join(source,'screenshots')):
-   p=os.path.join(source,'screenshots',name)
-   if name.startswith('final-') and os.path.isfile(p): z.write(p,'screenshots/'+name)`, project, archive])
+ for name in os.listdir(evidence):
+  p=os.path.join(evidence,name)
+  if name.startswith('final-') and os.path.isfile(p): z.write(p,'screenshots/'+name)`, project, archive, evidence])
+  assertSource()
+  if (controller.signal.aborted) throw new Error('Cancelled')
   const site = env.OMGITHUB_ORIGIN || 'https://omgithub.com'
   const response = await fetch(`${site}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/deployment`, { method: 'POST', headers: {
     authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'content-type': 'application/zip', 'x-omgithub-run': env.GITHUB_RUN_ID,
@@ -59,7 +73,7 @@ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
   const tag = `opencode-checkpoint-${env.TRIGGER_ISSUE_NUMBER}`
   const assets = screenshots.map(name => {
     const path = join(env.RUNNER_TEMP, `${env.CHECKPOINT_GENERATION}-${name}`)
-    writeFileSync(path, readFileSync(join(project, 'screenshots', name)))
+    writeFileSync(path, readFileSync(join(evidence, name)))
     return path
   })
   command('gh', ['release', 'upload', tag, ...assets, '--repo', env.GITHUB_REPOSITORY])
@@ -74,5 +88,5 @@ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
 } finally {
   await abort()
   rmSync(join(env.OPENCODE_WEB_DIR, 'active-validation.json'), { force: true })
-  command('git', ['worktree', 'remove', '--force', directory], { cwd: root })
+  rmSync(evidence, { recursive: true, force: true })
 }
