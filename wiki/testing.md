@@ -361,12 +361,12 @@ Reproduce registration failures with an Actions installation token. Retry the sa
 
 ## Verify live preview priority
 
-Start the main workspace with `scripts/start-project.sh` after checkpointing a completed response. Publish its `Playable preview` tunnel link once. Keep validation on the shared live server. Confirm the issue iframe selects the healthy live tunnel ahead of its deployed draft, and inspect the latest workspace change there.
+Start the main workspace with `scripts/start-project.sh` after checkpointing a completed response. Publish its `Playable preview` tunnel link once. Run capture on the shared live server. Confirm the issue iframe selects the healthy live tunnel ahead of its deployed draft, and inspect the latest workspace change there.
 
 ## Check validation setup ownership
 
-Keep the main build prompt equal to the user request. Create and repair startup inside the validation fork. Save setup changes before browser validation while retaining the main session export. Read new draft release IDs directly from the creation response. Retry tunnel startup at most three times and route files through the working control tunnel when the dedicated file tunnel fails.
+Keep the main build prompt equal to the user request. Run existing startup.sh and capture.sh directly. Create a repair fork only after startup or capture fails. Require that fork to execute changed scripts, check readiness, and inspect desktop/mobile screenshots. Save repaired scripts with the main session export. Read new draft release IDs directly from the creation response. Retry tunnel startup at most three times and route files through the working control tunnel when the dedicated file tunnel fails.
 
 ## Preserve validation evidence
 
-Exclude `.playwright-cli` output from checkpoint trees, source comparisons, and deployment archives. Normalize both old checkpoint trees and current source before comparison. Keep temporary validation screenshots when deployment fails; remove them only after successful delivery.
+Exclude `.playwright-cli` output from checkpoint trees and deployment archives. Keep capture screenshots outside source and retain them when deployment fails; remove them after successful delivery. Test healthy-server reuse, stopped-server startup, missing scripts, bounded repairs, fresh PNG output, and continuation cancellation. Treat successful capture as startup-and-capture evidence.

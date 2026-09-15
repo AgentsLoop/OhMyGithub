@@ -5,12 +5,12 @@ const read = path => readFileSync(new URL(path, import.meta.url), 'utf8')
 test('main prompt contains only the user request', () => {
   assert.equal(read('../.github/prompts/01-build.md'), '@COMMENT_BODY@\n')
 })
-test('fork setup precedes checkpoint replacement and read-only validation', () => {
+test('script preparation precedes checkpoint replacement and publication', () => {
   const source = read('./session-deploy.mjs')
-  const setup = source.indexOf('await runFork(`Prepare validation startup')
+  const setup = source.indexOf('await preparePreview(')
   const save = source.indexOf("'scripts/session-checkpoint.mjs'")
-  const validate = source.indexOf('const prompt = `Validate the shared live app')
-  assert.ok(setup > 0 && setup < save && save < validate)
-  assert.match(source, /attempt === 2/)
+  assert.ok(setup > 0 && setup < save)
+  assert.ok(source.indexOf('const deployed =') > save)
+  assert.doesNotMatch(source, /assertSource|validation\.json.*passed|RESTART_APP/)
   assert.doesNotMatch(read('./session-lifecycle.mjs'), /--session.*mainID\(\)/)
 })
