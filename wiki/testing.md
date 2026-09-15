@@ -25,6 +25,24 @@ Use `--backend vulkan` for native-driver experiments, `--backend swangle` for
 ANGLE SwiftShader experiments, and `--executable` to select another browser.
 Keep the default Metal path for the Mac test.
 
+## Capture Pascal Editor on Linux
+
+Use `http://localhost:3002`, not the numeric loopback origin, with the default
+Pascal Next.js development server. Check the server log for blocked development
+resources when HTTP 403 or HMR handshake errors occur.
+Install dependencies with the repository's Bun lockfile. Start `bun dev` and
+wait for the editor on port 3002. Create a studio through `POST /api/scenes`
+using the documented scene structure. Open `/scene/<id>?disable=postFx` for
+the reduced-effects capture. Do not use the empty root page as a scene test.
+Run headed Chromium under Xvfb with the tested SwiftShader flags above.
+Wait for visible geometry; verify the existing canvas accepts `webgpu` and
+rejects `webgl2`. Require the viewer's `WebGPU device ready` log, no failed
+HTTP requests, and no JavaScript errors. Inspect the screenshot manually.
+Treat the 2026-09-15 room capture on issue 113 as a software-rendering result.
+Do not claim full post-processing coverage. Preserve readiness-timeout warnings
+in the report; do not confuse an earlier WebGL fallback capture with the final
+WebGPU capture. Keep the saved scene and application server for further tests.
+
 ## Capture WebGPU on a hosted Mac
 
 Use full Chromium with the Metal backend. Keep Playwright's other launch defaults. Test
