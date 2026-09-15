@@ -271,3 +271,9 @@ Set `OPENCODE_DEBUG_HOLD=true` only in a debugging repository to retain failed l
 Keep `checkpoint-session-id` set to the main session. Save the latest workspace files with that conversation. Submit the exact user prompt to the restored main session. Preserve whitespace and bypass command wrappers. Run the verification fork when Actions cannot start the saved app. Skip repeated verification when startup succeeds. Reject saved child sessions instead of importing them as main conversations.
 
 Instruct OpenCode to generate and test `startup.sh` during initial verification. Install dependencies, build when required, and serve port 3000 in the foreground. Test from a stopped app without installed dependencies. Start three tunnels during worker setup. Run the saved script before submitting resumed work. Publish the restored preview only after local and public HTTP checks pass. Reuse the app tunnel for delivery. Run verification to generate or repair missing or failed startup scripts. Inspect `app.log` for startup failures.
+
+## Restore cross-repository checkpoints
+
+- Fetch the saved checkpoint commit from the metadata source repository before restoring it.
+- Keep the destination origin for result pushes. Do not require source checkpoint branches in the destination.
+- Test cross-repository restore when a copied game branch does not contain the separate checkpoint commit.
