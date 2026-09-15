@@ -819,16 +819,35 @@ jobs:
           nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$APP_PORT" \
             > "$OPENCODE_WEB_DIR/app-cloudflared.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/app-cloudflared.pid"
-          for _ in {1..60}; do
+          web_retries=0; project_retries=0; app_retries=0
+          for _ in {1..90}; do
+            for tunnel in web project app; do
+              case "$tunnel" in
+                web) prefix="cloudflared"; port="$OPENCODE_CONTROL_PORT"; retries="$web_retries" ;;
+                project) prefix="project-cloudflared"; port="$PROJECT_FILE_PORT"; retries="$project_retries" ;;
+                app) prefix="app-cloudflared"; port="$APP_PORT"; retries="$app_retries" ;;
+              esac
+              if ! kill -0 "$(cat "$OPENCODE_WEB_DIR/$prefix.pid")" 2>/dev/null && [[ "$retries" -lt 2 ]]; then
+                /usr/bin/time -p sleep 2
+                nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$port" > "$OPENCODE_WEB_DIR/$prefix.log" 2>&1 &
+                printf '%s\n' "$!" > "$OPENCODE_WEB_DIR/$prefix.pid"
+                case "$tunnel" in
+                  web) web_retries=$((web_retries + 1)) ;;
+                  project) project_retries=$((project_retries + 1)) ;;
+                  app) app_retries=$((app_retries + 1)) ;;
+                esac
+              fi
+            done
             WEB_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
             PROJECT_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/project-cloudflared.log" | head -n 1)"
             APP_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/app-cloudflared.log" | head -n 1)"
             [[ -n "$WEB_URL" && -n "$PROJECT_URL" && -n "$APP_URL" ]] && break
             sleep 1
           done
-          [[ -n "${WEB_URL:-}" && -n "${PROJECT_URL:-}" && -n "${APP_URL:-}" ]]
+          [[ -n "$PROJECT_URL" || -z "$WEB_URL" ]] || PROJECT_URL="$WEB_URL/omgithub/files/"
           echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
           printf 'url=%s\nproject_url=%s\n' "$WEB_URL" "$PROJECT_URL" >> "$GITHUB_OUTPUT"
+          [[ -n "${WEB_URL:-}" && -n "${PROJECT_URL:-}" && -n "${APP_URL:-}" ]] || { echo '::error::A preview tunnel failed after three attempts.'; exit 1; }
 
       - name: Configure Git identity
         if: env.SSH_ONLY_REQUEST != 'true'

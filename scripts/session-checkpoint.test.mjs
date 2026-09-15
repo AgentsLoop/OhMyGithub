@@ -64,7 +64,8 @@ if (path.basename(process.argv[1]) === 'opencode') {
  } else if(args[0]==='release' && args[1]==='edit') {
    release.body=args[args.indexOf('--notes')+1];release.draft=false;
  } else if(args[0]==='api') {
-   if(args.includes('DELETE')) release.assets=release.assets.filter(a=>!args[1].endsWith('/'+a.id));
+   if(args.includes('POST') && args[1].endsWith('/releases')) { release={id:1,tag_name:args.find(a=>a.startsWith('tag_name=')).slice(9),assets:[],draft:true,body:''}; process.stdout.write(JSON.stringify(release)); }
+   else if(args.includes('DELETE')) release.assets=release.assets.filter(a=>!args[1].endsWith('/'+a.id));
    else if(args[1].includes('/releases?')) process.stdout.write(JSON.stringify(release?[release]:[]));
    else if(args[1].includes('/releases/tags/')) { if(release?.draft) process.exit(1); process.stdout.write(JSON.stringify(release)); }
    else if(args[1].endsWith('/releases/1')) process.stdout.write(JSON.stringify(release));

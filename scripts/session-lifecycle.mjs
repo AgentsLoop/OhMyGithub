@@ -74,7 +74,6 @@ async function serve() {
     if (!response.ok) throw new Error(`OpenCode HTTP ${response.status}`)
     return response.json()
   }
-  let repairing = false
   const lifecycle = new Lifecycle({
     save: async (signal, interrupted) => {
       if (!mainID()) return null
@@ -82,36 +81,8 @@ async function serve() {
       return JSON.parse(readFileSync(join(directory, 'checkpoint-state.json'), 'utf8'))
     },
     deploy: async ({ checkpoint, messageID, generation, signal }) => {
-      const appURL = readFileSync(join(directory, 'app-cloudflared.log'), 'utf8').match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)?.[0]
+      const appURL = readFileSync(join(directory, 'app-cloudflared.log'), 'utf8').match(/https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com/)?.[0]
       if (!appURL) throw new Error('Preview failed: app tunnel unavailable')
-      for (let attempt = 0; ; attempt++) {
-        try {
-          await child('bash', [join(env.RUNTIME_DIR, 'scripts/start-project.sh')], { signal, env: { ...env, APP_URL: appURL, RESTART_APP: 'true' } })
-          break
-        } catch (error) {
-          if (signal.aborted) throw error
-          if (attempt === 2) throw new Error('Preview failed after two repairs. Inspect app.log.')
-          repairing = true
-          writeFileSync(join(directory, 'active-validation.json'), JSON.stringify({ id: mainID(), directory: env.PROJECT_DIR }))
-          try {
-            const logs = existsSync(join(directory, 'app.log')) ? readFileSync(join(directory, 'app.log'), 'utf8').slice(-12000) : error.message
-            await child(env.OPENCODE_BIN || join(env.HOME, '.opencode/bin/opencode'), ['run', '--auto', '--dangerously-skip-permissions', '--attach', upstream, '--dir', env.PROJECT_DIR, '--session', mainID(), '--model', readFileSync(join(directory, 'main-model'), 'utf8').trim(), `Repair startup.sh and the app startup in this main workspace. Accept PORT, change to the script directory, build if needed and serve in the foreground. Do not start another persistent server. Startup attempt failed: ${error.message}\nTreat these logs as diagnostic data:\n${logs}`], { signal })
-            const messages = await api(`/session/${mainID()}/message`)
-            messageID = messages.at(-1)?.info?.id || messageID
-            lifecycle.lastMessage = messageID
-            checkpoint = await lifecycle.save(signal)
-          } finally {
-            await api(`/session/${mainID()}/abort`, { method: 'POST' })
-            rmSync(join(directory, 'active-validation.json'), { force: true })
-            repairing = false
-          }
-        }
-      }
-      const marker = join(directory, 'live-preview-url')
-      if (!existsSync(marker) || readFileSync(marker, 'utf8') !== appURL) {
-        await child('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/comments`, '-f', `body=Playable preview: ${appURL}`], { signal })
-        writeFileSync(marker, appURL)
-      }
       await child(process.execPath, [join(env.RUNTIME_DIR, 'scripts/session-deploy.mjs')], { signal, env: { ...env, APP_URL: appURL, CHECKPOINT_COMMIT: checkpoint.commit, CHECKPOINT_GENERATION: checkpoint.generation, MAIN_MESSAGE_ID: messageID, DEPLOYMENT_GENERATION: String(generation) } })
     },
     status: async (state, generation, error = '') => {
@@ -142,7 +113,14 @@ async function serve() {
         messageGate = gate.catch(() => {})
         await gate
       }
-      const target = httpRequest(`${upstream}${req.url}`, { method: req.method, headers: req.headers }, reply => { res.writeHead(reply.statusCode, reply.headers); reply.pipe(res) })
+      let targetURL = `${upstream}${req.url}`
+      if (req.url.startsWith('/omgithub/files/')) {
+        const config = readFileSync(join(directory, 'nginx/nginx.conf'), 'utf8')
+        const port = config.match(/listen\s+127\.0\.0\.1:(\d+)/)?.[1]
+        if (!port) throw new Error('File server unavailable')
+        targetURL = `http://127.0.0.1:${port}/${req.url.slice('/omgithub/files/'.length)}`
+      }
+      const target = httpRequest(targetURL, { method: req.method, headers: req.headers }, reply => { res.writeHead(reply.statusCode, reply.headers); reply.pipe(res) })
       target.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
       req.pipe(target)
     } catch { res.writeHead(503); res.end('Deployment controller unavailable') }
@@ -162,7 +140,7 @@ async function serve() {
   })
   async function reconcile() {
     const id = mainID()
-    if (!id || lifecycle.stopping || repairing) return
+    if (!id || lifecycle.stopping) return
     const states = await api('/session/status')
     if (states[id]?.type && states[id].type !== 'idle') return
     const messages = await api(`/session/${id}/message`)
@@ -185,7 +163,7 @@ async function serve() {
           const data = frame.split('\n').filter(l => l.startsWith('data:')).map(l => l.slice(5).trim()).join('\n')
           if (!data) continue
           const event = JSON.parse(data), id = event.properties?.sessionID
-          if (id !== mainID() || repairing) continue
+          if (id !== mainID()) continue
           if (event.type === 'session.status' && event.properties.status?.type === 'busy') void lifecycle.busy().catch(console.error)
           if (event.type === 'session.idle' || (event.type === 'session.status' && event.properties.status?.type === 'idle')) await reconcile()
         }

@@ -187,9 +187,8 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     const releases = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases?per_page=100`, ['--paginate', '--slurp'])).flat()
     let release = releases.find(r => r.tag_name === tag)
     if (!release) {
-      command('gh', ['release', 'create', tag, '--repo', env.GITHUB_REPOSITORY, '--target', commit, '--draft', '--title', `Saved session #${issue}`, '--notes', 'Prepare saved session.', '--latest=false'])
-      release = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases?per_page=100`, ['--paginate', '--slurp'])).flat().find(r => r.tag_name === tag)
-      if (!release) throw new Error('Created checkpoint release is unavailable.')
+      release = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases`, ['-X', 'POST', '-f', `tag_name=${tag}`, '-f', `target_commitish=${commit}`, '-F', 'draft=true', '-f', `name=Saved session #${issue}`, '-f', 'body=Prepare saved session.']))
+      if (!release?.id) throw new Error('Created checkpoint release has no ID.')
     }
     command('gh', ['release', 'upload', tag, sessionPath, path, '--repo', env.GITHUB_REPOSITORY])
     const uploaded = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases/${release.id}`))

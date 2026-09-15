@@ -362,3 +362,7 @@ Reproduce registration failures with an Actions installation token. Retry the sa
 ## Verify live preview priority
 
 Start the main workspace with `scripts/start-project.sh` after checkpointing a completed response. Publish its `Playable preview` tunnel link once. Keep validation on the shared live server. Confirm the issue iframe selects the healthy live tunnel ahead of its deployed draft, and inspect the latest workspace change there.
+
+## Check validation setup ownership
+
+Keep the main build prompt equal to the user request. Create and repair startup inside the validation fork. Save setup changes before browser validation while retaining the main session export. Read new draft release IDs directly from the creation response. Retry tunnel startup at most three times and route files through the working control tunnel when the dedicated file tunnel fails.
