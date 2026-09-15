@@ -358,3 +358,7 @@ Attempt failure comments and each status-label update independently when GitHub 
 ## Test completion recovery
 
 Reproduce registration failures with an Actions installation token. Retry the same completion after registration recovers. Model draft-release tag lookups as unavailable; read the draft by its release ID. Confirm checkpoint creation, validation screenshots, and draft deployment on a live runner, not only with fixture tests.
+
+## Verify live preview priority
+
+Start the main workspace with `scripts/start-project.sh` after checkpointing a completed response. Publish its `Playable preview` tunnel link once. Keep validation in the isolated worktree. Confirm the issue iframe selects the healthy live tunnel ahead of its deployed draft, and inspect the latest workspace change there.

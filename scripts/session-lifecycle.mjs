@@ -78,6 +78,19 @@ async function serve() {
     save: async (signal, interrupted) => {
       if (!mainID()) return null
       await child(process.execPath, [join(env.RUNTIME_DIR, 'scripts/session-checkpoint.mjs'), interrupted ? 'shutdown' : 'save'], { signal })
+      if (!interrupted) {
+        const appURL = readFileSync(join(directory, 'app-cloudflared.log'), 'utf8').match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)?.[0]
+        if (appURL) {
+          try {
+            await child('bash', [join(env.RUNTIME_DIR, 'scripts/start-project.sh')], { signal, env: { ...env, APP_URL: appURL } })
+            const marker = join(directory, 'live-preview-url')
+            if (!existsSync(marker) || readFileSync(marker, 'utf8') !== appURL) {
+              await child('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/comments`, '-f', `body=Playable preview: ${appURL}`], { signal })
+              writeFileSync(marker, appURL)
+            }
+          } catch (error) { if (signal?.aborted) throw error; console.error(`Live preview: ${error.message}`) }
+        }
+      }
       return JSON.parse(readFileSync(join(directory, 'checkpoint-state.json'), 'utf8'))
     },
     deploy: async ({ checkpoint, messageID, generation, signal }) => {
