@@ -1,5 +1,15 @@
 # Testing and verification
 
+## Use the preconfigured Linux CLI
+
+Run `scripts/setup-linux-playwright.sh` on an Ubuntu worker to install the pinned
+CLI, Chromium, Mesa Vulkan drivers, and a persistent Xvfb display. Let the reusable
+workflow run this before publishing SSH access. Use `playwright-cli` from Actions
+or a fresh SSH shell; let the wrapper supply DISPLAY and the Linux configuration.
+Use `playwright-cli -s=check open <url>`, `eval`, `screenshot`, and `close` without
+manual browser flags. Load `.github/templates/linux.md` through the existing
+`linux` label or hashtag convention. Recheck the actual screenshot after upgrades.
+
 ## Capture the Linux WebGPU triangle
 
 Install Playwright 1.63.0 and its full Chromium browser as below. Install

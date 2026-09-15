@@ -127,6 +127,13 @@ jobs:
         shell: bash
         run: /usr/bin/time -p node "$RUNTIME_DIR/scripts/session-checkpoint.mjs" prepare
 
+      - name: Configure Linux Playwright CLI with WebGPU
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p bash "$RUNTIME_DIR/scripts/setup-linux-playwright.sh"
+
       - name: Checkout AgentsWeb tunnel client
         if: env.TEST_REQUEST != 'true'
         uses: actions/checkout@v6
