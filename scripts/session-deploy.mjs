@@ -19,11 +19,17 @@ function assertSource() {
   const options = { cwd: root, env: { ...env, GIT_INDEX_FILE: index } }
   try {
     command('git', ['read-tree', env.CHECKPOINT_COMMIT], options)
+    const prune = () => {
+      const paths = command('git', ['ls-files', '-z'], options).split('\0').filter(excludedPath)
+      if (paths.length) command('git', ['update-index', '--force-remove', '-z', '--stdin'], { ...options, input: paths.join('\0') + '\0' })
+    }
+    prune()
+    const expected = command('git', ['write-tree'], options)
     command('git', ['add', '-A', '--', '.'], options)
     const excluded = command('git', ['ls-files', '-z'], options).split('\0').filter(excludedPath)
     if (excluded.length) command('git', ['update-index', '--force-remove', '-z', '--stdin'], { ...options, input: excluded.join('\0') + '\0' })
     const tree = command('git', ['write-tree'], options)
-    if (tree !== command('git', ['rev-parse', `${env.CHECKPOINT_COMMIT}^{tree}`], { cwd: root })) throw new Error('Source no longer matches checkpoint')
+    if (tree !== expected) throw new Error('Source no longer matches checkpoint')
   } finally { rmSync(index, { force: true }) }
 }
 let fork
@@ -78,7 +84,7 @@ source=root
 if os.path.isfile(os.path.join(root,'dist','index.html')): root=os.path.join(root,'dist')
 with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
  for base,dirs,files in os.walk(root):
-  dirs[:]=[d for d in dirs if d not in ['node_modules','.git','.opencode','.agents','.opencode-web','.omgithub-runtime','.opencode-ssh','screenshots']]
+  dirs[:]=[d for d in dirs if d not in ['node_modules','.git','.opencode','.agents','.opencode-web','.omgithub-runtime','.opencode-ssh','.playwright-cli','screenshots']]
   for name in files:
    if name.startswith(('.env','opencode-agentsweb-')) or name.endswith(('.log','.pid')): continue
    p=os.path.join(base,name)
@@ -111,8 +117,8 @@ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
   command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--notes', body])
   for (const old of release.assets.filter(a => /-final-.*\.(png|jpe?g|webp)$/i.test(a.name) && !fresh.some(f => f.id === a.id))) command('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/releases/assets/${old.id}`, '-X', 'DELETE'])
   rmSync(archive, { force: true })
+  rmSync(evidence, { recursive: true, force: true })
 } finally {
   await abort()
   rmSync(join(env.OPENCODE_WEB_DIR, 'active-validation.json'), { force: true })
-  rmSync(evidence, { recursive: true, force: true })
 }

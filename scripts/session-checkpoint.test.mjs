@@ -25,7 +25,7 @@ test('retains conversation text but removes credentials and excludes runtime fil
   const clean = redactSession({ text: `Build a game ${secret}`, nested: { apiKey: 'another' } }, [secret])
   assert.equal(clean.text, 'Build a game [credential removed]')
   assert.equal(clean.nested.apiKey, '[credential removed]')
-  for (const file of ['.env', 'game/.env.production', '.opencode-web/checkpoint.json', 'game/node_modules/lib.js', 'game/auth.json', 'opencode-agentsweb-id_ed25519']) assert.equal(excludedPath(file), true, file)
+  for (const file of ['.env', '.playwright-cli/page.yml', 'game/.playwright-cli/page.yml', 'game/.env.production', '.opencode-web/checkpoint.json', 'game/node_modules/lib.js', 'game/auth.json', 'opencode-agentsweb-id_ed25519']) assert.equal(excludedPath(file), true, file)
   assert.equal(excludedPath('game/index.html'), false)
 })
 test('save, late edit, shutdown checkpoint, and restore preserve code and full conversation', () => {

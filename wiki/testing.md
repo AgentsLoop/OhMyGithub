@@ -366,3 +366,7 @@ Start the main workspace with `scripts/start-project.sh` after checkpointing a c
 ## Check validation setup ownership
 
 Keep the main build prompt equal to the user request. Create and repair startup inside the validation fork. Save setup changes before browser validation while retaining the main session export. Read new draft release IDs directly from the creation response. Retry tunnel startup at most three times and route files through the working control tunnel when the dedicated file tunnel fails.
+
+## Preserve validation evidence
+
+Exclude `.playwright-cli` output from checkpoint trees, source comparisons, and deployment archives. Normalize both old checkpoint trees and current source before comparison. Keep temporary validation screenshots when deployment fails; remove them only after successful delivery.
