@@ -762,12 +762,17 @@ jobs:
           install -d -m 700 "$NGINX_PREFIX" "$NGINX_PREFIX/client_body_temp" \
             "$NGINX_PREFIX/proxy_temp" "$NGINX_PREFIX/fastcgi_temp" \
             "$NGINX_PREFIX/uwsgi_temp" "$NGINX_PREFIX/scgi_temp"
+          NGINX_CONF_PATH="$("$NGINX_BIN" -V 2>&1 | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')"
+          /usr/bin/time -p node "$RUNTIME_DIR/scripts/project-file-mime.mjs" \
+            "$(dirname "$NGINX_CONF_PATH")/mime.types" "$NGINX_PREFIX/mime.types"
           cat > "$NGINX_PREFIX/nginx.conf" <<EOF
           worker_processes 1;
           pid $NGINX_PREFIX/nginx.pid;
           error_log $NGINX_PREFIX/error.log;
           events { worker_connections 128; }
           http {
+            include "$NGINX_PREFIX/mime.types";
+            default_type application/octet-stream;
             access_log $NGINX_PREFIX/access.log;
             client_body_temp_path $NGINX_PREFIX/client_body_temp;
             proxy_temp_path $NGINX_PREFIX/proxy_temp;
@@ -777,7 +782,8 @@ jobs:
             server {
               listen 127.0.0.1:$PROJECT_FILE_PORT;
               root $PROJECT_DIR;
-              index __codex_no_automatic_index_file__;
+              index index.html index.htm;
+              add_header Cache-Control "no-cache" always;
               autoindex on;
             }
           }

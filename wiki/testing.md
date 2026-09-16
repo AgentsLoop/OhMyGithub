@@ -378,3 +378,7 @@ Reuse the lifecycle checkpoint when preview preparation returns repaired=false. 
 Retry readiness and capture at most three times with bounded backoff. Return startup exit code 75 for a running server that remains unready or an unavailable public tunnel; report an exited startup process as a script failure. Retry capture without restarting the server. Preserve each capture attempt's stdout and stderr outside source. Escalate persistent script failures to OC; surface persistent DNS/network failures directly. Execute repaired scripts and inspect screenshots.
 
 Retry deployment upload using the same archive and generation for transient network failures, HTTP 408/429/500/502/503/504, and explicitly signaled rate limits. Stop on cancellation, superseded generations, and permanent errors. Deploy the server's idempotent upload handler before enabling workflow retries. Test concurrent uploads, lost responses, successful-generation replay after service recreation, capture diagnostics, readiness failures, and cancellation.
+
+## Verify project file serving
+
+Run `node --test scripts/project-file-mime.test.mjs`. Load the installed Nginx MIME table through `scripts/project-file-mime.mjs`; normalize browser asset types and fail startup if the table is unavailable. Serve directory index pages before directory listings. Revalidate cached preview assets. Check CSS, JS/MJS, WASM, fonts, nested paths, and missing-file 404 responses through the file tunnel. Use the app tunnel for framework servers and backend routes.
