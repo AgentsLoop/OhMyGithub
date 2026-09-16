@@ -382,3 +382,5 @@ Retry deployment upload using the same archive and generation for transient netw
 ## Verify project file serving
 
 Run `node --test scripts/project-file-mime.test.mjs`. Load the installed Nginx MIME table through `scripts/project-file-mime.mjs`; normalize browser asset types and fail startup if the table is unavailable. Show directory listings at `/` and do not open `index.html` automatically. Revalidate cached preview assets. Check CSS, JS/MJS, WASM, fonts, nested paths, and missing-file 404 responses through the file tunnel. Use the app tunnel for framework servers and backend routes.
+
+Open Markdown (`.md`, `.markdown`) and shell scripts (`.sh`, `.bash`, `.zsh`, `.fish`) as `text/plain` in the file browser. Preserve browser asset MIME types and binary download types. Verify direct file links and `/omgithub/files/` proxy links after starting a new worker.

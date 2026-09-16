@@ -11,6 +11,18 @@ test('preserves installed types and normalizes browser assets without duplicates
   assert.throws(() => browserMimeTypes(''), /Invalid/)
 })
 
+test('renders Markdown and shell scripts as text while preserving binary types', () => {
+  const output = browserMimeTypes('types { text/markdown md; application/x-sh sh; application/zip zip; application/octet-stream bin; }')
+  for (const ext of ['md', 'markdown', 'sh', 'bash', 'zsh', 'fish', 'txt', 'log']) {
+    assert.ok(output.includes(`text/plain ${ext};`), ext)
+    assert.equal(output.split('\n').filter(line => line.endsWith(` ${ext};`)).length, 1)
+  }
+  assert.ok(output.includes('application/zip zip;'))
+  assert.ok(output.includes('application/octet-stream bin;'))
+  assert.ok(output.includes('text/css css;'))
+  assert.ok(output.includes('text/javascript mjs;'))
+})
+
 test('standalone file server exposes directory listings without automatic index pages', () => {
   const workflow = readFileSync(new URL('../.github/workflows/opencode-reusable.yml', import.meta.url), 'utf8')
   assert.ok(workflow.includes('scripts/project-file-mime.mjs'))

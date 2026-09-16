@@ -11,6 +11,7 @@ export function browserMimeTypes(source) {
     for (const extension of extensions) types.set(extension, mime)
   }
   for (const [mime, extensions] of [
+    ['text/plain', 'txt text log md markdown sh bash zsh fish'],
     ['text/html', 'html htm'], ['text/css', 'css'],
     ['text/javascript', 'js mjs'], ['application/json', 'json map'],
     ['application/wasm', 'wasm'], ['image/svg+xml', 'svg svgz'],
