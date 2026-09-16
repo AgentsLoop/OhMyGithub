@@ -370,3 +370,11 @@ Keep the main build prompt equal to the user request. Run existing startup.sh an
 ## Preserve validation evidence
 
 Exclude `.playwright-cli` output from checkpoint trees and deployment archives. Keep capture screenshots outside source and retain them when deployment fails; remove them after successful delivery. Test healthy-server reuse, stopped-server startup, missing scripts, bounded repairs, fresh PNG output, and continuation cancellation. Treat successful capture as startup-and-capture evidence.
+
+## Separate deployment retries from repairs
+
+Reuse the lifecycle checkpoint when preview preparation returns repaired=false. Save again after successful OC repair. Fetch the checkpoint release by tag; create only after HTTP 404. Run legacy cleanup separately with GITHUB_REPOSITORY and TRIGGER_ISSUE_NUMBER set: bash scripts/cleanup-legacy-checkpoints.sh.
+
+Retry readiness and capture at most three times with bounded backoff. Return startup exit code 75 for a running server that remains unready or an unavailable public tunnel; report an exited startup process as a script failure. Retry capture without restarting the server. Preserve each capture attempt's stdout and stderr outside source. Escalate persistent script failures to OC; surface persistent DNS/network failures directly. Execute repaired scripts and inspect screenshots.
+
+Retry deployment upload using the same archive and generation for transient network failures, HTTP 408/429/500/502/503/504, and explicitly signaled rate limits. Stop on cancellation, superseded generations, and permanent errors. Deploy the server's idempotent upload handler before enabling workflow retries. Test concurrent uploads, lost responses, successful-generation replay after service recreation, capture diagnostics, readiness failures, and cancellation.

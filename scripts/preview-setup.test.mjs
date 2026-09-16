@@ -13,11 +13,11 @@ function fixture(t) {
   const capture = () => {
     for (const name of ['final-desktop.png', 'final-mobile.png']) writeFileSync(join(root, name), png)
   }
-  return { env, evidence: root, capture }
+  return { env, evidence: root, capture, wait: async () => {} }
 }
 test('runs startup and capture directly without OC', async t => {
   const f = fixture(t), calls = []
-  await preparePreview({ ...f, repair: () => assert.fail('unexpected OC'), run: async (file, args, options) => {
+  const result = await preparePreview({ ...f, repair: () => assert.fail('unexpected OC'), run: async (file, args, options) => {
     calls.push(args)
     if (args.length === 1 && args[0].endsWith('/capture.sh')) {
       assert.equal(options.env.CAPTURE_URL, f.env.APP_URL)
@@ -26,11 +26,12 @@ test('runs startup and capture directly without OC', async t => {
     }
   } })
   assert.equal(calls.length, 3)
+  assert.equal(result.repaired, false)
 })
 test('repairs missing startup then reruns scripts', async t => {
   const f = fixture(t)
   let repaired = false, repairs = 0
-  await preparePreview({ ...f, repair: async prompt => {
+  const result = await preparePreview({ ...f, repair: async prompt => {
     repairs++; repaired = true
     assert.match(prompt, /Run every script/)
     assert.match(prompt, /Open and inspect both screenshots/)
@@ -39,6 +40,7 @@ test('repairs missing startup then reruns scripts', async t => {
     if (args.length === 1 && args[0].endsWith('/capture.sh')) f.capture()
   } })
   assert.equal(repairs, 1)
+  assert.equal(result.repaired, true)
 })
 test('rejects stale screenshots and bounds repairs', async t => {
   const f = fixture(t)
@@ -50,5 +52,56 @@ test('rejects stale screenshots and bounds repairs', async t => {
 test('cancellation does not invoke repair', async t => {
   const f = fixture(t), controller = new AbortController()
   await assert.rejects(preparePreview({ ...f, signal: controller.signal, repair: () => assert.fail('repair after abort'),
-    run: async () => { controller.abort(); throw new Error('Cancelled') } }), /Cancelled/)
+    run: async () => { controller.abort(); throw new Error('Cancelled') } }), /Cancelled|aborted/)
+})
+
+test('retries readiness without OC and stops after bounded infrastructure failures', async t => {
+  const f = fixture(t)
+  let starts = 0
+  await assert.rejects(preparePreview({ ...f, repair: () => assert.fail('infrastructure must not invoke OC'),
+    run: async () => { starts++; throw Object.assign(new Error('not ready'), { exitCode: 75 }) }
+  }))
+  assert.equal(starts, 3)
+})
+test('retries capture without restarting the server', async t => {
+  const f = fixture(t)
+  let starts = 0, captures = 0
+  const result = await preparePreview({ ...f, repair: () => assert.fail('unexpected repair'),
+    run: async (file, args) => {
+      if (args[0].endsWith('start-project.sh')) starts++
+      if (args.length === 1 && args[0].endsWith('/capture.sh')) {
+        if (++captures < 3) throw new Error('browser temporarily unavailable')
+        f.capture()
+      }
+    }
+  })
+  assert.equal(starts, 1)
+  assert.equal(captures, 3)
+  assert.equal(result.repaired, false)
+})
+test('includes capture stderr in repair diagnostics', async t => {
+  const f = fixture(t)
+  let repaired = false
+  await preparePreview({ ...f, repair: async prompt => { assert.match(prompt, /capture-specific defect/); repaired = true },
+    run: async (file, args, options) => {
+      if (args.length === 1 && args[0].endsWith('/capture.sh')) {
+        if (!repaired) { writeFileSync(options.stdio[2], 'capture-specific defect\n'); throw new Error('capture failed') }
+        f.capture()
+      }
+    }
+  })
+})
+test('persistent DNS capture errors never invoke OC', async t => {
+  const f = fixture(t)
+  let captures = 0
+  await assert.rejects(preparePreview({ ...f, repair: () => assert.fail('DNS must not invoke repair'),
+    run: async (file, args, options) => {
+      if (args.length === 1 && args[0].endsWith('/capture.sh')) {
+        captures++
+        writeFileSync(options.stdio[2], 'net::ERR_NAME_NOT_RESOLVED')
+        throw new Error('navigation failed')
+      }
+    }
+  }))
+  assert.equal(captures, 3)
 })

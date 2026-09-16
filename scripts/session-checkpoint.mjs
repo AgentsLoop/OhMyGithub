@@ -9,7 +9,7 @@ const digest = value => createHash('sha256').update(value).digest('hex')
 export function command(file, args, options = {}) {
   const start = Date.now()
   try { return (execFileSync(file, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'], ...options }) || '').trim() }
-  catch (error) { throw new Error(`${file} ${args[0] || ''} failed (exit ${error.status ?? 'timeout'}).`) }
+  catch (error) { throw Object.assign(new Error(`${file} ${args[0] || ''} failed (exit ${error.status ?? 'timeout'}).`), { status: Number(String(error.stderr || '').match(/HTTP (\d{3})/)?.[1]) || undefined }) }
   finally { process.stderr.write(`[timing] ${file} ${args[0] || ''}: ${Date.now() - start} ms\n`) }
 }
 // OpenCode can exit before a piped stdout buffer drains. A regular file descriptor
@@ -184,8 +184,8 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     writeFileSync(path, JSON.stringify({ ...metadata, version: 2, generation, interrupted, session_id: sessionId, session_asset: sessionName }), { mode: 0o600 })
     const remote = git('ls-remote', 'origin', `refs/heads/${branch}`).split(/\s/)[0] || ''
     git('push', `--force-with-lease=refs/heads/${branch}:${remote}`, 'origin', `${commit}:refs/heads/${branch}`)
-    const releases = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases?per_page=100`, ['--paginate', '--slurp'])).flat()
-    let release = releases.find(r => r.tag_name === tag)
+    const releasePath = `repos/${env.GITHUB_REPOSITORY}/releases/tags/${tag}`
+    let release = findRelease(releasePath, api)
     if (!release) {
       release = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases`, ['-X', 'POST', '-f', `tag_name=${tag}`, '-f', `target_commitish=${commit}`, '-F', 'draft=true', '-f', `name=Saved session #${issue}`, '-f', 'body=Prepare saved session.']))
       if (!release?.id) throw new Error('Created checkpoint release has no ID.')
@@ -197,9 +197,6 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--draft=false', '--latest=false', '--notes', `Restore saved code and conversation.\n<!-- checkpoint-asset:${manifestName} -->${uploaded.body?.match(/\n<!-- deployment:v1 .*? -->/)?.[0] || ''}`])
     for (const asset of uploaded.assets.filter(a => /^(?:checkpoint|opencode)-.*\.json$/.test(a.name) && ![sessionName, manifestName].includes(a.name))) {
       api(`repos/${env.GITHUB_REPOSITORY}/releases/assets/${asset.id}`, ['-X', 'DELETE'])
-    }
-    for (const old of releases.filter(r => r.tag_name.startsWith(`${tag}-`))) {
-      command('gh', ['release', 'delete', old.tag_name, '--repo', env.GITHUB_REPOSITORY, '--yes', '--cleanup-tag'])
     }
     const state = { fingerprint, tag, commit, generation, sessionId, manifestName }
     writeFileSync(stateFile, JSON.stringify(state), { mode: 0o600 })
@@ -215,4 +212,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     else if (mode === 'shutdown') saveCheckpoint({ interrupted: true })
     else throw new Error('Use prepare, restore, save, or shutdown.')
   } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1 }
+}
+
+export function findRelease(path, request) {
+  try { return JSON.parse(request(path)) }
+  catch (error) { if (error.status === 404) return null; throw error }
 }

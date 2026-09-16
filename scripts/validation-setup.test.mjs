@@ -14,3 +14,16 @@ test('script preparation precedes checkpoint replacement and publication', () =>
   assert.doesNotMatch(source, /assertSource|validation\.json.*passed|RESTART_APP/)
   assert.doesNotMatch(read('./session-lifecycle.mjs'), /--session.*mainID\(\)/)
 })
+test('second checkpoint is conditional on repair', () => {
+  const source = read('./session-deploy.mjs')
+  assert.match(source, /const \{ repaired \} = await preparePreview/)
+  assert.match(source, /if \(repaired\) \{\s*await child\(process.execPath/)
+  const block = source.slice(source.indexOf('  if (repaired)'), source.indexOf('  const marker'))
+  assert.match(block, /CHECKPOINT_COMMIT = updated.commit/)
+  assert.match(block, /CHECKPOINT_GENERATION = updated.generation/)
+})
+test('checkpoint path does not paginate or delete legacy releases', () => {
+  const source = read('./session-checkpoint.mjs')
+  assert.match(source, /releases\/tags\//)
+  assert.doesNotMatch(source, /--paginate|release', 'delete'/)
+})

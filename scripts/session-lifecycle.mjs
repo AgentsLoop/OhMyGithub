@@ -59,7 +59,7 @@ export function child(file, args, { signal, ...options } = {}) {
       clearTimeout(forced); signal?.removeEventListener('abort', abort)
       process.stderr.write(`[timing] ${file}: ${Date.now() - started} ms\n`)
       if (signal?.aborted) reject(new Error('Cancelled'))
-      else if (code !== 0) reject(new Error(`${file} exited ${code}`))
+      else if (code !== 0) reject(Object.assign(new Error(`${file} exited ${code}`), { exitCode: code }))
       else resolve()
     })
   })

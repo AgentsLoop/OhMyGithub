@@ -20,9 +20,10 @@ for ((attempt=0; attempt<30; attempt++)); do
     ready=true
     break
   fi
+  /usr/bin/time -p tmux has-session -t app-server 2>/dev/null || { echo 'Startup process exited. Inspect app.log.' >&2; exit 1; }
   /usr/bin/time -p sleep 2
 done
-[[ "$ready" == true ]] || { echo 'Local startup failed. Inspect app.log.' >&2; exit 1; }
+[[ "$ready" == true ]] || { echo 'Local startup failed. Inspect app.log.' >&2; exit 75; }
 for ((attempt=0; attempt<12; attempt++)); do
   if /usr/bin/time -p curl --fail --silent --max-time 10 "$APP_URL" >/dev/null; then
     echo 'Local and public preview are ready.'
@@ -31,4 +32,4 @@ for ((attempt=0; attempt<12; attempt++)); do
   /usr/bin/time -p sleep 2
 done
 echo 'Public preview did not become ready.' >&2
-exit 1
+exit 75

@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { join } from 'node:path'
 import { command } from './session-checkpoint.mjs'
 import { preparePreview } from './preview-setup.mjs'
+import { uploadDeployment } from './deployment-retry.mjs'
 import { child } from './session-lifecycle.mjs'
 
 const env = process.env
@@ -28,11 +29,13 @@ try {
     }
     await child(env.OPENCODE_BIN || join(env.HOME, '.opencode/bin/opencode'), ['run', '--auto', '--dangerously-skip-permissions', '--attach', base, '--dir', project, '--session', fork.id, '--model', readFileSync(join(env.OPENCODE_WEB_DIR, 'main-model'), 'utf8').trim(), prompt], { signal: controller.signal, cwd: project })
   }
-  await preparePreview({ env, evidence, signal: controller.signal, repair: runFork })
-  await child(process.execPath, [join(env.RUNTIME_DIR, 'scripts/session-checkpoint.mjs'), 'save'], { signal: controller.signal })
-  const updated = JSON.parse(readFileSync(join(env.OPENCODE_WEB_DIR, 'checkpoint-state.json'), 'utf8'))
-  env.CHECKPOINT_COMMIT = updated.commit
-  env.CHECKPOINT_GENERATION = updated.generation
+  const { repaired } = await preparePreview({ env, evidence, signal: controller.signal, repair: runFork })
+  if (repaired) {
+    await child(process.execPath, [join(env.RUNTIME_DIR, 'scripts/session-checkpoint.mjs'), 'save'], { signal: controller.signal })
+    const updated = JSON.parse(readFileSync(join(env.OPENCODE_WEB_DIR, 'checkpoint-state.json'), 'utf8'))
+    env.CHECKPOINT_COMMIT = updated.commit
+    env.CHECKPOINT_GENERATION = updated.generation
+  }
   const marker = join(env.OPENCODE_WEB_DIR, 'live-preview-url')
   let advertised = ''
   try { advertised = readFileSync(marker, 'utf8') } catch {}
@@ -61,12 +64,10 @@ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
   if name.startswith('final-') and os.path.isfile(p): z.write(p,'screenshots/'+name)`, project, archive, evidence])
   if (controller.signal.aborted) throw new Error('Cancelled')
   const site = env.OMGITHUB_ORIGIN || 'https://omgithub.com'
-  const response = await fetch(`${site}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/deployment`, { method: 'POST', headers: {
+  const deployed = await uploadDeployment(`${site}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/deployment`, { method: 'POST', headers: {
     authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'content-type': 'application/zip', 'x-omgithub-run': env.GITHUB_RUN_ID,
     'x-omgithub-generation': env.DEPLOYMENT_GENERATION, 'x-omgithub-commit': env.CHECKPOINT_COMMIT
   }, body: readFileSync(archive), signal: controller.signal })
-  if (!response.ok) throw new Error(`Deployment HTTP ${response.status}: ${await response.text()}`)
-  const deployed = await response.json()
   if (controller.signal.aborted) throw new Error('Cancelled')
   const tag = `opencode-checkpoint-${env.TRIGGER_ISSUE_NUMBER}`
   const assets = screenshots.map(name => {
