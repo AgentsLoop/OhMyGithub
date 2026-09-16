@@ -33,10 +33,10 @@ test('repairs missing startup then reruns scripts', async t => {
   let repaired = false, repairs = 0
   const result = await preparePreview({ ...f, repair: async prompt => {
     repairs++; repaired = true
-    assert.match(prompt, /Run every script/)
+    assert.match(prompt, /Run every start/)
     assert.match(prompt, /Open and inspect both screenshots/)
   }, run: async (file, args) => {
-    if (!repaired) throw new Error('missing startup.sh')
+    if (!repaired) throw new Error('missing start.sh')
     if (args.length === 1 && args[0].endsWith('/capture.sh')) f.capture()
   } })
   assert.equal(repairs, 1)

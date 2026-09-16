@@ -42,7 +42,7 @@ test('keeps checkpoints on main and starts restored preview before model executi
 });
 test('asks OpenCode to generate and test the portable startup script during verification', () => {
   const prompt = readFileSync(new URL('../.github/prompts/02-verify.md', import.meta.url), 'utf8');
-  assert.match(prompt, /Generate `startup.sh`/);
+  assert.match(prompt, /Generate `start.sh`/);
   assert.match(prompt, /no installed project dependencies/);
 });
 

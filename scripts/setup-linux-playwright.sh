@@ -4,7 +4,7 @@ runtime="$HOME/.local/share/omgithub-playwright"
 /usr/bin/time -p mkdir -p "$runtime"
 /usr/bin/time -p sudo -n apt-get update
 /usr/bin/time -p sudo -n apt-get install -y mesa-vulkan-drivers vulkan-tools xvfb xauth
-/usr/bin/time -p npm install --prefix "$runtime" --no-save --no-package-lock @playwright/cli@0.1.19
+/usr/bin/time -p npm install --prefix "$runtime" --no-save --no-package-lock @playwright/cli@0.1.19 playwright
 /usr/bin/time -p "$runtime/node_modules/.bin/playwright" install --with-deps chromium
 /usr/bin/time -p tee "$runtime/linux.json" >/dev/null <<'JSON'
 {

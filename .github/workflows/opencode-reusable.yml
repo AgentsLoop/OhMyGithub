@@ -964,6 +964,16 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: /usr/bin/time -p node "$RUNTIME_DIR/scripts/session-checkpoint.mjs" restore
 
+      - name: Initialize project worker
+        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p node "$RUNTIME_DIR/scripts/provision-project.mjs"
+          /usr/bin/time -p bash -n startup.sh
+          /usr/bin/time -p bash startup.sh
+
       - name: Publish restored workspace
         if: env.RESUME_SESSION_ID != '' && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
@@ -996,8 +1006,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
-          if [[ ! -f startup.sh ]]; then
-            echo 'Saved project has no startup.sh. Run verification after the user request.'
+          if [[ ! -f start.sh ]]; then
+            echo 'Saved project has no start.sh. Run verification after the user request.'
             echo 'RESUME_STARTUP_STATUS=missing' >> "$GITHUB_ENV"
           elif /usr/bin/time -p bash "$RUNTIME_DIR/scripts/start-project.sh"; then
             echo 'RESUME_STARTUP_STATUS=ready' >> "$GITHUB_ENV"

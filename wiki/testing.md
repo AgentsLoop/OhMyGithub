@@ -365,7 +365,7 @@ Start the main workspace with `scripts/start-project.sh` after checkpointing a c
 
 ## Check validation setup ownership
 
-Keep the main build prompt equal to the user request. Run existing startup.sh and capture.sh directly. Create a repair fork only after startup or capture fails. Require that fork to execute changed scripts, check readiness, and inspect desktop/mobile screenshots. Save repaired scripts with the main session export. Read new draft release IDs directly from the creation response. Retry tunnel startup at most three times and route files through the working control tunnel when the dedicated file tunnel fails.
+Keep the main build prompt equal to the user request. Run existing start.sh and capture.sh directly. Create a repair fork only after startup or capture fails. Require that fork to execute changed scripts, check readiness, and inspect desktop/mobile screenshots. Save repaired scripts with the main session export. Read new draft release IDs directly from the creation response. Retry tunnel startup at most three times and route files through the working control tunnel when the dedicated file tunnel fails.
 
 ## Preserve validation evidence
 

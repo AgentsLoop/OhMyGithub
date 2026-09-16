@@ -11,7 +11,7 @@ function run(t, mode, script = 'exit 0\n', restart = false) {
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const bin = join(root, 'bin')
   mkdirSync(bin)
-  if (script !== null) writeFileSync(join(root, 'startup.sh'), script)
+  if (script !== null) writeFileSync(join(root, 'start.sh'), script)
   writeFileSync(join(root, 'calls'), '')
   const stub = (name, body) => writeFileSync(join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 })
   stub('sleep', 'exit 0')
@@ -24,7 +24,7 @@ function run(t, mode, script = 'exit 0\n', restart = false) {
   `)
   const result = spawnSync('bash', [fileURLToPath(new URL('./start-project.sh', import.meta.url))], {
     encoding: 'utf8', timeout: 20000,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, PROJECT_DIR: root, OPENCODE_WEB_DIR: root, APP_URL: 'https://public.test', APP_PORT: '3000', TEST_MODE: mode, RESTART_APP: String(restart) }
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, PROJECT_DIR: root, RUNTIME_DIR: root, OPENCODE_WEB_DIR: root, APP_URL: 'https://public.test', APP_PORT: '3000', TEST_MODE: mode, RESTART_APP: String(restart) }
   })
   return { ...result, calls: readFileSync(join(root, 'calls'), 'utf8') }
 }
