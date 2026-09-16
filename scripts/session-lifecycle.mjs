@@ -1,3 +1,4 @@
+import { registerRun } from './run-record.mjs'
 import { createServer, request as httpRequest } from 'node:http'
 import { connect } from 'node:net'
 import { spawn } from 'node:child_process'
@@ -81,7 +82,7 @@ async function serve() {
       return JSON.parse(readFileSync(join(directory, 'checkpoint-state.json'), 'utf8'))
     },
     deploy: async ({ checkpoint, messageID, generation, signal }) => {
-      const appURL = readFileSync(join(directory, 'app-cloudflared.log'), 'utf8').match(/https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com/)?.[0]
+      const appURL = readFileSync(join(directory, 'app-url'), 'utf8').trim()
       if (!appURL) throw new Error('Preview failed: app tunnel unavailable')
       await child(process.execPath, [join(env.RUNTIME_DIR, 'scripts/session-deploy.mjs')], { signal, env: { ...env, APP_URL: appURL, CHECKPOINT_COMMIT: checkpoint.commit, CHECKPOINT_GENERATION: checkpoint.generation, MAIN_MESSAGE_ID: messageID, DEPLOYMENT_GENERATION: String(generation) } })
     },
@@ -95,7 +96,7 @@ async function serve() {
       }
       if (!lifecycle.stopping) {
         const response = await fetch(`${env.OMGITHUB_ORIGIN || 'https://omgithub.com'}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/deployment`, {
-          method: 'POST', headers: { authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'x-omgithub-run': env.GITHUB_RUN_ID, 'x-omgithub-generation': String(generation), 'x-omgithub-state': state, 'x-omgithub-error': encodeURIComponent(error).slice(0, 1000) }, signal: AbortSignal.timeout(30000)
+          method: 'POST', headers: { authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'x-omgithub-run': env.GITHUB_RUN_ID, 'x-omgithub-attempt': env.GITHUB_RUN_ATTEMPT || '1', 'x-omgithub-generation': String(generation), 'x-omgithub-state': state, 'x-omgithub-error': encodeURIComponent(error).slice(0, 1000) }, signal: AbortSignal.timeout(30000)
         })
         if (!response.ok) throw new Error(`Deployment registration HTTP ${response.status}`)
       }
@@ -120,7 +121,13 @@ async function serve() {
         if (!port) throw new Error('File server unavailable')
         targetURL = `http://127.0.0.1:${port}/${req.url.slice('/omgithub/files/'.length)}`
       }
-      const target = httpRequest(targetURL, { method: req.method, headers: req.headers }, reply => { res.writeHead(reply.statusCode, reply.headers); reply.pipe(res) })
+      const target = httpRequest(targetURL, { method: req.method, headers: req.headers }, reply => {
+        if (req.url.startsWith('/omgithub/files/') && reply.headers.location) {
+          const location = new URL(reply.headers.location, targetURL)
+          reply.headers.location = '/omgithub/files' + location.pathname + location.search
+        }
+        res.writeHead(reply.statusCode, reply.headers); reply.pipe(res)
+      })
       target.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
       req.pipe(target)
     } catch { res.writeHead(503); res.end('Deployment controller unavailable') }
@@ -133,10 +140,20 @@ async function serve() {
     remote.on('error', () => socket.destroy()); socket.on('error', () => remote.destroy())
   })
   await new Promise(resolve => proxy.listen(Number(env.OPENCODE_CONTROL_PORT), '127.0.0.1', resolve))
+  let registering = false
+  const heartbeat = async state => {
+    if (registering) return
+    registering = true
+    try { await registerRun(env, state) } catch (error) { console.error(error.message) }
+    finally { registering = false }
+  }
+  await heartbeat()
+  const heartbeatTimer = setInterval(() => void heartbeat(), 30000)
   let stopping = false
   for (const name of ['SIGTERM', 'SIGINT']) process.once(name, () => {
     stopping = true
-    lifecycle.shutdown().catch(console.error).finally(() => process.exit())
+    clearInterval(heartbeatTimer)
+    lifecycle.shutdown().catch(console.error).finally(async () => { await registerRun(env, 'ended').catch(console.error); process.exit() })
   })
   async function reconcile() {
     const id = mainID()

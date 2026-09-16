@@ -7,7 +7,10 @@ PORT="${APP_PORT:-3000}"
 export PORT
 /usr/bin/time -p test -f start.sh
 /usr/bin/time -p bash -n start.sh
-if [[ "${RESTART_APP:-false}" == true ]] || ! /usr/bin/time -p curl --fail --silent --max-time 3 "http://127.0.0.1:$PORT/" >/dev/null; then
+current_commit="${CHECKPOINT_COMMIT:-}"
+previous_commit=""
+[[ ! -f "$OPENCODE_WEB_DIR/served-commit" ]] || previous_commit="$(/usr/bin/time -p cat "$OPENCODE_WEB_DIR/served-commit")"
+if [[ "${RESTART_APP:-false}" == true || ( -n "$current_commit" && "$previous_commit" != "$current_commit" ) ]] || ! /usr/bin/time -p curl --fail --silent --max-time 3 "http://127.0.0.1:$PORT/" >/dev/null; then
   /usr/bin/time -p tmux kill-session -t app-server 2>/dev/null || true
   # Pass paths through tmux's environment; keep the script in the foreground.
   /usr/bin/time -p tmux new-session -d -s app-server -c "$PROJECT_DIR" \
@@ -26,6 +29,7 @@ done
 [[ "$ready" == true ]] || { echo 'Local startup failed. Inspect app.log.' >&2; exit 75; }
 for ((attempt=0; attempt<12; attempt++)); do
   if /usr/bin/time -p curl --fail --silent --max-time 10 "$APP_URL" >/dev/null; then
+    printf '%s' "$current_commit" > "$OPENCODE_WEB_DIR/served-commit"
     echo 'Local and public preview are ready.'
     exit 0
   fi

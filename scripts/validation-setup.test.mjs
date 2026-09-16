@@ -27,3 +27,11 @@ test('checkpoint path does not paginate or delete legacy releases', () => {
   assert.match(source, /releases\/tags\//)
   assert.doesNotMatch(source, /--paginate|release', 'delete'/)
 })
+test('packages declared output and isolates reporting failure from deployment success', () => {
+  const source = read('./session-deploy.mjs')
+  assert.match(source, /deployment-output.json/)
+  assert.doesNotMatch(source, /root=os.path.join\(root,'dist'\)/)
+  assert.match(source, /Release synchronization failed/)
+  assert.match(source, /deployment-result.json/)
+  assert.match(source, /sync: 'failed'/)
+})

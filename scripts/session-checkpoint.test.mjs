@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process'
 import { parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore, exportSession, portableSession } from './session-checkpoint.mjs'
 const session = { info: { id: 'ses_checkpoint', directory: '/old/project' }, messages: [{ info: { id: 'msg_one', role: 'user' }, parts: [{ id: 'prt_one', type: 'text', text: 'Build a castle' }] }] }
 const source = { source_repository: 'alice/game', source_issue: 6 }
-const base = { version: 1, repository: 'alice/game', issue_number: 6, run_id: 123, commit: 'a'.repeat(40), branch: 'opencode-checkpoints/6', project_dir: '', opencode_version: '1.2.3', session, public_history: true }
+const base = { version: 2, repository: 'alice/game', issue_number: 6, run_id: 123, commit: 'a'.repeat(40), branch: 'opencode-checkpoints/6', project_dir: '', opencode_version: '1.2.3', session, public_history: true }
 test('requires a complete versioned checkpoint and rejects legacy data', () => {
   assert.equal(validateCheckpoint(base, source), base)
   for (const patch of [{ version: 0 }, { session: {} }, { repository: 'other/game' }, { project_dir: '../outside' }, { opencode_version: 'latest' }, { public_history: false }]) assert.throws(() => validateCheckpoint({ ...base, ...patch }, source), /complete/)

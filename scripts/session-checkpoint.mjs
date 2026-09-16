@@ -37,7 +37,7 @@ export function parseResume(request) {
   return { ...source, prompt: String(request).replace(matches[0][0], '').replace(/<!-- omgithub-resume-request:[a-f0-9]+ -->/g, '').replace(/^Continue from https:\/\/github\.com\/[^\n]+\n?/gm, '').trim() }
 }
 export function validateCheckpoint(c, source) {
-  if (!(c?.version === 1 && c.repository?.toLowerCase() === source.source_repository.toLowerCase() && c.issue_number === source.source_issue &&
+  if (!(c?.version === 2 && c.repository?.toLowerCase() === source.source_repository.toLowerCase() && c.issue_number === source.source_issue &&
       Number.isSafeInteger(c.run_id) && c.run_id > 0 && /^[a-f0-9]{40}$/.test(c.commit) && /^opencode-checkpoints\/[1-9]\d*$/.test(c.branch) &&
       typeof c.project_dir === 'string' && !c.project_dir.startsWith('/') && !c.project_dir.includes('\\') && !/[\r\n\0]/.test(c.project_dir) && !c.project_dir.split('/').includes('..') &&
       /^\d+\.\d+\.\d+$/.test(c.opencode_version) && c.public_history === true && /^ses_[a-zA-Z0-9]+$/.test(c.session?.info?.id || '') &&
@@ -89,18 +89,17 @@ export function prepare() {
   const repository = JSON.parse(api(`repos/${source.source_repository}`))
   if (repository.private) throw new Error('Only public checkpoints can be copied.')
   const release = JSON.parse(api(`repos/${source.source_repository}/releases/tags/${source.checkpoint_tag}`))
-  const manifestName = release.body?.match(/<!-- checkpoint-asset:([^ ]+) -->/)?.[1] || 'checkpoint.json'
+  const manifestName = release.body?.match(/<!-- checkpoint-asset:([^ ]+) -->/)?.[1]
   const asset = release.assets?.find(a => a.name === manifestName && a.state === 'uploaded' && a.size > 0 && a.size <= 25 * 1024 * 1024)
   if (release.draft || !asset) throw new Error('No complete saved session is available.')
   const payload = JSON.parse(api(`repos/${source.source_repository}/releases/assets/${asset.id}`, ['-H', 'Accept: application/octet-stream']))
-  if (![1, 2].includes(payload.version)) throw new Error('Unsupported checkpoint version.')
-  if (payload.version === 2) {
+  if (payload.version !== 2) throw new Error('Unsupported checkpoint version.')
+  {
     const sessionAsset = release.assets?.find(a => a.name === payload.session_asset && a.state === 'uploaded')
     if (!sessionAsset) throw new Error('Missing conversation asset.')
     payload.session = JSON.parse(api(`repos/${source.source_repository}/releases/assets/${sessionAsset.id}`, ['-H', 'Accept: application/octet-stream']))
   }
-  const checkpoint = validateCheckpoint({ ...payload, version: 1 }, source)
-  if (payload.version !== 2 && (release.target_commitish !== checkpoint.commit || !source.checkpoint_tag.startsWith(`opencode-checkpoint-${source.source_issue}-${checkpoint.run_id}-`))) throw new Error('Checkpoint release does not match saved code.')
+  const checkpoint = validateCheckpoint(payload, source)
   if (source.source_commit && source.source_commit !== checkpoint.commit) throw new Error('The selected checkpoint has been replaced. Select the current saved version.')
   command('git', ['fetch', '--no-tags', `https://github.com/${source.source_repository}.git`, checkpoint.commit], { cwd: env.GITHUB_WORKSPACE })
   // Preparation has already selected the compatible caller. Restore code before installing runtime-only files.
@@ -168,7 +167,7 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     if (previous?.fingerprint === fingerprint) return previous
     const parent = git('rev-parse', 'HEAD')
     const commit = git('commit-tree', tree, '-p', parent, '-m', `Save game and conversation for issue #${issue}\n\nRun: ${run}`)
-    const checkpoint = validateCheckpoint({ version: 1, repository: env.GITHUB_REPOSITORY, issue_number: issue, run_id: run, commit, branch,
+    const checkpoint = validateCheckpoint({ version: 2, repository: env.GITHUB_REPOSITORY, issue_number: issue, run_id: run, commit, branch,
       project_dir: projectDir, opencode_version: version, session, public_history: true, created_at: new Date().toISOString() }, source)
     const repository = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}`))
     if (repository.private) throw new Error('Public session checkpoints require a public repository.')

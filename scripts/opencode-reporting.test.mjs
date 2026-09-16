@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 const workflow = readFileSync(new URL('../.github/workflows/opencode-reusable.yml', import.meta.url), 'utf8');
 test('all tunnel parsers ignore API errors and select ready-box URLs', () => {
   const parsers = [...workflow.matchAll(/sed -nE '([^']+)'/g)].map(m => m[1]).filter(s => s.includes('trycloudflare'));
-  assert.equal(parsers.length, 3);
+  assert.equal(parsers.length, 2);
   for (const parser of parsers) {
     assert.equal(execFileSync('sed', ['-nE', parser], { input: 'ERR https://api.trycloudflare.com/tunnel\nINF | https://worker-name.trycloudflare.com |\n', encoding: 'utf8' }).trim(), 'https://worker-name.trycloudflare.com');
   }

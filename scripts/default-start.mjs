@@ -17,6 +17,7 @@ export function projectType(root) {
 }
 export async function start(root = process.cwd()) {
   const type = projectType(root)
+  const projectRoot = resolve(root)
   if (type === 'vite') {
     const stampDir = process.env.OPENCODE_WEB_DIR || join(root, 'node_modules', '.cache')
     mkdirSync(stampDir, { recursive: true })
@@ -35,6 +36,7 @@ export async function start(root = process.cwd()) {
     root = join(root, 'dist')
   }
   if (!existsSync(join(root, 'index.html'))) throw new Error('Static deployment output must contain index.html.')
+  if (process.env.OPENCODE_WEB_DIR) writeFileSync(join(process.env.OPENCODE_WEB_DIR, 'deployment-output.json'), JSON.stringify({ project: projectRoot, directory: resolve(root) }))
   const mime = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.json':'application/json', '.svg':'image/svg+xml', '.png':'image/png', '.jpg':'image/jpeg', '.webp':'image/webp', '.wasm':'application/wasm', '.glb':'model/gltf-binary' }
   const server = createServer((req, res) => {
     try {

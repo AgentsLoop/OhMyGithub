@@ -216,7 +216,6 @@ jobs:
           set -euo pipefail
           install -d "$PROJECT_DIR"
           template_dir="$RUNTIME_DIR/.github/templates"
-          [[ -d "$template_dir" ]] || template_dir="$RUNTIME_DIR/templates"
           base_template="$template_dir/agents.template.md"
           echo "Loading worker templates from $template_dir for labels: $LABELS_JSON"
           [[ -f "$base_template" ]] || { echo "Missing worker base template: $base_template" >&2; exit 1; }
@@ -819,18 +818,14 @@ jobs:
           nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$OPENCODE_CONTROL_PORT" \
             > "$OPENCODE_WEB_DIR/cloudflared.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/cloudflared.pid"
-          nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$PROJECT_FILE_PORT" \
-            > "$OPENCODE_WEB_DIR/project-cloudflared.log" 2>&1 &
-          echo $! > "$OPENCODE_WEB_DIR/project-cloudflared.pid"
           nohup "$OPENCODE_WEB_DIR/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$APP_PORT" \
             > "$OPENCODE_WEB_DIR/app-cloudflared.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/app-cloudflared.pid"
-          web_retries=0; project_retries=0; app_retries=0
+          web_retries=0; app_retries=0
           for _ in {1..90}; do
-            for tunnel in web project app; do
+            for tunnel in web app; do
               case "$tunnel" in
                 web) prefix="cloudflared"; port="$OPENCODE_CONTROL_PORT"; retries="$web_retries" ;;
-                project) prefix="project-cloudflared"; port="$PROJECT_FILE_PORT"; retries="$project_retries" ;;
                 app) prefix="app-cloudflared"; port="$APP_PORT"; retries="$app_retries" ;;
               esac
               if ! kill -0 "$(cat "$OPENCODE_WEB_DIR/$prefix.pid")" 2>/dev/null && [[ "$retries" -lt 2 ]]; then
@@ -839,18 +834,19 @@ jobs:
                 printf '%s\n' "$!" > "$OPENCODE_WEB_DIR/$prefix.pid"
                 case "$tunnel" in
                   web) web_retries=$((web_retries + 1)) ;;
-                  project) project_retries=$((project_retries + 1)) ;;
                   app) app_retries=$((app_retries + 1)) ;;
                 esac
               fi
             done
             WEB_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/cloudflared.log" | head -n 1)"
-            PROJECT_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/project-cloudflared.log" | head -n 1)"
             APP_URL="$(sed -nE 's#^[^|]*\|[[:space:]]*(https://[a-z0-9-]+\.trycloudflare\.com)[[:space:]]*\|.*$#\1#p' "$OPENCODE_WEB_DIR/app-cloudflared.log" | head -n 1)"
-            [[ -n "$WEB_URL" && -n "$PROJECT_URL" && -n "$APP_URL" ]] && break
+            [[ -n "$WEB_URL" && -n "$APP_URL" ]] && break
             sleep 1
           done
-          [[ -n "$PROJECT_URL" || -z "$WEB_URL" ]] || PROJECT_URL="$WEB_URL/omgithub/files/"
+          PROJECT_URL="$WEB_URL/omgithub/files/"
+          printf '%s' "$WEB_URL" > "$OPENCODE_WEB_DIR/web-url"
+          printf '%s' "$APP_URL" > "$OPENCODE_WEB_DIR/app-url"
+          /usr/bin/time -p node "$RUNTIME_DIR/scripts/run-record.mjs" starting
           echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
           printf 'url=%s\nproject_url=%s\n' "$WEB_URL" "$PROJECT_URL" >> "$GITHUB_OUTPUT"
           [[ -n "${WEB_URL:-}" && -n "${PROJECT_URL:-}" && -n "${APP_URL:-}" ]] || { echo '::error::A preview tunnel failed after three attempts.'; exit 1; }
@@ -985,16 +981,9 @@ jobs:
           script: |
             const fs = require('node:fs');
             const path = require('node:path');
-            const saved = JSON.parse(fs.readFileSync(process.env.RESUME_CHECKPOINT_FILE, 'utf8'));
-            const shotsDir = path.join(process.env.PROJECT_DIR, 'screenshots');
-            const shots = fs.existsSync(shotsDir)
-              ? fs.readdirSync(shotsDir).filter(name => /^final-.*\.(png|jpe?g|webp)$/i.test(name)) : [];
-            const rawRoot = `https://raw.githubusercontent.com/${saved.repository}/${saved.commit}`;
-            const projectPath = saved.project_dir ? `/${saved.project_dir.split('/').map(encodeURIComponent).join('/')}` : '';
             const body = [
               `OpenCode Web UI: ${process.env.OPENCODE_WEB_URL}/${Buffer.from(process.env.PROJECT_DIR).toString('base64url')}/session/${process.env.RESUME_SESSION_ID}`,
-              `Project files: ${process.env.PROJECT_FILE_URL}`,
-              ...shots.map(name => `![Previous screenshot](${rawRoot}${projectPath}/screenshots/${encodeURIComponent(name)})`)
+              `Project files: ${process.env.PROJECT_FILE_URL}`
             ].join('\n');
             await github.rest.issues.createComment({ owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER), body });
@@ -1114,6 +1103,7 @@ jobs:
           done
           [[ "$SESSION_ID" == ses_* ]]
           /usr/bin/time -p printf '%s\n' "$SESSION_ID" > "$OPENCODE_WEB_DIR/checkpoint-session-id"
+          /usr/bin/time -p node "$RUNTIME_DIR/scripts/run-record.mjs" live
           /usr/bin/time -p curl --fail --silent "http://127.0.0.1:$OPENCODE_CONTROL_PORT/omgithub/reconcile"
           DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')"
           printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
@@ -1393,64 +1383,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Post final game report
-        if: success() && env.TEST_REQUEST == 'true' && env.SSH_ONLY_REQUEST != 'true'
-        uses: actions/github-script@v7
-        env:
-          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
-          FINAL_COMMIT: ${{ steps.delivery.outputs.commit }}
-          SCREENSHOTS_JSON: ${{ steps.mock_project.outputs.screenshots_json }}
-          PROJECT_PATH: ${{ env.PROJECT_PATH }}
-          OPENCODE_RELEASE_URL: ${{ steps.opencode_release.outputs.url }}
-          OPENCODE_RELEASE_ASSETS: ${{ steps.opencode_release.outputs.assets_json }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
-            const branchUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/tree/${process.env.BRANCH_NAME.split('/').map(encodeURIComponent).join('/')}`;
-            const screenshots = JSON.parse(process.env.SCREENSHOTS_JSON || '[]');
-            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
-            const projectPath = process.env.PROJECT_PATH.replace(/^\.\//, '').replace(/\/$/, '');
-            const namedPath = [process.env.BRANCH_NAME, projectPath === '.' ? '' : projectPath]
-              .filter(Boolean)
-              .flatMap((part) => part.split('/'))
-              .map(encodeURIComponent)
-              .join('/');
-            const projectUrl = `https://omgithub.com/${process.env.TARGET_REPOSITORY}/tree/${namedPath}`;
-            const releaseAssets = JSON.parse(process.env.OPENCODE_RELEASE_ASSETS || '[]');
-            const assetUrls = new Map(releaseAssets.map((asset) => [asset.name, asset.url]));
-            const images = screenshots
-              .filter((name) => assetUrls.has(name))
-              .map((name) => `![Final game screenshot: ${name}](${assetUrls.get(name)})`);
-            const body = renderTemplate('opencode-final-report.md', {
-              PROJECT_URL: projectUrl,
-              APP_URL: process.env.APP_URL || '',
-              FILES_URL: process.env.PROJECT_FILE_URL || '',
-              BRANCH_NAME: process.env.BRANCH_NAME,
-              BRANCH_URL: branchUrl,
-              RELEASE_URL: process.env.OPENCODE_RELEASE_URL,
-              IMAGES: images.join('\n')
-            });
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: process.env.TARGET_OWNER,
-              repo: process.env.TARGET_REPO,
-              issue_number: number,
-              per_page: 100
-            });
-            const liveComment = comments.find((comment) =>
-              typeof comment.body === 'string' &&
-              comment.body.includes('🟡 **OpenCode progress (live)**')
-            );
-            if (!liveComment) {
-              throw new Error('Could not find the first OpenCode live-progress comment to update.');
-            }
-            await github.rest.issues.updateComment({
-              owner: process.env.TARGET_OWNER,
-              repo: process.env.TARGET_REPO,
-              comment_id: liveComment.id,
-              body: `${liveComment.body.trim()}\n\n${body}`
-            });
-
       - name: Mark issue complete
         if: success() && env.TEST_REQUEST == 'true' && env.SSH_ONLY_REQUEST != 'true'
         continue-on-error: true
@@ -1525,7 +1457,7 @@ jobs:
         shell: bash
         run: sleep 18000
 
-      - name: Save final game checkpoint
+      - name: Stop lifecycle controller
         if: always() && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && steps.opencode_run.outcome == 'success'
         shell: bash
         run: |
@@ -1538,7 +1470,7 @@ jobs:
             done
             exit 1
           fi
-          /usr/bin/time -p node "$RUNTIME_DIR/scripts/session-checkpoint.mjs" shutdown
+          echo 'Lifecycle controller was not started.'
 
       - name: Append SSH session closed
         if: always() && env.AGENTSWEB_SSH_ENABLED == 'true' && steps.agentsweb.outcome == 'success' && (steps.agentsweb.outputs.comment_id != '' || steps.access_comment.outputs.comment_id != '' || steps.ssh_access_comment.outputs.comment_id != '')
@@ -1563,7 +1495,6 @@ jobs:
           set +e
           [[ -f "$OPENCODE_WEB_DIR/lifecycle.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/lifecycle.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/cloudflared.pid")" 2>/dev/null || true
-          [[ -f "$OPENCODE_WEB_DIR/project-cloudflared.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/project-cloudflared.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/nginx/nginx.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/nginx/nginx.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode.pid")" 2>/dev/null || true
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.pid" ]] && kill "$(cat "$OPENCODE_WEB_DIR/opencode-run.pid")" 2>/dev/null || true

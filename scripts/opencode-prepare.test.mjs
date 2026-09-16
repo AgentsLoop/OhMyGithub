@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { prepareRequest, outputText } from './opencode-prepare.mjs';
 
 function fixture(options = {}) {
-  const issue = { id: 420, number: 42, title: 'Build a game branch: feature', body: 'Make it playable\nKeep controls simple.', state: 'open', user: { login: 'visitor', id: 7, type: 'User' }, labels: [{ name: 'OpenCode' }, { name: 'test' }], created_at: '2026-09-09T01:00:00Z', updated_at: '2026-09-09T01:00:10Z' };
+  const issue = { id: 420, number: 42, title: 'Build a game', body: 'Make it playable\nKeep controls simple.\n\n<!-- omgithub-request:v1 {"branch":"feature"} -->', state: 'open', user: { login: 'visitor', id: 7, type: 'User' }, labels: [{ name: 'OpenCode' }, { name: 'test' }], created_at: '2026-09-09T01:00:00Z', updated_at: '2026-09-09T01:00:10Z' };
   const event = { action: 'labeled', label: { name: 'OpenCode' }, issue, repository: { full_name: 'owner/repo' }, sender: { id: 7 } };
   const env = { GITHUB_REPOSITORY: 'owner/repo', GITHUB_EVENT_NAME: 'issues', GITHUB_RUN_ID: '100', GITHUB_RUN_ATTEMPT: '1', GITHUB_REF: 'refs/heads/main', GH_TOKEN: 'repository-token', ...options.env };
   const state = { current: structuredClone(issue), comments: [], runs: { '100/attempts/1': { id: 100, event: 'issues', status: 'in_progress', created_at: '2026-09-09T01:00:11Z' } }, branch: 'a'.repeat(40), calls: [] };
@@ -47,7 +47,7 @@ test('open once on the selected branch, authorize writers, and freeze the branch
   assert.equal(result.target_ref, 'feature');
   assert.equal(result.target_sha, 'a'.repeat(40));
   assert.equal(result.issue_title, 'Build a game');
-  assert.equal(result.request, f.event.issue.body);
+  assert.equal(result.request, 'Make it playable\nKeep controls simple.');
   assert.equal(f.state.comments.length, 0);
   assert.equal(f.state.calls.some(call => /timeline|comments|actions/.test(call.path)), false);
 });
@@ -62,7 +62,7 @@ test('reject outsiders by default and accept everyone when configured', async ()
 test('execution label starts clean titles in either access mode', async () => {
   for (const access of ['writers', 'everyone']) {
     const f = fixture({ env: { OPENCODE_ACCESS: access } }); f.event.action = 'opened';
-    f.state.current.title = 'Build a game'; f.state.current.labels = ['OpenCode'];
+    f.state.current.title = 'Build a game'; f.state.current.body = 'Make it playable'; f.state.current.labels = ['OpenCode'];
     const result = await f.run();
     assert.equal(result.approved, 'true');
     assert.equal(result.issue_title, 'Build a game');
@@ -100,7 +100,7 @@ test('reject invalid access, closed issues, pull requests, and invalid branches'
     f => { f.env.OPENCODE_ACCESS = 'public'; },
     f => { f.state.current.state = 'closed'; },
     f => { f.state.current.pull_request = {}; },
-    f => { f.state.current.title = 'Build branch: ../bad'; },
+    f => { f.state.current.body = '<!-- omgithub-request:v1 {"branch":"../bad"} -->'; },
     f => { f.state.branch = ''; },
   ]) {
     const f = fixture(); f.event.action = 'opened'; change(f);

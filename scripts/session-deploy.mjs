@@ -1,8 +1,9 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
-import { command } from './session-checkpoint.mjs'
+import { join, resolve } from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { preparePreview } from './preview-setup.mjs'
-import { uploadDeployment } from './deployment-retry.mjs'
+import { retry, uploadDeployment } from './deployment-retry.mjs'
 import { child } from './session-lifecycle.mjs'
 
 const env = process.env
@@ -18,6 +19,11 @@ const api = async (path, options = {}, workingDirectory = env.PROJECT_DIR) => {
 let fork
 async function abort() { if (fork) await api(`/session/${fork.id}/abort`, { method: 'POST' }, project) }
 const controller = new AbortController()
+async function command(file, args) {
+  const started = Date.now()
+  try { return (await promisify(execFile)(file, args, { signal: controller.signal, timeout: 120000, maxBuffer: 32 * 1024 * 1024 })).stdout.trim() }
+  finally { console.error(`[timing] ${file}: ${Date.now() - started} ms`) }
+}
 for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => { controller.abort(); void abort().catch(console.error) })
 try {
   mkdirSync(evidence, { recursive: true })
@@ -46,12 +52,13 @@ try {
   const screenshots = readdirSync(evidence).filter(name => /^final-.*\.(png|jpe?g|webp)$/i.test(name))
   if (!['final-desktop.png', 'final-mobile.png'].every(name => screenshots.includes(name))) throw new Error('Capture produced no screenshots')
   const archive = join(env.RUNNER_TEMP, `deployment-${env.CHECKPOINT_GENERATION}.zip`)
-  // Package generated dist when present, otherwise the static project. Exclude
-  // dependencies and runner state; materialization selects the HTML entrypoint.
-  command('python3', ['-c', `import os,sys,zipfile
+  const output = JSON.parse(readFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-output.json'), 'utf8'))
+  if (output.project !== resolve(project) || !output.directory) throw new Error('Missing deployment output declaration for this project')
+  const deployDirectory = resolve(output.directory)
+  if (deployDirectory !== resolve(project) && !deployDirectory.startsWith(resolve(project) + '/')) throw new Error('Deployment output must be inside the project')
+  await command('python3', ['-c', `import os,sys,zipfile
 root,out,evidence=sys.argv[1:]
-source=root
-if os.path.isfile(os.path.join(root,'dist','index.html')): root=os.path.join(root,'dist')
+if not os.path.isfile(os.path.join(root,'index.html')): raise Exception('Missing deployment index.html')
 with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
  for base,dirs,files in os.walk(root):
   dirs[:]=[d for d in dirs if d not in ['node_modules','.git','.opencode','.agents','.opencode-web','.omgithub-runtime','.opencode-ssh','.playwright-cli','screenshots']]
@@ -61,31 +68,50 @@ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
    if not os.path.islink(p): z.write(p,os.path.relpath(p,root))
  for name in os.listdir(evidence):
   p=os.path.join(evidence,name)
-  if name.startswith('final-') and os.path.isfile(p): z.write(p,'screenshots/'+name)`, project, archive, evidence])
+  if name.startswith('final-') and os.path.isfile(p): z.write(p,'screenshots/'+name)`, deployDirectory, archive, evidence])
   if (controller.signal.aborted) throw new Error('Cancelled')
   const site = env.OMGITHUB_ORIGIN || 'https://omgithub.com'
   const deployed = await uploadDeployment(`${site}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/deployment`, { method: 'POST', headers: {
-    authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'content-type': 'application/zip', 'x-omgithub-run': env.GITHUB_RUN_ID,
+    authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'content-type': 'application/zip', 'x-omgithub-run': env.GITHUB_RUN_ID, 'x-omgithub-attempt': env.GITHUB_RUN_ATTEMPT || '1',
     'x-omgithub-generation': env.DEPLOYMENT_GENERATION, 'x-omgithub-commit': env.CHECKPOINT_COMMIT
   }, body: readFileSync(archive), signal: controller.signal })
   if (controller.signal.aborted) throw new Error('Cancelled')
-  const tag = `opencode-checkpoint-${env.TRIGGER_ISSUE_NUMBER}`
-  const assets = screenshots.map(name => {
-    const path = join(env.RUNNER_TEMP, `${env.CHECKPOINT_GENERATION}-${name}`)
-    writeFileSync(path, readFileSync(join(evidence, name)))
-    return path
-  })
-  command('gh', ['release', 'upload', tag, ...assets, '--repo', env.GITHUB_REPOSITORY])
-  const release = JSON.parse(command('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/releases/tags/${tag}`]))
-  const fresh = release.assets.filter(a => a.name.startsWith(`${env.CHECKPOINT_GENERATION}-final-`))
-  const metadata = { ...deployed, generation: env.CHECKPOINT_GENERATION, screenshots: fresh.map(a => a.browser_download_url) }
-  // Append deployment evidence without changing the current checkpoint pointer.
-  const body = release.body.replace(/\n?<!-- deployment:v1 .*? -->/g, '') + `\n<!-- deployment:v1 ${JSON.stringify(metadata)} -->`
-  command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--notes', body])
-  for (const old of release.assets.filter(a => /-final-.*\.(png|jpe?g|webp)$/i.test(a.name) && !fresh.some(f => f.id === a.id))) command('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/releases/assets/${old.id}`, '-X', 'DELETE'])
+  writeFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-result.json'), JSON.stringify({ ...deployed, generation: env.DEPLOYMENT_GENERATION, sync: 'pending' }))
+  try {
+    await retry(async () => {
+      const tag = `opencode-checkpoint-${env.TRIGGER_ISSUE_NUMBER}`
+      const assets = screenshots.map(name => {
+        const path = join(env.RUNNER_TEMP, `${env.CHECKPOINT_GENERATION}-${name}`)
+        writeFileSync(path, readFileSync(join(evidence, name)))
+        return path
+      })
+      await command('gh', ['release', 'upload', tag, ...assets, '--clobber', '--repo', env.GITHUB_REPOSITORY])
+      const release = JSON.parse(await command('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/releases/tags/${tag}`]))
+      const fresh = release.assets.filter(a => a.name.startsWith(`${env.CHECKPOINT_GENERATION}-final-`))
+      const metadata = { ...deployed, generation: env.CHECKPOINT_GENERATION, screenshots: fresh.map(a => a.browser_download_url) }
+      // Append deployment evidence without changing the current checkpoint pointer.
+      const body = release.body.replace(/\n?<!-- deployment:v1 .*? -->/g, '') + `\n<!-- deployment:v1 ${JSON.stringify(metadata)} -->`
+      await command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--notes', body])
+      for (const old of release.assets.filter(a => /-final-.*\.(png|jpe?g|webp)$/i.test(a.name) && !fresh.some(f => f.id === a.id))) {
+        try { await command('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/releases/assets/${old.id}`, '-X', 'DELETE']) } catch (error) { console.error('Asset cleanup:', error.message) }
+      }
+      const reportFile = join(env.OPENCODE_WEB_DIR, 'deployment-comment-id')
+      let commentId = ''
+      try { commentId = readFileSync(reportFile, 'utf8').trim() } catch {}
+      const report = ['Deployment ready.', deployed.preview_url, ...screenshots.map(name => `![${name}](${fresh.find(a => a.name.endsWith(name))?.browser_download_url || ''})`)].join('\n\n')
+      const result = JSON.parse(await command('gh', ['api', commentId ? `repos/${env.GITHUB_REPOSITORY}/issues/comments/${commentId}` : `repos/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/comments`, '-X', commentId ? 'PATCH' : 'POST', '-f', `body=${report}`]))
+      writeFileSync(reportFile, String(result.id))
+      for (const path of assets) rmSync(path, { force: true })
+    }, { signal: controller.signal })
+    writeFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-result.json'), JSON.stringify({ ...deployed, generation: env.DEPLOYMENT_GENERATION, sync: 'ready' }))
+  } catch (error) {
+    if (controller.signal.aborted) throw error
+    console.error('Release synchronization failed:', error.message)
+    writeFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-result.json'), JSON.stringify({ ...deployed, generation: env.DEPLOYMENT_GENERATION, sync: 'failed', sync_error: error.message }))
+  }
   rmSync(archive, { force: true })
-  rmSync(evidence, { recursive: true, force: true })
+  if (JSON.parse(readFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-result.json'), 'utf8')).sync === 'ready') rmSync(evidence, { recursive: true, force: true })
 } finally {
-  await abort()
+  await abort().catch(error => console.error(error.message))
   rmSync(join(env.OPENCODE_WEB_DIR, 'active-validation.json'), { force: true })
 }

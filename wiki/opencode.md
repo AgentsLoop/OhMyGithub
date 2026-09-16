@@ -255,7 +255,7 @@ Save again before closing temporary access. Keep the five-hour access period.
 Reuse one checkpoint release per issue. Upload separate conversation and manifest assets. Switch the manifest pointer after verifying uploads.
 Retain earlier complete releases. Exclude credentials, dependencies, and runner files.
 
-Restore supported version 1 and version 2 checkpoints with matching repository, issue, commit, and OpenCode version.
+Restore version 2 checkpoints with matching repository, issue, commit, and OpenCode version.
 Import the complete conversation and submit only the next requested change.
 Use a new issue and result branch. Keep the source game's publication unchanged.
 Mark games without complete checkpoints as **Resume unavailable**.
@@ -266,9 +266,9 @@ Set `OPENCODE_DEBUG_HOLD=true` only in a debugging repository to retain failed l
 
 ## Restore the main session and preview
 
-Keep `checkpoint-session-id` set to the main session. Save the latest workspace files with that conversation. Submit the exact user prompt to the restored main session. Preserve whitespace and bypass command wrappers. Validate each completed response in an isolated fork. Reject saved child sessions instead of importing them as main conversations.
+Keep `checkpoint-session-id` set to the main session. Save the latest workspace files with that conversation. Submit the exact user prompt to the restored main session. Preserve whitespace and bypass command wrappers. Run scripted capture after each completed response. Reject saved child sessions instead of importing them as main conversations.
 
-Provision the default start.sh before main OpenCode runs. Install dependencies, build when required, and serve port 3000 in the foreground. Test from a stopped app without installed dependencies. Start three tunnels during worker setup. Run the saved script before submitting resumed work. Publish the restored preview only after local and public HTTP checks pass. Reuse the app tunnel for delivery. Run capture.sh against the ready preview. Repair missing or failing scripts in an OC repair fork; execute the repaired scripts and inspect their screenshots. Inspect `app.log` for startup failures.
+Provision the default start.sh before main OpenCode runs. Install dependencies, build when required, and serve port 3000 in the foreground. Test from a stopped app without installed dependencies. Start control and app tunnels during worker setup. Serve files through the control proxy. Run the saved script before submitting resumed work. Publish the restored preview only after local and public HTTP checks pass. Reuse the app tunnel for delivery. Run capture.sh against the ready preview. Repair missing or failing scripts in an OC repair fork; execute the repaired scripts and inspect their screenshots. Inspect `app.log` for startup failures.
 
 ## Save and deploy main-session responses
 
@@ -295,3 +295,11 @@ Provision missing project scripts after checkpoint restore and before main OC st
 Use start.sh for repeatable application startup and capture.sh for screenshot capture. Preserve customized scripts. Use the shared Node helpers through RUNTIME_DIR on macOS and Linux. Detect npm/Vite projects before standalone HTML, install dependencies when their manifest changes, build Vite output into dist, and serve on PORT defaulting to 3000. Customize start.sh and deployment output for other frameworks. Set CAPTURE_READY_SELECTOR for application-specific rendering readiness. Keep browser installation in worker infrastructure and capture output outside source.
 
 Adopt the new script contract directly. Create new checkpoints using startup.sh for initialization and start.sh for the server.
+
+## Register and deliver current runs
+
+Register structured run state through scripts/run-record.mjs. Send a heartbeat every 30 seconds from the controller. Persist tunnel URLs in web-url and app-url. Route project files through /omgithub/files/ on the control tunnel. Preserve directory listing, MIME types, and relative navigation.
+
+Declare the static deployment directory in OPENCODE_WEB_DIR/deployment-output.json with absolute project and directory fields. Use the shared default starter to write this declaration for HTML and Vite. Write the same declaration from custom start.sh scripts. Restart the app when its recorded checkpoint differs from the current checkpoint. Capture the resulting server before packaging that declared output.
+
+Keep deployment success separate from release synchronization. Retry synchronization independently and retain capture evidence on failure. Generate the human-readable deployment report from the controller result. Read readiness from structured run/deployment state. Require a version 2 checkpoint and an explicit release manifest pointer. Supply branch selection as omgithub-request:v1 metadata.

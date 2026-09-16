@@ -126,7 +126,7 @@ gh repo view "$repo" --json defaultBranchRef
 Keep the existing `main` branch and older test branches. Use a new branch name
 for each commit so the tested revision remains clear and recoverable. The
 workflow checks out the GitHub default branch when the issue title has no
-`branch:` suffix.
+branch metadata.
 
 Create an SSH test issue with the required labels:
 

@@ -10,6 +10,8 @@ function fixture(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const env = { PROJECT_DIR: root, RUNTIME_DIR: root, OPENCODE_WEB_DIR: root, APP_URL: 'https://preview.test' }
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64')
+  writeFileSync(join(root, 'index.html'), '<h1>Ready</h1>')
+  writeFileSync(join(root, 'deployment-output.json'), JSON.stringify({ project: root, directory: root }))
   const capture = () => {
     for (const name of ['final-desktop.png', 'final-mobile.png']) writeFileSync(join(root, name), png)
   }

@@ -4,10 +4,9 @@ export function parseIssueRequest(issue, defaultBranch = 'main') {
   let metadata = {}
   try { metadata = JSON.parse(body.match(/<!-- omgithub-request:v1 (\{[^\n]*\}) -->/)?.[1] || '{}') } catch {}
   const requestBody = body.replace(/<!-- omgithub-request:v1 \{[^\n]*\} -->/g, '').trim()
-  const directive = typeof metadata.branch === 'string' ? Object.assign([null, metadata.branch], { index: title.length }) : title.match(/(?:^|\s)branch:\s*(.*?)\s*$/i)
-  const requestTitle = directive ? title.slice(0, directive.index).trim() : title
-  if (!directive) return { request: requestBody || requestTitle, title: requestTitle, targetRef: defaultBranch, branchSpecified: false, branchError: '' }
-  const targetRef = directive[1].trim()
+  const requestTitle = title
+  if (typeof metadata.branch !== 'string') return { request: requestBody || title, title, targetRef: defaultBranch, branchSpecified: false, branchError: '' }
+  const targetRef = metadata.branch.trim()
   const invalid = !targetRef || targetRef.length > 255 || targetRef === '@' || targetRef.startsWith('-') ||
     targetRef.startsWith('/') || targetRef.endsWith('/') || targetRef.endsWith('.') || targetRef.endsWith('.lock') ||
     targetRef.includes('..') || targetRef.includes('@{') || targetRef.includes('//') ||
@@ -17,6 +16,6 @@ export function parseIssueRequest(issue, defaultBranch = 'main') {
     title: requestTitle,
     targetRef: invalid ? defaultBranch : targetRef,
     branchSpecified: true,
-    branchError: invalid ? 'Invalid branch directive. End the issue title with `branch: <existing-branch>`.' : ''
+    branchError: invalid ? 'Invalid branch metadata.' : ''
   }
 }
