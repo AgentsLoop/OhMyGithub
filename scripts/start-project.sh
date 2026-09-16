@@ -11,6 +11,7 @@ current_commit="${CHECKPOINT_COMMIT:-}"
 previous_commit=""
 [[ ! -f "$OPENCODE_WEB_DIR/served-commit" ]] || previous_commit="$(/usr/bin/time -p cat "$OPENCODE_WEB_DIR/served-commit")"
 if [[ "${RESTART_APP:-false}" == true || ( -n "$current_commit" && "$previous_commit" != "$current_commit" ) ]] || ! /usr/bin/time -p curl --fail --silent --max-time 3 "http://127.0.0.1:$PORT/" >/dev/null; then
+  /usr/bin/time -p rm -f "$OPENCODE_WEB_DIR/ready-preview-url"
   /usr/bin/time -p tmux kill-session -t app-server 2>/dev/null || true
   # Pass paths through tmux's environment; keep the script in the foreground.
   /usr/bin/time -p tmux new-session -d -s app-server -c "$PROJECT_DIR" \
@@ -31,6 +32,10 @@ done
 /usr/bin/time -p /usr/bin/printf '%s' "$current_commit" > "$OPENCODE_WEB_DIR/served-commit"
 for ((attempt=0; attempt<12; attempt++)); do
   if /usr/bin/time -p curl --fail --silent --max-time 10 "$APP_URL" >/dev/null; then
+    /usr/bin/time -p /usr/bin/printf '%s' "$APP_URL" > "$OPENCODE_WEB_DIR/ready-preview-url"
+    if [[ -n "${OPENCODE_CONTROL_PORT:-}" ]]; then
+      /usr/bin/time -p curl --fail --silent --max-time 5 "http://127.0.0.1:$OPENCODE_CONTROL_PORT/omgithub/heartbeat" >/dev/null || true
+    fi
     echo 'Local and public preview are ready.'
     exit 0
   fi

@@ -7,7 +7,7 @@ let lastSequence = 1
 export async function registerRun(env, state) {
   const directory = env.OPENCODE_WEB_DIR
   const read = name => { try { return readFileSync(join(directory, name), 'utf8').trim() } catch (error) { if (error.code === 'ENOENT') return ''; throw error } }
-  const web = read('web-url'), preview = read('app-url'), session = read('checkpoint-session-id')
+  const web = read('web-url'), preview = read('ready-preview-url'), session = read('checkpoint-session-id')
   const body = { run: env.GITHUB_RUN_ID, attempt: Number(env.GITHUB_RUN_ATTEMPT || 1), sequence: (lastSequence = Math.max(Date.now(), lastSequence + 1)),
     state: state || (session && web ? 'live' : 'starting'), session_id: session,
     urls: { opencode: session && web ? `${web}/${Buffer.from(env.PROJECT_DIR).toString('base64url')}/session/${session}` : '',

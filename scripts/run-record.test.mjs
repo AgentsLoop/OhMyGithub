@@ -9,7 +9,7 @@ import { registerRun } from './run-record.mjs'
 test('registers connectivity without duplicating publication state', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'run-register-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
-  for (const [name, value] of Object.entries({ 'web-url': 'https://control.test', 'app-url': 'https://app.test', 'checkpoint-session-id': 'ses_main', 'checkpoint-state.json': '{"commit":"abc"}', 'deployment-result.json': '{"sync":"failed"}' })) writeFileSync(join(dir, name), value)
+  for (const [name, value] of Object.entries({ 'web-url': 'https://control.test', 'ready-preview-url': 'https://app.test', 'checkpoint-session-id': 'ses_main', 'checkpoint-state.json': '{"commit":"abc"}', 'deployment-result.json': '{"sync":"failed"}' })) writeFileSync(join(dir, name), value)
   let payload
   const server = createServer(async (req, res) => {
     assert.equal(req.url, '/api/github/alice/game/issues/2/run')
@@ -25,4 +25,9 @@ test('registers connectivity without duplicating publication state', async t => 
   assert.equal(payload.deployment, undefined)
   assert.equal(payload.checkpoint, undefined)
   assert.equal(payload.attempt, 2)
+  assert.equal(payload.urls.preview, 'https://app.test')
+  rmSync(join(dir, 'ready-preview-url'))
+  writeFileSync(join(dir, 'app-url'), 'https://allocated-but-not-ready.test')
+  await registerRun({ OPENCODE_WEB_DIR: dir, PROJECT_DIR: dir, GITHUB_RUN_ID: '7', GITHUB_RUN_ATTEMPT: '2', GITHUB_REPOSITORY: 'alice/game', TRIGGER_ISSUE_NUMBER: '2', GH_TOKEN: 'fixture', OMGITHUB_ORIGIN: `http://127.0.0.1:${server.address().port}` })
+  assert.equal(payload.urls.preview, '')
 })

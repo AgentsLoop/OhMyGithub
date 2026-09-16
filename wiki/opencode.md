@@ -263,3 +263,7 @@ Use the bootstrap request only before the lifecycle starts. Let the lifecycle ow
 Use monotonically ordered synthetic message IDs. OpenCode sorts messages by ID; random IDs can put the user after the completed assistant and prevent reconciliation. Verify imported message order before writing the main-session marker.
 
 Return capture exit 75 for temporary navigation/browser failures. Return exit 1 for script or rendering defects. Preserve bounded retries and diagnostics.
+
+## Advertise ready previews
+
+Keep raw tunnel allocation in app-url and publish ready-preview-url only after the runtime launcher confirms local and public HTTP readiness. Clear readiness when restarting the app. Notify the lifecycle immediately after readiness succeeds. Keep tunnels owned by the runtime and keep start.sh focused on the foreground application.
