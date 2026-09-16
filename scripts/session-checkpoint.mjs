@@ -148,6 +148,7 @@ export function saveCheckpoint({ interrupted = false } = {}) {
   const leaves = value => typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(leaves) : []
   try { secrets.push(...leaves(JSON.parse(env.OPENCODE_AUTH_CONTENT || '{}'))) } catch {}
   const session = portableSession(redactSession(exportSession(binary, sessionId, project, env.RUNNER_TEMP), secrets))
+  writeFileSync(join(directory, 'log-session-export.json'), JSON.stringify(session), { mode: 0o600 })
   const issue = Number(env.TRIGGER_ISSUE_NUMBER), run = Number(env.GITHUB_RUN_ID)
   const branch = `opencode-checkpoints/${issue}`
   const source = { source_repository: env.GITHUB_REPOSITORY, source_issue: issue }
@@ -193,7 +194,7 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     const uploaded = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases/${release.id}`))
     if (![sessionName, manifestName].every(name => uploaded.assets.some(a => a.name === name && a.state === 'uploaded' && a.size > 0))) throw new Error('Checkpoint upload incomplete.')
     // Publish the pointer only after both files exist. Readers use the manifest commit, not the mutable tag.
-    command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--draft=false', '--latest=false', '--notes', `Restore saved code and conversation.\n<!-- checkpoint-asset:${manifestName} -->${uploaded.body?.match(/\n<!-- deployment:v1 .*? -->/)?.[0] || ''}`])
+    command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--draft=false', '--latest=false', '--notes', `Restore saved code and conversation.\n<!-- checkpoint-asset:${manifestName} -->`])
     for (const asset of uploaded.assets.filter(a => /^(?:checkpoint|opencode)-.*\.json$/.test(a.name) && ![sessionName, manifestName].includes(a.name))) {
       api(`repos/${env.GITHUB_REPOSITORY}/releases/assets/${asset.id}`, ['-X', 'DELETE'])
     }

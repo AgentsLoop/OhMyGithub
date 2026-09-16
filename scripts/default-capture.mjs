@@ -9,18 +9,24 @@ if (process.platform === 'linux') process.env.DISPLAY ||= ':' + readFileSync(joi
 const url = process.env.CAPTURE_URL, output = process.env.CAPTURE_DIR
 if (!url || !output) throw new Error('Set CAPTURE_URL and CAPTURE_DIR.')
 mkdirSync(output, { recursive: true })
-const browser = await chromium.launch({ ...config.browser.launchOptions, timeout: 30000 })
+const transient = error => { throw Object.assign(error, { exitCode: 75 }) }
+let browser
 try {
+  browser = await chromium.launch({ ...config.browser.launchOptions, timeout: 30000 }).catch(transient)
   for (const [name, width, height] of [['desktop', 1440, 900], ['mobile', 390, 844]]) {
-    const page = await browser.newPage({ viewport: { width, height } })
+    const page = await browser.newPage({ viewport: { width, height } }).catch(transient)
     page.setDefaultTimeout(30000)
     page.on('pageerror', error => console.error(error.message))
-    const response = await page.goto(url, { waitUntil: 'load', timeout: 45000 })
-    if (!response?.ok()) throw new Error(`HTTP ${response?.status()} loading preview`)
+    const response = await page.goto(url, { waitUntil: 'load', timeout: 45000 }).catch(transient)
+    if (!response?.ok()) throw Object.assign(new Error(`HTTP ${response?.status()} loading preview`), { exitCode: !response || [408, 429, 500, 502, 503, 504].includes(response.status()) ? 75 : 1 })
     await page.locator(process.env.CAPTURE_READY_SELECTOR || 'body').waitFor({ state: 'visible' })
     await page.waitForFunction(() => document.fonts.status === 'loaded')
     await page.waitForTimeout(1000)
-    await page.screenshot({ path: join(output, `final-${name}.png`), timeout: 30000 })
+    await page.screenshot({ path: join(output, `final-${name}.png`), timeout: 30000 }).catch(error => {
+      if (error.name === 'TimeoutError' || !browser.isConnected()) transient(error)
+      throw error
+    })
     await page.close()
   }
-} finally { await browser.close() }
+} catch (error) { console.error(error); process.exitCode = error.exitCode || 1 }
+finally { await browser?.close().catch(error => { console.error(error); process.exitCode ||= 75 }) }

@@ -86,6 +86,19 @@ jobs:
       SSH_ONLY_REQUEST: ${{ contains(inputs.labels_json, '"ssh"') }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
+      - name: Register Actions progress
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
+        run: |
+          set -euo pipefail
+          # Bootstrap without the runtime checkout; the lifecycle owns later updates.
+          /usr/bin/time -p curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --max-time 20 \
+            -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+            --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":1,\"state\":\"starting\"}" \
+            "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/run"
+
       - name: Publish task link
         shell: bash
         run: |
@@ -592,7 +605,7 @@ jobs:
 
       - name: Start OpenCode web UI and Cloudflare tunnel
         id: opencode_web
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -846,7 +859,7 @@ jobs:
           PROJECT_URL="$WEB_URL/omgithub/files/"
           printf '%s' "$WEB_URL" > "$OPENCODE_WEB_DIR/web-url"
           printf '%s' "$APP_URL" > "$OPENCODE_WEB_DIR/app-url"
-          /usr/bin/time -p node "$RUNTIME_DIR/scripts/run-record.mjs" starting
+          /usr/bin/time -p curl --fail --silent "http://127.0.0.1:$OPENCODE_CONTROL_PORT/omgithub/heartbeat"
           echo "APP_URL=$APP_URL" >> "$GITHUB_ENV"
           printf 'url=%s\nproject_url=%s\n' "$WEB_URL" "$PROJECT_URL" >> "$GITHUB_OUTPUT"
           [[ -n "${WEB_URL:-}" && -n "${PROJECT_URL:-}" && -n "${APP_URL:-}" ]] || { echo '::error::A preview tunnel failed after three attempts.'; exit 1; }
@@ -877,53 +890,7 @@ jobs:
           /usr/bin/time -p test -f "$PROJECT_DIR/index.html"
           /usr/bin/time -p test -f "$PROJECT_DIR/package.json"
           /usr/bin/time -p install -d "$OPENCODE_WEB_DIR"
-          /usr/bin/time -p /usr/bin/printf '%s\n' \
-            'Mock OpenCode generation started.' \
-            "Copied the committed fixture into $PROJECT_DIR." \
-            'Mock OpenCode generation completed successfully.' \
-            > "$OPENCODE_WEB_DIR/opencode-run.log"
-          /usr/bin/time -p /usr/bin/printf '%s\n' \
-            'Mock verification session completed successfully.' \
-            > "$OPENCODE_WEB_DIR/verification.log"
-          # shellcheck disable=SC2016
-          /usr/bin/time -p jq -n \
-            --arg id "ses_mock_${GITHUB_RUN_ID}" \
-            --arg request "$COMMENT_BODY" \
-            '[
-              {info:{role:"user"},parts:[{type:"text",text:$request}]},
-              {info:{role:"assistant"},parts:[{type:"text",text:"Mock OpenCode copied the fixture project and completed generation."}]}
-            ]' > "$OPENCODE_WEB_DIR/opencode-response.json"
-          printf 'MOCK_SESSION_ID=ses_mock_%s\n' "$GITHUB_RUN_ID" >> "$GITHUB_ENV"
-
-      - name: Verify mock OpenCode project locally
-        if: env.TEST_REQUEST == 'true'
-        id: mock_project
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          /usr/bin/time -p npm run start -- --port "$APP_PORT" > "$RUNNER_TEMP/mock-project.log" 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-          for _ in {1..30}; do
-            if page="$(curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$APP_PORT")"; then
-              grep -q 'mock-opencode-project' <<< "$page"
-              /usr/bin/time -p mkdir -p screenshots
-              /usr/bin/time -p npx --yes playwright@latest install chromium
-              /usr/bin/time -p npx --yes playwright@latest screenshot \
-                --browser chromium \
-                --wait-for-selector='[data-testid="mock-opencode-project"]' \
-                --wait-for-timeout=500 \
-                "http://127.0.0.1:$APP_PORT" \
-                screenshots/final-mock-opencode.png
-              /usr/bin/time -p test -s screenshots/final-mock-opencode.png
-              printf 'screenshots_json=["final-mock-opencode.png"]\n' >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            sleep 1
-          done
-          cat "$RUNNER_TEMP/mock-project.log" >&2
-          exit 1
+          /usr/bin/time -p cp "$RUNTIME_DIR/.github/fixtures/test-project-start.sh" "$PROJECT_DIR/start.sh"
 
       - name: Resolve OpenCode model and skill labels
         id: opencode_labels
@@ -961,7 +928,7 @@ jobs:
         run: /usr/bin/time -p node "$RUNTIME_DIR/scripts/session-checkpoint.mjs" restore
 
       - name: Initialize project worker
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -1022,7 +989,7 @@ jobs:
 
       - name: Run OpenCode and locate its web session
         id: opencode_run
-        if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
+        if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         env:
@@ -1035,6 +1002,11 @@ jobs:
           OMO_REQUEST: ${{ env.OMO_REQUEST }}
         run: |
           set -euo pipefail
+          if [[ "$TEST_REQUEST" == 'true' ]]; then
+            /usr/bin/time -p node "$RUNTIME_DIR/scripts/seed-test-session.mjs"
+            RESUME_SESSION_ID="$(cat "$OPENCODE_WEB_DIR/synthetic-session-id")"
+            printf '%s\n' fixture > "$OPENCODE_WEB_DIR/main-model"
+          else
           OPENCODE_BIN="$HOME/.opencode/bin/opencode"
           PROMPT_FILE="$OPENCODE_WEB_DIR/prompt.txt"
           RUN_LOG="$OPENCODE_WEB_DIR/opencode-run.log"
@@ -1092,6 +1064,7 @@ jobs:
             _ "$OPENCODE_BIN" "$OPENCODE_WEB_PORT" "$PROMPT_FILE" "$RUN_LOG" "$RUN_EXIT" "$OPENCODE_MODEL" "$GOAL_REQUEST" "$OMO_REQUEST" "$RALPH_REQUEST" \
             > /dev/null 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/opencode-run.pid"
+          fi
           SESSION_ID="${RESUME_SESSION_ID:-}"
           for _ in {1..120}; do
             [[ "$SESSION_ID" == ses_* ]] && break
@@ -1103,7 +1076,7 @@ jobs:
           done
           [[ "$SESSION_ID" == ses_* ]]
           /usr/bin/time -p printf '%s\n' "$SESSION_ID" > "$OPENCODE_WEB_DIR/checkpoint-session-id"
-          /usr/bin/time -p node "$RUNTIME_DIR/scripts/run-record.mjs" live
+          /usr/bin/time -p curl --fail --silent "http://127.0.0.1:$OPENCODE_CONTROL_PORT/omgithub/heartbeat"
           /usr/bin/time -p curl --fail --silent "http://127.0.0.1:$OPENCODE_CONTROL_PORT/omgithub/reconcile"
           DIRECTORY_B64="$(printf '%s' "$PROJECT_DIR" | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')"
           printf 'session_id=%s\nsession_url=%s\n' "$SESSION_ID" \
@@ -1119,8 +1092,8 @@ jobs:
           AGENTSWEB_SSH_READY: ${{ steps.agentsweb.outcome == 'success' }}
           SSH_ACCESS_FILE: ${{ env.SSH_DIR }}/access.env
           SSH_TUNNEL_LOG: ${{ env.SSH_DIR }}/tunnel.log
-          OPENCODE_WEB_URL: ${{ env.TEST_REQUEST == 'true' && format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) || steps.opencode_run.outputs.session_url }}
-          PROJECT_FILE_URL: ${{ env.TEST_REQUEST == 'true' && format('https://github.com/{0}/tree/{1}/workflow-test-project', github.repository, env.BRANCH_NAME) || steps.opencode_web.outputs.project_url }}
+          OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
+          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
           PROGRESS_COMMENT_TEMPLATE: ${{ env.RUNTIME_DIR }}/.github/scripts/opencode-progress-comment-template.md
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
           RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
@@ -1193,14 +1166,6 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [[ "$TEST_REQUEST" == 'true' ]]; then
-            /usr/bin/time -p /usr/bin/printf '%s\n' \
-              'Progress comment created.' \
-              "Synthetic session: $MOCK_SESSION_ID" \
-              'Fixture generation is complete; downstream validation and delivery are running.' \
-              > "$OPENCODE_WEB_DIR/response-comment-tracker.log"
-            exit 0
-          fi
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
           install -m 700 "$RUNTIME_DIR/.github/scripts/opencode-progress-tracker.sh" "$TRACKER"
           # The tracker is intentionally independent of the step shell so it can poll
@@ -1267,74 +1232,16 @@ jobs:
           [[ -f "$OPENCODE_WEB_DIR/opencode-run.exit" ]]
           [[ "$(cat "$OPENCODE_WEB_DIR/opencode-run.exit")" == 0 ]]
 
-      - name: Push project branch
-        if: success() && env.TEST_REQUEST == 'true' && env.SSH_ONLY_REQUEST != 'true'
-        id: delivery
+      - name: Verify synthetic production delivery
+        if: env.TEST_REQUEST == 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          remote_branch_ref="refs/heads/$BRANCH_NAME"
-          expected_remote_sha="$(
-            /usr/bin/time -p git ls-remote --heads origin "$remote_branch_ref" |
-              awk 'NR == 1 { print $1 }'
-          )"
-          # Collapse agent-created commits so excluded evidence and runner files do
-          # not remain reachable through the published branch history.
-          /usr/bin/time -p git reset --mixed "$TARGET_SHA"
-          # Dependencies are runtime-only and must never be included in the generated commit.
-          /usr/bin/time -p touch "$PROJECT_DIR/.gitignore"
-          grep -qxF 'node_modules/' "$PROJECT_DIR/.gitignore" || \
-            printf '\nnode_modules/\n' >> "$PROJECT_DIR/.gitignore"
-          /usr/bin/time -p git add -A -- "$PROJECT_PATH"
-          # Agents can commit generated evidence and runner state before this
-          # delivery step. Remove both after staging so git add cannot restore them.
-          project_prefix=''
-          [[ "$PROJECT_PATH" == '.' ]] || project_prefix="${PROJECT_PATH%/}/"
-          generated_paths=(
-            "${project_prefix}.agents"
-            "${project_prefix}.agentsweb"
-            "${project_prefix}.omgithub-runtime"
-            "${project_prefix}.opencode/goals"
-            "${project_prefix}.opencode-ssh"
-            "${project_prefix}.opencode-web"
-            "${project_prefix}opencode-agentsweb-id_ed25519"
-            "${project_prefix}opencode-agentsweb-id_ed25519.pub"
-            '.agentsweb'
-            '.omgithub-runtime'
-            '.opencode-ssh'
-            '.opencode-web'
-            'opencode-agentsweb-id_ed25519'
-            'opencode-agentsweb-id_ed25519.pub'
-          )
-          for generated_path in "${generated_paths[@]}"; do
-            [[ -e "$generated_path" || -L "$generated_path" ]] || continue
-            /usr/bin/time -p git rm -r -f --cached --ignore-unmatch -- "$generated_path"
-          done
-          while IFS= read -r -d '' generated_file; do
-            case "$generated_file" in
-              *.log|*.pid|screenshots/*|*/screenshots/*)
-                /usr/bin/time -p git rm -f --cached --ignore-unmatch -- "$generated_file"
-                ;;
-            esac
-          done < <(git ls-files -z -- "$PROJECT_PATH")
-          if ! git diff --cached --quiet; then
-            /usr/bin/time -p git commit -m "OpenCode: ${COMMENT_BODY%%$'\n'*}"
-          fi
-          if git diff --quiet "$TARGET_SHA..HEAD" -- "$PROJECT_PATH"; then
-            echo 'OpenCode made no changes; no project branch will be published.'
-            exit 0
-          fi
-          /usr/bin/time -p git push --set-upstream \
-            --force-with-lease="$remote_branch_ref:$expected_remote_sha" \
-            origin "$BRANCH_NAME:$remote_branch_ref"
-          FINAL_COMMIT="$(git rev-parse HEAD)"
-          printf 'commit=%s\n' "$FINAL_COMMIT" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
+          /usr/bin/time -p node "$RUNTIME_DIR/scripts/wait-deployment.mjs"
 
       - name: Create OpenCode logs release
+        continue-on-error: true
         if: always() && env.SSH_ONLY_REQUEST != 'true' && steps.opencode_run.outcome == 'success'
-        id: opencode_release
         shell: bash
         run: |
           set -euo pipefail
@@ -1343,16 +1250,7 @@ jobs:
 
           # Preserve machine-readable responses and execution logs without
           # publishing OpenCode configuration, credentials, or SSH material.
-          if [[ "$TEST_REQUEST" == 'true' ]]; then
-            cp "$OPENCODE_WEB_DIR/opencode-response.json" "$release_dir/opencode-response.json"
-            printf '%s\n' 'Synthetic OpenCode session used the committed fixture; downstream workflow steps are real.' \
-              > "$release_dir/mock-session.txt"
-          else
-            curl --fail --silent --show-error \
-              -H "x-opencode-directory: $PROJECT_DIR" \
-              "http://127.0.0.1:$OPENCODE_WEB_PORT/session/${{ steps.opencode_run.outputs.session_id }}/message" \
-              > "$release_dir/opencode-response.json"
-          fi
+          /usr/bin/time -p node "$RUNTIME_DIR/scripts/log-response.mjs" "$release_dir/opencode-response.json"
           if [[ ! -s "$release_dir/opencode-response.json" ]]; then
             echo 'OpenCode response artifact is empty; refusing to create an incomplete release.' >&2
             exit 1
@@ -1372,14 +1270,11 @@ jobs:
 
           tag="opencode-logs-${GITHUB_RUN_ID}"
           gh release create "$tag" "${release_assets[@]}" \
-            --target "${{ steps.delivery.outputs.commit || inputs.target_sha }}" \
+            --target "$TARGET_SHA" \
             --title "OpenCode logs for run #${GITHUB_RUN_NUMBER}" \
             --notes "Generated OpenCode response and execution logs for workflow run [#${GITHUB_RUN_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})." \
             --latest=false
 
-          release_json="$(gh release view "$tag" --json url,assets)"
-          printf 'url=%s\n' "$(jq -r '.url' <<<"$release_json")" >> "$GITHUB_OUTPUT"
-          printf 'assets_json=%s\n' "$(jq -c '[.assets[] | {name, url: .url}]' <<<"$release_json")" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -1458,7 +1353,7 @@ jobs:
         run: sleep 18000
 
       - name: Stop lifecycle controller
-        if: always() && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true' && steps.opencode_run.outcome == 'success'
+        if: always() && env.SSH_ONLY_REQUEST != 'true' && steps.opencode_run.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail

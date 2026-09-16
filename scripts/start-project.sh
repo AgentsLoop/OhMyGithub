@@ -27,9 +27,10 @@ for ((attempt=0; attempt<30; attempt++)); do
   /usr/bin/time -p sleep 2
 done
 [[ "$ready" == true ]] || { echo 'Local startup failed. Inspect app.log.' >&2; exit 75; }
+# Local readiness is independent of a temporary public tunnel failure.
+/usr/bin/time -p /usr/bin/printf '%s' "$current_commit" > "$OPENCODE_WEB_DIR/served-commit"
 for ((attempt=0; attempt<12; attempt++)); do
   if /usr/bin/time -p curl --fail --silent --max-time 10 "$APP_URL" >/dev/null; then
-    printf '%s' "$current_commit" > "$OPENCODE_WEB_DIR/served-commit"
     echo 'Local and public preview are ready.'
     exit 0
   fi

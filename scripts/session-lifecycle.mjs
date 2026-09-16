@@ -99,6 +99,7 @@ async function serve() {
           method: 'POST', headers: { authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'x-omgithub-run': env.GITHUB_RUN_ID, 'x-omgithub-attempt': env.GITHUB_RUN_ATTEMPT || '1', 'x-omgithub-generation': String(generation), 'x-omgithub-state': state, 'x-omgithub-error': encodeURIComponent(error).slice(0, 1000) }, signal: AbortSignal.timeout(30000)
         })
         if (!response.ok) throw new Error(`Deployment registration HTTP ${response.status}`)
+        await heartbeat()
       }
     }
   })
@@ -106,6 +107,7 @@ async function serve() {
   let messageGate = Promise.resolve()
   const proxy = createServer(async (req, res) => {
     try {
+      if (req.url === '/omgithub/heartbeat') { await heartbeat(); res.end('ok'); return }
       if (req.url === '/omgithub/reconcile') { await reconcile(); res.end('ok'); return }
       if (req.url === '/omgithub/deployment') { res.setHeader('content-type', 'application/json'); res.end(readFileSync(join(directory, 'deployment-status.json'), 'utf8')); return }
       const match = req.url.match(/^\/session\/([^/?]+)\/(message|prompt_async|command)(?:\?|$)/)
@@ -139,21 +141,19 @@ async function serve() {
     })
     remote.on('error', () => socket.destroy()); socket.on('error', () => remote.destroy())
   })
-  await new Promise(resolve => proxy.listen(Number(env.OPENCODE_CONTROL_PORT), '127.0.0.1', resolve))
-  let registering = false
-  const heartbeat = async state => {
-    if (registering) return
-    registering = true
-    try { await registerRun(env, state) } catch (error) { console.error(error.message) }
-    finally { registering = false }
+  let registration = Promise.resolve()
+  const heartbeat = state => {
+    registration = registration.then(() => registerRun(env, state)).catch(error => console.error(error.message))
+    return registration
   }
+  await new Promise(resolve => proxy.listen(Number(env.OPENCODE_CONTROL_PORT), '127.0.0.1', resolve))
   await heartbeat()
   const heartbeatTimer = setInterval(() => void heartbeat(), 30000)
   let stopping = false
   for (const name of ['SIGTERM', 'SIGINT']) process.once(name, () => {
     stopping = true
     clearInterval(heartbeatTimer)
-    lifecycle.shutdown().catch(console.error).finally(async () => { await registerRun(env, 'ended').catch(console.error); process.exit() })
+    lifecycle.shutdown().catch(console.error).finally(async () => { await heartbeat('ended'); process.exit() })
   })
   async function reconcile() {
     const id = mainID()

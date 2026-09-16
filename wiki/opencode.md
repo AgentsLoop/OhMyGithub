@@ -28,13 +28,7 @@ variable `OPENCODE_ACCESS=everyone` to accept any issue author.
 Attach the execution label when creating the issue. Leave the variable unset
 to require write, maintain, or admin access.
 
-The `test` label runs the full workflow with a mock OpenCode-generated project
-and must be used alongside `OpenCode`. Attach both labels when creating the issue. Test mode skips OpenCode generation, copies the fixture
-from `.github/fixtures/test-project`, then runs local verification, pushes the
-normal immutable branch, reports its OmGithub tree URL, and completes the issue.
-It also emits the normal live-progress comment, final report, lifecycle labels,
-and logs release from synthetic OpenCode session artifacts, so only the model
-generation itself is replaced.
+Attach `OpenCode` and `test` for synthetic generation. Copy the fixture project, import a completed synthetic conversation into the real OpenCode server, and run the production lifecycle for checkpoint, startup, capture, and deployment. Require a ready deployment with screenshots before marking the test complete. Keep the normal diagnostic logs release.
 
 The workflow uses the `macos-latest` GitHub-hosted runner by default for the
 entire OpenCode job. The `linux` label opts the run into `ubuntu-latest`.
@@ -57,61 +51,19 @@ not a command and does not trigger a run by itself. An `omo`-labeled OpenCode ru
 uses OMO's native `goal` command and prepends `ulw` to the objective. The Codex
 Light `ulw-loop` component is not recreated or registered for OpenCode.
 
-## What the job does
+## Run the job
 
-1. Checks out the repository with persisted `GITHUB_TOKEN` credentials.
-2. Copies `.github/templates/agents.template.md` to `$PROJECT_DIR/Agents.md`,
-   then appends every `.github/templates/*.md` file whose basename matches an
-   issue label,
-   excluding the base template itself. The worker therefore receives the
-   shared issue-update, screenshot, and completion-report requirements plus all
-   active label policies.
-3. Attempts to start an ephemeral AgentsWeb SSH tunnel. If setup fails, the
-   workflow continues without SSH access and keeps the browser session path
-   available.
-4. Starts the OpenCode web UI and a loopback Nginx file server rooted at the
-   resolved project directory, then publishes each through its own temporary
-   trycloudflare.com tunnel. The access comment contains both URLs, rendered
-   from shared templates under `scripts/` for both its initial and
-   live-progress forms. Final, smoke-test, failed, and SSH-closed
-   comments use the same renderer and remain independently status-specific.
-5. Creates an `opencode/<run-id>` branch from the relevant base branch.
-6. Starts `opencode run --attach` against the same OpenCode installation and
-   server-backed session store, then posts a direct URL to that live session.
-7. Verifies SSH connectivity when the optional tunnel was started successfully.
-8. Creates and refreshes one unified progress-comment template with aggregate
-   OpenCode statistics about every 10 seconds while the run is active, keeping
-   the launch access details intact. The report also
-   counts active child sessions from `/session/status` and all descendant
-   subagent sessions from their `parentID` lineage. It also reports inferred
-   human-readable elapsed time, aggregate token count and tokens-per-second speed,
-   plus inferred image-context model calls by following image MIME attachments
-   through each session transcript.
-   Message text, reasoning, prompts, and tool details are
-   never rendered in the live comment; full logs are published only in the
-   completion release.
-9. Waits for the build session to finish, forks it into a separate verification
-   session, runs the verification prompt there, starts the app, and exposes it through a
-   separate temporary trycloudflare.com tunnel, and verifies the public URL.
-10. Verifies the app through the public tunnel. If verification fails, sends a
-   remediation prompt to the forked verification session and retries up to three
-   times. The completion report and screenshot evidence prompts also use that
-   verification session. Squash all generated work onto the selected base,
-   remove screenshots, logs, and runner state from the Git index, and push one
-   clean project commit to the immutable branch. Record the remote branch tip
-   before rewriting it. Reject the push if that tip changes.
-11. Give the verified public URL back to the worker. Request uncommitted final
-    browser screenshots. Append immutable release screenshot URLs with the game,
-    repository path, compatibility commit, and Open Project links to the oldest triggering-issue comment containing the
-    `🟡 **OpenCode progress (live)**` marker. If screenshots are missing, it
-    sends up to two follow-up prompts to the same OpenCode session before
-    continuing delivery with a warning.
-12. Creates a uniquely tagged GitHub release containing the final OpenCode
-    response JSON, screenshots, and safe runner log files. Append its link to that same
-    live-progress comment.
-13. Keeps SSH, the OpenCode Web UI, and the app available for 5 hours after
-   verification,
-   then marks the comment closed and terminates both tunnels.
+1. Register run/attempt identity before runtime checkout. Preserve detailed Actions progress throughout execution.
+2. Check out the target and runtime. Install worker instructions and optional label policies.
+3. Start optional SSH access, OpenCode, and the control/app tunnels. Route project files through the control tunnel.
+4. Initialize the project once. Restore saved conversations and start saved apps before submitting resumed work.
+5. Run the model, or import synthetic generation for test requests. Publish real session URLs.
+6. Let the lifecycle controller checkpoint every completed main response. Execute startup and capture directly; fork OC only to repair broken scripts.
+7. Record local readiness before public checks. Retry temporary tunnel/capture failures without restarting a healthy app.
+8. Package declared static output and fresh screenshots. Retry the same upload archive and generation.
+9. Store deployed screenshots in OmSite. Post the durable preview link to GitHub. Preserve successful publication if reporting fails.
+10. Store diagnostic logs and response JSON in a run logs release. Reuse the checkpoint export only when its session revision matches current OpenCode metadata.
+11. Keep normal live access available for five hours. Save changed state and end registration during shutdown.
 
 Validation is controlled by the repository variable `VALIDATION_ENABLED`. It
 defaults to `true`. When set to `off` (or any value other than `true`), the
@@ -302,4 +254,12 @@ Register structured run state through scripts/run-record.mjs. Send a heartbeat e
 
 Declare the static deployment directory in OPENCODE_WEB_DIR/deployment-output.json with absolute project and directory fields. Use the shared default starter to write this declaration for HTML and Vite. Write the same declaration from custom start.sh scripts. Restart the app when its recorded checkpoint differs from the current checkpoint. Capture the resulting server before packaging that declared output.
 
-Keep deployment success separate from release synchronization. Retry synchronization independently and retain capture evidence on failure. Generate the human-readable deployment report from the controller result. Read readiness from structured run/deployment state. Require a version 2 checkpoint and an explicit release manifest pointer. Supply branch selection as omgithub-request:v1 metadata.
+Keep deployment success separate from result reporting. Retry reporting independently and retain capture evidence on failure. Generate the human-readable deployment report from the controller result. Read readiness from structured run/deployment state. Require a version 2 checkpoint and an explicit release manifest pointer. Supply branch selection as omgithub-request:v1 metadata.
+
+## Keep state and tests deterministic
+
+Use the bootstrap request only before the lifecycle starts. Let the lifecycle own later connectivity updates. Keep deployment state out of heartbeat payloads. Keep checkpoint manifests and conversations separate from deployment screenshots.
+
+Use monotonically ordered synthetic message IDs. OpenCode sorts messages by ID; random IDs can put the user after the completed assistant and prevent reconciliation. Verify imported message order before writing the main-session marker.
+
+Return capture exit 75 for temporary navigation/browser failures. Return exit 1 for script or rendering defects. Preserve bounded retries and diagnostics.

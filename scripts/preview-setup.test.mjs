@@ -72,7 +72,7 @@ test('retries capture without restarting the server', async t => {
     run: async (file, args) => {
       if (args[0].endsWith('start-project.sh')) starts++
       if (args.length === 1 && args[0].endsWith('/capture.sh')) {
-        if (++captures < 3) throw new Error('browser temporarily unavailable')
+        if (++captures < 3) throw Object.assign(new Error('browser temporarily unavailable'), { exitCode: 75 })
         f.capture()
       }
     }
@@ -101,7 +101,7 @@ test('persistent DNS capture errors never invoke OC', async t => {
       if (args.length === 1 && args[0].endsWith('/capture.sh')) {
         captures++
         writeFileSync(options.stdio[2], 'net::ERR_NAME_NOT_RESOLVED')
-        throw new Error('navigation failed')
+        throw Object.assign(new Error('navigation failed'), { exitCode: 75 })
       }
     }
   }))

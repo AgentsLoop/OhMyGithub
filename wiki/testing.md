@@ -209,17 +209,7 @@ actionlint .github/workflows/opencode.yml .github/workflows/opencode-prepare.yml
 git diff --check
 ```
 
-For a full workflow test, create an issue with both `OpenCode` and `test`. Use `test` to
-selects a deterministic mock-generation path. The workflow copies the fixture
-from `.github/fixtures/test-project` instead of invoking OpenCode, then verifies
-it locally, creates and pushes the normal branch, reports the immutable
-OmGithub tree URL, and completes the issue. Opening that URL must generate the
-store page and playable deployment without credentials. The test path does not keep a
-temporary worker alive for five hours.
-The issue must still receive the normal live-progress comment and final report,
-plus the completion report comment, and the run must publish a logs release
-containing the synthetic OpenCode transcript plus the real validation and
-delivery logs.
+Create an issue with `OpenCode` and `test` for a synthetic-generation run. Copy the committed fixture and import a completed conversation into the real OpenCode server. Exercise the production checkpoint, startup, capture, and deployment path. Require a ready deployment with desktop/mobile screenshots. Keep logs in the run release and skip the five-hour hold for synthetic runs.
 
 The caller must grant every permission requested by the reusable workflow.
 Otherwise GitHub rejects the run at startup before creating a job, even when
@@ -254,16 +244,7 @@ empty service logs such as `nginx.log` can make GitHub's upload API return
 `400 Bad Content-Length`. The OpenCode response JSON remains required and must
 be non-empty.
 
-Focused completion-evidence checks should also confirm that the workflow copies
-`.github/templates/agents.template.md` to `Agents.md` and appends every
-label-matched template, then forks the completed build session
-before verification, and sends up to two follow-up prompts to that verification
-session when no `screenshots/final-*` image exists, with three total
-evidence checks. Missing screenshots warn and do not block delivery; when present,
-a successful run must leave a final issue comment
-containing the Open Project URL, final commit, and embedded screenshots served
-from the run release. Confirm that the generated branch history contains no
-screenshots, logs, or runner-state files.
+Check scripted startup/capture before delivery. Require fresh desktop/mobile PNGs outside source. Invoke OC only for script repair and require execution plus screenshot inspection. Check the durable OmSite URL in the final comment and the diagnostic response/log files in the logs release.
 
 Watch a running workflow with live per-step logs using the same internal
 endpoints as the GitHub Actions web UI:
@@ -365,7 +346,7 @@ Start the main workspace with `scripts/start-project.sh` after checkpointing a c
 
 ## Check validation setup ownership
 
-Keep the main build prompt equal to the user request. Run existing start.sh and capture.sh directly. Create a repair fork only after startup or capture fails. Require that fork to execute changed scripts, check readiness, and inspect desktop/mobile screenshots. Save repaired scripts with the main session export. Read new draft release IDs directly from the creation response. Retry tunnel startup at most three times and route files through the working control tunnel when the dedicated file tunnel fails.
+Keep the main build prompt equal to the user request. Run existing start.sh and capture.sh directly. Create a repair fork only after startup or capture fails. Require that fork to execute changed scripts, check readiness, and inspect desktop/mobile screenshots. Save repaired scripts with the main session export. Read new draft release IDs directly from the creation response. Retry tunnel startup at most three times and route files through the control tunnel.
 
 ## Preserve validation evidence
 
@@ -384,3 +365,11 @@ Retry deployment upload using the same archive and generation for transient netw
 Run `node --test scripts/project-file-mime.test.mjs`. Load the installed Nginx MIME table through `scripts/project-file-mime.mjs`; normalize browser asset types and fail startup if the table is unavailable. Show directory listings at `/` and do not open `index.html` automatically. Revalidate cached preview assets. Check CSS, JS/MJS, WASM, fonts, nested paths, and missing-file 404 responses through the file tunnel. Use the app tunnel for framework servers and backend routes.
 
 Open Markdown (`.md`, `.markdown`) and shell scripts (`.sh`, `.bash`, `.zsh`, `.fish`) as `text/plain` in the file browser. Preserve browser asset MIME types and binary download types. Verify direct file links and `/omgithub/files/` proxy links after starting a new worker.
+
+## Verify progress and lean delivery
+
+Check the first Actions step registers the run before checkout. Render detailed steps in dark desktop/mobile views for starting, live, disconnected, and failed states. Retry temporary Actions errors without stopping page polling.
+
+Test metadata-only checkpoint reads and negative caching. Force fresh full validation on resume. Simulate three launcher calls with a healthy local app and failing public endpoint; require only one startup. Return exit 75 from transient capture fixtures and prove retries never invoke OC.
+
+Test diagnostic-export reuse with matching, stale, missing, and unknown session revisions. Keep nonempty logs in GitHub Releases. Keep screenshots in OmSite and checkpoint assets limited to restore data.

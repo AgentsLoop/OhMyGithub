@@ -79,34 +79,17 @@ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
   writeFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-result.json'), JSON.stringify({ ...deployed, generation: env.DEPLOYMENT_GENERATION, sync: 'pending' }))
   try {
     await retry(async () => {
-      const tag = `opencode-checkpoint-${env.TRIGGER_ISSUE_NUMBER}`
-      const assets = screenshots.map(name => {
-        const path = join(env.RUNNER_TEMP, `${env.CHECKPOINT_GENERATION}-${name}`)
-        writeFileSync(path, readFileSync(join(evidence, name)))
-        return path
-      })
-      await command('gh', ['release', 'upload', tag, ...assets, '--clobber', '--repo', env.GITHUB_REPOSITORY])
-      const release = JSON.parse(await command('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/releases/tags/${tag}`]))
-      const fresh = release.assets.filter(a => a.name.startsWith(`${env.CHECKPOINT_GENERATION}-final-`))
-      const metadata = { ...deployed, generation: env.CHECKPOINT_GENERATION, screenshots: fresh.map(a => a.browser_download_url) }
-      // Append deployment evidence without changing the current checkpoint pointer.
-      const body = release.body.replace(/\n?<!-- deployment:v1 .*? -->/g, '') + `\n<!-- deployment:v1 ${JSON.stringify(metadata)} -->`
-      await command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--notes', body])
-      for (const old of release.assets.filter(a => /-final-.*\.(png|jpe?g|webp)$/i.test(a.name) && !fresh.some(f => f.id === a.id))) {
-        try { await command('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/releases/assets/${old.id}`, '-X', 'DELETE']) } catch (error) { console.error('Asset cleanup:', error.message) }
-      }
       const reportFile = join(env.OPENCODE_WEB_DIR, 'deployment-comment-id')
       let commentId = ''
       try { commentId = readFileSync(reportFile, 'utf8').trim() } catch {}
-      const report = ['Deployment ready.', deployed.preview_url, ...screenshots.map(name => `![${name}](${fresh.find(a => a.name.endsWith(name))?.browser_download_url || ''})`)].join('\n\n')
+      const report = `Deployment ready.\n\n${deployed.preview_url}`
       const result = JSON.parse(await command('gh', ['api', commentId ? `repos/${env.GITHUB_REPOSITORY}/issues/comments/${commentId}` : `repos/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/comments`, '-X', commentId ? 'PATCH' : 'POST', '-f', `body=${report}`]))
       writeFileSync(reportFile, String(result.id))
-      for (const path of assets) rmSync(path, { force: true })
     }, { signal: controller.signal })
     writeFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-result.json'), JSON.stringify({ ...deployed, generation: env.DEPLOYMENT_GENERATION, sync: 'ready' }))
   } catch (error) {
     if (controller.signal.aborted) throw error
-    console.error('Release synchronization failed:', error.message)
+    console.error('Result reporting failed:', error.message)
     writeFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-result.json'), JSON.stringify({ ...deployed, generation: env.DEPLOYMENT_GENERATION, sync: 'failed', sync_error: error.message }))
   }
   rmSync(archive, { force: true })

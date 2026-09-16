@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { registerRun } from './run-record.mjs'
 
-test('registers session, URLs, checkpoint and deployment over HTTP', async t => {
+test('registers connectivity without duplicating publication state', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'run-register-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
   for (const [name, value] of Object.entries({ 'web-url': 'https://control.test', 'app-url': 'https://app.test', 'checkpoint-session-id': 'ses_main', 'checkpoint-state.json': '{"commit":"abc"}', 'deployment-result.json': '{"sync":"failed"}' })) writeFileSync(join(dir, name), value)
@@ -22,6 +22,7 @@ test('registers session, URLs, checkpoint and deployment over HTTP', async t => 
   assert.equal(payload.state, 'live')
   assert.equal(payload.urls.files, 'https://control.test/omgithub/files/')
   assert.match(payload.urls.opencode, /session\/ses_main$/)
-  assert.equal(payload.deployment.sync, 'failed')
+  assert.equal(payload.deployment, undefined)
+  assert.equal(payload.checkpoint, undefined)
   assert.equal(payload.attempt, 2)
 })

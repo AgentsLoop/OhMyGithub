@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-function run(t, mode, script = 'exit 0\n', restart = false) {
+function run(t, mode, script = 'exit 0\n', restart = false, repeat = 1) {
   const root = mkdtempSync(join(tmpdir(), 'startup-test-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const bin = join(root, 'bin')
@@ -22,9 +22,10 @@ function run(t, mode, script = 'exit 0\n', restart = false) {
     [[ "$TEST_MODE" != local-failure ]] || exit 1
     [[ "$TEST_MODE" == running || -f "$PROJECT_DIR/started" ]]
   `)
-  const result = spawnSync('bash', [fileURLToPath(new URL('./start-project.sh', import.meta.url))], {
+  let result
+  for (let i = 0; i < repeat; i++) result = spawnSync('bash', [fileURLToPath(new URL('./start-project.sh', import.meta.url))], {
     encoding: 'utf8', timeout: 20000,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, PROJECT_DIR: root, RUNTIME_DIR: root, OPENCODE_WEB_DIR: root, APP_URL: 'https://public.test', APP_PORT: '3000', TEST_MODE: mode, RESTART_APP: String(restart) }
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, PROJECT_DIR: root, RUNTIME_DIR: root, OPENCODE_WEB_DIR: root, APP_URL: 'https://public.test', APP_PORT: '3000', CHECKPOINT_COMMIT: repeat > 1 ? 'same-checkpoint' : '', TEST_MODE: mode, RESTART_APP: String(restart) }
   })
   return { ...result, calls: readFileSync(join(root, 'calls'), 'utf8') }
 }
@@ -52,4 +53,10 @@ test('restart current server after completion to rebuild the latest source', t =
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.calls, /kill-session/)
   assert.match(result.calls, /new-session/)
+})
+
+test('public retry across launcher invocations preserves the healthy checkpoint server', t => {
+  const result = run(t, 'public-failure', 'exit 0\n', false, 3)
+  assert.equal(result.status, 75)
+  assert.equal((result.calls.match(/new-session/g) || []).length, 1)
 })

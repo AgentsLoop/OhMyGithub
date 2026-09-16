@@ -31,7 +31,12 @@ test('packages declared output and isolates reporting failure from deployment su
   const source = read('./session-deploy.mjs')
   assert.match(source, /deployment-output.json/)
   assert.doesNotMatch(source, /root=os.path.join\(root,'dist'\)/)
-  assert.match(source, /Release synchronization failed/)
+  assert.match(source, /Result reporting failed/)
   assert.match(source, /deployment-result.json/)
   assert.match(source, /sync: 'failed'/)
+})
+
+test('checkpoint releases contain restore data, not deployment evidence', () => {
+  for (const path of ['./session-deploy.mjs', './session-checkpoint.mjs']) assert.doesNotMatch(read(path), /deployment:v1/)
+  assert.doesNotMatch(read('./session-deploy.mjs'), /release.*upload|releases.assets/)
 })

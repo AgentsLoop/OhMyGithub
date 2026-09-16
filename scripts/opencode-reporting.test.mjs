@@ -72,3 +72,14 @@ test('validates every main completion through the lifecycle worker', () => {
   assert.match(workflow, /checkpoint-session-id/);
   assert.match(workflow, /omgithub\/reconcile/);
 });
+
+test('registers progress before checkout and preserves real production delivery for fixtures', () => {
+  assert.ok(workflow.indexOf('name: Register Actions progress') < workflow.indexOf('name: Checkout target repository'))
+  const bootstrap = workflow.split('name: Register Actions progress')[1].split('      - name:')[0]
+  assert.doesNotMatch(bootstrap, /RUNTIME_DIR/)
+  assert.match(workflow, /seed-test-session.mjs/)
+  assert.match(workflow, /wait-deployment.mjs/)
+  assert.doesNotMatch(workflow, /name: Push project branch|name: Verify mock OpenCode project locally|steps.delivery.outputs|opencode_release|assets_json/)
+  assert.match(workflow, /gh release create/)
+  assert.doesNotMatch(workflow, /upload-artifact/)
+})
