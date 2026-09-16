@@ -267,3 +267,7 @@ Return capture exit 75 for temporary navigation/browser failures. Return exit 1 
 ## Advertise ready previews
 
 Keep raw tunnel allocation in app-url and publish ready-preview-url only after the runtime launcher confirms local and public HTTP readiness. Clear readiness when restarting the app. Notify the lifecycle immediately after readiness succeeds. Keep tunnels owned by the runtime and keep start.sh focused on the foreground application.
+
+## Gate public tunnel readiness
+
+Probe chat, files, and ready-preview HTTPS endpoints through normal DNS before publishing their URLs. Require a successful response within four seconds; reject redirects and retry failed checks on subsequent heartbeats or status refreshes. Run checks independently and concurrently on the worker and OmGithub server. Keep unready URLs empty and retain the waiting panel. Do not treat URL allocation or a local heartbeat as public readiness. Allow for client-specific DNS caches even after server probes succeed.
