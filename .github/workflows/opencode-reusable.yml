@@ -782,7 +782,7 @@ jobs:
             server {
               listen 127.0.0.1:$PROJECT_FILE_PORT;
               root $PROJECT_DIR;
-              index index.html index.htm;
+              index __codex_no_automatic_index_file__;
               add_header Cache-Control "no-cache" always;
               autoindex on;
             }

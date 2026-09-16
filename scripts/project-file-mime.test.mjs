@@ -11,13 +11,12 @@ test('preserves installed types and normalizes browser assets without duplicates
   assert.throws(() => browserMimeTypes(''), /Invalid/)
 })
 
-test('standalone file server loads MIME table, indexes and revalidates assets', () => {
+test('standalone file server exposes directory listings without automatic index pages', () => {
   const workflow = readFileSync(new URL('../.github/workflows/opencode-reusable.yml', import.meta.url), 'utf8')
   assert.ok(workflow.includes('scripts/project-file-mime.mjs'))
   assert.ok(workflow.includes('include "$NGINX_PREFIX/mime.types";'))
   assert.ok(workflow.includes('default_type application/octet-stream;'))
-  assert.ok(workflow.includes('index index.html index.htm;'))
+  assert.ok(workflow.includes('index __codex_no_automatic_index_file__;'))
   assert.ok(workflow.includes('add_header Cache-Control "no-cache" always;'))
   assert.ok(workflow.includes('autoindex on;'))
-  assert.doesNotMatch(workflow, /__codex_no_automatic_index_file__/i)
 })
