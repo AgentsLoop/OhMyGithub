@@ -6,6 +6,7 @@ on:
     paths:
       - scripts/setup-mac-dns.sh
       - scripts/setup-mac-dns.test.mjs
+      - scripts/mac-dns-recovery.mjs
       - scripts/public-readiness.mjs
       - scripts/smoke-mac-tunnel.mjs
       - .github/workflows/opencode-reusable.yml
@@ -19,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test DNS setup and readiness contracts
-        run: /usr/bin/time -p node --test scripts/setup-mac-dns.test.mjs scripts/public-readiness.test.mjs
+        run: /usr/bin/time -p node --test scripts/setup-mac-dns.test.mjs scripts/public-readiness.test.mjs scripts/mac-dns-recovery.test.mjs
       - name: Configure Mac runner DNS
         run: /usr/bin/time -p bash scripts/setup-mac-dns.sh
       - name: Install cloudflared
