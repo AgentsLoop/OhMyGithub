@@ -1,8 +1,10 @@
 import { createServer } from 'node:http'
-import { spawn, execFileSync } from 'node:child_process'
+import { spawn, execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
 import { publicUrlReady } from './public-readiness.mjs'
 
+const exec = promisify(execFile)
 const marker = `omgithub-dns-${Date.now()}`
 const server = createServer((req, res) => res.end(marker))
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -19,7 +21,7 @@ try {
     if (url && await publicUrlReady(url)) {
       const response = await fetch(url, { signal: AbortSignal.timeout(10000) })
       if (await response.text() !== marker) throw new Error('Node fetched unexpected origin content')
-      const body = execFileSync('curl', ['--fail', '--silent', '--show-error', '--max-time', '15', url], { encoding: 'utf8' })
+      const { stdout: body } = await exec('curl', ['--fail', '--silent', '--show-error', '--max-time', '15', url], { encoding: 'utf8' })
       if (body !== marker) throw new Error('curl fetched unexpected origin content')
       console.log(`PASS: fresh tunnel works through normal Node and curl DNS: ${url}`)
       passed = true
