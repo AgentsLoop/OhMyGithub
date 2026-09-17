@@ -596,6 +596,13 @@ jobs:
             core.setOutput('comment_id', comment.data.id);
             core.setFailed('AgentsWeb registration or SSH connectivity check failed.');
 
+      - name: Configure Mac runner DNS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p bash "$RUNTIME_DIR/scripts/setup-mac-dns.sh"
+
       - name: Configure Mac Playwright CLI with Metal
         if: runner.os == 'macOS'
         shell: bash

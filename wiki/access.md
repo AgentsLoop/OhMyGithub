@@ -27,3 +27,9 @@ reports `SSH URL: not registered`.
 
 If the command stops working, check the Actions run first. A completed or
 cancelled run has already closed the tunnel.
+
+## Mac runner DNS
+
+Run `bash "$RUNTIME_DIR/scripts/setup-mac-dns.sh"` before starting Cloudflare tunnels on GitHub-hosted Macs. Set Ethernet DNS to `1.1.1.1` and `8.8.8.8`; flush the macOS DNS cache. Keep public HTTP readiness checks enabled.
+
+Compare the default resolver with `dig @1.1.1.1 HOST` when a tunnel hostname fails. Check for the issue #42 failure pattern: VM resolver `192.168.64.1` returns NXDOMAIN while public resolvers return addresses. Verify both curl and Node fetch after repair, then confirm that the issue API reports `live`. Apply this setup only to disposable hosted runners.
