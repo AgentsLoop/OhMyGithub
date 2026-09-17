@@ -277,3 +277,7 @@ Probe chat, files, and ready-preview HTTPS endpoints through normal DNS before p
 Read `omgithub-snapshot:v1` from the frozen request. Download the selected public commit archive in the runner before checkpoint restore and AI startup. Preserve the installed execution workflow and runtime checkouts. Import selected files with a fresh commit; retain licenses and source attribution in `.omgithub-remix.json`. Push to the prepared branch without force. Export the new `TARGET_SHA` and strip snapshot metadata from the AI prompt. Restore a matching conversation without fetching source history. Read the named preparation step for progress and errors.
 
 Run `node --test scripts/remix-snapshot.test.mjs scripts/session-checkpoint.test.mjs`. Dispatch `remix-snapshot-smoke.yml` to check a public snapshot on Linux and Mac using isolated local Git destinations. Keep source code unexecuted during the import smoke test.
+
+## Install preview prerequisites
+
+Install and verify tmux before starting the web runtime on Linux and macOS. Keep preview dependency setup independent of optional SSH access. Fail the setup step when installation fails. Diagnose missing tmux from lifecycle.log before attempting project-script repairs.

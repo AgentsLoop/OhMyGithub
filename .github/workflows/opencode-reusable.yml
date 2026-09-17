@@ -407,6 +407,13 @@ jobs:
               ]
             });
 
+      - name: Install preview process manager
+        if: env.SSH_ONLY_REQUEST != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p bash "$RUNTIME_DIR/scripts/setup-preview-runtime.sh"
+
       - name: Start AgentsWeb SSH session
         id: agentsweb
         if: env.TEST_REQUEST != 'true' && env.AGENTSWEB_SSH_ENABLED == 'true'
