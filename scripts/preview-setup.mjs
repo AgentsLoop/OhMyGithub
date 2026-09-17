@@ -40,6 +40,7 @@ export async function preparePreview({ env, evidence, signal, repair, run = chil
       if (attempt === 2) throw new Error(`Preview startup/capture failed after two repairs: ${error.message}`)
       let logs = error.message
       try { logs += '\n' + readFileSync(join(env.OPENCODE_WEB_DIR, 'app.log'), 'utf8').slice(-12000) } catch {}
+      try { logs += '\n' + readFileSync(join(env.OPENCODE_WEB_DIR, 'public-readiness.log'), 'utf8').slice(-4000) } catch {}
       let captureLog = ''
       try { captureLog = readFileSync(captureLogPath, 'utf8').slice(-12000); logs += '\n' + captureLog } catch {}
       await repair(`Create or repair the project scripts in ${project}, limiting edits to startup/build setup and capture.

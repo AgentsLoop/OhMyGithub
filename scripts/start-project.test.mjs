@@ -14,11 +14,12 @@ function run(t, mode, script = 'exit 0\n', restart = false, repeat = 1) {
   if (script !== null) writeFileSync(join(root, 'start.sh'), script)
   writeFileSync(join(root, 'calls'), '')
   const stub = (name, body) => writeFileSync(join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 })
+  stub('node', 'echo reclaim-port >> "$PROJECT_DIR/calls"')
   stub('sleep', 'exit 0')
   stub('tmux', `echo "$1" >> "$PROJECT_DIR/calls"; [[ "$1" != new-session ]] || touch "$PROJECT_DIR/started"`)
   stub('curl', `
     url="\${!#}"
-    if [[ "$url" == https://public.test ]]; then [[ "$TEST_MODE" != public-failure ]]; exit $?; fi
+    if [[ "$url" == https://public.test ]]; then if [[ "$TEST_MODE" == public-rejected ]]; then echo 403; elif [[ "$TEST_MODE" == public-failure ]]; then echo 502; else echo 200; fi; exit 0; fi
     [[ "$TEST_MODE" != local-failure ]] || exit 1
     [[ "$TEST_MODE" == running || -f "$PROJECT_DIR/started" ]]
   `)
@@ -37,7 +38,7 @@ test('starts a stopped app and checks local and public readiness', t => {
 test('reuses an already running app', t => {
   const result = run(t, 'running')
   assert.equal(result.status, 0, result.stderr)
-  assert.equal(result.calls, '')
+  assert.equal(result.calls, 'has-session\n')
 })
 test('rejects missing or malformed startup scripts', t => {
   assert.notEqual(run(t, 'running', null).status, 0)
@@ -59,4 +60,14 @@ test('public retry across launcher invocations preserves the healthy checkpoint 
   const result = run(t, 'public-failure', 'exit 0\n', false, 3)
   assert.equal(result.status, 75)
   assert.equal((result.calls.match(/new-session/g) || []).length, 1)
+})
+
+test('classifies public host rejection as repairable instead of transient', t => {
+  const result = run(t, 'public-rejected')
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /HTTP 403/)
+})
+test('reclaims a project-owned listener before starting the managed server', t => {
+  const result = run(t, 'running', 'exit 0\n', true)
+  assert.ok(result.calls.indexOf('reclaim-port') < result.calls.indexOf('new-session'))
 })

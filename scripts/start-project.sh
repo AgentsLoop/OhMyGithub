@@ -13,6 +13,7 @@ previous_commit=""
 if [[ "${RESTART_APP:-false}" == true || ( -n "$current_commit" && "$previous_commit" != "$current_commit" ) ]] || ! /usr/bin/time -p curl --fail --silent --max-time 3 "http://127.0.0.1:$PORT/" >/dev/null; then
   /usr/bin/time -p rm -f "$OPENCODE_WEB_DIR/ready-preview-url"
   /usr/bin/time -p tmux kill-session -t app-server 2>/dev/null || true
+  /usr/bin/time -p node "${RUNTIME_DIR:?}/scripts/reclaim-preview-port.mjs"
   # Pass paths through tmux's environment; keep the script in the foreground.
   /usr/bin/time -p tmux new-session -d -s app-server -c "$PROJECT_DIR" \
     -e "RUNTIME_DIR=${RUNTIME_DIR:?}" -e "OPENCODE_WEB_DIR=$OPENCODE_WEB_DIR" -e "PORT=$PORT" -e "STARTUP_LOG=$OPENCODE_WEB_DIR/app.log" \
@@ -20,6 +21,7 @@ if [[ "${RESTART_APP:-false}" == true || ( -n "$current_commit" && "$previous_co
 fi
 ready=false
 for ((attempt=0; attempt<30; attempt++)); do
+  /usr/bin/time -p tmux has-session -t app-server 2>/dev/null || { echo 'Startup process exited. Inspect app.log.' >&2; exit 1; }
   if /usr/bin/time -p curl --fail --silent --max-time 3 "http://127.0.0.1:$PORT/" >/dev/null; then
     ready=true
     break
@@ -31,13 +33,18 @@ done
 # Local readiness is independent of a temporary public tunnel failure.
 /usr/bin/time -p /usr/bin/printf '%s' "$current_commit" > "$OPENCODE_WEB_DIR/served-commit"
 for ((attempt=0; attempt<12; attempt++)); do
-  if /usr/bin/time -p curl --fail --silent --max-time 10 "$APP_URL" >/dev/null; then
+  status="$(/usr/bin/time -p curl --silent --show-error --location --max-time 10 --output "$OPENCODE_WEB_DIR/public-readiness.log" --write-out '%{http_code}' "$APP_URL")" || status=000
+  if [[ "$status" == 2* ]]; then
     /usr/bin/time -p /usr/bin/printf '%s' "$APP_URL" > "$OPENCODE_WEB_DIR/ready-preview-url"
     if [[ -n "${OPENCODE_CONTROL_PORT:-}" ]]; then
       /usr/bin/time -p curl --fail --silent --max-time 5 "http://127.0.0.1:$OPENCODE_CONTROL_PORT/omgithub/heartbeat" >/dev/null || true
     fi
     echo 'Local and public preview are ready.'
     exit 0
+  fi
+  if [[ "$status" == 4* && "$status" != 408 && "$status" != 429 ]]; then
+    echo "Public preview rejected the request (HTTP $status). Inspect public-readiness.log." >&2
+    exit 1
   fi
   /usr/bin/time -p sleep 2
 done

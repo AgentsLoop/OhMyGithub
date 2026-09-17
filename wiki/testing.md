@@ -379,3 +379,7 @@ Test diagnostic-export reuse with matching, stale, missing, and unknown session 
 Use the default capture helper to click one visible, enabled button named Start, Play, Start game, Play game, Start now, or Play now before taking each viewport screenshot. Allow up to three seconds for delayed controls. Skip ambiguous matches, links, forms, and obscured controls. Keep capture on the menu when no eligible control appears.
 
 Set `CAPTURE_AUTO_START=false` to capture the initial screen. Set `CAPTURE_START_SELECTOR` to select a project-specific start control. Keep custom capture scripts responsible for their own interactions. Run `node --test scripts/capture-start.test.mjs`. Set `PLAYWRIGHT_MODULE` and optionally `CHROME_PATH` to enable the real-browser checks; set `CAPTURE_TEST_DIR` to an existing screenshot output directory.
+
+## Regress remix preview port ownership
+
+Run `node --test scripts/reclaim-preview-port.test.mjs scripts/start-project.test.mjs scripts/preview-setup.test.mjs`. Start an unmanaged project server before the controller; verify the controller stops only same-user listeners whose working directory belongs to the project, starts its own server, and serves the built output through the public hostname. Reject unrelated listeners without terminating them. Check controller process health before accepting HTTP readiness. Classify persistent HTTP 4xx host rejection as a repairable app defect; retry transport and 5xx failures separately.
