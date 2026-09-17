@@ -373,3 +373,9 @@ Check the first Actions step registers the run before checkout. Render detailed 
 Test metadata-only checkpoint reads and negative caching. Force fresh full validation on resume. Simulate three launcher calls with a healthy local app and failing public endpoint; require only one startup. Return exit 75 from transient capture fixtures and prove retries never invoke OC.
 
 Test diagnostic-export reuse with matching, stale, missing, and unknown session revisions. Keep nonempty logs in GitHub Releases. Keep screenshots in OmSite and checkpoint assets limited to restore data.
+
+## Auto-start screenshot captures
+
+Use the default capture helper to click one visible, enabled button named Start, Play, Start game, Play game, Start now, or Play now before taking each viewport screenshot. Allow up to three seconds for delayed controls. Skip ambiguous matches, links, forms, and obscured controls. Keep capture on the menu when no eligible control appears.
+
+Set `CAPTURE_AUTO_START=false` to capture the initial screen. Set `CAPTURE_START_SELECTOR` to select a project-specific start control. Keep custom capture scripts responsible for their own interactions. Run `node --test scripts/capture-start.test.mjs`. Set `PLAYWRIGHT_MODULE` and optionally `CHROME_PATH` to enable the real-browser checks; set `CAPTURE_TEST_DIR` to an existing screenshot output directory.
