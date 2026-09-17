@@ -33,3 +33,5 @@ cancelled run has already closed the tunnel.
 Run `bash "$RUNTIME_DIR/scripts/setup-mac-dns.sh"` before starting Cloudflare tunnels on GitHub-hosted Macs. Set Ethernet DNS to `1.1.1.1` and `8.8.8.8`; flush the macOS DNS cache. Keep public HTTP readiness checks enabled.
 
 Compare the default resolver with `dig @1.1.1.1 HOST` when a tunnel hostname fails. Check for the issue #42 failure pattern: VM resolver `192.168.64.1` returns NXDOMAIN while public resolvers return addresses. Verify both curl and Node fetch after repair, then confirm that the issue API reports `live`. Apply this setup only to disposable hosted runners.
+
+Run the `Mac tunnel DNS regression` workflow after DNS, readiness, or worker-workflow changes. Require a newly allocated Quick Tunnel to serve the exact local-origin response through ordinary Node fetch and curl within five minutes. Keep its automatic main-branch path trigger enabled. Allow propagation retries without weakening the readiness predicate or pinning edge addresses.
