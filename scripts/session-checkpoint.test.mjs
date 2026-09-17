@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore, exportSession, portableSession } from './session-checkpoint.mjs'
+import { usesImportedSnapshot, parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore, exportSession, portableSession } from './session-checkpoint.mjs'
 const session = { info: { id: 'ses_checkpoint', directory: '/old/project' }, messages: [{ info: { id: 'msg_one', role: 'user' }, parts: [{ id: 'prt_one', type: 'text', text: 'Build a castle' }] }] }
 const source = { source_repository: 'alice/game', source_issue: 6 }
 const base = { version: 2, repository: 'alice/game', issue_number: 6, run_id: 123, commit: 'a'.repeat(40), branch: 'opencode-checkpoints/6', project_dir: '', opencode_version: '1.2.3', session, public_history: true }
@@ -178,4 +178,11 @@ test('prepare fetches checkpoint history from its source rather than the destina
   const runtime = readFileSync(new URL('./session-checkpoint.mjs', import.meta.url), 'utf8')
   assert.ok(runtime.includes("['fetch', '--no-tags', `https://github.com/${source.source_repository}.git`, checkpoint.commit]"))
   assert.ok(!runtime.includes("['fetch', '--no-tags', 'origin', checkpoint.commit]"))
+})
+
+test('restore cross-repository conversation against the imported snapshot without fetching history', () => {
+  assert.equal(usesImportedSnapshot(source, base, {}), false)
+  assert.equal(usesImportedSnapshot(source, base, { SNAPSHOT_SOURCE_REPOSITORY: 'Alice/Game', SNAPSHOT_SOURCE_COMMIT: base.commit }), true)
+  assert.throws(() => usesImportedSnapshot(source, base, { SNAPSHOT_SOURCE_REPOSITORY: 'other/game', SNAPSHOT_SOURCE_COMMIT: base.commit }), /does not match/)
+  assert.throws(() => usesImportedSnapshot(source, base, { SNAPSHOT_SOURCE_REPOSITORY: 'alice/game', SNAPSHOT_SOURCE_COMMIT: 'b'.repeat(40) }), /does not match/)
 })

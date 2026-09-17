@@ -271,3 +271,9 @@ Keep raw tunnel allocation in app-url and publish ready-preview-url only after t
 ## Gate public tunnel readiness
 
 Probe chat, files, and ready-preview HTTPS endpoints through normal DNS before publishing their URLs. Require a successful response within four seconds; reject redirects and retry failed checks on subsequent heartbeats or status refreshes. Run checks independently and concurrently on the worker and OmGithub server. Keep unready URLs empty and retain the waiting panel. Do not treat URL allocation or a local heartbeat as public readiness. Allow for client-specific DNS caches even after server probes succeed.
+
+## Prepare remix snapshots
+
+Read `omgithub-snapshot:v1` from the frozen request. Download the selected public commit archive in the runner before checkpoint restore and AI startup. Preserve the installed execution workflow and runtime checkouts. Import selected files with a fresh commit; retain licenses and source attribution in `.omgithub-remix.json`. Push to the prepared branch without force. Export the new `TARGET_SHA` and strip snapshot metadata from the AI prompt. Restore a matching conversation without fetching source history. Read the named preparation step for progress and errors.
+
+Run `node --test scripts/remix-snapshot.test.mjs scripts/session-checkpoint.test.mjs`. Dispatch `remix-snapshot-smoke.yml` to check a public snapshot on Linux and Mac using isolated local Git destinations. Keep source code unexecuted during the import smoke test.

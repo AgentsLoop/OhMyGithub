@@ -133,6 +133,11 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Prepare selected remix snapshot
+        timeout-minutes: 15
+        shell: bash
+        run: /usr/bin/time -p node "$RUNTIME_DIR/scripts/remix-snapshot.mjs"
+
       - name: Load saved game checkpoint
         if: env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash

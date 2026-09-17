@@ -82,6 +82,11 @@ function setEnv(name, value) {
   const delimiter = `OMGHITHUB_${randomUUID().replaceAll('-', '')}`
   appendFileSync(env.GITHUB_ENV, `${name}<<${delimiter}\n${value}\n${delimiter}\n`)
 }
+export function usesImportedSnapshot(source, checkpoint, runtime = env) {
+  if (!runtime.SNAPSHOT_SOURCE_REPOSITORY && !runtime.SNAPSHOT_SOURCE_COMMIT) return false
+  if (runtime.SNAPSHOT_SOURCE_REPOSITORY?.toLowerCase() !== source.source_repository.toLowerCase() || runtime.SNAPSHOT_SOURCE_COMMIT !== checkpoint.commit) throw new Error('Imported snapshot does not match the saved checkpoint.')
+  return true
+}
 export function prepare() {
   const source = parseResume(env.COMMENT_BODY || '')
   if (!source) return
@@ -101,11 +106,14 @@ export function prepare() {
   }
   const checkpoint = validateCheckpoint(payload, source)
   if (source.source_commit && source.source_commit !== checkpoint.commit) throw new Error('The selected checkpoint has been replaced. Select the current saved version.')
-  command('git', ['fetch', '--no-tags', `https://github.com/${source.source_repository}.git`, checkpoint.commit], { cwd: env.GITHUB_WORKSPACE })
-  // Preparation has already selected the compatible caller. Restore code before installing runtime-only files.
-  command('git', ['checkout', '--detach', checkpoint.commit], { cwd: env.GITHUB_WORKSPACE })
+  const importedSnapshot = usesImportedSnapshot(source, checkpoint)
+  if (!importedSnapshot) {
+    command('git', ['fetch', '--no-tags', `https://github.com/${source.source_repository}.git`, checkpoint.commit], { cwd: env.GITHUB_WORKSPACE })
+    // Restore same-repository checkpoints before installing runtime-only files.
+    command('git', ['checkout', '--detach', checkpoint.commit], { cwd: env.GITHUB_WORKSPACE })
+  }
   writeFileSync(checkpointPath(), JSON.stringify(checkpoint), { mode: 0o600 })
-  setEnv('TARGET_SHA', checkpoint.commit)
+  if (!importedSnapshot) setEnv('TARGET_SHA', checkpoint.commit)
   setEnv('PROJECT_PATH', checkpoint.project_dir || '.')
   setEnv('COMMENT_BODY', source.prompt)
   setEnv('RESUME_OPENCODE_VERSION', checkpoint.opencode_version)
