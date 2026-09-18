@@ -383,3 +383,12 @@ Set `CAPTURE_AUTO_START=false` to capture the initial screen. Set `CAPTURE_START
 ## Regress remix preview port ownership
 
 Run `node --test scripts/reclaim-preview-port.test.mjs scripts/start-project.test.mjs scripts/preview-setup.test.mjs`. Start an unmanaged project server before the controller; verify the controller stops only same-user listeners whose working directory belongs to the project, starts its own server, and serves the built output through the public hostname. Reject unrelated listeners without terminating them. Check controller process health before accepting HTTP readiness. Classify persistent HTTP 4xx host rejection as a repairable app defect; retry transport and 5xx failures separately.
+
+## Verify slow remix startup
+
+Run `node --test scripts/start-project.test.mjs scripts/preview-setup.test.mjs`.
+Allow up to 600 seconds for dependency installation and a cold production build.
+Set `STARTUP_TIMEOUT_SECONDS` to override the local readiness window.
+Reuse the live `starting-commit` process for the same checkpoint across readiness retries.
+Restart for a changed checkpoint, an exited process, or explicit `RESTART_APP=true`.
+Reproduce Greywatch issue 1 with its pinned snapshot; require deployment and desktop/mobile captures after its 73-second build.
