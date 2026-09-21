@@ -281,3 +281,7 @@ Run `node --test scripts/remix-snapshot.test.mjs scripts/session-checkpoint.test
 ## Install preview prerequisites
 
 Install and verify tmux before starting the web runtime on Linux and macOS. Keep preview dependency setup independent of optional SSH access. Fail the setup step when installation fails. Diagnose missing tmux from lifecycle.log before attempting project-script repairs.
+
+## Recover provider failures
+
+Resume terminal retryable provider errors and `Invalid upload request` errors in the same session and model. Wait 30 seconds and send exactly `Continue`. Limit automatic resumes to five per human request, including failures after partial progress. Cancel pending recovery on new input, cancellation, shutdown, or successful completion. Inspect `lifecycle.log` for recovery attempts and exhaustion. Apply this behavior to newly started workers; do not expect running controllers to reload code.

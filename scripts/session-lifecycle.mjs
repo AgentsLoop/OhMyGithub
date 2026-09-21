@@ -1,3 +1,4 @@
+import { SessionRecovery } from './session-recovery.mjs'
 import { registerRun } from './run-record.mjs'
 import { createServer, request as httpRequest } from 'node:http'
 import { connect } from 'node:net'
@@ -73,7 +74,7 @@ async function serve() {
   const api = async (path, options = {}) => {
     const response = await fetch(`${upstream}${path}`, { ...options, headers: { 'x-opencode-directory': env.PROJECT_DIR, 'content-type': 'application/json' }, signal: AbortSignal.timeout(30000) })
     if (!response.ok) throw new Error(`OpenCode HTTP ${response.status}`)
-    return response.json()
+    return response.status === 204 ? undefined : response.json()
   }
   const lifecycle = new Lifecycle({
     save: async (signal, interrupted) => {
@@ -104,14 +105,21 @@ async function serve() {
     }
   })
   try { lifecycle.generation = Number(JSON.parse(readFileSync(join(directory, 'deployment-status.json'), 'utf8')).generation) || 0 } catch {}
+  const snapshot = async id => {
+    const states = await api('/session/status')
+    return { id, busy: Boolean(states[id]?.type && states[id].type !== 'idle'), messages: await api(`/session/${id}/message`) }
+  }
+  const recovery = new SessionRecovery({ snapshot, send: (id, body) => api(`/session/${id}/prompt_async`, { method: 'POST', body: JSON.stringify(body) }) })
   let messageGate = Promise.resolve()
   const proxy = createServer(async (req, res) => {
     try {
       if (req.url === '/omgithub/heartbeat') { await heartbeat(); res.end('ok'); return }
       if (req.url === '/omgithub/reconcile') { await reconcile(); res.end('ok'); return }
       if (req.url === '/omgithub/deployment') { res.setHeader('content-type', 'application/json'); res.end(readFileSync(join(directory, 'deployment-status.json'), 'utf8')); return }
+      if (req.method === 'POST' && req.url.split('?')[0] === `/session/${mainID()}/abort`) recovery.cancel()
       const match = req.url.match(/^\/session\/([^/?]+)\/(message|prompt_async|command)(?:\?|$)/)
       if (req.method === 'POST' && match?.[1] === mainID()) {
+        recovery.cancel(true)
         const gate = messageGate.then(() => lifecycle.busy())
         messageGate = gate.catch(() => {})
         await gate
@@ -152,15 +160,17 @@ async function serve() {
   let stopping = false
   for (const name of ['SIGTERM', 'SIGINT']) process.once(name, () => {
     stopping = true
+    recovery.cancel()
     clearInterval(heartbeatTimer)
     lifecycle.shutdown().catch(console.error).finally(async () => { await heartbeat('ended'); process.exit() })
   })
   async function reconcile() {
     const id = mainID()
     if (!id || lifecycle.stopping) return
-    const states = await api('/session/status')
-    if (states[id]?.type && states[id].type !== 'idle') return
-    const messages = await api(`/session/${id}/message`)
+    const current = await snapshot(id)
+    recovery.observe(current)
+    if (current.busy) return
+    const messages = current.messages
     const last = messages.at(-1)?.info
     if (last?.role === 'assistant' && last.time?.completed && !last.error && last.finish !== 'tool-calls') void lifecycle.complete(last.id).catch(console.error)
   }
@@ -181,7 +191,7 @@ async function serve() {
           if (!data) continue
           const event = JSON.parse(data), id = event.properties?.sessionID
           if (id !== mainID()) continue
-          if (event.type === 'session.status' && event.properties.status?.type === 'busy') void lifecycle.busy().catch(console.error)
+          if (event.type === 'session.status' && event.properties.status?.type === 'busy') { recovery.cancel(); void lifecycle.busy().catch(console.error) }
           if (event.type === 'session.idle' || (event.type === 'session.status' && event.properties.status?.type === 'idle')) await reconcile()
         }
       }
