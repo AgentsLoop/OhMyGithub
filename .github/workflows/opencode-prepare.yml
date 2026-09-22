@@ -70,6 +70,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: /usr/bin/time -p node scripts/opencode-prepare.mjs
 
+      - name: Report branch handoff
+        if: steps.prepare.outputs.redispatched == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+          OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
+        run: |
+          sequence=$(date +%s)000
+          /usr/bin/time -p curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 15 \
+            -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+            --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":$sequence,\"state\":\"starting\",\"phase\":\"queued\"}" \
+            "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/run"
+
       - name: Report preparation failure
         if: ${{ always() && (failure() || cancelled()) }}
         continue-on-error: true

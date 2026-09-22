@@ -53,7 +53,7 @@ export async function prepareRequest(event, env, fetcher = fetch) {
       method: 'POST',
       body: JSON.stringify({ ref: parsed.targetRef, inputs: { issue_number: String(number) } }),
     });
-    return { approved: 'false' };
+    return { approved: 'false', redispatched: 'true' };
   }
   return { approved: 'true', issue_number: String(number), request: parsed.request, issue_title: parsed.title, sender, labels_json: JSON.stringify(labels), target_ref: parsed.targetRef, target_sha: branch.commit.sha };
 }
