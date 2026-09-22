@@ -29,7 +29,7 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       issues: write
       actions: write
     outputs:
@@ -42,6 +42,17 @@ jobs:
       target_ref: ${{ steps.prepare.outputs.target_ref }}
       target_sha: ${{ steps.prepare.outputs.target_sha }}
     steps:
+      - name: Register preparation
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+          OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
+        run: |
+          /usr/bin/time -p curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 15 \
+            -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+            --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":1,\"state\":\"starting\",\"phase\":\"initializing\"}" \
+            "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/run"
       - name: Checkout trusted preparation code
         uses: actions/checkout@v6
         with:
@@ -58,3 +69,18 @@ jobs:
           OPENCODE_ACCESS: ${{ vars.OPENCODE_ACCESS || 'writers' }}
           GH_TOKEN: ${{ github.token }}
         run: /usr/bin/time -p node scripts/opencode-prepare.mjs
+
+      - name: Report preparation failure
+        if: ${{ always() && (failure() || cancelled()) }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+          OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
+          OUTCOME: ${{ job.status }}
+        run: |
+          sequence=$(date +%s)000
+          /usr/bin/time -p curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 15 \
+            -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+            --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":$sequence,\"state\":\"ended\",\"phase\":\"initializing\",\"outcome\":\"$OUTCOME\",\"reason\":\"Workflow preparation failed. Check build details.\"}" \
+            "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/run"

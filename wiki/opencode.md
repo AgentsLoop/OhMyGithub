@@ -285,3 +285,9 @@ Install and verify tmux before starting the web runtime on Linux and macOS. Keep
 ## Recover provider failures
 
 Resume terminal retryable provider errors and `Invalid upload request` errors in the same session and model. Wait 30 seconds and send exactly `Continue`. Limit automatic resumes to five per human request, including failures after partial progress. Cancel pending recovery on new input, cancellation, shutdown, or successful completion. Inspect `lifecycle.log` for recovery attempts and exhaustion. Apply this behavior to newly started workers; do not expect running controllers to reload code.
+
+## Report preparation and terminal status
+
+Register the run with OmGithub before preparation checkout. Grant preparation contents-write permission to support the existing workflow-token callback authentication. Report preparation failure from an always-run finalizer. Report the execution outcome after cleanup. Bound callback retries; keep execution independent of the optional GitHub App. Preserve GitHub error messages, request IDs, and rate-limit headers in preparation diagnostics.
+
+Update existing listener pins and permissions when deploying this workflow. Keep late heartbeats from replacing terminal outcomes. Reconcile missing callbacks in OmGithub rather than polling Actions separately from each project card.

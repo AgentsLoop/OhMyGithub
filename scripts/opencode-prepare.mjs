@@ -26,7 +26,12 @@ export async function prepareRequest(event, env, fetcher = fetch) {
       ...options, headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(30000), redirect: 'error',
     });
-    if (!response.ok) throw new Error(`GitHub request failed (HTTP ${response.status}) for ${path}.`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const metadata = ['x-github-request-id', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'retry-after'].map(k => `${k}=${response.headers?.get(k) || 'unknown'}`).join(' ');
+      const detail = String(body.message || '').replace(/[\r\n]/g, ' ').slice(0, 300);
+      throw new Error(`GitHub request failed (HTTP ${response.status}) for ${path}. ${detail} ${metadata}`);
+    }
     return response.status === 204 ? null : response.json();
   };
   const [repo, issue] = await Promise.all([api(''), api(`/issues/${number}`)]);

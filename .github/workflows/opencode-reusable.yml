@@ -1422,3 +1422,18 @@ jobs:
           rm -f "$SSH_KEY" "$SSH_PUBLIC_KEY"
           rm -rf "$SSH_DIR" "$HOME/.ssh/authorized_keys"
           rm -rf "$OPENCODE_WEB_DIR"
+
+      - name: Report terminal build status
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
+          OUTCOME: ${{ job.status }}
+        shell: bash
+        run: |
+          sequence=$(date +%s)000
+          /usr/bin/time -p curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 15 \
+            -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+            --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":$sequence,\"state\":\"ended\",\"phase\":\"building\",\"outcome\":\"$OUTCOME\"}" \
+            "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/run"
