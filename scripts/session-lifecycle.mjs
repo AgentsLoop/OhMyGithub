@@ -96,11 +96,13 @@ async function serve() {
         rmSync(join(directory, 'active-validation.json'), { force: true })
       }
       if (!lifecycle.stopping) {
+        try {
         const response = await fetch(`${env.OMGITHUB_ORIGIN || 'https://omgithub.com'}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/deployment`, {
-          method: 'POST', headers: { authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'x-omgithub-run': env.GITHUB_RUN_ID, 'x-omgithub-attempt': env.GITHUB_RUN_ATTEMPT || '1', 'x-omgithub-generation': String(generation), 'x-omgithub-state': state, 'x-omgithub-error': encodeURIComponent(error).slice(0, 1000) }, signal: AbortSignal.timeout(30000)
+          method: 'POST', headers: { authorization: `Bearer ${env.OMGITHUB_CALLBACK_TOKEN || ''}`, 'x-omgithub-run': env.GITHUB_RUN_ID, 'x-omgithub-attempt': env.GITHUB_RUN_ATTEMPT || '1', 'x-omgithub-generation': String(generation), 'x-omgithub-state': state, 'x-omgithub-error': encodeURIComponent(error).slice(0, 1000) }, signal: AbortSignal.timeout(30000)
         })
         if (!response.ok) throw new Error(`Deployment registration HTTP ${response.status}`)
         await heartbeat()
+        } catch (error) { process.stderr.write(`Status callback deferred: ${error.message}\n`) }
       }
     }
   })

@@ -291,3 +291,11 @@ Resume terminal retryable provider errors and `Invalid upload request` errors in
 Register the run with OmGithub before preparation checkout. Grant preparation contents-write permission to support the existing workflow-token callback authentication. Report preparation failure from an always-run finalizer. Report the execution outcome after cleanup. Bound callback retries; keep execution independent of the optional GitHub App. Preserve GitHub error messages, request IDs, and rate-limit headers in preparation diagnostics.
 
 Update existing listener pins and permissions when deploying this workflow. Keep late heartbeats from replacing terminal outcomes. Reconcile missing callbacks in OmGithub rather than polling Actions separately from each project card.
+
+## Report status without GitHub REST
+
+Grant `id-token: write` in listener and reusable jobs. Exchange the Actions identity
+for an OmGithub callback credential before checkout. Pass `OMGITHUB_CALLBACK_TOKEN`
+to run registration and deployment uploads. Keep registration nonfatal. Report
+terminal outcomes without loading checkout files. Install the updated listener
+before creating a fresh test issue; do not rerun existing issues for verification.

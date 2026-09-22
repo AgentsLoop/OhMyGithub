@@ -17,7 +17,7 @@ export async function registerRun(env, state, check) {
   body.urls = await readyPublicUrls(body.urls, check)
   if (body.state === 'live' && !body.urls.opencode) body.state = 'starting'
   const response = await fetch(`${env.OMGITHUB_ORIGIN || 'https://omgithub.com'}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/run`, {
-    method: 'POST', headers: { authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'content-type': 'application/json' },
+    method: 'POST', headers: { authorization: `Bearer ${env.OMGITHUB_CALLBACK_TOKEN || ''}`, 'content-type': 'application/json' },
     body: JSON.stringify(body), signal: AbortSignal.timeout(15000)
   })
   if (!response.ok) throw new Error(`Run registration HTTP ${response.status}`)

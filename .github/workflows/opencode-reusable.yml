@@ -48,6 +48,7 @@ jobs:
     # Ubuntu is the default; the mac label opts this run into macOS.
     runs-on: ${{ contains(inputs.labels_json, '"mac"') && 'macos-latest' || 'ubuntu-latest' }}
     permissions:
+      id-token: write
       contents: write
       issues: write
       actions: read
@@ -86,7 +87,42 @@ jobs:
       SSH_ONLY_REQUEST: ${{ contains(inputs.labels_json, '"ssh"') }}
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
+      - name: Authenticate status callbacks
+        continue-on-error: true
+        shell: bash
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
+        run: |
+          /usr/bin/time -p node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          const env = process.env;
+          const origin = env.OMGITHUB_ORIGIN.replace(/\/$/, '');
+          const url = new URL(env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          url.searchParams.set('audience', origin);
+          async function json(url, options) {
+            const response = await fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+            if (!response.ok) throw new Error(`Callback authentication HTTP ${response.status}`);
+            return response.json();
+          }
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const identity = await json(url, { headers: { authorization: `Bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` } });
+              const { token } = await json(`${origin}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.ISSUE_NUMBER}/callback-token`, {
+                method: 'POST', headers: { authorization: `Bearer ${identity.value}`, 'content-type': 'application/json' },
+                body: JSON.stringify({ run: env.GITHUB_RUN_ID, attempt: Number(env.GITHUB_RUN_ATTEMPT) })
+              });
+              console.log(`::add-mask::${token}`);
+              appendFileSync(env.GITHUB_ENV, `OMGITHUB_CALLBACK_TOKEN=${token}\n`);
+              break;
+            } catch (error) {
+              if (attempt === 2) throw error;
+              await new Promise(resolve => setTimeout(resolve, 2000 * 2 ** attempt));
+            }
+          }
+          NODE
       - name: Register Actions progress
+        continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -95,7 +131,7 @@ jobs:
           set -euo pipefail
           # Bootstrap without the runtime checkout; the lifecycle owns later updates.
           /usr/bin/time -p curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --max-time 20 \
-            -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer $OMGITHUB_CALLBACK_TOKEN" -H 'Content-Type: application/json' \
             --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":1,\"state\":\"starting\"}" \
             "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/run"
 
@@ -634,7 +670,7 @@ jobs:
           if [[ -z "$OPENCODE_VERSION" ]]; then
           OPENCODE_VERSION="$(
             curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
-              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Authorization: Bearer $OMGITHUB_CALLBACK_TOKEN" \
               -H 'Accept: application/vnd.github+json' \
               https://api.github.com/repos/anomalyco/opencode/releases/latest \
               | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p'
@@ -1329,29 +1365,12 @@ jobs:
           script: |
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
-            const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const warn = (error) => core.warning(error.message);
-            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-              per_page: 100
-            }).catch((error) => { warn(error); return []; });
-            const failedSteps = jobs
-              .flatMap((job) => (job.steps || [])
-                .filter((step) => step.conclusion === 'failure')
-                .map((step) => `${job.name}: ${step.name}`));
-            const details = failedSteps.length
-              ? failedSteps.map((step) => `- \`${step}\``).join('\n')
-              : '- See the workflow logs for the failing step.';
             await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER,
               repo: process.env.TARGET_REPO,
               issue_number: number,
-              body: renderTemplate('opencode-failed-comment.md', {
-                RUN_URL: runUrl,
-                FAILED_STEPS: details
-              })
+              body: `Build failed. [Open workflow logs](${runUrl}).`
             }).catch(warn);
             await github.rest.issues.removeLabel({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
@@ -1434,6 +1453,6 @@ jobs:
         run: |
           sequence=$(date +%s)000
           /usr/bin/time -p curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 15 \
-            -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer $OMGITHUB_CALLBACK_TOKEN" -H 'Content-Type: application/json' \
             --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":$sequence,\"state\":\"ended\",\"phase\":\"building\",\"outcome\":\"$OUTCOME\"}" \
             "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/run"

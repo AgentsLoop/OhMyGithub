@@ -72,7 +72,7 @@ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
   if (controller.signal.aborted) throw new Error('Cancelled')
   const site = env.OMGITHUB_ORIGIN || 'https://omgithub.com'
   const deployed = await uploadDeployment(`${site}/api/github/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/deployment`, { method: 'POST', headers: {
-    authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}`, 'content-type': 'application/zip', 'x-omgithub-run': env.GITHUB_RUN_ID, 'x-omgithub-attempt': env.GITHUB_RUN_ATTEMPT || '1',
+    authorization: `Bearer ${env.OMGITHUB_CALLBACK_TOKEN || ''}`, 'content-type': 'application/zip', 'x-omgithub-run': env.GITHUB_RUN_ID, 'x-omgithub-attempt': env.GITHUB_RUN_ATTEMPT || '1',
     'x-omgithub-generation': env.DEPLOYMENT_GENERATION, 'x-omgithub-commit': env.CHECKPOINT_COMMIT
   }, body: readFileSync(archive), signal: controller.signal })
   if (controller.signal.aborted) throw new Error('Cancelled')
