@@ -4,6 +4,8 @@ The canonical workflow is `.github/workflows/opencode.yml`.
 The numbered build, verification, remediation, completion, and screenshot
 prompt templates are stored as Markdown files in `.github/prompts/`.
 
+Keep the default static app server watching generated files. Inject its change-event client only for `omgithub_live=1`; leave the ordinary preview unmodified. For Vite projects, keep the output build running in watch mode while the worker is live.
+
 ## Trigger
 
 Create the issue with `OpenCode` and requested mode labels, to start `.github/workflows/opencode.yml` through `issues.opened`. Install this listener
