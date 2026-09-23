@@ -63,7 +63,7 @@ while :; do
       --argjson messages "$payload" \
       --argjson statuses "$status_payload" \
       --arg root "$SESSION_ID" \
-      --argjson now "$(date +%s)" '
+      --argjson now "${PROGRESS_NOW_SECONDS:-$(date +%s)}" '
       def epoch:
         if . == null then null
         elif . > 100000000000 then . / 1000

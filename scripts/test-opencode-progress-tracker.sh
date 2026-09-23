@@ -42,6 +42,7 @@ sessions = [
     {"id": "ses_failed", "parentID": "ses_root", "tokens": {"cache": {"write": 5}}},
 ]
 statuses = {
+    "ses_root": {"type": "busy"},
     "ses_child": {"type": "busy"},
     "ses_nested": {"type": "retry"},
     "ses_done": {"type": "idle"},
@@ -55,7 +56,9 @@ messages = {
             "parts": [{"type": "tool", "tool": "task", "state": {"status": "running"}}],
         },
         {"info": {"id": "msg_user_two", "role": "user", "time": {"created": 1000000200000}}, "parts": [{"type": "text", "text": "continue"}]},
-        {"info": {"role": "assistant", "parentID": "msg_user_two", "time": {"created": 1000000201000, "completed": 1000000246000}}, "parts": []},
+        {"info": {"role": "assistant", "parentID": "msg_user_two", "time": {"created": 1000000201000, "completed": 1000000210000}}, "parts": []},
+        {"info": {"id": "msg_user_three", "role": "user", "time": {"created": 1000000300000}}, "parts": [{"type": "text", "text": "editor follow-up"}]},
+        {"info": {"role": "assistant", "parentID": "msg_user_three", "time": {"created": 1000000301000}}, "parts": []},
     ],
     "ses_child": [
         {
@@ -152,6 +155,7 @@ SESSION_ID=ses_root \
 OPENCODE_WEB_URL=http://127.0.0.1/session/ses_root \
 PROJECT_FILE_URL=http://127.0.0.1/project-files \
 PROGRESS_DRY_RUN=true \
+PROGRESS_NOW_SECONDS=1000000330 \
 PROGRESS_OUTPUT="$output_file" \
 PROGRESS_COMMENT_TEMPLATE="$workflow_script_dir/opencode-progress-comment-template.md" \
 AGENTSWEB_SSH_ENABLED=true \
@@ -185,7 +189,7 @@ assert_line "📁 **Project files:** http://127.0.0.1/project-files"
 assert_line "🔐 **Temporary AgentsWeb SSH session is ready.**"
 assert_line "ssh -p 2222 runner@example"
 assert_line "- Token count: 190"
-assert_line "- Speed score:"
+assert_line "- Speed score: 2.4 tokens/s"
 assert_line "- Total chat runtime: 1m"
 
 if [[ "$("$tracker" --format-elapsed 1266)" != "21m" ]]; then
