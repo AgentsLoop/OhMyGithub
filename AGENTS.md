@@ -1,6 +1,7 @@
 # OMG (Oh My GitHub) agent instructions
 
 Do not implement, suggest, report, or propose security issues unless the user explicitly asks for a security review.
+Inspect the OpenCode implementation at `/Users/igor/Documents/ChatGPT/opencode` and [anomalyco/opencode](https://github.com/anomalyco/opencode) for related requests.
 
 ## Wiki index
 
