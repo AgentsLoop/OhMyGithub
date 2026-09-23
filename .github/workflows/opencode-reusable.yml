@@ -54,9 +54,7 @@ jobs:
       actions: read
     env:
       SSH_NAME: opencode-issue-${{ inputs.issue_number }}-${{ github.run_id }}-ssh
-      SSH_DIR: ${{ github.workspace }}/.opencode-ssh
       OPENCODE_WEB_PORT: 4096
-      OPENCODE_WEB_DIR: ${{ github.workspace }}/.opencode-web
       PROJECT_PATH: ${{ vars.PROJECT_DIR || './' }}
       PROJECT_DIR: ${{ github.workspace }}/${{ vars.PROJECT_DIR || './' }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
@@ -73,7 +71,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       TARGET_REF: ${{ inputs.target_ref }}
       TARGET_SHA: ${{ inputs.target_sha }}
-      RUNTIME_DIR: ${{ github.workspace }}/.omgithub-runtime
+      RUNTIME_REF: ${{ inputs.runtime_ref }}
       APP_PORT: 3000
       BRANCH_NAME: opencode/${{ github.run_id }}
       AGENTSWEB_SSH_ENABLED: ${{ secrets.AGENTSWEB_SSH_PUBLIC_KEY != '' }}
@@ -159,15 +157,23 @@ jobs:
           fetch-depth: 1
           persist-credentials: true
 
-      - name: Checkout centralized OMG runtime
-        uses: actions/checkout@v6
-        with:
-          repository: AgentsLoop/OhMyGithub
-          ref: ${{ inputs.runtime_ref }}
-          path: .omgithub-runtime
-          token: ${{ github.token }}
-          fetch-depth: 1
-          persist-credentials: false
+      - name: Set worker paths outside the project
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p printf 'SSH_DIR=%s\nOPENCODE_WEB_DIR=%s\nRUNTIME_DIR=%s\nAGENTSWEB_DIR=%s\n' \
+            "$RUNNER_TEMP/omgithub-ssh" "$RUNNER_TEMP/omgithub-web" \
+            "$RUNNER_TEMP/omgithub-runtime" "$RUNNER_TEMP/omgithub-agentsweb" >> "$GITHUB_ENV"
+
+      - name: Fetch centralized OMG runtime outside the project
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p git init "$RUNTIME_DIR"
+          /usr/bin/time -p git -C "$RUNTIME_DIR" remote add origin https://github.com/AgentsLoop/OhMyGithub.git
+          /usr/bin/time -p git -C "$RUNTIME_DIR" fetch --depth=1 origin "$RUNTIME_REF"
+          /usr/bin/time -p git -C "$RUNTIME_DIR" checkout --detach FETCH_HEAD
+          [[ "$(git -C "$RUNTIME_DIR" rev-parse HEAD)" == "$RUNTIME_REF" ]]
 
       - name: Prepare selected remix snapshot
         timeout-minutes: 15
@@ -186,15 +192,15 @@ jobs:
           set -euo pipefail
           /usr/bin/time -p bash "$RUNTIME_DIR/scripts/setup-linux-playwright.sh"
 
-      - name: Checkout AgentsWeb tunnel client
+      - name: Fetch AgentsWeb tunnel client outside the project
         if: env.TEST_REQUEST != 'true'
-        uses: actions/checkout@v6
-        with:
-          repository: agents-dev/agent-workspace
-          path: .agentsweb
-          sparse-checkout: |
-            lolgames_tunnel
-          persist-credentials: false
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p git clone --depth=1 --filter=blob:none --sparse \
+            https://github.com/agents-dev/agent-workspace.git "$AGENTSWEB_DIR"
+          /usr/bin/time -p git -C "$AGENTSWEB_DIR" sparse-checkout set lolgames_tunnel
+          /usr/bin/time -p test -f "$AGENTSWEB_DIR/lolgames_tunnel/client.py"
 
       - name: Resolve project directory
         shell: bash
@@ -407,7 +413,7 @@ jobs:
             sed -n '1,160p' "$SSH_DIR/sshd.log" >&2
             exit 1
           fi
-          nohup env PYTHONPATH="$GITHUB_WORKSPACE/.agentsweb" \
+          nohup env PYTHONPATH="$AGENTSWEB_DIR" \
             python3 -m lolgames_tunnel client 127.0.0.1:2222 \
             --server agentsweb.space --name "$SSH_NAME" --public-port "$REQUESTED_SSH_PORT" \
             > "$SSH_DIR/tunnel.log" 2>&1 &
@@ -1037,8 +1043,8 @@ jobs:
         env:
           AGENTSWEB_SSH_ENABLED: ${{ env.AGENTSWEB_SSH_ENABLED }}
           AGENTSWEB_SSH_READY: ${{ steps.agentsweb.outcome == 'success' }}
-          SSH_ACCESS_FILE: ${{ env.SSH_DIR }}/access.env
-          SSH_TUNNEL_LOG: ${{ env.SSH_DIR }}/tunnel.log
+          SSH_ACCESS_FILE: ${{ runner.temp }}/omgithub-ssh/access.env
+          SSH_TUNNEL_LOG: ${{ runner.temp }}/omgithub-ssh/tunnel.log
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}

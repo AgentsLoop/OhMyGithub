@@ -6,6 +6,8 @@ prompt templates are stored as Markdown files in `.github/prompts/`.
 
 Keep the default static app server watching generated files. Inject its change-event client only for `omgithub_live=1`; leave the ordinary preview unmodified. For Vite projects, keep the output build running in watch mode while the worker is live.
 
+Keep the runtime checkout, AgentsWeb client, SSH files, and web-control state under `$RUNNER_TEMP`, outside the project checkout. Fetch the runtime at the pinned workflow commit. Keep Playwright CLI snapshots and logs under `$HOME/.local/share/omgithub-playwright/output`. Read live lifecycle diagnostics from `$RUNNER_TEMP/omgithub-web` over SSH.
+
 ## Trigger
 
 Create the issue with `OpenCode` and requested mode labels, to start `.github/workflows/opencode.yml` through `issues.opened`. Install this listener

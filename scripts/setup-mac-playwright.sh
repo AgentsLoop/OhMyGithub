@@ -3,11 +3,12 @@ set -euo pipefail
 
 # Keep the CLI and its matching browser outside the generated project.
 runtime="$HOME/.local/share/omgithub-playwright"
-/usr/bin/time -p mkdir -p "$runtime" /usr/local/bin
+/usr/bin/time -p mkdir -p "$runtime/output" /usr/local/bin
 /usr/bin/time -p npm install --prefix "$runtime" --no-save --no-package-lock @playwright/cli@0.1.19 playwright
 /usr/bin/time -p "$runtime/node_modules/.bin/playwright" install chromium
-/usr/bin/time -p tee "$runtime/metal.json" >/dev/null <<'JSON'
+/usr/bin/time -p tee "$runtime/metal.json" >/dev/null <<JSON
 {
+  "outputDir": "$runtime/output",
   "browser": {
     "browserName": "chromium",
     "launchOptions": {
@@ -23,6 +24,7 @@ node_dir="$(dirname "$(command -v node)")"
 /usr/bin/time -p tee "$runtime/playwright-cli" >/dev/null <<WRAPPER
 #!/usr/bin/env bash
 export PATH="$node_dir:\$PATH"
+export PLAYWRIGHT_MCP_OUTPUT_DIR="$runtime/output"
 for arg in "\$@"; do
   case "\$arg" in
     -*) continue ;;

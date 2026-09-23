@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 runtime="$HOME/.local/share/omgithub-playwright"
-/usr/bin/time -p mkdir -p "$runtime"
+/usr/bin/time -p mkdir -p "$runtime/output"
 /usr/bin/time -p sudo -n apt-get update
 /usr/bin/time -p sudo -n apt-get install -y mesa-vulkan-drivers vulkan-tools xvfb xauth lsof
 /usr/bin/time -p npm install --prefix "$runtime" --no-save --no-package-lock @playwright/cli@0.1.19 playwright
 /usr/bin/time -p "$runtime/node_modules/.bin/playwright" install --with-deps chromium
-/usr/bin/time -p tee "$runtime/linux.json" >/dev/null <<'JSON'
+/usr/bin/time -p tee "$runtime/linux.json" >/dev/null <<JSON
 {
+  "outputDir": "$runtime/output",
   "browser": {
     "browserName": "chromium",
     "launchOptions": {
@@ -30,6 +31,7 @@ node_dir="$(dirname "$(command -v node)")"
 set -euo pipefail
 export PATH="$node_dir:\$PATH"
 export DISPLAY=":\$(cat "$runtime/display")"
+export PLAYWRIGHT_MCP_OUTPUT_DIR="$runtime/output"
 for arg in "\$@"; do
   case "\$arg" in
     -*) continue ;;
