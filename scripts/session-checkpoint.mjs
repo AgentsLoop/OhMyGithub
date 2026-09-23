@@ -9,7 +9,7 @@ const digest = value => createHash('sha256').update(value).digest('hex')
 export function command(file, args, options = {}) {
   const start = Date.now()
   try { return (execFileSync(file, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'], ...options }) || '').trim() }
-  catch (error) { throw Object.assign(new Error(`${file} ${args[0] || ''} failed (exit ${error.status ?? 'timeout'}).`), { status: Number(String(error.stderr || '').match(/HTTP (\d{3})/)?.[1]) || undefined }) }
+  catch (error) { throw Object.assign(new Error(`${file} ${args[0] || ''} failed (exit ${error.status ?? 'timeout'}).`), { status: Number(String(error.stderr || '').match(/(?:HTTP |error: )(\d{3})/)?.[1]) || undefined }) }
   finally { process.stderr.write(`[timing] ${file} ${args[0] || ''}: ${Date.now() - start} ms\n`) }
 }
 // OpenCode can exit before a piped stdout buffer drains. A regular file descriptor
@@ -91,15 +91,20 @@ export function prepare() {
   const source = parseResume(env.COMMENT_BODY || '')
   if (!source) return
   if (!source.prompt.trim()) throw new Error('Enter the next game change.')
-  const repository = JSON.parse(api(`repos/${source.source_repository}`))
-  if (repository.private) throw new Error('Only public checkpoints can be copied.')
-  const release = JSON.parse(api(`repos/${source.source_repository}/releases/tags/${source.checkpoint_tag}`))
-  const manifestName = release.body?.match(/<!-- checkpoint-asset:([^ ]+) -->/)?.[1]
-  const asset = release.assets?.find(a => a.name === manifestName && a.state === 'uploaded' && a.size > 0 && a.size <= 25 * 1024 * 1024)
-  if (release.draft || !asset) throw new Error('No complete saved session is available.')
-  const payload = JSON.parse(api(`repos/${source.source_repository}/releases/assets/${asset.id}`, ['-H', 'Accept: application/octet-stream']))
-  if (payload.version !== 2) throw new Error('Unsupported checkpoint version.')
-  {
+  let payload
+  const managedUrl = `${env.OMGITHUB_ORIGIN || 'https://omgithub.com'}/api/github/${source.source_repository}/issues/${source.source_issue}/checkpoint`
+  try { payload = JSON.parse(command('curl', ['--fail', '--silent', '--show-error', '--max-time', '30', managedUrl])) }
+  catch (error) {
+    if (error.status !== 404) throw error
+    // Read old releases until their checkpoints have moved to OmGithub storage.
+    const repository = JSON.parse(api(`repos/${source.source_repository}`))
+    if (repository.private) throw new Error('Only public checkpoints can be copied.')
+    const release = JSON.parse(api(`repos/${source.source_repository}/releases/tags/${source.checkpoint_tag}`))
+    const manifestName = release.body?.match(/<!-- checkpoint-asset:([^ ]+) -->/)?.[1]
+    const asset = release.assets?.find(a => a.name === manifestName && a.state === 'uploaded' && a.size > 0 && a.size <= 25 * 1024 * 1024)
+    if (release.draft || !asset) throw new Error('No complete saved session is available.')
+    payload = JSON.parse(api(`repos/${source.source_repository}/releases/assets/${asset.id}`, ['-H', 'Accept: application/octet-stream']))
+    if (payload.version !== 2) throw new Error('Unsupported checkpoint version.')
     const sessionAsset = release.assets?.find(a => a.name === payload.session_asset && a.state === 'uploaded')
     if (!sessionAsset) throw new Error('Missing conversation asset.')
     payload.session = JSON.parse(api(`repos/${source.source_repository}/releases/assets/${sessionAsset.id}`, ['-H', 'Accept: application/octet-stream']))
@@ -178,35 +183,22 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     const commit = git('commit-tree', tree, '-p', parent, '-m', `Save game and conversation for issue #${issue}\n\nRun: ${run}`)
     const checkpoint = validateCheckpoint({ version: 2, repository: env.GITHUB_REPOSITORY, issue_number: issue, run_id: run, commit, branch,
       project_dir: projectDir, opencode_version: version, session, public_history: true, created_at: new Date().toISOString() }, source)
-    const repository = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}`))
-    if (repository.private) throw new Error('Public session checkpoints require a public repository.')
     const generation = `${run}-${Date.now()}`
     const tag = `opencode-checkpoint-${issue}`
-    const sessionName = `opencode-${generation}.json`
-    const manifestName = `checkpoint-${generation}.json`
-    const sessionPath = join(directory, sessionName)
-    const path = join(directory, manifestName)
     const { session: exported, ...metadata } = checkpoint
     if (Buffer.byteLength(JSON.stringify(exported)) > 25 * 1024 * 1024) throw new Error('Session export exceeds 25 MB.')
-    writeFileSync(sessionPath, JSON.stringify(exported), { mode: 0o600 })
-    writeFileSync(path, JSON.stringify({ ...metadata, version: 2, generation, interrupted, session_id: sessionId, session_asset: sessionName }), { mode: 0o600 })
     const remote = git('ls-remote', 'origin', `refs/heads/${branch}`).split(/\s/)[0] || ''
     git('push', `--force-with-lease=refs/heads/${branch}:${remote}`, 'origin', `${commit}:refs/heads/${branch}`)
-    const releasePath = `repos/${env.GITHUB_REPOSITORY}/releases/tags/${tag}`
-    let release = findRelease(releasePath, api)
-    if (!release) {
-      release = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases`, ['-X', 'POST', '-f', `tag_name=${tag}`, '-f', `target_commitish=${commit}`, '-F', 'draft=true', '-f', `name=Saved session #${issue}`, '-f', 'body=Prepare saved session.']))
-      if (!release?.id) throw new Error('Created checkpoint release has no ID.')
-    }
-    command('gh', ['release', 'upload', tag, sessionPath, path, '--repo', env.GITHUB_REPOSITORY])
-    const uploaded = JSON.parse(api(`repos/${env.GITHUB_REPOSITORY}/releases/${release.id}`))
-    if (![sessionName, manifestName].every(name => uploaded.assets.some(a => a.name === name && a.state === 'uploaded' && a.size > 0))) throw new Error('Checkpoint upload incomplete.')
-    // Publish the pointer only after both files exist. Readers use the manifest commit, not the mutable tag.
-    command('gh', ['release', 'edit', tag, '--repo', env.GITHUB_REPOSITORY, '--draft=false', '--latest=false', '--notes', `Restore saved code and conversation.\n<!-- checkpoint-asset:${manifestName} -->`])
-    for (const asset of uploaded.assets.filter(a => /^(?:checkpoint|opencode)-.*\.json$/.test(a.name) && ![sessionName, manifestName].includes(a.name))) {
-      api(`repos/${env.GITHUB_REPOSITORY}/releases/assets/${asset.id}`, ['-X', 'DELETE'])
-    }
-    const state = { fingerprint, tag, commit, generation, sessionId, manifestName }
+    const uploadPath = join(directory, `checkpoint-upload-${generation}.json`)
+    writeFileSync(uploadPath, JSON.stringify({ manifest: { ...metadata, generation, interrupted, session_id: sessionId }, session: exported }), { mode: 0o600 })
+    try {
+      command('curl', ['--fail-with-body', '--silent', '--show-error', '--max-time', '120', '-X', 'PUT',
+        '-H', `Authorization: Bearer ${env.OMGITHUB_CALLBACK_TOKEN || ''}`, '-H', 'Content-Type: application/octet-stream',
+        '-H', `x-omgithub-run: ${run}`, '-H', `x-omgithub-attempt: ${env.GITHUB_RUN_ATTEMPT || 1}`,
+        '--data-binary', `@${uploadPath}`,
+        `${env.OMGITHUB_ORIGIN || 'https://omgithub.com'}/api/github/${env.GITHUB_REPOSITORY}/issues/${issue}/checkpoint`])
+    } finally { rmSync(uploadPath, { force: true }) }
+    const state = { fingerprint, tag, commit, generation, sessionId }
     writeFileSync(stateFile, JSON.stringify(state), { mode: 0o600 })
     return state
   } finally { rmSync(gitEnv.GIT_INDEX_FILE, { force: true }) }

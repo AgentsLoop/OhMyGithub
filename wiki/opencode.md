@@ -137,11 +137,11 @@ Before starting OpenCode, the workflow checks out `agents-dev/skills` into
 The workflow excludes this nested skills checkout through `.git/info/exclude`
 so it cannot be included in the generated app commit.
 The workflow verifies the discovered skill list through OpenCode's `/skill`
-endpoint and synchronizes `model/<provider>/<name>` and `skill/<name>` labels
-in the repository.
+endpoint. OmGithub installs `model/<provider>/<name>` and `skill/<name>` labels
+before the first issue, while `OpenCode` is absent. Create `OpenCode` last.
 This keeps the regular OpenCode session while making branch and immutable
 commit behavior explicit and reviewable in YAML.
-Model labels are refreshed from the live OpenCode catalog on each run and are
+Initial model labels come from the live OpenCode catalog and are
 limited to models with zero input, output, and cache-read cost, plus the
 explicitly allowed `opencode/gpt-5.6-luna` and `openai/gpt-5.6-luna` models.
 Use `model/openai/gpt-5.6-luna` when the OpenAI provider is required. Default GitHub labels are removed, and
@@ -204,8 +204,8 @@ for non-interactive Actions or SSH commands.
 
 Save code and the main public conversation after each completed response with `scripts/session-checkpoint.mjs`.
 Save again before closing temporary access. Keep the five-hour access period.
-Reuse one checkpoint release per issue. Upload separate conversation and manifest assets. Switch the manifest pointer after verifying uploads.
-Retain earlier complete releases. Exclude credentials, dependencies, and runner files.
+Store the conversation and manifest in OmGithub-managed checkpoint storage. Publish the latest pointer after both files are durable. Read old releases only for legacy sessions.
+Retain legacy releases for old-session restores. Exclude credentials, dependencies, and runner files.
 
 Restore version 2 checkpoints with matching repository, issue, commit, and OpenCode version.
 Import the complete conversation and submit only the next requested change.
@@ -226,7 +226,7 @@ Provision the default start.sh before main OpenCode runs. Install dependencies, 
 
 Run `scripts/session-lifecycle.mjs` once before exposing the web tunnel. Route browser requests through its control port. Read `main-model` after execution-label resolution. Register the main session before reconciling idle events.
 
-Save each completed main response through `scripts/session-checkpoint.mjs`. Keep one issue release and separate JSON assets. Validate through `scripts/session-deploy.mjs` in the main workspace against the shared live server. Cancel validation before forwarding new web messages. Preserve the last successful deployment and reject obsolete generations. Save changed state during shutdown without starting validation.
+Save each completed main response through `scripts/session-checkpoint.mjs`. Keep one OmGithub checkpoint pointer per issue and separate conversation and manifest files. Validate through `scripts/session-deploy.mjs` in the main workspace against the shared live server. Cancel validation before forwarding new web messages. Preserve the last successful deployment and reject obsolete generations. Save changed state during shutdown without starting validation.
 
 Run `node --test scripts/session-lifecycle.test.mjs scripts/session-checkpoint.test.mjs scripts/opencode-prepare.test.mjs scripts/opencode-reporting.test.mjs`. Run `actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.yml`.
 
@@ -254,7 +254,7 @@ Register structured run state through scripts/run-record.mjs. Send a heartbeat e
 
 Declare the static deployment directory in OPENCODE_WEB_DIR/deployment-output.json with absolute project and directory fields. Use the shared default starter to write this declaration for HTML and Vite. Write the same declaration from custom start.sh scripts. Restart the app when its recorded checkpoint differs from the current checkpoint. Capture the resulting server before packaging that declared output.
 
-Keep deployment success separate from result reporting. Retry reporting independently and retain capture evidence on failure. Generate the human-readable deployment report from the controller result. Read readiness from structured run/deployment state. Require a version 2 checkpoint and an explicit release manifest pointer. Supply branch selection as omgithub-request:v1 metadata.
+Keep deployment success separate from result reporting. Retry reporting independently and retain capture evidence on failure. Generate the human-readable deployment report from the controller result. Read readiness from structured run/deployment state. Require a version 2 checkpoint and an explicit OmGithub manifest pointer. Supply branch selection as omgithub-request:v1 metadata.
 
 ## Keep state and tests deterministic
 

@@ -78,6 +78,7 @@ jobs:
       BRANCH_NAME: opencode/${{ github.run_id }}
       AGENTSWEB_SSH_ENABLED: ${{ secrets.AGENTSWEB_SSH_PUBLIC_KEY != '' }}
       TRIGGER_ISSUE_NUMBER: ${{ inputs.issue_number }}
+      OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
       COMMENT_BODY: ${{ inputs.request }}
       LABELS_JSON: ${{ inputs.labels_json }}
       TEST_REQUEST: ${{ contains(inputs.labels_json, '"test"') && contains(inputs.labels_json, '"OpenCode"') }}
@@ -88,7 +89,6 @@ jobs:
       VALIDATION_ENABLED: ${{ vars.VALIDATION_ENABLED || 'true' }}
     steps:
       - name: Authenticate status callbacks
-        continue-on-error: true
         shell: bash
         env:
           ISSUE_NUMBER: ${{ inputs.issue_number }}
@@ -300,116 +300,6 @@ jobs:
             fi
           done < <(find "$template_dir" -maxdepth 1 -type f -name '*.md' ! -name 'agents.template.md' -print | sort)
 
-      - name: Sync OpenCode labels
-        uses: actions/github-script@v7
-        env:
-          OPENCODE_MODEL: opencode/muse-spark-1.3-contributor-free
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const fs = require('node:fs');
-            const path = require('node:path');
-
-            const catalog = await fetch('https://models.opencode.ai/api.json').then(async (response) => {
-              if (!response.ok) throw new Error(`OpenCode model catalog returned ${response.status}`);
-              return response.json();
-            });
-            const models = Object.values(catalog.opencode?.models ?? {})
-              .filter((model) =>
-                (model.cost?.input === 0 && model.cost?.output === 0 && model.cost?.cache_read === 0) ||
-                model.id === 'gpt-5.6-luna'
-              )
-              .map((model) => model.id)
-              .filter(Boolean)
-              .sort();
-            if (!models.includes(process.env.OPENCODE_MODEL.slice('opencode/'.length))) {
-              throw new Error(`Configured model is missing from the OpenCode catalog: ${process.env.OPENCODE_MODEL}`);
-            }
-            const openaiLuna = catalog.openai?.models?.['gpt-5.6-luna'];
-            if (!openaiLuna) {
-              throw new Error('OpenAI catalog is missing gpt-5.6-luna');
-            }
-
-            const skillsRoot = path.join(process.env.PROJECT_DIR, '.agents', 'skills');
-            const skillNames = fs.existsSync(skillsRoot)
-              ? fs.readdirSync(skillsRoot, { withFileTypes: true })
-                  .filter((entry) => entry.isDirectory())
-                  .filter((entry) => fs.existsSync(path.join(skillsRoot, entry.name, 'SKILL.md')))
-                  .map((entry) => entry.name)
-              : [];
-
-            const labels = [
-              { name: 'in progress', color: 'FBCA04', description: 'OpenCode workflow is running' },
-              { name: 'validating', color: '1D76DB', description: 'OpenCode workflow is validating the result' },
-              { name: 'complete', color: '0E8A16', description: 'OpenCode workflow completed successfully' },
-              { name: 'failed', color: 'B60205', description: 'OpenCode workflow failed' },
-              { name: 'Goal', color: '8A2BE2', description: 'Run OMG with the persistent Goal command' },
-              { name: 'ralph', color: '5319E7', description: 'Run OpenCode with the Ralph auto-continuation loop' },
-              { name: 'omo', color: '5319E7', description: 'Preinstall oh-my-openagent for this OpenCode run' },
-              { name: 'test', color: '1D76DB', description: 'Run the full workflow with a mock OpenCode-generated project' },
-              { name: 'mac', color: 'B60205', description: 'Run OpenCode on the macos-latest GitHub-hosted runner' },
-              { name: 'linux', color: '1D76DB', description: 'Run OpenCode on the ubuntu-latest GitHub-hosted runner' },
-              { name: 'ssh', color: '5319E7', description: 'Start an SSH-only debugging session without OpenCode' },
-              ...models.map((model) => ({
-                name: `model/opencode/${model}`,
-                color: '5319E7',
-                description: `OpenCode model: opencode/${model}`
-              })),
-              {
-                name: 'model/openai/gpt-5.6-luna',
-                color: '5319E7',
-                description: 'OpenAI model: openai/gpt-5.6-luna'
-              },
-              ...skillNames.map((name) => ({
-                name: `skill/${name}`,
-                color: '1D76DB',
-                description: `OpenCode skill: ${name}`
-              }))
-            ];
-
-            for (const label of labels) {
-              try {
-                await github.rest.issues.createLabel({
-                  owner: process.env.TARGET_OWNER,
-                  repo: process.env.TARGET_REPO,
-                  ...label
-                });
-              } catch (error) {
-                if (error.status !== 422) throw error;
-                await github.rest.issues.updateLabel({
-                  owner: process.env.TARGET_OWNER,
-                  repo: process.env.TARGET_REPO,
-                  name: label.name,
-                  color: label.color,
-                  description: label.description
-                });
-              }
-            }
-
-            const managedPrefixes = ['model/', 'skill/'];
-            const defaultLabels = new Set([
-              'bug', 'documentation', 'duplicate', 'enhancement', 'good first issue',
-              'help wanted', 'invalid', 'question', 'wontfix'
-            ]);
-            const existing = await github.paginate(github.rest.issues.listLabelsForRepo, {
-              owner: process.env.TARGET_OWNER,
-              repo: process.env.TARGET_REPO,
-              per_page: 100
-            });
-            const desired = new Set(labels.map(({ name }) => name));
-            for (const label of existing) {
-              if (defaultLabels.has(label.name) ||
-                  (managedPrefixes.some((prefix) => label.name.startsWith(prefix)) && !desired.has(label.name))) {
-                await github.rest.issues.deleteLabel({
-                  owner: process.env.TARGET_OWNER,
-                  repo: process.env.TARGET_REPO,
-                  name: label.name
-                });
-              }
-            }
-
-            core.info(`Synchronized ${labels.length} labels from the live OpenCode catalog and shared skills`);
-
       - name: Mark issue in progress
         continue-on-error: true
         uses: actions/github-script@v7
@@ -420,6 +310,7 @@ jobs:
           retries: 3
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const fs = require('node:fs');
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const statuses = ['in progress', 'validating', 'complete', 'failed'];
@@ -596,6 +487,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = [
@@ -630,6 +522,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const comment = await github.rest.issues.createComment({
@@ -950,6 +843,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const response = await github.rest.issues.listLabelsOnIssue({
               owner: process.env.TARGET_OWNER,
@@ -997,6 +891,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const fs = require('node:fs');
             const path = require('node:path');
             const body = [
@@ -1032,6 +927,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER),
@@ -1145,12 +1041,12 @@ jobs:
           SSH_TUNNEL_LOG: ${{ env.SSH_DIR }}/tunnel.log
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
-          PROGRESS_COMMENT_TEMPLATE: ${{ env.RUNTIME_DIR }}/.github/scripts/opencode-progress-comment-template.md
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
           RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
         with:
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const fs = require('node:fs');
             const sshReady = process.env.AGENTSWEB_SSH_ENABLED === 'true' &&
               process.env.AGENTSWEB_SSH_READY === 'true' &&
@@ -1167,7 +1063,6 @@ jobs:
             const tunnelUrl = access.AGENTSWEB_TUNNEL_URL ||
               (tunnelLog.match(/^ssh:\/\/[^\s]+/m) || [])[0] ||
               'not registered';
-            const { renderProgressComment } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const command = process.env.TEST_REQUEST === 'true'
@@ -1185,36 +1080,30 @@ jobs:
               : (process.env.AGENTSWEB_SSH_ENABLED === 'true'
                 ? ['⚠️ **AgentsWeb SSH tunnel setup failed.**', '', `Run: ${run}`, `SSH URL: \`${tunnelUrl}\``].join('\n')
                 : '');
-            const body = renderProgressComment({
-              SSH_SECTION: sshSection,
-              UPDATED: new Date().toISOString().replace('T', ' ').replace('Z', ' UTC'),
-              OPENCODE_WEB_URL: process.env.OPENCODE_WEB_URL,
-              PROJECT_FILE_URL: process.env.PROJECT_FILE_URL || 'unavailable',
-              VALIDATION_SESSION_SECTION: '',
-              PROGRESS_STATS: process.env.TEST_REQUEST === 'true'
-                ? '- Elapsed: under 1 minute\n- Token count: 0\n- Speed score: fixture copy\n- Tool calls: 0\n- Active tool calls: 0\n- Active subagents: 0\n- Total subagents executed: 0\n- Total failed subagents: 0\n- Image-context model calls: 0\n- Changed workspace files: fixture project'
-                : '- Waiting for live OpenCode progress statistics.',
-              ACCESS_NOTE: process.env.TEST_REQUEST === 'true'
-                ? 'This is a synthetic OpenCode session for the full workflow test. Generation is replaced only by the fixture copy; reporting and delivery continue normally.'
+            const body = [sshSection,
+              `🌐 **OpenCode Web UI:** ${process.env.OPENCODE_WEB_URL}`,
+              `📁 **Project files:** ${process.env.PROJECT_FILE_URL || 'unavailable'}`,
+              `Live progress is shown on the OmGithub project card.`,
+              process.env.TEST_REQUEST === 'true'
+                ? 'This is a synthetic OpenCode session for the full workflow test.'
                 : `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
-            });
+            ].filter(Boolean).join('\n\n');
             const comment = await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO, issue_number: number, body
             });
             core.setOutput('comment_id', comment.data.id);
 
-      - name: Start live OpenCode response comment
+      - name: Start live OpenCode progress reporter
         id: response_comment
         if: env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          COMMENT_ID: ${{ steps.access_comment.outputs.comment_id }}
           SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
           OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
           PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
           ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
           REPOSITORY: ${{ github.repository }}
+          OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
         run: |
           set -euo pipefail
           TRACKER="$OPENCODE_WEB_DIR/response-comment-tracker.sh"
@@ -1232,7 +1121,8 @@ jobs:
             SSH_HOST="${AGENTSWEB_HOST:-}" \
             SSH_PORT="${AGENTSWEB_PORT:-}" \
             RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            COMMENT_ID="$COMMENT_ID" REPOSITORY="$REPOSITORY" GH_TOKEN="$GH_TOKEN" \
+            REPOSITORY="$REPOSITORY" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            TRIGGER_ISSUE_NUMBER="$TRIGGER_ISSUE_NUMBER" ISSUE_NUMBER="$ISSUE_NUMBER" OMGITHUB_ORIGIN="$OMGITHUB_ORIGIN" OMGITHUB_CALLBACK_TOKEN="$OMGITHUB_CALLBACK_TOKEN" \
             "$TRACKER" > "$OPENCODE_WEB_DIR/response-comment-tracker.log" 2>&1 &
           echo $! > "$OPENCODE_WEB_DIR/response-comment-tracker.pid"
           sleep 1
@@ -1337,6 +1227,7 @@ jobs:
           retries: 3
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             await github.rest.issues.removeLabel({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
@@ -1359,6 +1250,7 @@ jobs:
           retries: 3
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const runUrl = `https://github.com/${process.env.TARGET_REPOSITORY}/actions/runs/${context.runId}`;
             const warn = (error) => core.warning(error.message);
@@ -1407,6 +1299,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
             const { renderTemplate } = require(`${process.env.RUNTIME_DIR}/.github/scripts/opencode-comment-templates.cjs`);
             await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,

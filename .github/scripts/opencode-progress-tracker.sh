@@ -174,8 +174,22 @@ ${SSH_COMMAND}
     if [[ "${PROGRESS_DRY_RUN:-false}" == "true" ]]; then
       printf '%s\n' "$body" > "${PROGRESS_OUTPUT:?PROGRESS_OUTPUT is required in dry-run mode}"
     else
-      gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" \
-        -f body="$body" >/dev/null || true
+      rate_json='null'
+      if [[ -s "${OPENCODE_WEB_DIR}/github-rate.json" ]] && jq -e 'type == "object"' "${OPENCODE_WEB_DIR}/github-rate.json" >/dev/null 2>&1; then
+        rate_json="$(<"${OPENCODE_WEB_DIR}/github-rate.json")"
+      fi
+      report="$(jq -n \
+        --arg run "$GITHUB_RUN_ID" --argjson attempt "${GITHUB_RUN_ATTEMPT:-1}" \
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        --argjson elapsed_seconds "$elapsed_seconds" --argjson model_tokens "$token_count" \
+        --argjson tool_calls "$tool_count" --argjson active_tool_calls "$active_count" \
+        --argjson active_subagents "$active_subagents" --argjson total_subagents "$total_subagents" \
+        --argjson failed_subagents "$failed_subagents" --argjson image_calls "$vision_count" \
+        --argjson changed_files "$changed_count" --argjson rate "$rate_json" \
+        '{run:$run,attempt:$attempt,observed_at:$observed_at,stats:{elapsed_seconds:$elapsed_seconds,model_tokens:$model_tokens,tool_calls:$tool_calls,active_tool_calls:$active_tool_calls,active_subagents:$active_subagents,total_subagents:$total_subagents,failed_subagents:$failed_subagents,image_calls:$image_calls,changed_files:$changed_files},rate:$rate}')"
+      /usr/bin/time -p curl --connect-timeout 5 --max-time 15 --fail --silent --show-error \
+        -H "Authorization: Bearer ${OMGITHUB_CALLBACK_TOKEN:-}" -H 'Content-Type: application/json' \
+        --data "$report" "${OMGITHUB_ORIGIN:-https://omgithub.com}/api/github/$REPOSITORY/issues/$ISSUE_NUMBER/telemetry" >/dev/null || true
     fi
   fi
   [[ -f "$OPENCODE_WEB_DIR/response-comment.done" ]] && break

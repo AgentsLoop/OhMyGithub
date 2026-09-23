@@ -354,7 +354,7 @@ Exclude `.playwright-cli` output from checkpoint trees and deployment archives. 
 
 ## Separate deployment retries from repairs
 
-Reuse the lifecycle checkpoint when preview preparation returns repaired=false. Save again after successful OC repair. Fetch the checkpoint release by tag; create only after HTTP 404. Run legacy cleanup separately with GITHUB_REPOSITORY and TRIGGER_ISSUE_NUMBER set: bash scripts/cleanup-legacy-checkpoints.sh.
+Reuse the lifecycle checkpoint when preview preparation returns repaired=false. Save again after successful OC repair. Upload new checkpoint data to OmGithub and verify the latest pointer and conversation digest. Read legacy releases only when no managed checkpoint exists. Run legacy cleanup separately with GITHUB_REPOSITORY and TRIGGER_ISSUE_NUMBER set: bash scripts/cleanup-legacy-checkpoints.sh.
 
 Retry readiness and capture at most three times with bounded backoff. Return startup exit code 75 for a running server that remains unready or an unavailable public tunnel; report an exited startup process as a script failure. Retry capture without restarting the server. Preserve each capture attempt's stdout and stderr outside source. Escalate persistent script failures to OC; surface persistent DNS/network failures directly. Execute repaired scripts and inspect screenshots.
 

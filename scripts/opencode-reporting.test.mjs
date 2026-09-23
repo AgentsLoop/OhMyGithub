@@ -19,8 +19,8 @@ test('failure reporting attempts every operation despite earlier API failures', 
     createComment: fail('comment'), removeLabel: fail('remove'), addLabels: fail('add')
   } } };
   const run = new (Object.getPrototypeOf(async function() {}).constructor)('github','core','context','require',script);
-  await run(github, { warning() {} }, { repo: { owner: 'o', repo: 'r' }, runId: 1 }, () => ({ renderTemplate: () => 'failure' }));
-  assert.deepEqual(calls, ['jobs', 'comment', 'remove', 'remove', 'add']);
+  await run(github, { warning() {} }, { repo: { owner: 'o', repo: 'r' }, runId: 1 }, () => ({ attach() {}, renderTemplate: () => 'failure' }));
+  assert.deepEqual(calls, ['comment', 'remove', 'remove', 'add']);
 });
 test('routes live validation through one lifecycle controller', () => {
   assert.match(workflow, /scripts\/session-lifecycle.mjs/);

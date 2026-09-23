@@ -21,11 +21,29 @@ export async function prepareRequest(event, env, fetcher = fetch) {
   if (!manual && (env.GITHUB_EVENT_NAME !== 'issues' || event.action !== 'opened')) return { approved: 'false' };
   const number = Number(manual ? event.inputs?.issue_number : event.issue?.number);
   if (!Number.isSafeInteger(number) || number < 1) throw new Error('Supply a valid issue number.');
+  const reportRate = async response => {
+    if (!env.OMGITHUB_CALLBACK_TOKEN) return
+    const names = ['limit', 'remaining', 'used', 'reset']
+    const rate = { resource: response.headers.get('x-ratelimit-resource'), observed_at: new Date().toISOString(), status: response.status }
+    for (const name of names) {
+      const value = response.headers.get(`x-ratelimit-${name}`)
+      rate[name] = value === null ? NaN : Number(value)
+    }
+    if (!rate.resource || names.some(name => !Number.isSafeInteger(rate[name]) || rate[name] < 0)) return
+    try {
+      await fetch(`${env.OMGITHUB_ORIGIN || 'https://omgithub.com'}/api/github/${repository}/issues/${number}/telemetry`, {
+        method: 'POST', headers: { authorization: `Bearer ${env.OMGITHUB_CALLBACK_TOKEN}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ run: env.GITHUB_RUN_ID, attempt: Number(env.GITHUB_RUN_ATTEMPT || 1), observed_at: rate.observed_at, rate }),
+        signal: AbortSignal.timeout(5000)
+      })
+    } catch { /* Keep request accounting independent of preparation. */ }
+  }
   const api = async (path, options = {}) => {
     const response = await fetcher(`${env.GITHUB_API_URL || 'https://api.github.com'}/repos/${repository}${path}`, {
       ...options, headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(30000), redirect: 'error',
     });
+    await reportRate(response)
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       const metadata = ['x-github-request-id', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'retry-after'].map(k => `${k}=${response.headers?.get(k) || 'unknown'}`).join(' ');

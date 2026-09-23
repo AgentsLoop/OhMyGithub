@@ -46,7 +46,11 @@ test('save, late edit, shutdown checkpoint, and restore preserve code and full c
     writeFileSync(join(state, 'session.json'), JSON.stringify(session))
     const fake = `#!/usr/bin/env node
 const fs = require('node:fs'), path = require('node:path'); const args=process.argv.slice(2), state=process.env.FAKE_STATE;
-if (path.basename(process.argv[1]) === 'opencode') {
+if (path.basename(process.argv[1]) === 'curl') {
+ const source=args[args.indexOf('--data-binary')+1];
+ fs.copyFileSync(source.slice(1),path.join(state,'checkpoint-upload.json'));
+ process.stdout.write('{}');
+} else if (path.basename(process.argv[1]) === 'opencode') {
  if(args[0]==='--version') process.stdout.write('1.2.3');
  else if(args[0]==='export') process.stdout.write(fs.readFileSync(path.join(state,'session.json')));
  else if(args[0]==='import') fs.copyFileSync(args[1],path.join(state,'session.json'));
@@ -74,7 +78,7 @@ if (path.basename(process.argv[1]) === 'opencode') {
  if(release) fs.writeFileSync(file,JSON.stringify(release));
 }
 `
-    for (const name of ['opencode', 'gh']) writeFileSync(join(bin, name), fake, { mode: 0o755 })
+    for (const name of ['opencode', 'gh', 'curl']) writeFileSync(join(bin, name), fake, { mode: 0o755 })
     Object.assign(process.env, { PATH: `${bin}:${original.PATH}`, OPENCODE_BIN: join(bin, 'opencode'), FAKE_STATE: state, GITHUB_WORKSPACE: root, PROJECT_DIR: root,
       OPENCODE_WEB_DIR: join(root, '.opencode-web'), RUNNER_TEMP: state, GITHUB_ENV: join(state, 'github-env'), GITHUB_REPOSITORY: 'alice/game', TRIGGER_ISSUE_NUMBER: '6', GITHUB_RUN_ID: '123' })
     writeFileSync(join(root, '.env'), 'SECRET=never-save')
@@ -82,21 +86,20 @@ if (path.basename(process.argv[1]) === 'opencode') {
     assert.equal(git('rev-parse', 'HEAD'), head, 'checkpoint leaves the working branch unchanged')
     assert.equal(git('show', `${first.commit}:index.html`), '<h1>Castle</h1>')
     assert.throws(() => git('show', `${first.commit}:.env`))
-    assert.deepEqual(saveCheckpoint(), first, 'unchanged checkpoint does not create another release')
+    assert.deepEqual(saveCheckpoint(), first, 'unchanged checkpoint does not upload again')
     writeFileSync(join(root, 'index.html'), '<h1>Castle and water</h1>')
     const updated = structuredClone(session)
     updated.messages.push({ info: { id: 'msg_two', role: 'user' }, parts: [{ id: 'prt_two', type: 'text', text: 'Add water' }] })
     writeFileSync(join(state, 'session.json'), JSON.stringify(updated))
     const second = saveCheckpoint()
     assert.notEqual(second.commit, first.commit)
-    assert.equal(first.tag, second.tag, 'reuse the issue release')
-    const release = JSON.parse(readFileSync(join(state, 'release-state.json')))
-    assert.equal(release.assets.filter(a => a.name.startsWith('checkpoint-')).length, 1)
+    assert.equal(first.tag, second.tag, 'retain the issue checkpoint selector')
     assert.equal(git('show', `${second.commit}:index.html`), '<h1>Castle and water</h1>')
-    const manifest = JSON.parse(readFileSync(join(state, second.manifestName)))
+    const upload = JSON.parse(readFileSync(join(state, 'checkpoint-upload.json')))
+    const manifest = upload.manifest
     assert.equal(manifest.session, undefined)
     assert.equal(manifest.version, 2)
-    const exported = JSON.parse(readFileSync(join(state, manifest.session_asset)))
+    const exported = upload.session
     process.env.RESUME_CHECKPOINT_FILE = join(state, 'restore.json')
     writeFileSync(process.env.RESUME_CHECKPOINT_FILE, JSON.stringify({ ...manifest, session: exported }))
     writeFileSync(join(state, 'session.json'), '{}')
