@@ -49,11 +49,13 @@ statuses = {
 }
 messages = {
     "ses_root": [
-        {"info": {"role": "user"}, "parts": [{"type": "text", "text": "start"}]},
+        {"info": {"id": "msg_user_one", "role": "user", "time": {"created": 1000000000000}}, "parts": [{"type": "text", "text": "start"}]},
         {
-            "info": {"role": "assistant"},
+            "info": {"role": "assistant", "parentID": "msg_user_one", "time": {"created": 1000000001000, "completed": 1000000040000}},
             "parts": [{"type": "tool", "tool": "task", "state": {"status": "running"}}],
         },
+        {"info": {"id": "msg_user_two", "role": "user", "time": {"created": 1000000200000}}, "parts": [{"type": "text", "text": "continue"}]},
+        {"info": {"role": "assistant", "parentID": "msg_user_two", "time": {"created": 1000000201000, "completed": 1000000246000}}, "parts": []},
     ],
     "ses_child": [
         {
@@ -184,12 +186,7 @@ assert_line "🔐 **Temporary AgentsWeb SSH session is ready.**"
 assert_line "ssh -p 2222 runner@example"
 assert_line "- Token count: 190"
 assert_line "- Speed score:"
-if ! grep -Eq -- '^- Elapsed: [0-9]+m$' "$output_file"; then
-  echo "FAIL: invalid elapsed format" >&2
-  sed -n '1,120p' "$output_file" >&2
-  exit 1
-fi
-echo "PASS: valid elapsed format"
+assert_line "- Total chat runtime: 1m"
 
 if [[ "$("$tracker" --format-elapsed 1266)" != "21m" ]]; then
   echo "FAIL: 1266 seconds should format as 21m" >&2

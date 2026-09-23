@@ -232,6 +232,8 @@ Run `scripts/session-lifecycle.mjs` once before exposing the web tunnel. Route b
 
 Save each completed main response through `scripts/session-checkpoint.mjs`. Keep one OmGithub checkpoint pointer per issue and separate conversation and manifest files. Validate through `scripts/session-deploy.mjs` in the main workspace against the shared live server. Cancel validation before forwarding new web messages. Preserve the last successful deployment and reject obsolete generations. Save changed state during shutdown without starting validation.
 
+Report total chat runtime as the sum of all main-session turns. Measure each turn from its user message creation time through its assistant completion time. Add the active turn through the current time. Include tool and subagent work inside each turn. Exclude idle time between turns. Divide cumulative session tokens by total chat runtime for the speed score.
+
 Run `node --test scripts/session-lifecycle.test.mjs scripts/session-checkpoint.test.mjs scripts/opencode-prepare.test.mjs scripts/opencode-reporting.test.mjs`. Run `actionlint .github/workflows/opencode.yml .github/workflows/opencode-reusable.yml`.
 
 ## Restore cross-repository checkpoints

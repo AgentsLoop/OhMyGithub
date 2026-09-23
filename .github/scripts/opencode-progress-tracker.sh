@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-started_at="$(date +%s)"
-
 format_elapsed() {
   local elapsed_seconds="$1"
   local elapsed_hours=$((elapsed_seconds / 3600))
@@ -61,6 +59,30 @@ while :; do
       ] | @tsv
     ' <<<"$payload")"
     IFS=$'\t' read -r tool_count active_count <<<"$stats"
+    chat_runtime_seconds="$(jq -nr \
+      --argjson messages "$payload" \
+      --argjson statuses "$status_payload" \
+      --arg root "$SESSION_ID" \
+      --argjson now "$(date +%s)" '
+      def epoch:
+        if . == null then null
+        elif . > 100000000000 then . / 1000
+        else .
+        end;
+      (reduce ($messages[] | select(.info.role == "user" and .info.id and .info.time.created)) as $message
+        ({}; .[$message.info.id] = ($message.info.time.created | epoch))) as $users
+      | (($statuses[$root].type // "idle") as $state
+        | ($state != "idle" and $state != "error" and $state != "failed")) as $busy
+      | [
+          $messages[]
+          | select(.info.role == "assistant")
+          | ($users[.info.parentID] // (.info.time.created | epoch)) as $started
+          | ((.info.time.completed | epoch) // (if $busy then $now else null end)) as $finished
+          | select($started != null and $finished != null and $finished > $started)
+          | ($finished - $started)
+        ]
+      | (add // 0 | floor)
+    ')"
     subagent_stats="$(jq -nr \
       --arg root "$SESSION_ID" \
       --argjson sessions "$sessions_payload" \
@@ -130,9 +152,8 @@ while :; do
       fi
     done <<<"$subagent_ids"
     changed_count="$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
-    elapsed_seconds="$(( $(date +%s) - started_at ))"
-    elapsed="$(format_elapsed "$elapsed_seconds")"
-    speed_score="$(awk -v tokens="$token_count" -v elapsed="$elapsed_seconds" \
+    chat_runtime="$(format_elapsed "$chat_runtime_seconds")"
+    speed_score="$(awk -v tokens="$token_count" -v elapsed="$chat_runtime_seconds" \
       'BEGIN { if (elapsed > 0) printf "%.1f", tokens / elapsed; else print "0.0" }')"
     access_links="$(< "${PROGRESS_COMMENT_TEMPLATE:-$(dirname "$0")/opencode-progress-comment-template.md}")"
     ssh_section=""
@@ -148,7 +169,7 @@ Command:
 ${SSH_COMMAND}
 "
     fi
-    progress_stats="- Elapsed: ${elapsed}
+    progress_stats="- Total chat runtime: ${chat_runtime}
 - Token count: ${token_count}
 - Speed score: ${speed_score} tokens/s
 - Tool calls: $tool_count
@@ -181,12 +202,12 @@ ${SSH_COMMAND}
       report="$(jq -n \
         --arg run "$GITHUB_RUN_ID" --argjson attempt "${GITHUB_RUN_ATTEMPT:-1}" \
         --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-        --argjson elapsed_seconds "$elapsed_seconds" --argjson model_tokens "$token_count" \
+        --argjson chat_runtime_seconds "$chat_runtime_seconds" --argjson model_tokens "$token_count" \
         --argjson tool_calls "$tool_count" --argjson active_tool_calls "$active_count" \
         --argjson active_subagents "$active_subagents" --argjson total_subagents "$total_subagents" \
         --argjson failed_subagents "$failed_subagents" --argjson image_calls "$vision_count" \
         --argjson changed_files "$changed_count" --argjson rate "$rate_json" \
-        '{run:$run,attempt:$attempt,observed_at:$observed_at,stats:{elapsed_seconds:$elapsed_seconds,model_tokens:$model_tokens,tool_calls:$tool_calls,active_tool_calls:$active_tool_calls,active_subagents:$active_subagents,total_subagents:$total_subagents,failed_subagents:$failed_subagents,image_calls:$image_calls,changed_files:$changed_files},rate:$rate}')"
+        '{run:$run,attempt:$attempt,observed_at:$observed_at,stats:{chat_runtime_seconds:$chat_runtime_seconds,model_tokens:$model_tokens,tool_calls:$tool_calls,active_tool_calls:$active_tool_calls,active_subagents:$active_subagents,total_subagents:$total_subagents,failed_subagents:$failed_subagents,image_calls:$image_calls,changed_files:$changed_files},rate:$rate}')"
       /usr/bin/time -p curl --connect-timeout 5 --max-time 15 --fail --silent --show-error \
         -H "Authorization: Bearer ${OMGITHUB_CALLBACK_TOKEN:-}" -H 'Content-Type: application/json' \
         --data "$report" "${OMGITHUB_ORIGIN:-https://omgithub.com}/api/github/$REPOSITORY/issues/$ISSUE_NUMBER/telemetry" >/dev/null || true
