@@ -142,9 +142,9 @@ before the first issue, while `OpenCode` is absent. Create `OpenCode` last.
 This keeps the regular OpenCode session while making branch and immutable
 commit behavior explicit and reviewable in YAML.
 Initial model labels come from the live OpenCode catalog and are
-limited to models with zero input, output, and cache-read cost, plus the
-explicitly allowed `opencode/gpt-5.6-luna` and `openai/gpt-5.6-luna` models.
-Use `model/openai/gpt-5.6-luna` when the OpenAI provider is required. Default GitHub labels are removed, and
+limited to models with zero input, output, and cache-read cost. Add
+`model/openai/gpt-6-luna` only when an issue explicitly selects that model.
+Omit the model label when the workflow default is selected. Default GitHub labels are removed, and
 the triggering issue is marked `in progress`, `validating`, `complete`, or
 `failed` as the job advances.
 For difficult game requests, the `game-issue-e2e` skill selects the synchronized
