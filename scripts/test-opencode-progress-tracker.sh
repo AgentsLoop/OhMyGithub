@@ -50,7 +50,7 @@ statuses = {
 }
 messages = {
     "ses_root": [
-        {"info": {"id": "msg_user_one", "role": "user", "time": {"created": 1000000000000}}, "parts": [{"type": "text", "text": "start"}]},
+        {"info": {"id": "msg_user_one", "role": "user", "time": {"created": 1000000000000}}, "parts": [{"type": "text", "text": "start" + "x" * 200000}]},
         {
             "info": {"role": "assistant", "parentID": "msg_user_one", "time": {"created": 1000000001000, "completed": 1000000040000}},
             "parts": [{"type": "tool", "tool": "task", "state": {"status": "running"}}],

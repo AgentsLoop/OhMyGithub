@@ -51,7 +51,7 @@ while :; do
     jq -e 'type == "array"' >/dev/null 2>&1 <<<"$sessions_payload" && \
     jq -e 'type == "object"' >/dev/null 2>&1 <<<"$status_payload"; then
     chat_runtime_seconds="$(jq -nr \
-      --argjson messages "$payload" \
+      --slurpfile messages <(printf '%s' "$payload") \
       --argjson statuses "$status_payload" \
       --arg root "$SESSION_ID" \
       --argjson now "${PROGRESS_NOW_SECONDS:-$(date +%s)}" '
@@ -60,12 +60,12 @@ while :; do
         elif . > 100000000000 then . / 1000
         else .
         end;
-      ($messages | map(select(.info.role == "user" and .info.id and .info.time.created))) as $users
+      ($messages[0] | map(select(.info.role == "user" and .info.id and .info.time.created))) as $users
       | (($statuses[$root].type // "idle") as $state | ($state != "idle" and $state != "error" and $state != "failed")) as $busy
       | [range(0; $users | length) as $index
           | ($users[$index].info.time.created | epoch) as $started
           | (($users[$index + 1].info.time.created | epoch) // $now) as $boundary
-          | ([$messages[] | select(.info.role == "assistant" and .info.parentID == $users[$index].info.id)
+          | ([$messages[0][] | select(.info.role == "assistant" and .info.parentID == $users[$index].info.id)
               | (.info.time.completed | epoch) // (.info.time.created | epoch)] | max) as $last
           | (if $busy and $index == (($users | length) - 1) then $now else $last end) as $finished
           | select($started != null and $finished != null and $finished > $started)
@@ -74,7 +74,6 @@ while :; do
       | (add // 0 | floor)
     ')"
     # The list endpoint is capped and may omit children; walk the explicit child relation.
-    sessions_payload="$(jq -cn --argjson root "$sessions_payload" '$root')"
     pending_ids=("$SESSION_ID")
     seen_ids=("$SESSION_ID")
     while (( ${#pending_ids[@]} )); do
@@ -91,12 +90,12 @@ while :; do
             pending_ids+=("$child_id")
           fi
         done < <(jq -r '.[].id' <<<"$children_payload")
-        sessions_payload="$(jq -cn --argjson all "$sessions_payload" --argjson children "$children_payload" '$all + $children | unique_by(.id)')"
+        sessions_payload="$(jq -cn --slurpfile all <(printf '%s' "$sessions_payload") --slurpfile children <(printf '%s' "$children_payload") '$all[0] + $children[0] | unique_by(.id)')"
       fi
     done
     subagent_stats="$(jq -nr \
       --arg root "$SESSION_ID" \
-      --argjson sessions "$sessions_payload" \
+      --slurpfile sessions <(printf '%s' "$sessions_payload") \
       --argjson statuses "$status_payload" '
       def descendants($all; $parent):
         [$all[] | select(.parentID == $parent)] as $children
@@ -104,7 +103,7 @@ while :; do
         | if ($ids | length) == 0 then $ids
           else $ids + ([$ids[] | descendants($all; .)] | add)
           end;
-      ($sessions | descendants($sessions; $root)) as $subagents
+      ($sessions[0] | descendants($sessions[0]; $root)) as $subagents
       | {
           total: ($subagents | length),
           failed: ([$statuses | to_entries[]
@@ -121,15 +120,15 @@ while :; do
     IFS=$'\t' read -r active_subagents total_subagents failed_subagents <<<"$subagent_stats"
     token_count="$(jq -nr \
       --arg root "$SESSION_ID" \
-      --argjson sessions "$sessions_payload" '
+      --slurpfile sessions <(printf '%s' "$sessions_payload") '
       def descendants($all; $parent):
         [$all[] | select(.parentID == $parent)] as $children
         | ($children | map(.id)) as $ids
         | if ($ids | length) == 0 then $ids
           else $ids + ([$ids[] | descendants($all; .)] | add)
           end;
-      ([$root] + ($sessions | descendants($sessions; $root))) as $tracked
-      | reduce $sessions[] as $session (0;
+      ([$root] + ($sessions[0] | descendants($sessions[0]; $root))) as $tracked
+      | reduce $sessions[0][] as $session (0;
           if ($tracked | index($session.id)) == null then .
           else .
             + ($session.tokens.input // 0)
@@ -142,14 +141,14 @@ while :; do
     ')"
     subagent_ids="$(jq -nr \
       --arg root "$SESSION_ID" \
-      --argjson sessions "$sessions_payload" '
+      --slurpfile sessions <(printf '%s' "$sessions_payload") '
       def descendants($all; $parent):
         [$all[] | select(.parentID == $parent)] as $children
         | ($children | map(.id)) as $ids
         | if ($ids | length) == 0 then $ids
           else $ids + ([$ids[] | descendants($all; .)] | add)
           end;
-      ($sessions | descendants($sessions; $root))[]
+      ($sessions[0] | descendants($sessions[0]; $root))[]
     ')"
     vision_count="$(vision_calls <<<"$payload")"
     stats="$(jq -r '[.[].parts[]? | select(.type == "tool")] | [length, ([.[] | select(.state.status == "running" or .state.status == "pending")] | length)] | @tsv' <<<"$payload")"
