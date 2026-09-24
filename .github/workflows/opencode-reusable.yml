@@ -1279,6 +1279,20 @@ jobs:
               issue_number: number, labels: ['failed']
             }).catch(warn);
 
+      - name: Report failed build before debug hold
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
+        run: |
+          set -euo pipefail
+          sequence=$(date +%s)000
+          /usr/bin/time -p curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 15 \
+            -H "Authorization: Bearer $OMGITHUB_CALLBACK_TOKEN" -H 'Content-Type: application/json' \
+            --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":$sequence,\"state\":\"ended\",\"phase\":\"building\",\"outcome\":\"failure\"}" \
+            "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/run"
+
       - name: Keep temporary access available for 5 hours
         if: (success() || (failure() && vars.OPENCODE_DEBUG_HOLD == 'true' && steps.opencode_web.outcome == 'success')) && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash

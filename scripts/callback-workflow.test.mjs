@@ -21,3 +21,14 @@ test('grant OIDC permission and bootstrap before checkout in both jobs', () => {
     assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_URL/)
   }
 })
+test('report failed execution before the debug hold keeps Actions running', () => {
+  const workflow = read('.github/workflows/opencode-reusable.yml')
+  const early = workflow.indexOf('name: Report failed build before debug hold')
+  const hold = workflow.indexOf('name: Keep temporary access available for 5 hours')
+  const final = workflow.indexOf('name: Report terminal build status')
+  assert.ok(early > 0 && early < hold && hold < final)
+  const step = workflow.slice(early, hold)
+  assert.match(step, /if: failure\(\)/)
+  assert.match(step, /"outcome\\":\\"failure\\"/)
+  assert.match(step, /issues\/\$TRIGGER_ISSUE_NUMBER\/run/)
+})
