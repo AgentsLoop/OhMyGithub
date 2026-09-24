@@ -50,15 +50,6 @@ while :; do
   if jq -e 'type == "array"' >/dev/null 2>&1 <<<"$payload" && \
     jq -e 'type == "array"' >/dev/null 2>&1 <<<"$sessions_payload" && \
     jq -e 'type == "object"' >/dev/null 2>&1 <<<"$status_payload"; then
-    stats="$(jq -r '
-      def parts: [.[].parts[]?];
-      def tools: [parts[] | select(.type == "tool")];
-      [
-        (tools | length),
-        ([tools[] | select(.state.status == "running" or .state.status == "pending")] | length)
-      ] | @tsv
-    ' <<<"$payload")"
-    IFS=$'\t' read -r tool_count active_count <<<"$stats"
     chat_runtime_seconds="$(jq -nr \
       --argjson messages "$payload" \
       --argjson statuses "$status_payload" \
@@ -69,20 +60,40 @@ while :; do
         elif . > 100000000000 then . / 1000
         else .
         end;
-      (reduce ($messages[] | select(.info.role == "user" and .info.id and .info.time.created)) as $message
-        ({}; .[$message.info.id] = ($message.info.time.created | epoch))) as $users
-      | (($statuses[$root].type // "idle") as $state
-        | ($state != "idle" and $state != "error" and $state != "failed")) as $busy
-      | [
-          $messages[]
-          | select(.info.role == "assistant")
-          | ($users[.info.parentID] // (.info.time.created | epoch)) as $started
-          | ((.info.time.completed | epoch) // (if $busy then $now else null end)) as $finished
+      ($messages | map(select(.info.role == "user" and .info.id and .info.time.created))) as $users
+      | (($statuses[$root].type // "idle") as $state | ($state != "idle" and $state != "error" and $state != "failed")) as $busy
+      | [range(0; $users | length) as $index
+          | ($users[$index].info.time.created | epoch) as $started
+          | (($users[$index + 1].info.time.created | epoch) // $now) as $boundary
+          | ([$messages[] | select(.info.role == "assistant" and .info.parentID == $users[$index].info.id)
+              | (.info.time.completed | epoch) // (.info.time.created | epoch)] | max) as $last
+          | (if $busy and $index == (($users | length) - 1) then $now else $last end) as $finished
           | select($started != null and $finished != null and $finished > $started)
-          | ($finished - $started)
+          | (([$finished, $boundary] | min) - $started)
         ]
       | (add // 0 | floor)
     ')"
+    # The list endpoint is capped and may omit children; walk the explicit child relation.
+    sessions_payload="$(jq -cn --argjson root "$sessions_payload" '$root')"
+    pending_ids=("$SESSION_ID")
+    seen_ids=("$SESSION_ID")
+    while (( ${#pending_ids[@]} )); do
+      parent_id="${pending_ids[0]}"
+      pending_ids=("${pending_ids[@]:1}")
+      children_payload="$(curl --connect-timeout 5 --max-time 15 --fail --silent --show-error \
+        -H "x-opencode-directory: $PROJECT_DIR" \
+        "http://127.0.0.1:$OPENCODE_WEB_PORT/session/$parent_id/children" 2>/dev/null || true)"
+      if jq -e 'type == "array"' >/dev/null 2>&1 <<<"$children_payload"; then
+        while IFS= read -r child_id; do
+          [[ -n "$child_id" ]] || continue
+          if [[ " ${seen_ids[*]} " != *" $child_id "* ]]; then
+            seen_ids+=("$child_id")
+            pending_ids+=("$child_id")
+          fi
+        done < <(jq -r '.[].id' <<<"$children_payload")
+        sessions_payload="$(jq -cn --argjson all "$sessions_payload" --argjson children "$children_payload" '$all + $children | unique_by(.id)')"
+      fi
+    done
     subagent_stats="$(jq -nr \
       --arg root "$SESSION_ID" \
       --argjson sessions "$sessions_payload" \
@@ -141,6 +152,8 @@ while :; do
       ($sessions | descendants($sessions; $root))[]
     ')"
     vision_count="$(vision_calls <<<"$payload")"
+    stats="$(jq -r '[.[].parts[]? | select(.type == "tool")] | [length, ([.[] | select(.state.status == "running" or .state.status == "pending")] | length)] | @tsv' <<<"$payload")"
+    IFS=$'\t' read -r tool_count active_count <<<"$stats"
     while IFS= read -r subagent_id; do
       [[ -n "$subagent_id" ]] || continue
       subagent_payload="$(curl --connect-timeout 5 --max-time 15 --fail --silent --show-error \
@@ -149,6 +162,10 @@ while :; do
       if jq -e 'type == "array"' >/dev/null 2>&1 <<<"$subagent_payload"; then
         subagent_vision_count="$(vision_calls <<<"$subagent_payload")"
         vision_count=$((vision_count + subagent_vision_count))
+        subagent_tools="$(jq -r '[.[].parts[]? | select(.type == "tool")] | [length, ([.[] | select(.state.status == "running" or .state.status == "pending")] | length)] | @tsv' <<<"$subagent_payload")"
+        IFS=$'\t' read -r child_tools child_active <<<"$subagent_tools"
+        tool_count=$((tool_count + child_tools))
+        active_count=$((active_count + child_active))
       fi
     done <<<"$subagent_ids"
     changed_count="$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"

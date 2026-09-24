@@ -111,9 +111,12 @@ messages = {
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/session":
-            value = sessions
+            value = sessions[:1]  # Reproduce a truncated session list.
         elif self.path == "/session/status":
             value = statuses
+        elif self.path.startswith("/session/") and self.path.endswith("/children"):
+            session_id = self.path.split("/")[2]
+            value = [item for item in sessions if item.get("parentID") == session_id]
         elif self.path.startswith("/session/") and self.path.endswith("/message"):
             session_id = self.path.split("/")[2]
             value = messages.get(session_id, [])
@@ -184,6 +187,7 @@ assert_line "- Active subagents: 2"
 assert_line "- Total subagents executed: 4"
 assert_line "- Total failed subagents: 1"
 assert_line "- Image-context model calls: 5"
+assert_line "- Tool calls: 3"
 assert_line "🌐 **OpenCode Web UI:** http://127.0.0.1/session/ses_root"
 assert_line "📁 **Project files:** http://127.0.0.1/project-files"
 assert_line "🔐 **Temporary AgentsWeb SSH session is ready.**"
