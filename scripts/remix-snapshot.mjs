@@ -22,7 +22,10 @@ export const preserve = path => reserved.some(name => path === name || path.star
 export function command(file, args, options = {}) {
   const start = Date.now()
   try { return String(execFileSync(file, args, { encoding: 'utf8', timeout: 600000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], ...options }) || '').trim() }
-  catch (error) { throw new Error(`${file} ${args[0]} failed (${error.status ?? 'timeout'}). ${String(error.stderr || '').slice(-1500)}`) }
+  catch (error) {
+    const output = [error.stdout, error.stderr].map(value => String(value || '').trim()).filter(Boolean).map(value => value.slice(-4000)).join('\n')
+    throw new Error(`${file} ${args[0]} failed (${error.status ?? 'timeout'}). ${output}`)
+  }
   finally { process.stderr.write(`[timing] ${file} ${args[0]}: ${Date.now() - start} ms\n`) }
 }
 
@@ -100,7 +103,7 @@ for path,_ in links:
     console.log('Import selected files and preserve the execution workflow')
     const sha = importSnapshot({ root, directory, source, run })
     // A normal push preserves concurrent updates rather than replacing them.
-    run('git', ['push', 'origin', `${sha}:refs/heads/${env.TARGET_REF}`], { cwd: root })
+    run('git', ['push', '--porcelain', '--no-progress', 'origin', `${sha}:refs/heads/${env.TARGET_REF}`], { cwd: root })
     const values = { TARGET_SHA: sha, COMMENT_BODY: source.prompt, SNAPSHOT_SOURCE_REPOSITORY: source.source_repository, SNAPSHOT_SOURCE_COMMIT: source.source_commit }
     for (const [name, value] of Object.entries(values)) {
       const delimiter = `snapshot_${randomUUID()}`

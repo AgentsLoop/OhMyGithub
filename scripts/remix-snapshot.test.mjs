@@ -78,3 +78,7 @@ test('failed downloads do not publish readiness or alter the destination', t => 
   assert.equal(git('rev-parse', 'HEAD'), before)
   assert.equal(existsSync(output), false)
 })
+
+test('failed commands retain stdout and stderr diagnostics', () => {
+  assert.throws(() => command('node', ['-e', "process.stdout.write('push rejected'); process.stderr.write('remote reason'); process.exit(1)"]), /push rejected[\s\S]*remote reason/)
+})
