@@ -56,6 +56,22 @@ export function importSnapshot({ root, directory, source, run = command }) {
   return git('rev-parse', 'HEAD')
 }
 
+export function fetchSnapshotLfs({ root, source, run = command }) {
+  const options = { cwd: root }
+  const files = run('git', ['lfs', 'ls-files', '--name-only'], options)
+  if (!files) return false
+  const remote = `omgithub-snapshot-${randomUUID()}`
+  console.log(`Fetch ${files.split('\n').length} source Git LFS objects`)
+  run('git', ['remote', 'add', remote, `https://github.com/${source.source_repository}.git`], options)
+  try {
+    run('git', ['fetch', '--no-tags', '--depth=1', remote, source.source_commit], options)
+    run('git', ['lfs', 'fetch', remote, 'FETCH_HEAD'], options)
+  } finally {
+    run('git', ['remote', 'remove', remote], options)
+  }
+  return true
+}
+
 export function prepareSnapshot(env = process.env, run = command) {
   const source = parseSnapshot(env.COMMENT_BODY || '')
   if (!source) return
@@ -102,6 +118,7 @@ for path,_ in links:
 `, archive, directory])
     console.log('Import selected files and preserve the execution workflow')
     const sha = importSnapshot({ root, directory, source, run })
+    fetchSnapshotLfs({ root, source, run })
     // A normal push preserves concurrent updates rather than replacing them.
     run('git', ['push', '--porcelain', '--no-progress', 'origin', `${sha}:refs/heads/${env.TARGET_REF}`], { cwd: root })
     const values = { TARGET_SHA: sha, COMMENT_BODY: source.prompt, SNAPSHOT_SOURCE_REPOSITORY: source.source_repository, SNAPSHOT_SOURCE_COMMIT: source.source_commit }

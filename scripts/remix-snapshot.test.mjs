@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, copyFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { command, importSnapshot, parseSnapshot, prepareSnapshot } from './remix-snapshot.mjs'
+import { command, fetchSnapshotLfs, importSnapshot, parseSnapshot, prepareSnapshot } from './remix-snapshot.mjs'
 const source = { source_repository: 'creator/game', source_commit: 'b'.repeat(40) }
 const request = `Make sky red\n\n<!-- omgithub-snapshot:v1 ${JSON.stringify(source)} -->`
 function fixture(t) {
@@ -81,4 +81,21 @@ test('failed downloads do not publish readiness or alter the destination', t => 
 
 test('failed commands retain stdout and stderr diagnostics', () => {
   assert.throws(() => command('node', ['-e', "process.stdout.write('push rejected'); process.stderr.write('remote reason'); process.exit(1)"]), /push rejected[\s\S]*remote reason/)
+})
+
+test('fetch source LFS objects before push and remove its temporary remote', () => {
+  const calls = []
+  const run = (_file, args) => {
+    calls.push(args)
+    if (args[0] === 'lfs' && args[1] === 'ls-files') return 'public/assets/avatar.vrm\npublic/ui/logo.png'
+    return ''
+  }
+  assert.equal(fetchSnapshotLfs({ root: '/project', source, run }), true)
+  const remote = calls[1][2]
+  assert.deepEqual(calls.map(args => args.slice(0, 2)), [['lfs', 'ls-files'], ['remote', 'add'], ['fetch', '--no-tags'], ['lfs', 'fetch'], ['remote', 'remove']])
+  assert.equal(calls[1][3], `https://github.com/${source.source_repository}.git`)
+  assert.equal(calls[2].at(-1), source.source_commit)
+  assert.deepEqual(calls[3], ['lfs', 'fetch', remote, 'FETCH_HEAD'])
+  assert.equal(calls[4][2], remote)
+  assert.equal(fetchSnapshotLfs({ root: '/project', source, run: (_file, args) => args[1] === 'ls-files' ? '' : assert.fail('No fetch expected') }), false)
 })
