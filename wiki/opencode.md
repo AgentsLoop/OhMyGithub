@@ -328,3 +328,7 @@ Keep source and static build output inside PROJECT_DIR, such as PROJECT_DIR/dist
 Use [Tribes 3D issue 31](https://omgithub.com/VibeFin/PlayGround/issues/31) and [Warcraft 3D issue 32](https://omgithub.com/VibeFin/PlayGround/issues/32) as the 2026-10-01 live concurrency evidence. Inspect [the Tribes run](https://github.com/VibeFin/PlayGround/actions/runs/36818330174) and [the Warcraft run](https://github.com/VibeFin/PlayGround/actions/runs/36818335585). Verify both passed account credential loading and produced model output during overlapping execution. Compare access-token fingerprints inside a diagnostic process without logging credentials. Require account-auth files in both workers and no repository-auth override. Treat this as concurrency verification, not completed-game validation or simultaneous provider-refresh validation.
 
 Close child-process stdin when spawning isolated `opencode run` smoke tests; avoid blocking the CLI while it waits for piped input. Keep each smoke process in its own data directory and clean up only its own files.
+
+## Link issue access through OmGithub
+
+Publish one [Open project](https://omgithub.com/OWNER/REPO/issues/NUMBER) access link in workspace, live-progress, preview, and deployment comments. Build the URL from OMGITHUB_ORIGIN, the repository, and the issue number. Keep SSH commands and diagnostic evidence links available. Keep service URLs in structured run registration.

@@ -3,11 +3,7 @@
 
 Updated: @UPDATED@
 
-🌐 **OpenCode Web UI:** @OPENCODE_WEB_URL@
-
-📁 **Project files:** @PROJECT_FILE_URL@
-
-@VALIDATION_SESSION_SECTION@
+[Open project](@PROJECT_URL@)
 
 @PROGRESS_STATS@
 

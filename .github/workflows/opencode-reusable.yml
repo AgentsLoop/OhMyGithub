@@ -856,19 +856,12 @@ jobs:
       - name: Publish restored workspace
         if: env.RESUME_SESSION_ID != '' && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         uses: actions/github-script@v7
-        env:
-          OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
-          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
         with:
           github-token: ${{ github.token }}
           script: |
             require(`${process.env.RUNTIME_DIR}/.github/scripts/github-rate-observer.cjs`).attach(github, process.env.OPENCODE_WEB_DIR);
-            const fs = require('node:fs');
-            const path = require('node:path');
-            const body = [
-              `OpenCode Web UI: ${process.env.OPENCODE_WEB_URL}/${Buffer.from(process.env.PROJECT_DIR).toString('base64url')}/session/${process.env.RESUME_SESSION_ID}`,
-              `Project files: ${process.env.PROJECT_FILE_URL}`
-            ].join('\n');
+            const { projectLink } = require(`${process.env.RUNTIME_DIR}/scripts/project-link.cjs`);
+            const body = projectLink(process.env);
             await github.rest.issues.createComment({ owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER), body });
 
@@ -893,8 +886,6 @@ jobs:
       - name: Publish restored preview
         if: steps.resume_app.outputs.ready == 'true'
         uses: actions/github-script@v7
-        env:
-          OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -902,7 +893,7 @@ jobs:
             await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO,
               issue_number: Number(process.env.TRIGGER_ISSUE_NUMBER),
-              body: `OpenCode Web UI: ${process.env.OPENCODE_WEB_URL}/${Buffer.from(process.env.PROJECT_DIR).toString('base64url')}/session/${process.env.RESUME_SESSION_ID}\nPlayable preview: ${process.env.APP_URL}\n\nRestored app is ready. New changes are not yet verified.`
+              body: `${require(`${process.env.RUNTIME_DIR}/scripts/project-link.cjs`).projectLink(process.env)}\n\nRestored app is ready. New changes are not yet verified.`
             });
 
       - name: Run OpenCode and locate its web session
@@ -1013,10 +1004,6 @@ jobs:
           AGENTSWEB_SSH_READY: ${{ steps.agentsweb.outcome == 'success' }}
           SSH_ACCESS_FILE: ${{ runner.temp }}/omgithub-ssh/access.env
           SSH_TUNNEL_LOG: ${{ runner.temp }}/omgithub-ssh/tunnel.log
-          OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
-          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
-          GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
-          RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -1039,11 +1026,6 @@ jobs:
               'not registered';
             const number = Number(process.env.TRIGGER_ISSUE_NUMBER);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const command = process.env.TEST_REQUEST === 'true'
-              ? 'mock OpenCode'
-              : (process.env.RALPH_REQUEST === 'true'
-              ? 'OpenCode with Ralph Loop'
-              : (process.env.GOAL_REQUEST === 'true' ? 'OpenCode with Goal' : 'OpenCode'));
             const sshSection = sshReady
               ? [
                   '🔐 **Temporary AgentsWeb SSH session is ready.**', '',
@@ -1055,12 +1037,10 @@ jobs:
                 ? ['⚠️ **AgentsWeb SSH tunnel setup failed.**', '', `Run: ${run}`, `SSH URL: \`${tunnelUrl}\``].join('\n')
                 : '');
             const body = [sshSection,
-              `🌐 **OpenCode Web UI:** ${process.env.OPENCODE_WEB_URL}`,
-              `📁 **Project files:** ${process.env.PROJECT_FILE_URL || 'unavailable'}`,
-              `Live progress is shown on the OmGithub project card.`,
+              require(`${process.env.RUNTIME_DIR}/scripts/project-link.cjs`).projectLink(process.env),
               process.env.TEST_REQUEST === 'true'
                 ? 'This is a synthetic OpenCode session for the full workflow test.'
-                : `This opens the currently running ${command} session directly. Access remains available while OpenCode runs and for 5 hours afterwards.`
+                : 'Open the project to access chat, live files, previews, and progress.'
             ].filter(Boolean).join('\n\n');
             const comment = await github.rest.issues.createComment({
               owner: process.env.TARGET_OWNER, repo: process.env.TARGET_REPO, issue_number: number, body
@@ -1073,8 +1053,6 @@ jobs:
         shell: bash
         env:
           SESSION_ID: ${{ steps.opencode_run.outputs.session_id }}
-          OPENCODE_WEB_URL: ${{ steps.opencode_run.outputs.session_url }}
-          PROJECT_FILE_URL: ${{ steps.opencode_web.outputs.project_url }}
           ISSUE_NUMBER: ${{ env.TRIGGER_ISSUE_NUMBER }}
           REPOSITORY: ${{ github.repository }}
           OMGITHUB_ORIGIN: ${{ vars.OMGITHUB_ORIGIN || 'https://omgithub.com' }}
@@ -1086,8 +1064,6 @@ jobs:
           # while later workflow steps run; cleanup stops it at the end of the job.
           nohup env PROJECT_DIR="$PROJECT_DIR" OPENCODE_WEB_PORT="$OPENCODE_WEB_PORT" \
             OPENCODE_WEB_DIR="$OPENCODE_WEB_DIR" SESSION_ID="$SESSION_ID" \
-            OPENCODE_WEB_URL="$OPENCODE_WEB_URL" \
-            PROJECT_FILE_URL="${{ steps.opencode_web.outputs.project_url }}" \
             PROGRESS_COMMENT_TEMPLATE="$RUNTIME_DIR/.github/scripts/opencode-progress-comment-template.md" \
             AGENTSWEB_SSH_ENABLED="$AGENTSWEB_SSH_ENABLED" \
             AGENTSWEB_SSH_READY="${{ steps.agentsweb.outcome == 'success' }}" \

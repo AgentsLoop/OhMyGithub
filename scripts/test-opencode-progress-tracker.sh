@@ -155,8 +155,9 @@ OPENCODE_WEB_PORT="$(<"$port_file")" \
 PROJECT_DIR="$test_dir" \
 OPENCODE_WEB_DIR="$test_dir" \
 SESSION_ID=ses_root \
-OPENCODE_WEB_URL=http://127.0.0.1/session/ses_root \
-PROJECT_FILE_URL=http://127.0.0.1/project-files \
+REPOSITORY=AgentsLoop/PlayGround \
+ISSUE_NUMBER=114 \
+OMGITHUB_ORIGIN=https://omgithub.com \
 PROGRESS_DRY_RUN=true \
 PROGRESS_NOW_SECONDS=1000000330 \
 PROGRESS_OUTPUT="$output_file" \
@@ -188,8 +189,7 @@ assert_line "- Total subagents executed: 4"
 assert_line "- Total failed subagents: 1"
 assert_line "- Image-context model calls: 5"
 assert_line "- Tool calls: 3"
-assert_line "🌐 **OpenCode Web UI:** http://127.0.0.1/session/ses_root"
-assert_line "📁 **Project files:** http://127.0.0.1/project-files"
+assert_line "[Open project](https://omgithub.com/AgentsLoop/PlayGround/issues/114)"
 assert_line "🔐 **Temporary AgentsWeb SSH session is ready.**"
 assert_line "ssh -p 2222 runner@example"
 assert_line "- Token count: 190"

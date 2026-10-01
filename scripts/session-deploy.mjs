@@ -5,6 +5,7 @@ import { promisify } from 'node:util'
 import { preparePreview, validateDeploymentOutput } from './preview-setup.mjs'
 import { retry, uploadDeployment } from './deployment-retry.mjs'
 import { child } from './session-lifecycle.mjs'
+import projectLinks from './project-link.cjs'
 
 const env = process.env
 const evidence = join(env.RUNNER_TEMP, `validation-${env.CHECKPOINT_GENERATION}`)
@@ -46,7 +47,7 @@ try {
   let advertised = ''
   try { advertised = readFileSync(marker, 'utf8') } catch {}
   if (advertised !== env.APP_URL) {
-    await child('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/comments`, '-f', `body=Playable preview: ${env.APP_URL}`], { signal: controller.signal })
+    await child('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/comments`, '-f', `body=Preview ready.\n\n${projectLinks.projectLink(env)}`], { signal: controller.signal })
     writeFileSync(marker, env.APP_URL)
   }
   const screenshots = readdirSync(evidence).filter(name => /^final-.*\.(png|jpe?g|webp)$/i.test(name))
@@ -80,7 +81,7 @@ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
       const reportFile = join(env.OPENCODE_WEB_DIR, 'deployment-comment-id')
       let commentId = ''
       try { commentId = readFileSync(reportFile, 'utf8').trim() } catch {}
-      const report = `Deployment ready.\n\n${deployed.preview_url}`
+      const report = `Deployment ready.\n\n${projectLinks.projectLink(env)}`
       const result = JSON.parse(await command('gh', ['api', commentId ? `repos/${env.GITHUB_REPOSITORY}/issues/comments/${commentId}` : `repos/${env.GITHUB_REPOSITORY}/issues/${env.TRIGGER_ISSUE_NUMBER}/comments`, '-X', commentId ? 'PATCH' : 'POST', '-f', `body=${report}`]))
       writeFileSync(reportFile, String(result.id))
     }, { signal: controller.signal })
