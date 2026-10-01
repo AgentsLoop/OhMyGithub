@@ -1,0 +1,12 @@
+{
+  "name": "asteroid-dodger",
+  "version": "1.0.0",
+  "description": "Asteroid Dodger — dodge asteroids with your spaceship, survive as long as you can!",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": ["game", "asteroid", "canvas", "browser-game"],
+  "license": "MIT"
+}

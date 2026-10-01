@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<title>Asteroid Dodger — Survive the Belt</title>
+<meta name="description" content="Dodge asteroids, survive the belt. Arrow keys or WASD, increasing difficulty, score chase." />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">☄️</div>
+    <div>
+      <h1 class="title-neon">ASTEROID DODGER</h1>
+      <p>Survive the belt • Dodge • Score • Repeat</p>
+    </div>
+  </div>
+  <div class="hud" role="status" aria-live="polite">
+    <div class="stat"><small>SCORE</small><strong id="score">0</strong></div>
+    <div class="stat"><small>BEST</small><strong id="best">0</strong></div>
+    <div class="stat"><small>LEVEL</small><strong id="level">1</strong></div>
+    <button id="pauseBtn" class="btn btn-ghost" aria-label="Pause or resume">⏸️ Pause</button>
+  </div>
+</header>
+
+<main id="wrap">
+  <div class="game-card">
+    <div class="canvas-wrap">
+      <canvas id="game" width="800" height="600" aria-label="Asteroid field game canvas"></canvas>
+
+      <!-- Start overlay -->
+      <div id="startOverlay" class="overlay">
+        <div class="card">
+          <span class="badge">✦ POLISHED • 60 FPS • MOBILE READY</span>
+          <h2>Dodge the<br/>Asteroid Belt</h2>
+          <p>Steer your ship with <span class="kbd">WASD</span> or <span class="kbd">Arrow Keys</span>. Touch &amp; drag on mobile. Survive as long as you can — the belt gets faster and denser every level.</p>
+
+          <div class="controls-grid">
+            <div class="ctrl"><strong>↔︎ MOVE</strong><span>Arrow Keys / WASD — smooth 360° steering</span></div>
+            <div class="ctrl"><strong>⏸️ PAUSE</strong><span><span class="kbd">Space</span> or <span class="kbd">P</span></span></div>
+            <div class="ctrl"><strong>🎯 SCORE</strong><span>+60/sec survived + bonus per asteroid dodged</span></div>
+            <div class="ctrl"><strong>☄️ DODGE</strong><span>One hit = game over. No shields.</span></div>
+          </div>
+
+          <button id="startBtn" class="btn btn-primary">▶ START GAME — Hit Enter</button>
+          <div class="how">
+            <span>60 FPS starfield parallax</span><span>Irregular spinning asteroids</span><span>Screen shake &amp; particles</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pause overlay -->
+      <div id="pauseOverlay" class="overlay hidden">
+        <div class="card">
+          <span class="badge">⏸️ PAUSED</span>
+          <h2>Take a breather</h2>
+          <p>Press <span class="kbd">Space</span> or <span class="kbd">P</span> to resume.</p>
+          <div class="btn-row">
+            <button id="resumeBtn" class="btn btn-primary">▶ Resume</button>
+            <button id="restartBtn2" class="btn btn-ghost">Restart</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game over overlay -->
+      <div id="gameOverOverlay" class="overlay hidden">
+        <div class="card">
+          <span class="badge" style="background:rgba(255,59,107,.12);border-color:rgba(255,59,107,.28);color:#ff9ab2">☠️ SHIP DESTROYED</span>
+          <h2>Game Over</h2>
+          <p>You survived with <strong id="finalScore" style="color:#fff">0</strong> points.</p>
+          <p style="margin-top:6px">Best: <strong id="finalBest" style="color:#7dd8ff">0</strong> • Tip: stay near center and make small moves.</p>
+          <button id="restartBtn" class="btn btn-primary">↻ Play Again — Enter</button>
+          <div class="how">
+            <span>Level <span id="finalLevelHint">1</span> reached</span><span>Share your score!</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-row">
+      <small>Tip: On mobile, touch &amp; drag the ship directly. On desktop, hold <span class="kbd">Shift</span>-like precision with small taps.</small>
+      <small>Built for aiplay • <a href="#" onclick="event.preventDefault(); document.getElementById('startOverlay').classList.remove('hidden');">How to play</a></small>
+    </div>
+  </div>
+
+  <section style="margin:12px auto 0; max-width:860px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px 14px;">
+    <h3 style="margin:0 0 6px; font-size:13px; letter-spacing:.08em; color:#cbb8ff">ABOUT</h3>
+    <p style="margin:0; color:#9aa3c8; font-size:13px; line-height:1.6">A self-contained Canvas game — no dependencies. Starfield parallax, irregular asteroids with craters, thruster particles, screen shake, and a difficulty curve that tightens spawn rate and speed every ~800 points. Best score saved in <span class="kbd">localStorage</span>. Fully keyboard + touch + mouse.</p>
+  </section>
+</main>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
