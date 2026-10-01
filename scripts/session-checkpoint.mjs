@@ -160,6 +160,8 @@ export function saveCheckpoint({ interrupted = false } = {}) {
   // Authentication JSON can contain individual secrets echoed separately in tool output.
   const leaves = value => typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(leaves) : []
   try { secrets.push(...leaves(JSON.parse(env.OPENCODE_AUTH_CONTENT || '{}'))) } catch {}
+  if (env.OMGITHUB_SECRET_VALUES_FILE) secrets.push(...JSON.parse(readFileSync(env.OMGITHUB_SECRET_VALUES_FILE, 'utf8')))
+  if (env.OMGITHUB_ACCOUNT_AUTH_FILE && existsSync(env.OMGITHUB_ACCOUNT_AUTH_FILE)) secrets.push(...leaves(JSON.parse(readFileSync(env.OMGITHUB_ACCOUNT_AUTH_FILE, 'utf8'))))
   const session = portableSession(redactSession(exportSession(binary, sessionId, project, env.RUNNER_TEMP), secrets))
   writeFileSync(join(directory, 'log-session-export.json'), JSON.stringify(session), { mode: 0o600 })
   const issue = Number(env.TRIGGER_ISSUE_NUMBER), run = Number(env.GITHUB_RUN_ID)

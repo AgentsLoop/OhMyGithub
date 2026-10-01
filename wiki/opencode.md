@@ -305,3 +305,14 @@ for an OmGithub callback credential before checkout. Pass `OMGITHUB_CALLBACK_TOK
 to run registration and deployment uploads. Keep registration nonfatal. Report
 terminal outcomes without loading checkout files. Install the updated listener
 before creating a fresh test issue; do not rerun existing issues for verification.
+
+
+## Load OmGithub account credentials
+
+Load account credentials with `scripts/account-credentials.mjs` after fetching the pinned runtime and before starting OpenCode. Authenticate each request with fresh Actions OIDC. Keep repository auth JSON and explicit workflow environment values as overrides. Load only the account bound to the issue by OmGithub. Keep unbound GitHub issues on repository defaults.
+
+Write account auth outside the checkout. Mask account values before exporting custom environment variables. Retain initial and refreshed values for checkpoint redaction. Run the auth watcher every minute; return refreshed auth with its revision and release the OAuth lease during cleanup. Wait for another account subscription run to release its lease before using the same refresh token. Replace expired or revoked subscription credentials in OmGithub Settings.
+
+Map `openai/gpt-6.1-sol` and `openai/gpt-6-astra` to `--variant high` in every invocation mode, including resumes and Goal/Ralph commands. Keep other models on their existing defaults.
+
+Run `node --test scripts/account-credentials.test.mjs scripts/session-checkpoint.test.mjs`. Validate the workflow with `actionlint .github/workflows/opencode-reusable.yml`.

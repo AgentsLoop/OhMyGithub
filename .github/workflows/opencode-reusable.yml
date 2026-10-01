@@ -175,6 +175,14 @@ jobs:
           /usr/bin/time -p git -C "$RUNTIME_DIR" checkout --detach FETCH_HEAD
           [[ "$(git -C "$RUNTIME_DIR" rev-parse HEAD)" == "$RUNTIME_REF" ]]
 
+      - name: Load account credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p node "$RUNTIME_DIR/scripts/account-credentials.mjs" load
+          nohup node "$RUNTIME_DIR/scripts/account-credentials.mjs" watch > "$RUNNER_TEMP/omgithub-account-auth-sync.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/omgithub-account-auth-sync.pid"
+
       - name: Prepare selected remix snapshot
         timeout-minutes: 15
         shell: bash
@@ -869,6 +877,7 @@ jobs:
             const skills = names.filter((name) => name.startsWith('skill/'))
               .map((name) => name.slice('skill/'.length)).sort();
             core.setOutput('model', model);
+            core.setOutput('variant', ['openai/gpt-6.1-sol', 'openai/gpt-6-astra'].includes(model) ? 'high' : '');
             core.setOutput('skills_json', JSON.stringify(skills));
             core.info(`Resolved model=${model}; skills=${skills.join(', ') || '(none)'}`);
 
@@ -949,6 +958,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           OPENCODE_WEB_URL: ${{ steps.opencode_web.outputs.url }}
           OPENCODE_MODEL: ${{ steps.opencode_labels.outputs.model }}
+          OPENCODE_VARIANT: ${{ steps.opencode_labels.outputs.variant }}
           OPENCODE_SKILLS: ${{ steps.opencode_labels.outputs.skills_json }}
           GOAL_REQUEST: ${{ env.GOAL_REQUEST }}
           RALPH_REQUEST: ${{ env.RALPH_REQUEST }}
@@ -995,20 +1005,22 @@ jobs:
           # The inner shell expands the positional parameters after nohup starts.
           # shellcheck disable=SC2016
           nohup bash -c '
+            variant_args=()
+            [[ -n "${OPENCODE_VARIANT:-}" ]] && variant_args=(--variant "$OPENCODE_VARIANT")
             resume_args=()
             [[ -n "${RESUME_SESSION_ID:-}" ]] && resume_args=(--session "$RESUME_SESSION_ID")
             if [[ -n "${RESUME_SESSION_ID:-}" ]]; then
               exact_prompt="$(cat "$3"; printf .)"
               exact_prompt="${exact_prompt%.}"
-              "$1" run --session "$RESUME_SESSION_ID" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" "$exact_prompt" > "$4" 2>&1
+              "$1" run --session "$RESUME_SESSION_ID" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" "${variant_args[@]}" "$exact_prompt" > "$4" 2>&1
             elif [[ "$9" == true ]]; then
-              "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" --command ralph-loop "$(cat "$3")" > "$4" 2>&1
+              "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" "${variant_args[@]}" --command ralph-loop "$(cat "$3")" > "$4" 2>&1
             elif [[ "$8" == true ]]; then
-              "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
+              "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" "${variant_args[@]}" --command goal "$(cat "$3")" > "$4" 2>&1
             elif [[ "$7" == true ]]; then
-              "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" --command goal "$(cat "$3")" > "$4" 2>&1
+              "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" "${variant_args[@]}" --command goal "$(cat "$3")" > "$4" 2>&1
             else
-              "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" "$(cat "$3")" > "$4" 2>&1
+              "$1" run "${resume_args[@]}" --auto --dangerously-skip-permissions --attach "http://127.0.0.1:$2" --dir "$PROJECT_DIR" --model "$6" "${variant_args[@]}" "$(cat "$3")" > "$4" 2>&1
             fi
             code=$?
             echo "$code" > "$5"
@@ -1297,6 +1309,19 @@ jobs:
         if: (success() || (failure() && vars.OPENCODE_DEBUG_HOLD == 'true' && steps.opencode_web.outcome == 'success')) && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash
         run: sleep 18000
+
+      - name: Sync and release account credentials
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f "$RUNNER_TEMP/omgithub-account-auth-sync.pid" ]]; then
+            /usr/bin/time -p kill "$(cat "$RUNNER_TEMP/omgithub-account-auth-sync.pid")" 2>/dev/null || true
+          fi
+          if [[ -f "$RUNTIME_DIR/scripts/account-credentials.mjs" ]]; then
+            /usr/bin/time -p node "$RUNTIME_DIR/scripts/account-credentials.mjs" release
+          fi
 
       - name: Stop lifecycle controller
         if: always() && env.SSH_ONLY_REQUEST != 'true' && steps.opencode_run.outcome == 'success'
