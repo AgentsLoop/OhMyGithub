@@ -1,0 +1,73 @@
+{
+  "uid": "739772a9b0f14feeb4a4f1b45dadf4e3",
+  "name": "Low Poly Soldier -Free",
+  "author": "manoeldarochadeoliveira",
+  "authorUrl": "https://sketchfab.com/manoeldarochadeoliveira",
+  "license": "CC Attribution",
+  "licenseUrl": null,
+  "modelUrl": "https://sketchfab.com/3d-models/none-739772a9b0f14feeb4a4f1b45dadf4e3",
+  "thumbnailUrl": "https://media.sketchfab.com/models/739772a9b0f14feeb4a4f1b45dadf4e3/thumbnails/cfac87e8ff324eec8fd20fd21377ccc9/d7217206d1624c3596344c45173e518e.jpeg",
+  "glbBytes": 1617660,
+  "faceCount": 1432,
+  "vertexCount": 1329,
+  "textureCount": 1,
+  "textureMaxResolution": 1024,
+  "animationCount": 5,
+  "animations": [
+    {
+      "uid": "8a221d9ef8fb48dea67618dbbdcc66de",
+      "name": "rig|walk -loop",
+      "url": "https://media.sketchfab.com/models/739772a9b0f14feeb4a4f1b45dadf4e3/37a3dcac468b460e8c27625f2e9d8f8a/animations/8a221d9ef8fb48dea67618dbbdcc66de.bin.gz",
+      "size": 43244,
+      "duration": 1.2,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2021-03-16T23:42:23.710085",
+      "updatedAt": "2021-03-16T23:42:23.710098"
+    },
+    {
+      "uid": "ebd7ffffa0b04d1a805de4b2ce14d7b7",
+      "name": "rig|run -loop",
+      "url": "https://media.sketchfab.com/models/739772a9b0f14feeb4a4f1b45dadf4e3/37a3dcac468b460e8c27625f2e9d8f8a/animations/ebd7ffffa0b04d1a805de4b2ce14d7b7.bin.gz",
+      "size": 34796,
+      "duration": 0.8,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2021-03-16T23:42:23.701102",
+      "updatedAt": "2021-03-16T23:42:23.701116"
+    },
+    {
+      "uid": "805242a2694840f08f23b0f5534f5bff",
+      "name": "rig|knife_action",
+      "url": "https://media.sketchfab.com/models/739772a9b0f14feeb4a4f1b45dadf4e3/37a3dcac468b460e8c27625f2e9d8f8a/animations/805242a2694840f08f23b0f5534f5bff.bin.gz",
+      "size": 110212,
+      "duration": 1.833,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2021-03-16T23:42:23.698186",
+      "updatedAt": "2021-03-16T23:42:23.698200"
+    },
+    {
+      "uid": "8a7eea147f6f43c5ba8cc414fd08eda2",
+      "name": "rig|idle -loop",
+      "url": "https://media.sketchfab.com/models/739772a9b0f14feeb4a4f1b45dadf4e3/37a3dcac468b460e8c27625f2e9d8f8a/animations/8a7eea147f6f43c5ba8cc414fd08eda2.bin.gz",
+      "size": 404868,
+      "duration": 8.333,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2021-03-16T23:42:23.684717",
+      "updatedAt": "2021-03-16T23:42:23.684732"
+    },
+    {
+      "uid": "cee60e803c024e2eb9077d8183699578",
+      "name": "rig|air -loop",
+      "url": "https://media.sketchfab.com/models/739772a9b0f14feeb4a4f1b45dadf4e3/37a3dcac468b460e8c27625f2e9d8f8a/animations/cee60e803c024e2eb9077d8183699578.bin.gz",
+      "size": 129080,
+      "duration": 3.333,
+      "isLoop": false,
+      "isEnabled": true,
+      "createdAt": "2021-03-16T23:42:23.680141",
+      "updatedAt": "2021-03-16T23:42:23.680160"
+    }
+  ]
+}
