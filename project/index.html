@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Luna Lantern Dash</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">✦</span><div><p class="eyebrow">NIGHT FLIGHT 01</p><h1>Luna Lantern Dash</h1></div></div>
+      <button id="restart" class="restart" type="button"><span>↻</span> Restart</button>
+    </header>
+    <section class="game-card" aria-label="Luna Lantern Dash game">
+      <div class="hud">
+        <div class="stat"><span class="stat-label">MOON SHARDS</span><strong><span id="score">0</span><small> / 10</small></strong></div>
+        <div class="timer"><span class="timer-dot"></span><span id="timer">60</span><span class="stat-label">SEC</span></div>
+        <div class="objective"><span class="stat-label">MISSION</span><strong>Find the light</strong></div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="game" aria-label="Game canvas. Use arrow keys or WASD to guide the lantern."></canvas>
+        <div id="message" class="message" hidden>
+          <div class="message-icon">✦</div><p class="eyebrow" id="message-kicker">MISSION COMPLETE</p><h2 id="message-title">The night is yours.</h2><p id="message-copy">Every shard found. The moon is glowing brighter.</p><button id="play-again" class="primary" type="button">Play again <span>→</span></button>
+        </div>
+      </div>
+      <footer class="controls"><span class="key-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <em>or</em> <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>Guide the lantern through the clouds</span></footer>
+    </section>
+    <p class="tip"><span>✧</span> Collect ten moon shards before the last star fades.</p>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
