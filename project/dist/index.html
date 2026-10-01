@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLB Gallery Dash — Low-Poly Collector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-B6qbE1WM.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BYd_Q1WZ.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="c"></canvas>
+
+    <!-- Top HUD -->
+    <header class="hud">
+      <div class="hud-left">
+        <div class="logo">GLB <span>GALLERY DASH</span></div>
+        <div class="subtitle">Catch the floating prisms before time runs out</div>
+      </div>
+      <div class="hud-center">
+        <div class="stat">
+          <span class="label">COLLECTED</span>
+          <span class="value" id="score">0 / 8</span>
+        </div>
+        <div class="stat">
+          <span class="label">TIME</span>
+          <span class="value mono" id="timer">60.0s</span>
+        </div>
+        <div class="stat">
+          <span class="label">BEST</span>
+          <span class="value mono" id="best">—</span>
+        </div>
+      </div>
+      <div class="hud-right">
+        <button id="restartBtn" class="btn btn-ghost">↻ Restart</button>
+        <button id="startBtn" class="btn btn-primary">▶ Start Dash</button>
+      </div>
+    </header>
+
+    <!-- Controls hint -->
+    <div class="controls">
+      <div class="keys"><span>WASD</span> or <span>ARROWS</span> to move · <span>SHIFT</span> sprint · <span>R</span> restart</div>
+      <div class="model-badge" id="modelBadge">◍ Loading hero.glb…</div>
+    </div>
+
+    <!-- Center message -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Start overlay -->
+    <div id="startOverlay" class="overlay">
+      <div class="card">
+        <div class="eyebrow">★ LOW-POLY GLB SHOWCASE</div>
+        <h1>GLB Gallery Dash</h1>
+        <p>Your hero is a <b>low-poly GLB</b> loaded with <code>GLTFLoader</code>. Dash through the minimalist gallery, sprint between pedestals, and collect <b>8 floating prisms</b> before the clock hits zero.</p>
+        <ul class="features">
+          <li>🎨 GLB with 4 PBR materials + idle bob animation</li>
+          <li>🕹 WASD / Arrows + Shift to sprint</li>
+          <li>💎 Prisms pulse, spin and magnetize on approach</li>
+        </ul>
+        <div class="cta-row">
+          <button id="ctaStart" class="btn btn-primary btn-large">▶ Enter Gallery</button>
+          <span class="hint">Tip: corners hide two prisms — check the shadows!</span>
+        </div>
+        <div class="attribution" id="attribution">Hero: synthetic low-poly · CC0-1.0 · generated locally · no external fetch</div>
+      </div>
+    </div>
+
+    <!-- Win / Lose overlay -->
+    <div id="endOverlay" class="overlay hidden">
+      <div class="card">
+        <div id="endEyebrow" class="eyebrow">CLEARED</div>
+        <h2 id="endTitle">Gallery Cleared!</h2>
+        <p id="endDesc">You collected all prisms.</p>
+        <div class="result-grid">
+          <div class="result"><span>Time left</span><b id="endTime">0.0s</b></div>
+          <div class="result"><span>Collected</span><b id="endScore">0/8</b></div>
+          <div class="result"><span>Best</span><b id="endBest">—</b></div>
+        </div>
+        <div class="cta-row">
+          <button id="playAgain" class="btn btn-primary btn-large">↻ Play Again</button>
+          <button id="viewGallery" class="btn btn-ghost">Explore Gallery</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile touch -->
+    <div class="touch-pad" id="touchPad">
+      <div class="dpad">
+        <button data-dir="up">▲</button>
+        <div class="mid"><button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button></div>
+      </div>
+      <button class="btn btn-primary" id="dashBtn">⚡ DASH</button>
+    </div>
+  </div>
+</body>
+</html>
