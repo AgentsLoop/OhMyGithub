@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Crystal Catcher — Catch the Light</title>
+  <meta name="description" content="Move your basket to catch falling crystals and avoid bombs. Polished arcade action for desktop and mobile." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">◆</div>
+        <div class="brand-text">
+          <h1>Crystal Catcher</h1>
+          <p>Catch light • Dodge shadow</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="pauseBtn" class="icon-btn" aria-label="Pause">⏸</button>
+        <button id="soundBtn" class="icon-btn" aria-label="Sound">🔊</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="game-column">
+        <div class="hud">
+          <div class="hud-card score-card">
+            <span class="hud-label">Score</span>
+            <span id="scoreEl" class="hud-value">0</span>
+          </div>
+          <div class="hud-card level-card">
+            <span class="hud-label">Level</span>
+            <span id="levelEl" class="hud-value">1</span>
+            <div class="level-bar"><div id="levelProgress" class="level-fill" style="width: 0%"></div></div>
+          </div>
+          <div class="hud-card lives-card">
+            <span class="hud-label">Lives</span>
+            <div id="livesEl" class="lives"></div>
+          </div>
+        </div>
+
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="gameCanvas" width="480" height="720" aria-label="Crystal Catcher game canvas"></canvas>
+          <div id="overlay" class="overlay hidden">
+            <div class="overlay-card">
+              <div id="overlayIcon" class="overlay-icon">💎</div>
+              <h2 id="overlayTitle">Crystal Catcher</h2>
+              <p id="overlayDesc">Catch the falling crystals. Avoid the bombs.<br>Use <b>← →</b> or <b>A D</b>. Drag the basket on mobile.</p>
+              <div class="overlay-stats" id="overlayStats"></div>
+              <button id="startBtn" class="primary-btn">Play Now →</button>
+              <p class="hint">Tip: Gold crystals are rare — 50 points!</p>
+            </div>
+          </div>
+          <div id="pauseOverlay" class="overlay hidden">
+            <div class="overlay-card">
+              <h2>Paused</h2>
+              <p>Take a breath. The crystals wait.</p>
+              <button id="resumeBtn" class="primary-btn">Resume</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mobile-controls" aria-hidden="false">
+          <button id="leftBtn" class="ctrl-btn" aria-label="Move left">◀</button>
+          <div class="ctrl-center">
+            <span class="ctrl-hint">Hold or drag on the field</span>
+            <button id="restartBtnMobile" class="secondary-btn">Restart</button>
+          </div>
+          <button id="rightBtn" class="ctrl-btn" aria-label="Move right">▶</button>
+        </div>
+
+        <div class="action-row">
+          <button id="restartBtn" class="secondary-btn desktop-only">↻ Restart</button>
+          <div class="legend">
+            <span class="legend-item"><i class="dot dot-blue"></i> 10</span>
+            <span class="legend-item"><i class="dot dot-purple"></i> 20</span>
+            <span class="legend-item"><i class="dot dot-cyan"></i> 30</span>
+            <span class="legend-item"><i class="dot dot-gold"></i> 50</span>
+            <span class="legend-item"><i class="dot dot-bomb"></i> bomb</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <div class="panel-card">
+          <h3>How to play</h3>
+          <ul>
+            <li><b>Move</b> basket with <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd>. Hold to glide.</li>
+            <li><b>Catch</b> crystals: <span class="inline-dot blue"></span> <span class="inline-dot purple"></span> <span class="inline-dot cyan"></span> <span class="inline-dot gold"></span></li>
+            <li><b>Avoid</b> bombs — they cost a life. <b>3 lives</b> per run.</li>
+            <li>Difficulty rises every <b>250 pts</b>. Faster fall, more bombs.</li>
+            <li>On mobile, <b>drag</b> the basket or use the ◀ ▶ buttons. Swipe anywhere.</li>
+          </ul>
+        </div>
+        <div class="panel-card stats-card">
+          <h3>Session</h3>
+          <div class="stat-row"><span>Best score</span><strong id="bestScoreEl">0</strong></div>
+          <div class="stat-row"><span>Crystals caught</span><strong id="caughtEl">0</strong></div>
+          <div class="stat-row"><span>Bombs hit</span><strong id="bombsEl">0</strong></div>
+        </div>
+        <div class="panel-card tip-card">
+          <h3>✦ Polished play</h3>
+          <p>Every catch bursts into particles. Listen for the chime — gold sings loudest. Survive long enough and the cave begins to glow faster.</p>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="footer">Built for desktop & mobile • <span id="footerScore">0 pts</span> • Crystal Catcher v1.0</footer>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
