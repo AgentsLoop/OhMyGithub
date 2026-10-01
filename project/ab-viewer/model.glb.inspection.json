@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 2,
+  "path": "/home/runner/work/aiplay/aiplay/project/public/models/rifle.glb",
+  "bytes": 2629352,
+  "sha256": "93c0ccd9bea165d47d61d12d023d9cbed7dc8acea79d1f8783e97514b7b6c4d7",
+  "title": "M762 Assault Rifle",
+  "author": "STALKER (https://sketchfab.com/STALKER72)",
+  "generator": "Sketchfab-15.27.0",
+  "extensionsUsed": [
+    "KHR_materials_specular"
+  ],
+  "extensionsRequired": [],
+  "scenes": 1,
+  "nodes": 7,
+  "meshes": 5,
+  "morphTargets": 0,
+  "skins": [],
+  "animations": [],
+  "materials": 5,
+  "textures": 3,
+  "images": [
+    {
+      "index": 0,
+      "name": "image-0",
+      "mimeType": "image/png",
+      "uri": null,
+      "bytes": 227339,
+      "embedded": true
+    },
+    {
+      "index": 1,
+      "name": "image-1",
+      "mimeType": "image/png",
+      "uri": null,
+      "bytes": 1248165,
+      "embedded": true
+    },
+    {
+      "index": 2,
+      "name": "image-2",
+      "mimeType": "image/png",
+      "uri": null,
+      "bytes": 336613,
+      "embedded": true
+    }
+  ],
+  "materialDetails": [
+    {
+      "index": 0,
+      "name": "M762_Bullets",
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "baseColorTexture": null,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.6,
+      "metallicRoughnessTexture": null,
+      "normalTexture": null,
+      "occlusionTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ],
+      "emissiveTexture": null,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": true,
+      "unlit": false,
+      "transmissionFactor": null,
+      "transmissionTexture": null,
+      "clearcoatFactor": null,
+      "clearcoatTexture": null,
+      "specularFactor": null,
+      "specGlossDiffuseTexture": null,
+      "extensions": []
+    },
+    {
+      "index": 1,
+      "name": "M762_Charmholder",
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "baseColorTexture": 0,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.6,
+      "metallicRoughnessTexture": null,
+      "normalTexture": null,
+      "occlusionTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ],
+      "emissiveTexture": null,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": true,
+      "unlit": false,
+      "transmissionFactor": null,
+      "transmissionTexture": null,
+      "clearcoatFactor": null,
+      "clearcoatTexture": null,
+      "specularFactor": 1,
+      "specGlossDiffuseTexture": null,
+      "extensions": [
+        "KHR_materials_specular"
+      ]
+    },
+    {
+      "index": 2,
+      "name": "M762_Magazine",
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "baseColorTexture": 0,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.6,
+      "metallicRoughnessTexture": null,
+      "normalTexture": null,
+      "occlusionTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ],
+      "emissiveTexture": null,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": true,
+      "unlit": false,
+      "transmissionFactor": null,
+      "transmissionTexture": null,
+      "clearcoatFactor": null,
+      "clearcoatTexture": null,
+      "specularFactor": null,
+      "specGlossDiffuseTexture": null,
+      "extensions": []
+    },
+    {
+      "index": 3,
+      "name": "M762_Weapon",
+      "baseColorFactor": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "baseColorTexture": 1,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.6,
+      "metallicRoughnessTexture": null,
+      "normalTexture": null,
+      "occlusionTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ],
+      "emissiveTexture": null,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": true,
+      "unlit": false,
+      "transmissionFactor": null,
+      "transmissionTexture": null,
+      "clearcoatFactor": null,
+      "clearcoatTexture": null,
+      "specularFactor": 1,
+      "specGlossDiffuseTexture": null,
+      "extensions": [
+        "KHR_materials_specular"
+      ]
+    },
+    {
+      "index": 4,
+      "name": "Phosphorescent_Sights",
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "baseColorTexture": null,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.6,
+      "metallicRoughnessTexture": null,
+      "normalTexture": null,
+      "occlusionTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ],
+      "emissiveTexture": null,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": true,
+      "unlit": false,
+      "transmissionFactor": null,
+      "transmissionTexture": null,
+      "clearcoatFactor": null,
+      "clearcoatTexture": null,
+      "specularFactor": null,
+      "specGlossDiffuseTexture": null,
+      "extensions": []
+    }
+  ],
+  "textureDetails": [
+    {
+      "index": 0,
+      "name": "texture-0",
+      "source": 0,
+      "sampler": 0,
+      "extensions": [],
+      "usages": [
+        {
+          "material": 1,
+          "slot": "baseColorTexture"
+        },
+        {
+          "material": 2,
+          "slot": "baseColorTexture"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "name": "texture-1",
+      "source": 1,
+      "sampler": 0,
+      "extensions": [],
+      "usages": [
+        {
+          "material": 3,
+          "slot": "baseColorTexture"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "name": "texture-2",
+      "source": 2,
+      "sampler": 0,
+      "extensions": [],
+      "usages": []
+    }
+  ],
+  "binaryBytes": 2622612
+}

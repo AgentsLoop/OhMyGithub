@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>STRIKE POINT // FPS</title>
+<link rel="preconnect" href="https://unpkg.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@500;800;900&family=Share+Tech+Mono&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#06080a;color:#e8eef2;font-family:'JetBrains Mono',monospace}
+  #canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #hud{position:absolute;inset:0;pointer-events:none;user-select:none}
+  /* Top bar */
+  .topbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:linear-gradient(180deg,rgba(0,0,0,.7),transparent);border-bottom:1px solid rgba(255,255,255,.08)}
+  .brand{font-family:'Orbitron',sans-serif;font-weight:900;letter-spacing:.18em;font-size:11px;color:#9fb8c9}
+  .brand b{color:#fff;font-size:13px;letter-spacing:.22em}
+  .pill{display:flex;gap:10px;align-items:center}
+  .pill span{font-size:10px;letter-spacing:.16em;color:#8aa0b3;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);padding:6px 10px;border-radius:999px}
+  .pill .live{background:#ff2b2b;color:#fff;border-color:#ff2b2b;animation:pulse 1s infinite alternate}
+  @keyframes pulse{from{opacity:.85}to{opacity:1}}
+  /* Crosshair */
+  #crosshair{position:absolute;left:50%;top:50%;width:28px;height:28px;transform:translate(-50%,-50%)}
+  #crosshair::before,#crosshair::after{content:"";position:absolute;background:#fff}
+  #crosshair::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-50%);opacity:.9}
+  #crosshair::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-50%);opacity:.9}
+  #crosshair i{position:absolute;left:50%;top:50%;width:6px;height:6px;border:1px solid rgba(255,255,255,.9);transform:translate(-50%,-50%);border-radius:50%;background:rgba(255,255,255,.15)}
+  #crosshair.hit{transform:translate(-50%,-50%) scale(1.35)}
+  #crosshair.hit::before,#crosshair.hit::after{background:#ff2b2b}
+  /* Bottom HUD */
+  .bottom{position:absolute;bottom:0;left:0;right:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:end;padding:14px 16px 12px;gap:12px;background:linear-gradient(0deg,rgba(0,0,0,.75) 0%,rgba(0,0,0,0) 100%)}
+  .hud-card{background:rgba(12,16,20,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 14px;min-width:160px}
+  .label{font-size:9px;letter-spacing:.2em;color:#8fb0c6;margin-bottom:6px}
+  .big{font-family:'Orbitron',sans-serif;font-weight:900;font-size:28px;line-height:1;color:#fff;letter-spacing:.02em;display:flex;align-items:baseline;gap:6px}
+  .big small{font-size:13px;color:#8aa0b3;font-weight:700}
+  .bar{height:6px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden;margin-top:8px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#ff2b2b,#ff6a00);width:100%;transition:width .2s}
+  .bar.ammo i{background:linear-gradient(90deg,#00e5ff,#7af0ff)}
+  .center-hud{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .compass{width:320px;height:36px;background:rgba(10,14,18,.7);border:1px solid rgba(255,255,255,.12);border-radius:999px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:10px;letter-spacing:.18em;color:#8fb0c6}
+  .compass b{color:#fff}
+  .killfeed{position:absolute;right:16px;top:64px;display:flex;flex-direction:column;gap:6px;align-items:flex-end;max-width:260px}
+  .kill{font-size:11px;background:rgba(0,0,0,.6);border-left:3px solid #ff2b2b;padding:6px 10px;border-radius:6px;color:#fff;animation:slide .3s}
+  @keyframes slide{from{transform:translateX(12px);opacity:0}to{transform:none;opacity:1}}
+  .hitmarker{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);pointer-events:none;opacity:0}
+  .hitmarker.show{opacity:1;animation:hm .25s}
+  .hitmarker::before,.hitmarker::after{content:"";position:absolute;inset:0;border:2px solid #fff;transform:rotate(45deg)}
+  .hitmarker::after{border-color:#ff2b2b;transform:rotate(45deg) scale(.6)}
+  @keyframes hm{0%{transform:translate(-50%,-50%) scale(.6)}100%{transform:translate(-50%,-50%) scale(1)}}
+  #damage{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .22s ease,border-width .22s ease; background:radial-gradient(ellipse 92% 78% at 50% 50%, transparent 46%, rgba(255,32,32,.18) 76%, rgba(110,0,0,.38) 100%); box-shadow:inset 0 0 120px rgba(255,32,32,.42), inset 0 0 42px rgba(255,0,0,.22); border:0 solid rgba(255,43,43,.92)}
+  #damage.on{opacity:1;border-width:20px}
+  #damage::after{content:"";position:absolute;inset:0;background:rgba(255,18,18,.065);opacity:1}
+  /* Overlays */
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(800px 600px at 50% 30%,rgba(0,229,255,.18),transparent 60%),linear-gradient(180deg,rgba(6,10,14,.85),rgba(6,10,14,.95));backdrop-filter:blur(6px)}
+  .panel{width:min(560px,92vw);background:rgba(12,16,20,.88);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:22px 22px 16px;box-shadow:0 20px 60px rgba(0,0,0,.6);text-align:center}
+  .panel h1{font-family:'Orbitron',sans-serif;font-weight:900;letter-spacing:.18em;font-size:22px;color:#fff}
+  .panel h1 em{color:#00e5ff;font-style:normal}
+  .panel p{color:#a8bece;font-size:12.5px;line-height:1.6;margin:10px 0 14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left;margin:10px 0}
+  .k{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 11px}
+  .k b{font-size:10px;letter-spacing:.14em;color:#8fb0c6}
+  .k div{font-size:12px;color:#fff;margin-top:4px}
+  .btn{pointer-events:auto;cursor:pointer;background:linear-gradient(90deg,#00e5ff,#5ef0ff);color:#02141a;font-family:'Orbitron',sans-serif;font-weight:900;letter-spacing:.16em;font-size:12px;border:0;border-radius:999px;padding:13px 18px;width:100%;transition:transform .1s,filter .15s}
+  .btn:hover{filter:brightness(1.08)} .btn:active{transform:scale(.98)}
+  .btn.secondary{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.14)}
+  .row{display:flex;gap:10px}
+  .tiny{font-size:10px;color:#7a90a3;letter-spacing:.12em;margin-top:10px}
+  .hide{display:none !important}
+  #minimap{position:absolute;left:16px;top:64px;width:144px;height:144px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.14);background:rgba(6,10,14,.6);backdrop-filter:blur(8px)}
+  #minimap canvas{width:100%;height:100%;display:block}
+  #stats{position:absolute;left:16px;top:218px;font-size:10px;letter-spacing:.12em;color:#8aa0b3;line-height:1.7}
+  @media(max-width:760px){.bottom{grid-template-columns:1fr 1fr}.center-hud{display:flex;grid-column:1/-1;order:-1;align-items:center}.compass{width:min(92vw,320px)}.hud-card{min-width:0}#minimap{width:110px;height:110px;left:10px;top:58px}#stats{top:176px;font-size:9px}}
+  @media(max-width:480px){.topbar{padding:10px 12px}.brand{font-size:9px}.pill span{font-size:9px;padding:5px 8px}.bottom{padding:10px 10px 8px;gap:8px}.big{font-size:22px}}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="hud">
+  <div class="topbar">
+    <div class="brand"><b>STRIKE POINT</b> — KILLHOUSE MK.IV</div>
+    <div class="pill"><span id="wavePill">WAVE 1</span><span id="enemiesPill">HOSTILES 6</span><span class="live">● LIVE</span></div>
+  </div>
+  <div id="minimap"><canvas id="mini" width="144" height="144"></canvas></div>
+  <div id="stats">ACCURACY 0%<br>HEADSHOTS 0<br><span id="fpsStat">60 FPS</span></div>
+  <div id="killfeed" class="killfeed"></div>
+  <div id="crosshair"><i></i></div>
+  <div id="hitmarker" class="hitmarker"></div>
+  <div id="damage"></div>
+  <div class="bottom">
+    <div class="hud-card">
+      <div class="label">HEALTH — ARMOR</div>
+      <div class="big" id="healthTxt">100<small>HP</small></div>
+      <div class="bar"><i id="healthBar"></i></div>
+      <div class="tiny" id="armorTxt">PLATE 50</div>
+    </div>
+      <div class="center-hud">
+       <div class="compass" id="compass" style="position:relative;overflow:hidden"><div id="compassTrack" style="display:flex;align-items:center;gap:18px;white-space:nowrap;will-change:transform;transition:transform .12s linear"><span>W</span><span>NW</span><b>N</b><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span><span>NW</span><b>N</b><span>NE</span><span>E</span></div><div style="position:absolute;left:50%;top:0;bottom:0;width:2px;background:#00e5ff;opacity:.95;transform:translateX(-50%);box-shadow:0 0 6px #00e5ff"></div></div>
+       <div style="font-size:10px;letter-spacing:.18em;color:#8fb0c6">OBJECTIVE: ELIMINATE ALL HOSTILES — HOLD THE KILLHOUSE</div>
+     </div>
+    <div class="hud-card" style="text-align:right">
+      <div class="label">M762 — 5.56×45MM</div>
+      <div class="big" style="justify-content:flex-end" id="ammoTxt">30<small>/ 90</small></div>
+      <div class="bar ammo"><i id="ammoBar" style="width:100%"></i></div>
+      <div class="tiny" id="firemodeTxt">AUTO • 760 RPM • R TO RELOAD</div>
+    </div>
+  </div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>STRIKE <em>POINT</em></h1>
+    <p>AAA-inspired close-quarters FPS built in Three.js. Hold the killhouse, clear waves of hostiles. Pointer-lock aiming, ballistic hits, reloads and armor.</p>
+    <div class="grid2">
+      <div class="k"><b>MOVE</b><div>WASD — Shift sprint</div></div>
+      <div class="k"><b>LOOK / AIM</b><div>Mouse — Right-click ADS</div></div>
+      <div class="k"><b>FIRE / RELOAD</b><div>Left click — R</div></div>
+      <div class="k"><b>JUMP / CROUCH</b><div>Space — C / Ctrl</div></div>
+    </div>
+    <div class="row">
+      <button id="playBtn" class="btn">▶ ENGAGE — CLICK TO LOCK POINTER</button>
+    </div>
+    <div class="tiny">M762 Assault Rifle model: “M762 Assault Rifle” by STALKER (CC Attribution) via Sketchfab — <span id="attrTxt">public/models/rifle.glb</span> • Lighting: ACES + neutral environment • Materials: PBR metallic-roughness</div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button id="viewerBtn" class="btn secondary" style="font-size:10px;padding:10px">OPEN A/B VIEWER</button>
+      <button id="howBtn" class="btn secondary" style="font-size:10px;padding:10px">SENSITIVITY: <span id="sensLabel">1.0×</span></button>
+    </div>
+  </div>
+</div>
+
+<div id="dead" class="overlay hide">
+  <div class="panel">
+    <h1 style="color:#ff2b2b">KIA</h1>
+    <p id="deadStats">You were neutralized. Wave 1 — 0 kills.</p>
+    <button id="restartBtn" class="btn">REINSERT — R</button>
+    <div class="tiny">Tip: use cover. Hostiles flank and push when you reload. Headshots deal ×2.2.</div>
+  </div>
+</div>
+
+<div id="win" class="overlay hide">
+  <div class="panel">
+    <h1 style="color:#00e5ff">KILLHOUSE SECURED</h1>
+    <p id="winStats">All waves cleared. Outstanding shooting.</p>
+    <button id="againBtn" class="btn">PLAY AGAIN</button>
+  </div>
+</div>
+
+<div id="pause" class="overlay hide">
+  <div class="panel">
+    <h1>PAUSED</h1>
+    <p>Pointer released. Press ESC to resume or click to re-lock.</p>
+    <button id="resumeBtn" class="btn secondary">RESUME</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
