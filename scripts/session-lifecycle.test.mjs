@@ -1,7 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { Lifecycle } from './session-lifecycle.mjs'
+import { Lifecycle, finishedMessage, child } from './session-lifecycle.mjs'
 const tick = () => new Promise(resolve => setImmediate(resolve))
+test('manual Stop finishes a completed idle response; real errors and running responses do not', () => {
+  const snapshot = error => ({ busy: false, messages: [{ info: { id: 'm1', role: 'assistant', time: { completed: 1 }, error } }] })
+  assert.equal(finishedMessage(snapshot({ name: 'MessageAbortedError' })), 'm1')
+  assert.equal(finishedMessage(snapshot()), 'm1')
+  assert.equal(finishedMessage(snapshot({ name: 'APIError' })), null)
+  assert.equal(finishedMessage({ ...snapshot(), busy: true }), null)
+  assert.equal(finishedMessage({ busy: false, messages: [] }), null)
+  assert.equal(finishedMessage({ busy: false, messages: [{ info: { id: 'm1', role: 'assistant', time: { completed: 1 }, finish: 'tool-calls' } }] }), null)
+})
+test('surface the child failure instead of hiding it behind node exited 1', async () => {
+  await assert.rejects(child(process.execPath, ['-e', 'console.error("git push rejected: workflows permission"); process.exit(1)']), /git push rejected: workflows permission/)
+})
 test('completion saves before deploying and deduplicates the same response', async () => {
   const calls = []
   const lifecycle = new Lifecycle({ save: async () => { calls.push('save'); return {} }, deploy: async () => calls.push('deploy') })

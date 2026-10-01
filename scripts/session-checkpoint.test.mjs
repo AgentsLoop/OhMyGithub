@@ -4,10 +4,34 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { usesImportedSnapshot, parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore, exportSession, portableSession } from './session-checkpoint.mjs'
+import { usesImportedSnapshot, parseResume, validateCheckpoint, redactSession, excludedPath, saveCheckpoint, restore, exportSession, portableSession, retainWorkflowTree, command } from './session-checkpoint.mjs'
 const session = { info: { id: 'ses_checkpoint', directory: '/old/project' }, messages: [{ info: { id: 'msg_one', role: 'user' }, parts: [{ id: 'prt_one', type: 'text', text: 'Build a castle' }] }] }
 const source = { source_repository: 'alice/game', source_issue: 6 }
 const base = { version: 2, repository: 'alice/game', issue_number: 6, run_id: 123, commit: 'a'.repeat(40), branch: 'opencode-checkpoints/6', project_dir: '', opencode_version: '1.2.3', session, public_history: true }
+test('retain remote listener workflows without losing game edits or altering the working index', () => {
+  const root = mkdtempSync(join(tmpdir(), 'checkpoint-workflows-'))
+  const git = (...args) => {
+    const options = typeof args.at(-1) === 'object' ? args.pop() : {}
+    return command('git', args, { cwd: root, ...options })
+  }
+  try {
+    git('init'); git('config', 'user.name', 'Test'); git('config', 'user.email', 'test@example.test')
+    mkdirSync(join(root, '.github/workflows'), { recursive: true })
+    writeFileSync(join(root, '.github/workflows/opencode.yml'), 'current listener')
+    writeFileSync(join(root, 'index.html'), 'old game')
+    git('add', '.'); git('commit', '-m', 'Baseline')
+    const baseline = git('rev-parse', 'HEAD')
+    writeFileSync(join(root, '.github/workflows/opencode.yml'), 'stale or generated listener')
+    writeFileSync(join(root, '.github/workflows/extra.yml'), 'new generated workflow')
+    writeFileSync(join(root, 'index.html'), 'new game')
+    git('add', '.')
+    retainWorkflowTree(git, baseline)
+    assert.equal(git('show', ':.github/workflows/opencode.yml'), 'current listener')
+    assert.equal(git('ls-files', '--', '.github/workflows/extra.yml'), '')
+    assert.equal(git('show', ':index.html'), 'new game')
+    assert.equal(readFileSync(join(root, '.github/workflows/opencode.yml'), 'utf8'), 'stale or generated listener')
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
 test('requires a complete versioned checkpoint and rejects legacy data', () => {
   assert.equal(validateCheckpoint(base, source), base)
   for (const patch of [{ version: 0 }, { session: {} }, { repository: 'other/game' }, { project_dir: '../outside' }, { opencode_version: 'latest' }, { public_history: false }]) assert.throws(() => validateCheckpoint({ ...base, ...patch }, source), /complete/)

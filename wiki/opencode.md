@@ -332,3 +332,6 @@ Close child-process stdin when spawning isolated `opencode run` smoke tests; avo
 ## Link issue access through OmGithub
 
 Publish one [Open project](https://omgithub.com/OWNER/REPO/issues/NUMBER) access link in workspace, live-progress, preview, and deployment comments. Build the URL from OMGITHUB_ORIGIN, the repository, and the issue number. Keep SSH commands and diagnostic evidence links available. Keep service URLs in structured run registration.
+# Finish interrupted builds
+
+Treat a completed, idle `MessageAbortedError` response as finished. Save the checkpoint and run deployment validation after manual Stop. Reject ordinary execution errors and unfinished tool calls. Preserve the checkpoint branch's workflow tree; use the current remote default workflow tree for its first checkpoint. Keep game edits in the isolated index. Surface child stderr when checkpoint saving or publishing fails.

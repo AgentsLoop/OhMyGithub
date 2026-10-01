@@ -9,7 +9,11 @@ const digest = value => createHash('sha256').update(value).digest('hex')
 export function command(file, args, options = {}) {
   const start = Date.now()
   try { return (execFileSync(file, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'], ...options }) || '').trim() }
-  catch (error) { throw Object.assign(new Error(`${file} ${args[0] || ''} failed (exit ${error.status ?? 'timeout'}).`), { status: Number(String(error.stderr || '').match(/(?:HTTP |error: )(\d{3})/)?.[1]) || undefined }) }
+  catch (error) {
+    const secrets = Object.entries(env).filter(([key]) => /TOKEN|SECRET|PASSWORD|API_KEY|AUTH_CONTENT|PRIVATE_KEY/.test(key)).map(([, value]) => value)
+    const detail = redactSession(String(error.stderr || '').trim(), secrets).slice(-2000)
+    throw Object.assign(new Error(`${file} ${args[0] || ''} failed (exit ${error.status ?? 'timeout'}).${detail ? `\n${detail}` : ''}`), { status: Number(String(error.stderr || '').match(/(?:HTTP |error: )(\d{3})/)?.[1]) || undefined })
+  }
   finally { process.stderr.write(`[timing] ${file} ${args[0] || ''}: ${Date.now() - start} ms\n`) }
 }
 // OpenCode can exit before a piped stdout buffer drains. A regular file descriptor
@@ -75,6 +79,15 @@ export function redactSession(session, secrets = []) {
 }
 const forbidden = /(^|\/)(?:\.env(?:\.[^/]*)?|auth\.json|credentials(?:\.json)?|node_modules|screenshots|\.playwright-cli|\.git|\.agents|\.agentsweb|\.omgithub-runtime|\.opencode-ssh|\.opencode-web|opencode-agentsweb-id_ed25519(?:\.pub)?)(\/|$)|(?:\.log|\.pid|\.pem|\.key)$/i
 export function excludedPath(path) { return forbidden.test(path) || /(^|\/)\.opencode\/(?:goals|auth\.json)(\/|$)/.test(path) }
+
+// Snapshot game edits, not listener changes. A new branch is compared with the
+// current default branch by GitHub, which may have advanced since checkout.
+export function retainWorkflowTree(git, baseline) {
+  const staged = git('ls-files', '-z', '--', '.github/workflows').split('\0').filter(Boolean)
+  if (staged.length) git('update-index', '--force-remove', '-z', '--stdin', { input: staged.join('\0') + '\0' })
+  const entries = git('ls-tree', '-r', '-z', baseline, '--', '.github/workflows')
+  if (entries) git('update-index', '-z', '--index-info', { input: entries.endsWith('\0') ? entries : entries + '\0' })
+}
 
 function api(path, args = []) { return command('gh', ['api', path, ...args]) }
 function checkpointPath() { return join(env.RUNNER_TEMP, 'omgithub-restore-checkpoint.json') }
@@ -168,13 +181,20 @@ export function saveCheckpoint({ interrupted = false } = {}) {
   const branch = `opencode-checkpoints/${issue}`
   const source = { source_repository: env.GITHUB_REPOSITORY, source_issue: issue }
   const gitEnv = { ...env, GIT_INDEX_FILE: join(directory, `checkpoint-index-${process.pid}`) }
-  const git = (...args) => command('git', args, { cwd: root, env: gitEnv })
+  const git = (...args) => {
+    const options = typeof args.at(-1) === 'object' ? args.pop() : {}
+    return command('git', args, { cwd: root, env: gitEnv, ...options })
+  }
   try {
+    const remote = git('ls-remote', 'origin', `refs/heads/${branch}`).split(/\s/)[0] || ''
+    const baseline = remote || git('ls-remote', 'origin', 'HEAD').split(/\s/)[0]
+    if (baseline) git('fetch', '--no-tags', 'origin', baseline)
     git('read-tree', 'HEAD')
     git('add', '-A', '--', '.')
     const files = command('git', ['ls-files', '-z'], { cwd: root, env: gitEnv }).split('\0').filter(Boolean)
     const exclude = files.filter(excludedPath)
     if (exclude.length) command('git', ['update-index', '--force-remove', '-z', '--stdin'], { cwd: root, env: gitEnv, input: `${exclude.join('\0')}\0` })
+    if (baseline) retainWorkflowTree(git, baseline)
     const tree = git('write-tree')
     const fingerprint = digest(`${tree}\n${version}\n${JSON.stringify(session)}`)
     const stateFile = join(directory, 'checkpoint-state.json')
@@ -189,7 +209,6 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     const tag = `opencode-checkpoint-${issue}`
     const { session: exported, ...metadata } = checkpoint
     if (Buffer.byteLength(JSON.stringify(exported)) > 25 * 1024 * 1024) throw new Error('Session export exceeds 25 MB.')
-    const remote = git('ls-remote', 'origin', `refs/heads/${branch}`).split(/\s/)[0] || ''
     git('push', `--force-with-lease=refs/heads/${branch}:${remote}`, 'origin', `${commit}:refs/heads/${branch}`)
     const uploadPath = join(directory, `checkpoint-upload-${generation}.json`)
     writeFileSync(uploadPath, JSON.stringify({ manifest: { ...metadata, generation, interrupted, session_id: sessionId }, session: exported }), { mode: 0o600 })

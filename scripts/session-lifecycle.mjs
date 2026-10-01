@@ -50,7 +50,9 @@ export class Lifecycle {
 export function child(file, args, { signal, ...options } = {}) {
   return new Promise((resolve, reject) => {
     const started = Date.now()
-    const proc = spawn(file, args, { stdio: 'inherit', detached: process.platform !== 'win32', ...options })
+    const proc = spawn(file, args, { stdio: ['ignore', 'inherit', 'pipe'], detached: process.platform !== 'win32', ...options })
+    let stderr = ''
+    proc.stderr?.on('data', chunk => { process.stderr.write(chunk); stderr = (stderr + chunk.toString()).slice(-4000) })
     let forced
     const kill = signame => { try { process.kill(-proc.pid, signame) } catch { proc.kill(signame) } }
     const abort = () => { kill('SIGTERM'); forced = setTimeout(() => kill('SIGKILL'), 5000) }
@@ -61,10 +63,17 @@ export function child(file, args, { signal, ...options } = {}) {
       clearTimeout(forced); signal?.removeEventListener('abort', abort)
       process.stderr.write(`[timing] ${file}: ${Date.now() - started} ms\n`)
       if (signal?.aborted) reject(new Error('Cancelled'))
-      else if (code !== 0) reject(Object.assign(new Error(`${file} exited ${code}`), { exitCode: code }))
+      else if (code !== 0) reject(Object.assign(new Error(`${file} exited ${code}${stderr.trim() ? `: ${stderr.trim().slice(-1500)}` : ''}`), { exitCode: code }))
       else resolve()
     })
   })
+}
+
+export function finishedMessage(current) {
+  const last = current.messages?.at(-1)?.info
+  if (current.busy || last?.role !== 'assistant' || !last.time?.completed || last.finish === 'tool-calls') return null
+  if (last.error && last.error.name !== 'MessageAbortedError') return null
+  return last.id
 }
 
 async function serve() {
@@ -128,6 +137,8 @@ async function serve() {
       }
       const targetURL = `${upstream}${req.url}`
       const target = httpRequest(targetURL, { method: req.method, headers: req.headers }, reply => {
+        if (req.method === 'POST' && req.url.split('?')[0] === `/session/${mainID()}/abort` && reply.statusCode < 300)
+          reply.on('end', () => { void reconcile().catch(console.error) })
         res.writeHead(reply.statusCode, reply.headers); reply.pipe(res)
       })
       target.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
@@ -162,9 +173,8 @@ async function serve() {
     const current = await snapshot(id)
     recovery.observe(current)
     if (current.busy) return
-    const messages = current.messages
-    const last = messages.at(-1)?.info
-    if (last?.role === 'assistant' && last.time?.completed && !last.error && last.finish !== 'tool-calls') void lifecycle.complete(last.id).catch(console.error)
+    const messageID = finishedMessage(current)
+    if (messageID) void lifecycle.complete(messageID).catch(console.error)
   }
   // Reconnect the event stream, not a checkpoint timer. Reconcile missed idle
   // events after reconnecting so the first quick response is not lost.
