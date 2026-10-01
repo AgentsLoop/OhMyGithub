@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Tide Courier</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--cyan:#00f0ff;--magenta:#ff2b8a;--bg:#040a18}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%, #0e2a4a 0%, #060d1e 45%, #040a18 100%);
+    color:#e6faff;min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    overflow-x:hidden;
+  }
+  header{padding:18px 16px 8px;text-align:center}
+  header h1{
+    font-size:clamp(22px,4vw,36px);letter-spacing:0.12em;text-transform:uppercase;
+    color:#fff;text-shadow:0 0 12px var(--cyan),0 0 32px rgba(0,240,255,.6);
+  }
+  header h1 span{color:var(--cyan)}
+  header p{opacity:.7;font-size:13px;letter-spacing:.08em;margin-top:6px}
+  #gameWrap{
+    width:min(960px,96vw);position:relative;
+    border:1px solid rgba(0,240,255,.35);border-radius:16px;overflow:hidden;
+    box-shadow:0 0 0 1px rgba(0,240,255,.15),0 0 40px rgba(0,240,255,.2),0 16px 40px rgba(0,0,0,.6);
+    background:#081428;
+  }
+  canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;background:#071428}
+  #hud{
+    position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;
+    padding:10px 14px;pointer-events:none;
+    background:linear-gradient(to bottom, rgba(4,10,24,.85), transparent);
+    font-size:13px;letter-spacing:.06em;
+  }
+  #hud .left,#hud .right{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .pill{
+    background:rgba(0,240,255,.12);border:1px solid rgba(0,240,255,.35);border-radius:999px;
+    padding:6px 12px;display:flex;gap:8px;align-items:center;backdrop-filter:blur(6px);
+  }
+  .pill b{color:var(--cyan)}
+  #healthHearts{color:#ff3b5e;letter-spacing:2px}
+  #controlsHint{
+    text-align:center;font-size:12px;opacity:.6;padding:8px 12px;line-height:1.5
+  }
+  #overlay{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(4,10,24,.78);backdrop-filter:blur(4px);flex-direction:column;gap:14px;text-align:center;padding:24px
+  }
+  #overlay.show{display:flex}
+  #overlay h2{font-size:clamp(22px,5vw,34px);letter-spacing:.08em;text-transform:uppercase;text-shadow:0 0 16px var(--cyan)}
+  #overlay p{opacity:.8;max-width:420px;line-height:1.6;font-size:14px}
+  .btn{
+    appearance:none;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--cyan),#7b5bff);color:#041018;
+    font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    padding:12px 28px;border-radius:999px;box-shadow:0 0 18px rgba(0,240,255,.6);
+    transition:.15s;pointer-events:auto;
+  }
+  .btn:hover{transform:translateY(-1px);box-shadow:0 0 28px rgba(0,240,255,.85)}
+  .btn:active{transform:translateY(0)}
+  .btn.secondary{background:transparent;color:var(--cyan);border:1px solid rgba(0,240,255,.5);box-shadow:none}
+  #touchControls{display:none;position:absolute;bottom:10px;left:10px;right:10px;justify-content:space-between;pointer-events:none}
+  .dpad{display:grid;grid-template-columns:32px 32px 32px;grid-template-rows:32px 32px;gap:6px;pointer-events:auto}
+  .dpad button,.actionBtn{width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,240,255,.4);background:rgba(0,240,255,.15);color:#fff;font-size:14px;touch-action:none;user-select:none;-webkit-user-select:none}
+  .dpad button:active,.actionBtn:active{background:rgba(0,240,255,.35);transform:scale(.96)}
+  .actionBtn{width:56px;height:56px;border-radius:50%;align-self:center}
+  @media(max-width:640px){
+    #touchControls{display:flex}
+    #controlsHint{padding-bottom:72px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Neon</span> Tide Courier</h1>
+  <p>Pilot the skiff • Collect 10 signal buoys • Avoid red mines • WASD / Arrow Keys</p>
+</header>
+
+<div id="gameWrap">
+  <canvas id="c" width="960" height="600" aria-label="Neon Tide Courier game"></canvas>
+  <div id="hud">
+    <div class="left">
+      <div class="pill">Buoys <b id="score">0/10</b></div>
+      <div class="pill">Health <span id="healthHearts">♥♥♥</span></div>
+    </div>
+    <div class="right">
+      <div class="pill">Time <b id="timer">00:00</b></div>
+    </div>
+  </div>
+  <div id="touchControls">
+    <div class="dpad">
+      <span></span><button data-dir="up">▲</button><span></span>
+      <button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
+    </div>
+    <button class="actionBtn" id="boostBtn">⚡</button>
+  </div>
+  <div id="overlay">
+    <h2 id="overlayTitle">Ready to Launch</h2>
+    <p id="overlayMsg">Collect all 10 cyan signal buoys drifting on the neon tide. Red mines drift toward you — hit 3 and your skiff sinks.</p>
+    <button class="btn" id="restartBtn">Launch Courier</button>
+    <p style="font-size:11px;opacity:.5">Move: WASD or Arrow Keys • Responsive &amp; self-contained</p>
+  </div>
+</div>
+<div id="controlsHint">Tip: Hold direction to glide. Buoys pulse cyan, mines pulse red. Trail glows brighter when you accelerate.</div>
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const heartsEl = document.getElementById('healthHearts');
+  const timerEl = document.getElementById('timer');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayMsg = document.getElementById('overlayMsg');
+  const restartBtn = document.getElementById('restartBtn');
+
+  // Game state
+  let W = 960, H = 600;
+  let keys = {};
+  let gameState = 'start'; // start, playing, won, lost
+  let score = 0, health = 3, startTime = 0, elapsed = 0;
+  let oceanOffset = 0;
+  let buoys = [], mines = [], particles = [], wake = [];
+  let rafId = 0;
+
+  const player = { x: 160, y: 300, vx:0, vy:0, r:18, speed: 3.8, friction:0.88 };
+
+  function resetGame(){
+    score=0; health=3; oceanOffset=0; buoys=[]; mines=[]; particles=[]; wake=[];
+    player.x=160; player.y=300; player.vx=0; player.vy=0;
+    elapsed=0; startTime=performance.now();
+    spawnBuoys();
+    spawnMines(4);
+    gameState='playing';
+    overlay.classList.remove('show');
+    updateHud();
+  }
+
+  function spawnBuoys(){
+    buoys=[];
+    for(let i=0;i<10;i++){
+      buoys.push({
+        x: 350 + Math.random()* (W*2.2),
+        y: 60 + Math.random()*(H-120),
+        r: 16,
+        collected:false,
+        phase: Math.random()*Math.PI*2,
+        bob: Math.random()*2+1
+      });
+    }
+    // ensure some near start
+    buoys[0].x = 420; buoys[1].x = 620;
+  }
+  function spawnMines(n){
+    for(let i=0;i<n;i++){
+      mines.push({
+        x: W + 120 + Math.random()*800,
+        y: 50+Math.random()*(H-100),
+        r: 18+Math.random()*6,
+        vx: 1.6+Math.random()*2.2,
+        vy: (Math.random()-0.5)*1.2,
+        phase: Math.random()*Math.PI*2
+      });
+    }
+  }
+
+  // Input
+  window.addEventListener('keydown', e=>{
+    const k=e.key.toLowerCase();
+    keys[k]=true;
+    if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+    if(gameState!=='playing' && (k==='enter' || k===' ')) { if(gameState!=='playing') resetGame(); }
+  });
+  window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+
+  // Touch dpad
+  document.querySelectorAll('[data-dir]').forEach(btn=>{
+    const dir=btn.dataset.dir;
+    const press = ()=> keys['arrow'+dir]=true;
+    const release = ()=> keys['arrow'+dir]=false;
+    btn.addEventListener('touchstart', e=>{e.preventDefault(); press();},{passive:false});
+    btn.addEventListener('touchend', e=>{e.preventDefault(); release();},{passive:false});
+    btn.addEventListener('touchcancel', e=>{e.preventDefault(); release();},{passive:false});
+    btn.addEventListener('mousedown', press);
+    btn.addEventListener('mouseup', release);
+    btn.addEventListener('mouseleave', release);
+  });
+  // Boost button (touch + mouse) — maps to Space
+  const boostBtn = document.getElementById('boostBtn');
+  if(boostBtn){
+    const bPress = ()=> keys[' ']=true;
+    const bRelease = ()=> keys[' ']=false;
+    boostBtn.addEventListener('touchstart', e=>{e.preventDefault(); bPress();},{passive:false});
+    boostBtn.addEventListener('touchend', e=>{e.preventDefault(); bRelease();},{passive:false});
+    boostBtn.addEventListener('touchcancel', e=>{e.preventDefault(); bRelease();},{passive:false});
+    boostBtn.addEventListener('mousedown', bPress);
+    boostBtn.addEventListener('mouseup', bRelease);
+    boostBtn.addEventListener('mouseleave', bRelease);
+  }
+
+  // Resize handling: canvas is fixed internal res, CSS scales.
+  function updateHud(){
+    scoreEl.textContent = `${score}/10`;
+    heartsEl.textContent = '♥'.repeat(health) + '♡'.repeat(3-health);
+    heartsEl.style.opacity = health===1 ? '1' : '.95';
+    if(health===1) heartsEl.style.textShadow='0 0 8px #ff3b5e';
+    else heartsEl.style.textShadow='none';
+  }
+  function formatTime(ms){
+    const s=Math.floor(ms/1000);
+    const m=Math.floor(s/60).toString().padStart(2,'0');
+    const ss=(s%60).toString().padStart(2,'0');
+    return `${m}:${ss}`;
+  }
+
+  function collide(ax,ay,ar, bx,by,br){
+    const dx=ax-bx, dy=ay-by;
+    return Math.hypot(dx,dy) < ar+br;
+  }
+  function addBurst(x,y,color,count=12){
+    for(let i=0;i<count;i++){
+      const a=Math.random()*Math.PI*2;
+      const sp= 2+Math.random()*4;
+      particles.push({x,y,vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:1, decay:0.03+Math.random()*0.02, color, r:2+Math.random()*3});
+    }
+  }
+
+  function update(){
+    if(gameState!=='playing') return;
+    elapsed = performance.now() - startTime;
+    timerEl.textContent = formatTime(elapsed);
+
+    // input -> acceleration
+    let ax=0, ay=0;
+    if(keys['arrowup']||keys['w']) ay-=1;
+    if(keys['arrowdown']||keys['s']) ay+=1;
+    if(keys['arrowleft']||keys['a']) ax-=1;
+    if(keys['arrowright']||keys['d']) ax+=1;
+    if(ax!==0||ay!==0){
+      const len=Math.hypot(ax,ay)||1; ax/=len; ay/=len;
+      player.vx += ax * 0.62;
+      player.vy += ay * 0.62;
+      // boost on space/hold?
+      if(keys[' ']) { player.vx+=ax*0.4; player.vy+=ay*0.4; }
+    }
+    player.vx *= player.friction;
+    player.vy *= player.friction;
+    // clamp speed
+    const sp=Math.hypot(player.vx, player.vy);
+    if(sp>player.speed){
+      player.vx = player.vx/sp*player.speed;
+      player.vy = player.vy/sp*player.speed;
+    }
+    player.x += player.vx;
+    player.y += player.vy;
+    // bounds
+    player.x = Math.max(player.r+8, Math.min(W-player.r-8, player.x));
+    player.y = Math.max(player.r+28, Math.min(H-player.r-12, player.y));
+
+    // ocean scroll speed ties to player x velocity slightly
+    oceanOffset = (oceanOffset + 2.2 + Math.max(0, player.vx*0.35)) % 80;
+
+    // wake trail
+    if(Math.hypot(player.vx,player.vy)>0.5){
+      wake.push({x:player.x-18, y:player.y+4, life:1, r:4+Math.random()*4});
+      if(wake.length>18) wake.shift();
+    }
+    wake.forEach(w=> w.life-=0.06);
+    wake = wake.filter(w=>w.life>0);
+
+    // buoys drift left slowly (scrolling ocean)
+    const scrollSpeed = 1.9;
+    buoys.forEach(b=>{
+      if(b.collected) return;
+      b.x -= scrollSpeed;
+      b.y += Math.sin(performance.now()*0.0015 + b.phase)*0.35;
+      // respawn if off-screen without collection (loop around far right)
+      if(b.x < -80){
+        b.x = W + 120 + Math.random()*600;
+        b.y = 60+Math.random()*(H-120);
+      }
+      if(collide(player.x,player.y,player.r-2, b.x,b.y,b.r+2)){
+        b.collected=true;
+        score++;
+        addBurst(b.x,b.y,'#00f0ff',16);
+        updateHud();
+        if(score>=10){
+          win();
+        }
+      }
+    });
+
+    // mines move left + vertical
+    mines.forEach(m=>{
+      m.x -= m.vx;
+      m.y += m.vy;
+      if(m.y < 40 || m.y > H-40) m.vy*=-1;
+      m.phase += 0.08;
+      if(collide(player.x,player.y,player.r-3, m.x,m.y,m.r)){
+        // hit
+        health--;
+        addBurst(m.x,m.y,'#ff2b5a',18);
+        // knockback
+        const ang=Math.atan2(player.y-m.y, player.x-m.x);
+        player.vx += Math.cos(ang)*4;
+        player.vy += Math.sin(ang)*4;
+        // respawn mine far right
+        m.x = W + 80 + Math.random()*400;
+        m.y = 50+Math.random()*(H-100);
+        updateHud();
+        // flash
+        canvas.style.filter='brightness(1.4)';
+        setTimeout(()=>canvas.style.filter='',120);
+        if(health<=0) lose();
+      }
+      if(m.x < -60){
+        m.x = W + 80 + Math.random()*300;
+        m.y = 50+Math.random()*(H-100);
+      }
+    });
+    // keep mine count increasing with score (difficulty)
+    if(mines.length < 5 + Math.floor(score/2)){
+      spawnMines(1);
+    }
+
+    // particles
+    particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vx*=0.98; p.vy*=0.98; p.life-=p.decay; });
+    particles = particles.filter(p=>p.life>0);
+  }
+
+  function win(){
+    gameState='won';
+    overlayTitle.textContent='Signal Restored!';
+    overlayTitle.style.color='#00f0ff';
+    overlayMsg.textContent=`You delivered ${score}/10 buoys in ${formatTime(elapsed)}. The neon tide is calm again.`;
+    restartBtn.textContent='Play Again';
+    overlay.classList.add('show');
+  }
+  function lose(){
+    gameState='lost';
+    overlayTitle.textContent='Courier Down';
+    overlayTitle.style.color='#ff3b5e';
+    overlayMsg.textContent=`Your skiff took too much damage. You secured ${score}/10 buoys. Try a cleaner route.`;
+    restartBtn.textContent='Retry';
+    overlay.classList.add('show');
+  }
+
+  let oceanOffset2=0;
+  function drawOcean(){
+    // base deep gradient
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0c2340');
+    g.addColorStop(0.45,'#081428');
+    g.addColorStop(1,'#070f24');
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W,H);
+    // secondary magenta depth fog (parallax)
+    const fog=ctx.createLinearGradient(0,H*0.55,0,H);
+    fog.addColorStop(0,'transparent');
+    fog.addColorStop(1,'rgba(255,43,138,0.07)');
+    ctx.fillStyle=fog; ctx.fillRect(0,H*0.55,W,H*0.45);
+
+    oceanOffset2 = (oceanOffset2 + 3.4) % 120;
+    ctx.save();
+    // Layer 1: bright cyan ribbons with bloom (additive)
+    ctx.globalCompositeOperation='lighter';
+    ctx.shadowColor='#00f0ff'; ctx.shadowBlur=14;
+    ctx.strokeStyle='rgba(0,240,255,0.22)';
+    ctx.lineWidth=1.6;
+    for(let y=90;y<H;y+=36){
+      ctx.beginPath();
+      for(let x=0;x<=W;x+=10){
+        const wy = y + Math.sin((x+oceanOffset*2.1)*0.014 + y*0.018)*9 + Math.sin(oceanOffset*0.06 + x*0.012)*5;
+        if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
+      }
+      ctx.stroke();
+    }
+    // Layer 2: softer cyan secondary
+    ctx.shadowBlur=10;
+    ctx.strokeStyle='rgba(0,240,255,0.13)';
+    ctx.lineWidth=1;
+    for(let y=110;y<H;y+=36){
+      ctx.beginPath();
+      for(let x=0;x<=W;x+=10){
+        const wy = y + Math.sin((x+oceanOffset2*1.4)*0.013 + y*0.02)*7 + Math.cos(oceanOffset*0.04 + x*0.01)*4;
+        if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
+      }
+      ctx.stroke();
+    }
+    // Layer 3: magenta accent ribbons (uses --magenta)
+    ctx.shadowColor='#ff2b8a'; ctx.shadowBlur=12;
+    ctx.strokeStyle='rgba(255,43,138,0.14)';
+    ctx.lineWidth=1.2;
+    for(let y=140;y<H;y+=72){
+      ctx.beginPath();
+      for(let x=0;x<=W;x+=12){
+        const wy = y + Math.sin((x+oceanOffset*1.2)*0.011 + y*0.015)*6 + Math.sin(oceanOffset*0.03 + x*0.008)*4;
+        if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
+      }
+      ctx.stroke();
+    }
+    // vertical shimmer additive
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='rgba(123,91,255,0.11)';
+    ctx.lineWidth=1;
+    for(let x=-60+ (oceanOffset%40); x<W; x+=40){
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+12,H); ctx.stroke();
+    }
+    // diagonal specular sweep (slow)
+    const sweepX = (performance.now()*0.06) % (W+400) - 200;
+    const sg=ctx.createLinearGradient(sweepX,0,sweepX+160, H);
+    sg.addColorStop(0,'transparent');
+    sg.addColorStop(0.5,'rgba(255,255,255,0.055)');
+    sg.addColorStop(1,'transparent');
+    ctx.fillStyle=sg;
+    ctx.fillRect(sweepX-80,0,160,H);
+    ctx.restore();
+    // dual-tone horizon glow: cyan -> magenta
+    const hg=ctx.createLinearGradient(0,0,0,140);
+    hg.addColorStop(0,'rgba(0,240,255,0.22)');
+    hg.addColorStop(0.45,'rgba(123,91,255,0.12)');
+    hg.addColorStop(0.85,'rgba(255,43,138,0.10)');
+    hg.addColorStop(1,'transparent');
+    ctx.fillStyle=hg; ctx.fillRect(0,0,W,140);
+  }
+  function drawReflections(){
+    // wet reflections under buoys/mines/player - subtle additive
+    ctx.save();
+    ctx.globalCompositeOperation='lighter';
+    buoys.forEach(b=>{
+      if(b.collected) return;
+      ctx.fillStyle='rgba(0,240,255,0.09)';
+      ctx.beginPath(); ctx.ellipse(b.x,b.y+22, b.r*1.3, 7, 0,0,Math.PI*2); ctx.fill();
+    });
+    mines.forEach(m=>{
+      ctx.fillStyle='rgba(255,43,90,0.08)';
+      ctx.beginPath(); ctx.ellipse(m.x,m.y+20, m.r*1.2, 6, 0,0,Math.PI*2); ctx.fill();
+    });
+    // player reflection
+    ctx.fillStyle='rgba(0,240,255,0.10)';
+    ctx.beginPath(); ctx.ellipse(player.x, player.y+18, 22, 6, 0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBuoy(b){
+    if(b.collected) return;
+    const t=performance.now()*0.003 + b.phase;
+    const pulse = 0.85 + Math.sin(t*2)*0.15;
+    // outer glow
+    ctx.save();
+    ctx.shadowColor='#00f0ff'; ctx.shadowBlur=18*pulse;
+    ctx.fillStyle='rgba(0,240,255,0.95)';
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r*pulse,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    // inner
+    ctx.fillStyle='#e6ffff';
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r*0.55,0,Math.PI*2); ctx.fill();
+    // signal ring
+    ctx.strokeStyle=`rgba(0,240,255,${0.5+0.3*Math.sin(t*3)})`;
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r*1.6 + Math.sin(t*2)*3,0,Math.PI*2); ctx.stroke();
+    // antenna
+    ctx.strokeStyle='rgba(230,255,255,0.9)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(b.x,b.y-b.r); ctx.lineTo(b.x,b.y-b.r-10); ctx.stroke();
+    ctx.fillStyle='#00f0ff'; ctx.beginPath(); ctx.arc(b.x,b.y-b.r-12,3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // label
+    ctx.fillStyle='rgba(0,240,255,0.7)'; ctx.font='10px monospace'; ctx.textAlign='center';
+    ctx.fillText('◉ BUOY', b.x, b.y + b.r + 14);
+  }
+
+  function drawMine(m){
+    ctx.save();
+    const pulse = 0.9 + Math.sin(m.phase)*0.12;
+    // glow
+    ctx.shadowColor='#ff2b5a'; ctx.shadowBlur=16;
+    ctx.fillStyle='#ff2b5a';
+    ctx.beginPath(); ctx.arc(m.x,m.y,m.r*pulse,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    // spikes
+    ctx.strokeStyle='#ff6b8a'; ctx.lineWidth=2;
+    for(let i=0;i<6;i++){
+      const a=i*Math.PI/3 + m.phase*0.5;
+      ctx.beginPath(); ctx.moveTo(m.x+Math.cos(a)*(m.r*0.7), m.y+Math.sin(a)*(m.r*0.7));
+      ctx.lineTo(m.x+Math.cos(a)*(m.r*1.25), m.y+Math.sin(a)*(m.r*1.25)); ctx.stroke();
+    }
+    // core
+    ctx.fillStyle='#2a0a14'; ctx.beginPath(); ctx.arc(m.x,m.y,m.r*0.45,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffccd6'; ctx.beginPath(); ctx.arc(m.x-3,m.y-3,3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPlayer(){
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    const speed = Math.hypot(player.vx, player.vy);
+    const tilt = player.vx*0.06;
+    ctx.rotate(tilt);
+    // wake behind
+    wake.forEach(w=>{
+      const alpha=w.life*0.25;
+      ctx.fillStyle=`rgba(0,240,255,${alpha})`;
+      ctx.beginPath(); ctx.ellipse((w.x-player.x)/1, (w.y-player.y), w.r*w.life, w.r*0.5, 0,0,Math.PI*2); ctx.fill();
+    });
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0,10,22,8,0,0,Math.PI*2); ctx.fill();
+    // hull
+    ctx.shadowColor='#00f0ff'; ctx.shadowBlur=18;
+    ctx.fillStyle='#e6faff';
+    ctx.beginPath();
+    ctx.moveTo(20,0);
+    ctx.lineTo(-14,-12);
+    ctx.lineTo(-10,0);
+    ctx.lineTo(-14,12);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur=0;
+    // cockpit
+    ctx.fillStyle='#7b5bff'; ctx.beginPath(); ctx.ellipse(-2,0,7,6,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#00f0ff'; ctx.beginPath(); ctx.ellipse(-1,-1,4,3,0,0,Math.PI*2); ctx.fill();
+    // thruster glow
+    const thrust = 0.7 + speed*0.3;
+    ctx.fillStyle=`rgba(0,240,255,${0.6*thrust})`;
+    ctx.beginPath(); ctx.moveTo(-14, -5); ctx.lineTo(-22 - thrust*4, 0); ctx.lineTo(-14,5); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(-18,0,2,0,Math.PI*2); ctx.fill();
+    // neon outline
+    ctx.strokeStyle='rgba(0,240,255,0.9)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(20,0); ctx.lineTo(-14,-12); ctx.lineTo(-10,0); ctx.lineTo(-14,12); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  }
+
+  function render(){
+    drawOcean();
+    drawReflections();
+    buoys.forEach(drawBuoy);
+    mines.forEach(drawMine);
+    // particles
+    particles.forEach(p=>{
+      ctx.globalAlpha = Math.max(0,p.life);
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+    drawPlayer();
+    // edge vignette
+    const vg=ctx.createRadialGradient(W/2,H/2, H*0.6, W/2,H/2, W*0.9);
+    vg.addColorStop(0,'transparent'); vg.addColorStop(1,'rgba(0,0,0,0.38)');
+    ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  }
+
+  function loop(){
+    update();
+    render();
+    rafId=requestAnimationFrame(loop);
+  }
+
+  restartBtn.addEventListener('click', resetGame);
+  // show initial overlay
+  overlay.classList.add('show');
+  updateHud();
+  loop();
+
+  // expose for testing (focused helper)
+  window.__game = {
+    get player(){return player},
+    get buoys(){return buoys},
+    get mines(){return mines},
+    get particles(){return particles},
+    get wake(){return wake},
+    get score(){return score},
+    get health(){return health},
+    get state(){return gameState},
+    get elapsed(){return elapsed},
+    canvas, ctx, W, H,
+    resetGame, win, lose, collide, formatTime, updateHud, spawnBuoys, spawnMines, addBurst
+  };
+})();
+</script>
+</body>
+</html>
