@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moonlit Moth Garden</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg1:#0b1020;--bg2:#1a2342;--accent:#ffe9a8;--accent2:#7af0d6;--muted:#9aa8cc}
+  body{
+    min-height:100vh;
+    background:radial-gradient(1200px 800px at 70% 10%, #2a3566 0%, var(--bg2) 30%, var(--bg1) 70%);
+    color:#eef2ff;
+    font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    display:flex;flex-direction:column;align-items:center;
+    padding:16px;
+  }
+  h1{
+    font-size:clamp(22px,4vw,32px);
+    letter-spacing:0.04em;
+    text-shadow:0 0 18px rgba(255,233,168,0.5);
+    margin:8px 0 4px;
+  }
+  .subtitle{color:var(--muted);font-size:14px;margin-bottom:10px;text-align:center}
+  .hud{
+    width:min(860px,95vw);
+    display:flex;justify-content:space-between;align-items:center;
+    background:rgba(255,255,255,0.07);
+    backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:14px;
+    padding:10px 14px;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .hud-left,.hud-right{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .stat{font-weight:700;font-size:15px}
+  .stat span{color:var(--accent)}
+  .hearts{letter-spacing:2px;font-size:18px}
+  .wrap{
+    width:min(860px,95vw);
+    aspect-ratio: 860 / 540;
+    margin-top:12px;
+    position:relative;
+    border-radius:18px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,0.14);
+    box-shadow:0 18px 50px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.05) inset;
+    background:#0e1430;
+  }
+  canvas{width:100%;height:100%;display:block}
+  .overlay{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(8,12,28,0.62);
+    backdrop-filter:blur(4px);
+    text-align:center;
+    padding:20px;
+  }
+  .overlay h2{font-size:clamp(24px,5vw,38px);margin-bottom:8px;text-shadow:0 0 20px rgba(255,233,168,0.6)}
+  .overlay p{color:#cbd5f5;max-width:520px;line-height:1.5;margin-bottom:16px}
+  .btn{
+    appearance:none;border:0;cursor:pointer;
+    background:linear-gradient(180deg,#ffe9a8,#f5c86a);
+    color:#1a1100;font-weight:800;letter-spacing:0.04em;
+    padding:12px 22px;border-radius:999px;
+    box-shadow:0 6px 18px rgba(245,200,106,0.4);
+    font-size:15px;
+    transition:transform .12s,filter .12s;
+  }
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.05)}
+  .btn:active{transform:translateY(1px)}
+  .btn.secondary{background:rgba(255,255,255,0.12);color:#eef2ff;box-shadow:none;border:1px solid rgba(255,255,255,0.18)}
+  .controls{
+    width:min(860px,95vw);
+    display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+    margin-top:10px;
+    color:var(--muted);font-size:13px;
+  }
+  .kbd{border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:6px;font-size:12px;color:#fff}
+  .touchpad{
+    width:min(860px,95vw);
+    display:none;
+    grid-template-columns:60px 60px 60px;
+    grid-template-rows:44px 44px;
+    gap:8px;
+    justify-content:center;
+    margin-top:12px;
+  }
+  .touchpad button{
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
+    border-radius:12px;color:#fff;font-size:18px;touch-action:manipulation;user-select:none;
+  }
+  .touchpad button:active{background:rgba(255,255,255,0.22)}
+  @media (max-width:640px){.touchpad{display:grid}}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+<h1>🌙 Moonlit Moth Garden ✨</h1>
+<p class="subtitle">Guide the moth • Collect 12 moonflowers • Avoid the owls • Arrow keys / WASD</p>
+
+<div class="hud" role="status" aria-live="polite">
+  <div class="hud-left">
+    <div class="stat">Score: <span id="score">0</span> / 12</div>
+    <div class="stat">Flowers: <span id="flowersLeft">12</span> left</div>
+  </div>
+  <div class="hud-right">
+    <div class="stat">Lives: <span id="lives" class="hearts">❤❤❤</span></div>
+    <button id="restartHud" class="btn secondary" style="padding:8px 14px;font-size:13px">Restart</button>
+  </div>
+</div>
+
+<div class="wrap" id="wrap">
+  <canvas id="game" width="860" height="540" aria-label="Moonlit Moth Garden game canvas"></canvas>
+  <div id="startOverlay" class="overlay">
+    <h2>Moonlit Moth Garden</h2>
+    <p>On a quiet moonlit night, a friendly moth flutters among glowing flowers. Owls patrol the garden — don't get caught!<br><br>
+      <span class="kbd">↑ ↓ ← →</span> or <span class="kbd">W A S D</span> to fly • Collect all 12 flowers to win</p>
+    <button id="playBtn" class="btn">🦋 Start Flight</button>
+    <p style="margin-top:10px;font-size:12px;opacity:.8">Tip: Hold direction for smooth flight. Touch controls appear on mobile.</p>
+  </div>
+  <div id="winOverlay" class="overlay hidden">
+    <h2>🌸 You Bloomed! 🌸</h2>
+    <p>You collected all 12 moonflowers and lit up the garden. The moth dances under the full moon!</p>
+    <button class="btn restartBtn">Play Again</button>
+  </div>
+  <div id="loseOverlay" class="overlay hidden">
+    <h2>🦉 Caught!</h2>
+    <p>The owls were too watchful tonight. Try again — the moonflowers await.</p>
+    <button class="btn restartBtn">Try Again</button>
+  </div>
+</div>
+
+<div class="controls">
+  <span><span class="kbd">↑</span> <span class="kbd">↓</span> <span class="kbd">←</span> <span class="kbd">→</span> Move</span>
+  <span>•</span>
+  <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> Alternate</span>
+  <span>•</span>
+  <span><span class="kbd">R</span> Restart</span>
+</div>
+
+<div class="touchpad" aria-label="Touch controls">
+  <div></div><button data-dir="up">▲</button><div></div>
+  <button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
+</div>
+
+<script>
+// ---------- Game State ----------
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const flowersLeftEl = document.getElementById('flowersLeft');
+const livesEl = document.getElementById('lives');
+
+const DPR = Math.min(window.devicePixelRatio||1, 2);
+function applyDPR(){
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.round(860*DPR), h = Math.round(540*DPR);
+  if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; ctx.setTransform(DPR,0,0,DPR,0,0); }
+}
+const W = 860, H = 540;
+applyDPR();
+window.addEventListener('resize', applyDPR);
+
+const state = {
+  running:false,
+  gameOver:false,
+  win:false,
+  score:0,
+  lives:3,
+  invuln:0,
+  keys:{},
+  moth:{x:W/2,y:H/2,vx:0,vy:0,r:18},
+  flowers:[],
+  owls:[],
+  particles:[],
+  time:0
+};
+
+// ---------- Input ----------
+const keyMap = {
+  ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
+  w:'up', W:'up', a:'left', A:'left', s:'down', S:'down', d:'right', D:'right'
+};
+window.addEventListener('keydown', e=>{
+  if(keyMap[e.key]){ state.keys[keyMap[e.key]]=true; e.preventDefault(); }
+  if(e.key==='r' || e.key==='R') resetGame(true);
+});
+window.addEventListener('keyup', e=>{
+  if(keyMap[e.key]){ state.keys[keyMap[e.key]]=false; e.preventDefault(); }
+});
+// touch
+document.querySelectorAll('.touchpad button[data-dir]').forEach(btn=>{
+  const dir=btn.dataset.dir;
+  const down=e=>{e.preventDefault(); state.keys[dir]=true;};
+  const up=e=>{e.preventDefault(); state.keys[dir]=false;};
+  btn.addEventListener('touchstart',down,{passive:false});
+  btn.addEventListener('touchend',up,{passive:false});
+  btn.addEventListener('mousedown',down);
+  btn.addEventListener('mouseup',up);
+  btn.addEventListener('mouseleave',up);
+});
+
+// ---------- Helpers ----------
+function rand(a,b){return a+Math.random()*(b-a)}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+// ---------- Init ----------
+function createFlowers(){
+  state.flowers=[];
+  for(let i=0;i<12;i++){
+    let x,y,tries=0;
+    do{
+      x=rand(50,W-50); y=rand(50,H-50);
+      tries++;
+    }while(state.flowers.some(f=>Math.hypot(f.x-x,f.y-y)<55) && tries<100);
+    state.flowers.push({x,y,r:16,phase:rand(0,Math.PI*2),collected:false});
+  }
+}
+function createOwls(){
+  state.owls=[];
+  const starts=[{x:120,y:120},{x:W-120,y:140},{x:W/2,y:H-100}];
+  const patterns=['horizontal','vertical','hunter'];
+  for(let i=0;i<3;i++){
+    const s=starts[i];
+    state.owls.push({
+      x:s.x, y:s.y, r:26,
+      vx: i===0? 1.8 : i===1? rand(-0.6,0.6) : rand(-1,1)*1.2,
+      vy: i===1? 1.7 : i===0? rand(-0.6,0.6) : rand(-1,1)*1.2,
+      baseSpeed: 1.4 + i*0.25,
+      pattern: patterns[i],
+      t: rand(0,100)
+    });
+  }
+}
+function resetGame(forceStart=false){
+  state.score=0; state.lives=3; state.invuln=0;
+  state.gameOver=false; state.win=false;
+  state.moth.x=W/2; state.moth.y=H/2; state.moth.vx=0; state.moth.vy=0;
+  state.particles=[];
+  state.time=0;
+  createFlowers(); createOwls();
+  updateHUD();
+  hideAllOverlays();
+  if(forceStart) startGame();
+  else showStart();
+}
+function hideAllOverlays(){
+  document.getElementById('startOverlay').classList.add('hidden');
+  document.getElementById('winOverlay').classList.add('hidden');
+  document.getElementById('loseOverlay').classList.add('hidden');
+}
+function showStart(){ document.getElementById('startOverlay').classList.remove('hidden'); }
+function showWin(){ document.getElementById('winOverlay').classList.remove('hidden'); }
+function showLose(){ document.getElementById('loseOverlay').classList.remove('hidden'); }
+function startGame(){
+  hideAllOverlays();
+  state.running=true;
+  state.gameOver=false;
+  if(!loopRunning) requestAnimationFrame(loop);
+}
+function updateHUD(){
+  scoreEl.textContent = state.score;
+  flowersLeftEl.textContent = 12 - state.score;
+  const hearts = '❤'.repeat(state.lives) + '♡'.repeat(3-state.lives);
+  livesEl.textContent = hearts;
+  livesEl.style.opacity = state.invuln>0 ? '0.6' : '1';
+}
+
+// ---------- Particles ----------
+function spawnParticles(x,y,color,count=10){
+  for(let i=0;i<count;i++){
+    state.particles.push({
+      x,y, vx:rand(-3,3), vy:rand(-3,3),
+      life:1, decay: rand(0.03,0.06),
+      color, size: rand(2,5)
+    });
+  }
+}
+
+// ---------- Game Loop ----------
+let loopRunning=false;
+let lastT=0;
+function loop(t){
+  loopRunning=true;
+  if(!lastT) lastT=t;
+  const dt = Math.min(32, t-lastT)/16.66;
+  lastT=t;
+  if(state.running && !state.gameOver){
+    update(dt);
+  }
+  render();
+  if(state.running || state.gameOver) requestAnimationFrame(loop);
+  else loopRunning=false;
+}
+
+function update(dt){
+  state.time+=0.02*dt;
+  // moth physics -- smooth accel/decel
+  const speed=4.2;
+  let ax=0,ay=0;
+  if(state.keys.left) ax-=1;
+  if(state.keys.right) ax+=1;
+  if(state.keys.up) ay-=1;
+  if(state.keys.down) ay+=1;
+  if(ax!==0 && ay!==0){ ax*=0.707; ay*=0.707; }
+  state.moth.vx += ax * 0.85 * dt;
+  state.moth.vy += ay * 0.85 * dt;
+  // friction
+  state.moth.vx *= Math.pow(0.82, dt);
+  state.moth.vy *= Math.pow(0.82, dt);
+  // limit speed
+  const sp = Math.hypot(state.moth.vx, state.moth.vy);
+  if(sp>speed){
+    state.moth.vx = state.moth.vx/sp*speed;
+    state.moth.vy = state.moth.vy/sp*speed;
+  }
+  state.moth.x += state.moth.vx * dt;
+  state.moth.y += state.moth.vy * dt;
+  state.moth.x = clamp(state.moth.x, state.moth.r, W-state.moth.r);
+  state.moth.y = clamp(state.moth.y, state.moth.r, H-state.moth.r);
+  if(state.moth.x===state.moth.r || state.moth.x===W-state.moth.r) state.moth.vx*= -0.4;
+  if(state.moth.y===state.moth.r || state.moth.y===H-state.moth.r) state.moth.vy*= -0.4;
+
+  // owls roaming — distinct movement per owl
+  state.owls.forEach(o=>{
+    o.t+=0.02*dt;
+    if(o.pattern==='horizontal'){
+      // Horizontal patrol: strong lateral drift, gentle vertical bob
+      o.vx += Math.sin(o.t*0.9)*0.07*dt;
+      o.vy += Math.cos(o.t*0.5)*0.02*dt;
+    } else if(o.pattern==='vertical'){
+      // Vertical patrol: strong vertical drift, gentle horizontal sway
+      o.vx += Math.sin(o.t*0.5)*0.02*dt;
+      o.vy += Math.cos(o.t*0.9)*0.07*dt;
+    } else {
+      // Hunter: looping orbit + stronger homing
+      o.vx += Math.sin(o.t*0.7 + o.x*0.01)*0.04*dt;
+      o.vy += Math.cos(o.t*0.6 + o.y*0.01)*0.04*dt;
+    }
+    // homing when moth near (hunter homes stronger)
+    const dToMoth = Math.hypot(state.moth.x - o.x, state.moth.y - o.y);
+    if(dToMoth < 220){
+      const ang = Math.atan2(state.moth.y - o.y, state.moth.x - o.x);
+      const homing = o.pattern==='hunter' ? 0.12 : 0.06;
+      o.vx += Math.cos(ang)*homing*dt;
+      o.vy += Math.sin(ang)*homing*dt;
+    }
+    const s = Math.hypot(o.vx,o.vy);
+    const max = o.baseSpeed + (state.score*0.05);
+    if(s>max){ o.vx=o.vx/s*max; o.vy=o.vy/s*max; }
+    if(s<0.6){ o.vx+=rand(-0.2,0.2); o.vy+=rand(-0.2,0.2); }
+    o.x += o.vx*dt;
+    o.y += o.vy*dt;
+    if(o.x < o.r || o.x > W-o.r){ o.vx*=-1; o.x=clamp(o.x,o.r,W-o.r); }
+    if(o.y < o.r || o.y > H-o.r){ o.vy*=-1; o.y=clamp(o.y,o.r,H-o.r); }
+    // owl-owl separation
+    state.owls.forEach(other=>{
+      if(other===o) return;
+      const d = Math.hypot(o.x-other.x,o.y-other.y);
+      if(d<60 && d>0){
+        const ang=Math.atan2(o.y-other.y,o.x-other.x);
+        o.vx+=Math.cos(ang)*0.3*dt; o.vy+=Math.sin(ang)*0.3*dt;
+      }
+    });
+  });
+
+  // flower collect
+  state.flowers.forEach(f=>{
+    if(f.collected) return;
+    if(dist(state.moth,f) < state.moth.r + f.r -4){
+      f.collected=true;
+      state.score++;
+      spawnParticles(f.x,f.y,'#ffe9a8',14);
+      spawnParticles(f.x,f.y,'#7af0d6',8);
+      updateHUD();
+      if(state.score>=12){
+        winGame();
+      }
+    }
+  });
+
+  // owl collision
+  if(state.invuln>0) state.invuln -= dt;
+  if(state.invuln<=0){
+    for(const o of state.owls){
+      if(dist(state.moth,o) < state.moth.r + o.r -6){
+        state.lives--;
+        state.invuln=90; // frames ~1.5s
+        spawnParticles(state.moth.x,state.moth.y,'#ff7a7a',12);
+        // knockback
+        const ang=Math.atan2(state.moth.y - o.y, state.moth.x - o.x);
+        state.moth.vx += Math.cos(ang)*6;
+        state.moth.vy += Math.sin(ang)*6;
+        updateHUD();
+        if(state.lives<=0){
+          loseGame();
+        }
+        break;
+      }
+    }
+  }
+
+  // particles
+  state.particles.forEach(p=>{
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.08*dt; p.life-=p.decay*dt;
+  });
+  state.particles = state.particles.filter(p=>p.life>0);
+}
+
+function winGame(){
+  state.gameOver=true; state.win=true; state.running=false;
+  updateHUD();
+  showWin();
+}
+function loseGame(){
+  state.gameOver=true; state.win=false; state.running=false;
+  updateHUD();
+  showLose();
+}
+
+// ---------- Render ----------
+function render(){
+  // layered night sky — 4-tone palette (critic: harmonious cool tones)
+  const g = ctx.createRadialGradient(W*0.72, H*0.08, 0, W*0.5, H*0.5, 780);
+  g.addColorStop(0,'#2f3a6e');
+  g.addColorStop(0.18,'#222e5a');
+  g.addColorStop(0.42,'#172040');
+  g.addColorStop(0.72,'#0f1730');
+  g.addColorStop(1,'#0b1020');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+  // subtle vignette
+  const vig = ctx.createRadialGradient(W/2,H/2, W*0.55, W/2,H/2, W*0.95);
+  vig.addColorStop(0,'rgba(0,0,0,0)');
+  vig.addColorStop(1,'rgba(0,0,0,0.38)');
+  ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+  // stars — crisp, non-scrolling, clamped alpha
+  ctx.save();
+  for(let i=0;i<90;i++){
+    const sx = (i*137.5) % W;
+    const sy = (i*73.7) % (H*0.62);
+    const tw = Math.sin(state.time*1.4 + i*1.7);
+    const a = clamp(0.35 + 0.65*((tw+1)/2), 0.15, 1); // 0.35..1 clamped, never negative
+    ctx.globalAlpha = a * (i%4===0?0.95:0.55);
+    ctx.fillStyle = i%7===0 ? '#ffe9a8' : '#ffffff';
+    const r = i%4===0 ? 1.35 : i%3===0 ? 1.0 : 0.65;
+    ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2); ctx.fill();
+    if(i%9===0){ // subtle cross sparkle
+      ctx.globalAlpha = a*0.18;
+      ctx.fillRect(sx-4,sy-0.3,8,0.6);
+      ctx.fillRect(sx-0.3,sy-4,0.6,8);
+    }
+  }
+  ctx.restore();
+
+  // distant treeline parallax — layer 2 (far)
+  ctx.fillStyle='#0d142e';
+  ctx.beginPath();
+  ctx.moveTo(0, H*0.64);
+  for(let x=0;x<=W;x+=18){
+    const y = H*0.64 + Math.sin(x*0.015)*10 + Math.cos(x*0.008 + state.time*0.15)*4;
+    ctx.lineTo(x,y);
+  }
+  ctx.lineTo(W,H*0.72); ctx.lineTo(0,H*0.72); ctx.closePath(); ctx.fill();
+  // treeline layer 1 (near)
+  ctx.fillStyle='#111d3a';
+  ctx.beginPath();
+  ctx.moveTo(0, H*0.70);
+  for(let x=0;x<=W;x+=14){
+    const y = H*0.70 + Math.sin(x*0.022 + 1.2)*12 + Math.cos(x*0.013)*6;
+    // add tree spikes every ~90px
+    const spike = (x%90<12) ? -18 : 0;
+    ctx.lineTo(x, y+spike);
+  }
+  ctx.lineTo(W,H*0.78); ctx.lineTo(0,H*0.78); ctx.closePath(); ctx.fill();
+
+  // soft moon bloom behind moon
+  ctx.save();
+  const moonX=W-110, moonY=88;
+  const bloom = ctx.createRadialGradient(moonX,moonY,8, moonX,moonY,120);
+  bloom.addColorStop(0,'rgba(255,233,168,0.35)');
+  bloom.addColorStop(0.4,'rgba(255,233,168,0.12)');
+  bloom.addColorStop(1,'rgba(255,233,168,0)');
+  ctx.fillStyle=bloom; ctx.beginPath(); ctx.arc(moonX,moonY,120,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // moon
+  ctx.save();
+  ctx.globalAlpha=0.98;
+  ctx.fillStyle='#fff6c9';
+  ctx.shadowColor='#ffe9a8'; ctx.shadowBlur=28;
+  ctx.beginPath(); ctx.arc(moonX, moonY, 36,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(190,180,140,0.22)';
+  ctx.beginPath(); ctx.arc(moonX-12,moonY-2,9,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(moonX+10,moonY+13,6,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(moonX-4,moonY+15,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // garden ground — layered depth
+  // base grass
+  ctx.fillStyle='#162a1c';
+  ctx.fillRect(0, H-96, W, 96);
+  // mid grass texture band
+  ctx.fillStyle='rgba(34,58,38,0.9)';
+  ctx.beginPath(); ctx.ellipse(W*0.5, H-48, W*0.68, 56, 0,0,Math.PI*2); ctx.fill();
+  // flower bed soil / path
+  ctx.fillStyle='rgba(32,38,22,0.55)';
+  ctx.beginPath(); ctx.ellipse(W*0.5, H-14, W*0.52, 26, 0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(255,233,168,0.08)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.ellipse(W*0.5, H-14, W*0.52, 26, 0,0,Math.PI*2); ctx.stroke();
+  // foliage blobs with AO
+  const blobs=[
+    {x:W*0.18,y:H-38,rx:150,ry:42,c:'rgba(42,77,42,0.55)'},
+    {x:W*0.48,y:H-52,rx:180,ry:48,c:'rgba(38,68,38,0.62)'},
+    {x:W*0.78,y:H-34,rx:200,ry:46,c:'rgba(44,80,44,0.5)'},
+    {x:W*0.86,y:H-66,rx:90,ry:28,c:'rgba(52,90,52,0.45)'},
+    {x:W*0.08,y:H-58,rx:80,ry:24,c:'rgba(50,86,48,0.42)'},
+  ];
+  blobs.forEach(b=>{
+    ctx.fillStyle=b.c;
+    ctx.beginPath(); ctx.ellipse(b.x,b.y,b.rx,b.ry,0,0,Math.PI*2); ctx.fill();
+    // AO highlight top edge
+    ctx.fillStyle='rgba(122,240,214,0.07)';
+    ctx.beginPath(); ctx.ellipse(b.x,b.y-10,b.rx*0.9,b.ry*0.5,0,0,Math.PI*2); ctx.fill();
+  });
+  // lantern posts / firefly glows along ground (garden feel)
+  for(let i=0;i<5;i++){
+    const lx = 90 + i*168 + Math.sin(state.time + i)*3;
+    const ly = H-62 + (i%2? 8: -6);
+    ctx.fillStyle='rgba(255,233,168,0.22)';
+    ctx.shadowColor='#ffe9a8'; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.arc(lx,ly,5,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    // post
+    ctx.fillStyle='rgba(60,44,24,0.9)';
+    ctx.fillRect(lx-1.5, ly+5, 3, 18);
+  }
+  // grass blades — denser, varied
+  ctx.strokeStyle='rgba(122,240,214,0.10)';
+  ctx.lineWidth=1;
+  for(let i=0;i<32;i++){
+    const gx = (i*27.5 + (i%3)*8) % W;
+    const gh = 8 + (i%4)*4;
+    const sway = Math.sin(state.time*1.2 + i*0.8)*2.5;
+    ctx.beginPath(); ctx.moveTo(gx, H-20); ctx.lineTo(gx+sway, H-20-gh); ctx.stroke();
+  }
+  // hedge lattice top edge
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,H-96); ctx.lineTo(W,H-96); ctx.stroke();
+
+  // flowers
+  state.flowers.forEach(f=>{
+    if(f.collected) return;
+    const pulse = 1 + Math.sin(state.time*3 + f.phase)*0.12;
+    // glow
+    ctx.save();
+    ctx.globalAlpha=0.28;
+    ctx.fillStyle='#ffe9a8';
+    ctx.shadowColor='#ffe9a8'; ctx.shadowBlur=18;
+    ctx.beginPath(); ctx.arc(f.x,f.y, f.r*1.8*pulse,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // petals
+    ctx.save();
+    ctx.translate(f.x,f.y);
+    ctx.rotate(f.phase + state.time*0.5);
+    for(let k=0;k<5;k++){
+      ctx.rotate(Math.PI*2/5);
+      ctx.fillStyle='#fff7d6';
+      ctx.beginPath(); ctx.ellipse(0,-8,7,10,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffd86e';
+      ctx.beginPath(); ctx.ellipse(0,-8,3.5,5,0,0,Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle='#ffeb9a';
+    ctx.beginPath(); ctx.arc(0,0,4.5,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // stem
+    ctx.strokeStyle='rgba(122,240,214,0.5)';
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(f.x,f.y+10); ctx.lineTo(f.x,f.y+26); ctx.stroke();
+  });
+
+  // owls
+  state.owls.forEach(o=>{
+    const wing = Math.sin(state.time*10 + o.t)*0.18;
+    ctx.save();
+    ctx.translate(o.x,o.y);
+    // shadow
+    ctx.globalAlpha=0.18; ctx.fillStyle='#000';
+    ctx.beginPath(); ctx.ellipse(0, 24, 22, 8, 0,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+    // body
+    ctx.fillStyle='#5b3a22';
+    ctx.beginPath(); ctx.ellipse(0,4,18,22,0,0,Math.PI*2); ctx.fill();
+    // wings
+    ctx.fillStyle='#3e2512';
+    ctx.save(); ctx.rotate(wing);
+    ctx.beginPath(); ctx.ellipse(-16,2,10,18,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.save(); ctx.rotate(-wing);
+    ctx.beginPath(); ctx.ellipse(16,2,10,18,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // belly
+    ctx.fillStyle='#f2d6b6';
+    ctx.beginPath(); ctx.ellipse(0,10,10,12,0,0,Math.PI*2); ctx.fill();
+    // face
+    ctx.fillStyle='#e8dcc8';
+    ctx.beginPath(); ctx.ellipse(0,-10,16,13,0,0,Math.PI*2); ctx.fill();
+    // eyes
+    ctx.fillStyle='#ffd86e';
+    ctx.shadowColor='#ff8a00'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.arc(-7,-10,7,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(7,-10,7,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#0b1020';
+    const lookX = clamp((state.moth.x - o.x)*0.02,-2,2);
+    const lookY = clamp((state.moth.y - o.y)*0.02,-2,2);
+    ctx.beginPath(); ctx.arc(-7+lookX,-10+lookY,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(7+lookX,-10+lookY,3,0,Math.PI*2); ctx.fill();
+    // beak
+    ctx.fillStyle='#ffb84d';
+    ctx.beginPath(); ctx.moveTo(0,-6); ctx.lineTo(-4,0); ctx.lineTo(4,0); ctx.closePath(); ctx.fill();
+    // ears
+    ctx.fillStyle='#5b3a22';
+    ctx.beginPath(); ctx.moveTo(-12,-18); ctx.lineTo(-16,-26); ctx.lineTo(-8,-20); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(12,-18); ctx.lineTo(16,-26); ctx.lineTo(8,-20); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  });
+
+  // moth
+  ctx.save();
+  ctx.translate(state.moth.x, state.moth.y);
+  const tilt = clamp(state.moth.vx*0.08,-0.5,0.5);
+  ctx.rotate(tilt);
+  const flap = Math.sin(state.time*18)*0.55;
+  const invBlink = state.invuln>0 && Math.floor(state.invuln/6)%2===0;
+  ctx.globalAlpha = invBlink ? 0.45 : 1;
+  // wings
+  ctx.fillStyle='rgba(255,233,168,0.92)';
+  ctx.strokeStyle='rgba(110,80,30,0.25)'; ctx.lineWidth=1;
+  // upper wings
+  ctx.save(); ctx.rotate(flap*0.6);
+  ctx.beginPath(); ctx.ellipse(-16,-4,20,14, -0.2,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(-12,-6,8,5, -0.2,0,Math.PI*2); ctx.fillStyle='rgba(90,60,20,0.18)'; ctx.fill();
+  ctx.restore();
+  ctx.save(); ctx.rotate(-flap*0.6);
+  ctx.beginPath(); ctx.ellipse(16,-4,20,14, 0.2,0,Math.PI*2); ctx.fillStyle='rgba(255,233,168,0.92)'; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(12,-6,8,5, 0.2,0,Math.PI*2); ctx.fillStyle='rgba(90,60,20,0.18)'; ctx.fill();
+  ctx.restore();
+  // lower wings
+  ctx.save(); ctx.rotate(flap*0.4);
+  ctx.beginPath(); ctx.ellipse(-12,8,12,9, -0.3,0,Math.PI*2); ctx.fillStyle='rgba(255,246,201,0.9)'; ctx.fill(); ctx.stroke();
+  ctx.restore();
+  ctx.save(); ctx.rotate(-flap*0.4);
+  ctx.beginPath(); ctx.ellipse(12,8,12,9, 0.3,0,Math.PI*2); ctx.fillStyle='rgba(255,246,201,0.9)'; ctx.fill(); ctx.stroke();
+  ctx.restore();
+  // body
+  ctx.fillStyle='#2b1d0f';
+  ctx.beginPath(); ctx.ellipse(0,2,5,14,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ffd86e';
+  ctx.beginPath(); ctx.ellipse(0,-8,4,4,0,0,Math.PI*2); ctx.fill();
+  // antennae
+  ctx.strokeStyle='#2b1d0f'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(-2,-10); ctx.quadraticCurveTo(-7,-16,-9,-18); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(2,-10); ctx.quadraticCurveTo(7,-16,9,-18); ctx.stroke();
+  ctx.fillStyle='#2b1d0f';
+  ctx.beginPath(); ctx.arc(-9,-18,1.8,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(9,-18,1.8,0,Math.PI*2); ctx.fill();
+  // eyes
+  ctx.fillStyle='#0b1020';
+  ctx.beginPath(); ctx.arc(-2,-8,1.4,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(2,-8,1.4,0,Math.PI*2); ctx.fill();
+  // glow under moth
+  ctx.globalAlpha=0.18; ctx.fillStyle='#ffe9a8';
+  ctx.beginPath(); ctx.ellipse(0,18,18,6,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // particles
+  state.particles.forEach(p=>{
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+
+// ---------- Wire up UI ----------
+document.getElementById('playBtn').addEventListener('click', ()=> startGame());
+document.querySelectorAll('.restartBtn').forEach(b=>b.addEventListener('click', ()=> resetGame(true)));
+document.getElementById('restartHud').addEventListener('click', ()=> resetGame(true));
+
+// init
+createFlowers(); createOwls(); updateHUD(); render();
+hideAllOverlays(); showStart();
+
+// expose for tests
+window.__gameState = state;
+window.__resetGame = resetGame;
+window.__startGame = startGame;
+window.__winGame = winGame;
+window.__loseGame = loseGame;
+</script>
+</body>
+</html>
