@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>SKYSTRIKE ACE — Air Combat Vertical Slice</title>
+  <meta name="description" content="Polished 3D air combat prototype — chase cam, missiles, guns, waves." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <style>html,body{background:#040a18}</style>
+  <script type="module" crossorigin src="/assets/index-CurIReuX.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Dmx661F5.css">
+</head>
+<body>
+  <div id="app">
+    <div class="topbar">
+      <div class="brand"><span style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#4fd1ff,#6a7bff);display:grid;place-items:center;color:#001322;font-weight:900;font-size:12px">SA</span> <b>SKYSTRIKE ACE</b> <span class="badge">VERTICAL SLICE v1.0</span></div>
+      <div class="topstats">
+        <span>WAVE <strong id="uiWave">1/3</strong></span>
+        <span>SCORE <strong id="uiScore">00000</strong></span>
+        <span>TIME <strong id="uiTime">02:30</strong></span>
+        <button id="btnHelp" class="btn btn-ghost" style="padding:6px 10px;font-size:11px;pointer-events:auto">HELP [H]</button>
+      </div>
+    </div>
+
+    <div id="canvasWrap" style="flex:1;position:relative;overflow:hidden;background:#07122e"></div>
+
+    <div class="vignette"></div>
+    <div class="horizon-line" aria-hidden="true"></div>
+
+    <!-- HUD -->
+    <div class="hud" id="hud">
+      <div class="hud-row hud-top">
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="panel kpi">
+            <div class="kpi-col">
+              <div class="kpi-label">AIRSPEED</div>
+              <div class="kpi-value" id="uiSpeed">—</div>
+              <div class="kpi-sub">KNOTS • THROTTLE <span id="uiThrottlePct">0%</span></div>
+              <div class="bar bar-speed"><i id="barSpeed" style="width:40%"></i></div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-label">ALTITUDE</div>
+              <div class="kpi-value" id="uiAlt">—</div>
+              <div class="kpi-sub">FEET • GEAR AUTO</div>
+              <div class="bar bar-throttle"><i id="barAlt" style="width:40%"></i></div>
+            </div>
+          </div>
+          <div class="panel kpi" style="min-width:180px;align-items:center">
+            <div class="kpi-col">
+              <div class="kpi-label">LOCK • <span id="uiLockText">SEARCH</span></div>
+              <div class="kpi-value" style="font-size:13px" id="uiLockName">NO TARGET</div>
+              <div class="bar bar-lock"><i id="barLock" style="width:0%"></i></div>
+              <div class="kpi-sub" id="uiLockHint">KEEP TARGET IN RETICLE</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel card" style="min-width:170px">
+          <h3>HEALTH & WARNINGS</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div class="big" style="font-size:18px;font-weight:900;color:var(--text)" id="uiHealth">100%</div>
+            <div id="uiWarn" class="warn hidden">⚠ STALL</div>
+          </div>
+          <div class="bar" style="margin-top:8px"><i id="barHealth" style="width:100%;background:linear-gradient(90deg,#38ffb0,#4fd1ff)"></i></div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px">PULL UP WHEN LOW • AVOID CRASH</div>
+        </div>
+      </div>
+
+      <div class="center">
+        <div class="reticle" id="reticle"></div>
+        <div class="reticle-label" id="reticleLabel">GUNS READY</div>
+        <div class="gunsight"></div>
+      </div>
+      <div class="crosshair-hit" id="hitFlash"></div>
+
+      <div class="hud-row hud-bottom bottom-hud">
+        <div class="panel mini">
+          <div>
+            <div class="lbl">MSL • MISSILES</div>
+            <div class="ammo" id="uiAmmo"></div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="text-align:right">
+            <div class="lbl">GUN</div>
+            <div class="big" id="uiGun">READY</div>
+          </div>
+          <div style="width:1px;height:36px;background:var(--line)"></div>
+          <div style="text-align:right;min-width:90px">
+            <div class="lbl">KILLS</div>
+            <div class="big" id="uiKills">0/7</div>
+          </div>
+        </div>
+        <div class="panel mini" style="max-width:320px">
+          <div style="font-size:11px;color:var(--muted);line-height:1.4">
+            <b style="color:var(--text)">CONTROLS</b><br/>
+            <span style="color:var(--muted)"><b>W/S</b> Pitch • <b>A/D</b> Roll • <b>Q/E</b> Yaw • <b>Shift/Ctrl</b> Throttle • <b>SPACE</b> Missile • <b>CLICK</b> Guns • <b>R</b> Restart</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="panel card">
+          <h3>OBJECTIVE</h3>
+          <div class="objective" id="uiObjective">DESTROY ALL BANDITS<br/><small id="uiObjSub">0 / 7 eliminated</small></div>
+          <div class="wave-dots" id="uiWaveDots"></div>
+        </div>
+        <div class="panel card">
+          <h3>CONTROLS — KEYBOARD + MOUSE</h3>
+          <div class="controls">
+            <div><kbd>W</kbd> <kbd>S</kbd> Pitch • <kbd>A</kbd> <kbd>D</kbd> Roll • <kbd>Q</kbd> <kbd>E</kbd> Yaw</div>
+            <div><kbd>Shift</kbd> Throttle Up • <kbd>Ctrl</kbd> Down • <kbd>SPACE</kbd> Fire MSL</div>
+            <div><kbd>Mouse</kbd> Click or <kbd>Enter</kbd> Guns • Nose follows pitch/roll, throttle controls speed</div>
+            <div style="margin-top:6px;color:var(--accent)">Tip: Keep bandit in center 18° cone to lock — red reticle = locked. Missiles track.</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button id="btnRestart" class="btn" style="flex:1">RESTART [R]</button>
+            <button id="btnPause" class="btn btn-ghost" style="flex:1">PAUSE [P]</button>
+          </div>
+        </div>
+        <div class="panel card" id="helpCard">
+          <h3>HOW TO PLAY</h3>
+          <div class="controls" style="font-size:11px">
+            • 3 waves (7 bandits). Eliminate all before 2:30 or crash.<br/>
+            • Guns: unlimited, short range, use tracer. Missiles: 6, need lock.<br/>
+            • Low & slow = stall warning. Terrain is lethal below 20 ft.<br/>
+            • Camera is chase — banking turns tighten with speed.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden">LOCKED — FIRE!</div>
+
+    <!-- Start / End Overlays -->
+    <div class="overlay" id="overlayStart">
+      <div class="sheet">
+        <div class="sheet-head">
+          <div>
+            <h1>SKYSTRIKE ACE</h1>
+            <p>Cinematic air-combat vertical slice. AAA chase-cam feel, responsive flight model, lock-and-fire combat. Self-contained — no login, no external services.</p>
+          </div>
+          <span class="badge">BUILT FOR BROWSER • 60 FPS TARGET</span>
+        </div>
+        <div class="sheet-body">
+          <div>
+            <div class="hero-art">
+              <div class="hero-jet" aria-hidden="true">
+                <i style="left:20px;top:28px;width:150px;height:18px;transform:skew(-14deg);background:#eaf0ff"></i>
+                <i style="left:150px;top:22px;width:60px;height:10px;transform:skew(-18deg);background:#cfe6ff"></i>
+                <i style="left:40px;top:46px;width:110px;height:10px;transform:skew(22deg);background:#9fc8ff"></i>
+                <i style="left:40px;top:12px;width:110px;height:10px;transform:skew(-22deg);background:#9fc8ff"></i>
+                <i style="left:8px;top:33px;width:18px;height:8px;background:#6aa8ff;transform:skew(-10deg)"></i>
+                <i style="left:170px;top:28px;width:6px;height:18px;background:#ff5a3c;border-radius:2px"></i>
+              </div>
+              <div style="position:absolute;left:14px;bottom:12px;z-index:1;color:#eaf0ff;font-weight:800;letter-spacing:.12em;font-size:10px;text-shadow:0 2px 12px rgba(0,0,0,.7)">CHASE CAM • LOCK • MSL AWAY • EXPLOSION</div>
+              <div style="position:absolute;right:12px;top:12px;z-index:1;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.18);color:#fff;padding:6px 8px;border-radius:8px;font-size:10px;font-weight:700">60 FPS • FOG • OCEAN • CLOUDS</div>
+            </div>
+            <div class="cta-row">
+              <button id="btnPlay" class="btn cta" style="font-size:14px;padding:12px">▶ ENGAGE — START MISSION</button>
+              <button id="btnHow" class="btn btn-ghost cta">CONTROLS</button>
+            </div>
+            <div class="stats-grid">
+              <div class="stat"><b id="statBest">—</b><span>BEST SCORE</span></div>
+              <div class="stat"><b>7 BANDITS</b><span>3 WAVES • 150s</span></div>
+              <div class="stat"><b>CHASE CAM</b><span>DAMPED • FOV KICK</span></div>
+              <div class="stat"><b>GUNS + MSL</b><span>LOCK • TRACK • HIT FX</span></div>
+            </div>
+          </div>
+          <div>
+            <h3 style="font-size:10px;letter-spacing:.16em;color:var(--muted)">MISSION BRIEF</h3>
+            <div class="list" style="margin-top:6px">
+              <p><b>OPERATION CLEAR SKY</b> — Hostile fighters patrol the archipelago. You are the spearhead. Destroy all bandits before fuel/time expires. Ocean is unforgiving — stay above 20 ft.</p>
+              <p style="margin-top:8px"><b>Flight model:</b> Throttle → target speed, pitch/roll mix into banked turns. Yaw assists. Stall below 55 kts banks you down. World wraps at horizon.</p>
+              <p style="margin-top:8px"><b>Quality bar:</b> Inspired by Ace Combat 7 presentation — readable HUD, smooth chase cam, missile lock feedback, explosions and screen shake.</p>
+            </div>
+            <div style="margin-top:12px;padding:10px;border-radius:10px;background:rgba(79,209,255,.08);border:1px solid var(--line);font-size:11px;color:var(--text)">
+              <b style="color:var(--accent)">NO CREDENTIALS NEEDED.</b> 100% local. Built with Three.js r160. Tests + production build included. Works on public tunnel (0.0.0.0:3000).
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="overlayEnd">
+      <div class="sheet" style="max-width:560px">
+        <div class="sheet-head">
+          <div>
+            <h1 id="endTitle">MISSION COMPLETE</h1>
+            <p id="endSub">All bandits destroyed. RTB.</p>
+          </div>
+          <span class="badge" id="endBadge">VICTORY</span>
+        </div>
+        <div class="sheet-body" style="grid-template-columns:1fr">
+          <div class="stats-grid">
+            <div class="stat"><b id="endScore">0</b><span>SCORE</span></div>
+            <div class="stat"><b id="endKills">0/7</b><span>KILLS</span></div>
+            <div class="stat"><b id="endTime">00:00</b><span>TIME</span></div>
+            <div class="stat"><b id="endAcc">—</b><span>RESULT</span></div>
+          </div>
+          <div class="cta-row">
+            <button id="btnReplay" class="btn cta">↻ REPLAY MISSION</button>
+            <button id="btnCloseEnd" class="btn btn-ghost cta">REVIEW HUD</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
