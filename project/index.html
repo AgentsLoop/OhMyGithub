@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sky Rings — Arcade Flight</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">✈︎</span>
+      <div>
+        <h1>Sky Rings</h1>
+        <p>Arcade Flight</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="helpBtn" class="btn ghost" aria-label="Help">? Help</button>
+      <button id="muteBtn" class="btn ghost" aria-label="Mute">🔊</button>
+    </div>
+  </header>
+
+  <div class="game-shell">
+    <div class="canvas-wrap">
+      <canvas id="game" width="1280" height="720" aria-label="Airplane game canvas"></canvas>
+
+      <!-- HUD -->
+      <div class="hud">
+        <div class="hud-row">
+          <div class="hud-card score-card">
+            <span class="hud-label">Score</span>
+            <span id="scoreVal" class="hud-value">0</span>
+          </div>
+          <div class="hud-card">
+            <span class="hud-label">Rings</span>
+            <span class="hud-value"><span id="ringsVal">0</span><span class="dim"> / 20</span></span>
+          </div>
+          <div class="hud-card hide-mobile">
+            <span class="hud-label">Combo</span>
+            <span id="comboVal" class="hud-value combo">—</span>
+          </div>
+          <div class="hud-card">
+            <span class="hud-label">Lives</span>
+            <span id="livesVal" class="hearts">♥ ♥ ♥</span>
+          </div>
+        </div>
+        <div class="hud-row progress-row">
+          <div class="progress-wrap">
+            <div class="progress-label"><span>Progress</span><span id="progressText">0%</span></div>
+            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+          </div>
+          <div class="speed-card">
+            <span class="hud-label">Speed</span>
+            <div class="speed-bar"><div id="speedFill"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Messages -->
+      <div id="centerMsg" class="center-msg hidden"></div>
+
+      <!-- Overlays -->
+      <div id="overlay-start" class="overlay">
+        <div class="overlay-card">
+          <div class="badge">✈︎ Bright Sky Arcade</div>
+          <h2>Fly Through the Rings!</h2>
+          <p class="subtitle">Pilot your little red racer through 20 sky rings. Dodge storm clouds & balloons.</p>
+          <div class="controls-grid">
+            <div class="ctrl">
+              <div class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span class="or">or</span><kbd>▲</kbd><kbd>◀</kbd><kbd>▼</kbd><kbd>▶</kbd></div>
+              <span>Move airplane</span>
+            </div>
+            <div class="ctrl"><div class="keys"><kbd>Space</kbd></div><span>Pause</span></div>
+            <div class="ctrl"><div class="keys"><kbd>R</kbd></div><span>Restart</span></div>
+            <div class="ctrl"><div class="keys"><kbd>H</kbd></div><span>Help</span></div>
+          </div>
+          <button id="startBtn" class="btn primary big">▶ Start Flying</button>
+          <p class="hint">Tip: Stay centered for perfect rings (+50)! Near-misses shake the screen.</p>
+        </div>
+      </div>
+
+      <div id="overlay-pause" class="overlay hidden">
+        <div class="overlay-card small">
+          <h2>Paused</h2>
+          <p>Take a breath. The sky isn't going anywhere.</p>
+          <button id="resumeBtn" class="btn primary">Resume (Space)</button>
+        </div>
+      </div>
+
+      <div id="overlay-crash" class="overlay hidden">
+        <div class="overlay-card small crash-card">
+          <h2 id="crashTitle">Crashed!</h2>
+          <p id="crashDesc">You hit a storm cloud.</p>
+          <div class="stats-row"><span>Score <b id="crashScore">0</b></span><span>Rings <b id="crashRings">0/20</b></span></div>
+          <div class="btn-row">
+            <button id="retryBtn" class="btn primary">↻ Try Again</button>
+            <button id="retryBtn2" class="btn ghost">Restart</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="overlay-win" class="overlay hidden">
+        <div class="overlay-card win-card">
+          <div class="badge win">🏆 All Rings Cleared!</div>
+          <h2>Sky Ace!</h2>
+          <p id="winDesc">You nailed every ring.</p>
+          <div class="stats-row"><span>Final Score <b id="winScore">0</b></span><span>Best Combo <b id="winCombo">x0</b></span></div>
+          <button id="playAgainBtn" class="btn primary big">Play Again</button>
+        </div>
+      </div>
+
+      <!-- Help Panel -->
+      <div id="helpPanel" class="help-panel hidden">
+        <h3>How to Play</h3>
+        <ul>
+          <li><b>Objective:</b> Fly through 20 glowing rings. Perfect center = bonus.</li>
+          <li><b>Controls:</b> WASD / Arrow Keys to move. Smooth, responsive.</li>
+          <li><b>Hazards:</b> Dark storm clouds & red balloons = -1 life & screen shake. 3 hits = crash.</li>
+          <li><b>Boundaries:</b> Don't scrape the ground or sky ceiling — you'll stall.</li>
+          <li><b>Feel:</b> Engine hum, ring chimes, tilt & particles. Turn sound on!</li>
+        </ul>
+        <button id="closeHelp" class="btn ghost small">Close</button>
+      </div>
+
+      <!-- Mobile controls -->
+      <div class="mobile-controls">
+        <div class="dpad">
+          <button class="mbtn" data-dir="up">▲</button>
+          <div class="dpad-mid"><button class="mbtn" data-dir="left">◀</button><button class="mbtn" data-dir="right">▶</button></div>
+          <button class="mbtn" data-dir="down">▼</button>
+        </div>
+        <button id="mobileStart" class="btn primary">START</button>
+      </div>
+    </div>
+
+    <footer class="foot">
+      <span>Built lightweight — canvas + procedural sky. No external assets.</span>
+      <span class="foot-right">Gauntlet bar: Pilotwings Resort · 60 fps target</span>
+    </footer>
+  </div>
+</div>
+<script type="module" src="main.js"></script>
+</body>
+</html>
