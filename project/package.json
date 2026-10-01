@@ -1,0 +1,12 @@
+{
+  "name": "snake-neon-orchard",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Polished Snake game — arrow keys + WASD, score, restart, no reverse, responsive",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": ["snake","game","canvas"],
+  "license": "MIT"
+}
