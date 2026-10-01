@@ -1,5 +1,6 @@
 import { SessionRecovery } from './session-recovery.mjs'
 import { registerRun } from './run-record.mjs'
+import { uploadScreenshots } from './wip-upload.mjs'
 import { createServer, request as httpRequest } from 'node:http'
 import { connect } from 'node:net'
 import { spawn } from 'node:child_process'
@@ -71,8 +72,9 @@ export function child(file, args, { signal, ...options } = {}) {
 
 export function finishedMessage(current) {
   const last = current.messages?.at(-1)?.info
-  if (current.busy || last?.role !== 'assistant' || !last.time?.completed || last.finish === 'tool-calls') return null
-  if (last.error && last.error.name !== 'MessageAbortedError') return null
+  if (current.busy || last?.role !== 'assistant' || !last.time?.completed) return null
+  if (last.error?.name === 'MessageAbortedError') return last.id
+  if (last.error || last.finish === 'tool-calls') return null
   return last.id
 }
 
@@ -160,11 +162,21 @@ async function serve() {
   await new Promise(resolve => proxy.listen(Number(env.OPENCODE_CONTROL_PORT), '127.0.0.1', resolve))
   await heartbeat()
   const heartbeatTimer = setInterval(() => void heartbeat(), 30000)
+  let uploading = false
+  const upload = async () => {
+    if (uploading) return
+    uploading = true
+    try { await uploadScreenshots(env) } catch (error) { console.error('WIP upload deferred:', error.message) }
+    finally { uploading = false }
+  }
+  const screenshotTimer = setInterval(() => void upload(), 2000)
+  void upload()
   let stopping = false
   for (const name of ['SIGTERM', 'SIGINT']) process.once(name, () => {
     stopping = true
     recovery.cancel()
     clearInterval(heartbeatTimer)
+    clearInterval(screenshotTimer)
     lifecycle.shutdown().catch(console.error).finally(async () => { await heartbeat('ended'); process.exit() })
   })
   async function reconcile() {

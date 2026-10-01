@@ -1,10 +1,12 @@
 import { startForCapture } from './capture-start.mjs'
+import captures from './wip-screenshots.cjs'
 import { createRequire } from 'node:module'
 import { readFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 const runtime = join(process.env.HOME, '.local/share/omgithub-playwright')
 const require = createRequire(join(runtime, 'package.json'))
 const { chromium } = require('playwright')
+captures.instrument({ chromium })
 const config = JSON.parse(readFileSync(join(runtime, process.platform === 'darwin' ? 'metal.json' : 'linux.json'), 'utf8'))
 if (process.platform === 'linux') process.env.DISPLAY ||= ':' + readFileSync(join(runtime, 'display'), 'utf8').trim()
 const url = process.env.CAPTURE_URL, output = process.env.CAPTURE_DIR

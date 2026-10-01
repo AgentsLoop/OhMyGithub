@@ -26,12 +26,16 @@ if [[ ! -s "$runtime/display" ]] || ! kill -0 "$(cat "$runtime/xvfb.pid" 2>/dev/
   /usr/bin/time -p timeout 15 bash -c 'until test -s "$1/display"; do sleep 0.1; done' _ "$runtime"
 fi
 node_dir="$(dirname "$(command -v node)")"
+/usr/bin/time -p cp "$(dirname "${BASH_SOURCE[0]}")/wip-screenshots.cjs" "$(dirname "${BASH_SOURCE[0]}")/wip-screenshot-hook.cjs" "$runtime/"
 /usr/bin/time -p tee "$runtime/playwright-cli" >/dev/null <<WRAPPER
 #!/usr/bin/env bash
 set -euo pipefail
 export PATH="$node_dir:\$PATH"
 export DISPLAY=":\$(cat "$runtime/display")"
 export PLAYWRIGHT_MCP_OUTPUT_DIR="$runtime/output"
+export OMGITHUB_CAPTURE_WEB_DIR="${OPENCODE_WEB_DIR:-}"
+export OMGITHUB_PLAYWRIGHT_ROOT="$runtime"
+export NODE_OPTIONS="--require=$runtime/wip-screenshot-hook.cjs \${NODE_OPTIONS:-}"
 for arg in "\$@"; do
   case "\$arg" in
     -*) continue ;;

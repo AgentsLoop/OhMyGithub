@@ -5,6 +5,8 @@ const tick = () => new Promise(resolve => setImmediate(resolve))
 test('manual Stop finishes a completed idle response; real errors and running responses do not', () => {
   const snapshot = error => ({ busy: false, messages: [{ info: { id: 'm1', role: 'assistant', time: { completed: 1 }, error } }] })
   assert.equal(finishedMessage(snapshot({ name: 'MessageAbortedError' })), 'm1')
+  const abortedTools = snapshot({ name: 'MessageAbortedError' }); abortedTools.messages[0].info.finish = 'tool-calls'
+  assert.equal(finishedMessage(abortedTools), 'm1')
   assert.equal(finishedMessage(snapshot()), 'm1')
   assert.equal(finishedMessage(snapshot({ name: 'APIError' })), null)
   assert.equal(finishedMessage({ ...snapshot(), busy: true }), null)

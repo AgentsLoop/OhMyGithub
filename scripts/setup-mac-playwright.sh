@@ -21,10 +21,14 @@ runtime="$HOME/.local/share/omgithub-playwright"
 JSON
 # An executable wrapper also works in fresh SSH shells without Actions env.
 node_dir="$(dirname "$(command -v node)")"
+/usr/bin/time -p cp "$(dirname "${BASH_SOURCE[0]}")/wip-screenshots.cjs" "$(dirname "${BASH_SOURCE[0]}")/wip-screenshot-hook.cjs" "$runtime/"
 /usr/bin/time -p tee "$runtime/playwright-cli" >/dev/null <<WRAPPER
 #!/usr/bin/env bash
 export PATH="$node_dir:\$PATH"
 export PLAYWRIGHT_MCP_OUTPUT_DIR="$runtime/output"
+export OMGITHUB_CAPTURE_WEB_DIR="${OPENCODE_WEB_DIR:-}"
+export OMGITHUB_PLAYWRIGHT_ROOT="$runtime"
+export NODE_OPTIONS="--require=$runtime/wip-screenshot-hook.cjs \${NODE_OPTIONS:-}"
 for arg in "\$@"; do
   case "\$arg" in
     -*) continue ;;

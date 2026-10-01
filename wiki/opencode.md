@@ -332,6 +332,12 @@ Close child-process stdin when spawning isolated `opencode run` smoke tests; avo
 ## Link issue access through OmGithub
 
 Publish one [Open project](https://omgithub.com/OWNER/REPO/issues/NUMBER) access link in workspace, live-progress, preview, and deployment comments. Build the URL from OMGITHUB_ORIGIN, the repository, and the issue number. Keep SSH commands and diagnostic evidence links available. Keep service URLs in structured run registration.
-# Finish interrupted builds
+## Finish interrupted builds
 
 Treat a completed, idle `MessageAbortedError` response as finished. Save the checkpoint and run deployment validation after manual Stop. Reject ordinary execution errors and unfinished tool calls. Preserve the checkpoint branch's workflow tree; use the current remote default workflow tree for its first checkpoint. Keep game edits in the isolated index. Surface child stderr when checkpoint saving or publishing fails.
+
+## Capture project progress
+
+Use the shared Playwright CLI or default capture script to collect page and locator screenshots from every agent. Match the page origin at capture time against port 3000, `app-url`, and explicitly registered project origins. Register additional project servers in `$OPENCODE_WEB_DIR/project-preview-origins.json` as a JSON URL array. Exclude reference sites and unregistered local servers. Keep captures in `$OPENCODE_WEB_DIR/wip-queue`; upload them asynchronously every two seconds. Retry failed uploads without blocking generation. Deduplicate identical bytes and retain capture timestamps. Keep WIP history separate from final deployment evidence. Instrument custom browser tools with `scripts/wip-screenshots.cjs`; exclude unattributed image attachments.
+
+Run `node --test scripts/wip-screenshots.test.mjs`. Run `scripts/test-wip-capture.mjs` with `PLAYWRIGHT_CLI`, `PLAYWRIGHT_ROOT`, and an optional `CHROME_PATH`. Verify main/child browser captures, locator captures, reference exclusion, and duplicate suppression.
