@@ -2,7 +2,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { preparePreview } from './preview-setup.mjs'
+import { preparePreview, validateDeploymentOutput } from './preview-setup.mjs'
 import { retry, uploadDeployment } from './deployment-retry.mjs'
 import { child } from './session-lifecycle.mjs'
 
@@ -53,9 +53,7 @@ try {
   if (!['final-desktop.png', 'final-mobile.png'].every(name => screenshots.includes(name))) throw new Error('Capture produced no screenshots')
   const archive = join(env.RUNNER_TEMP, `deployment-${env.CHECKPOINT_GENERATION}.zip`)
   const output = JSON.parse(readFileSync(join(env.OPENCODE_WEB_DIR, 'deployment-output.json'), 'utf8'))
-  if (output.project !== resolve(project) || !output.directory) throw new Error('Missing deployment output declaration for this project')
-  const deployDirectory = resolve(output.directory)
-  if (deployDirectory !== resolve(project) && !deployDirectory.startsWith(resolve(project) + '/')) throw new Error('Deployment output must be inside the project')
+  const deployDirectory = validateDeploymentOutput(project, output)
   await command('python3', ['-c', `import os,sys,zipfile
 root,out,evidence=sys.argv[1:]
 if not os.path.isfile(os.path.join(root,'index.html')): raise Exception('Missing deployment index.html')

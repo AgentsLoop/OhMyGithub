@@ -316,3 +316,8 @@ Write account auth outside the checkout. Mask account values before exporting cu
 Map `openai/gpt-6.1-sol` and `openai/gpt-6-astra` to `--variant high` in every invocation mode, including resumes and Goal/Ralph commands. Keep other models on their existing defaults.
 
 Run `node --test scripts/account-credentials.test.mjs scripts/session-checkpoint.test.mjs`. Validate the workflow with `actionlint .github/workflows/opencode-reusable.yml`.
+
+
+## Validate the publish directory before capture
+
+Keep source and static build output inside PROJECT_DIR, such as PROJECT_DIR/dist. Reserve OPENCODE_WEB_DIR and RUNNER_TEMP for runner metadata and capture evidence. Validate the declared directory inside the startup/capture repair loop, before treating a working preview as publishable. Reuse the same validation before packaging. Repair an external build path instead of accepting screenshots and failing only at upload.

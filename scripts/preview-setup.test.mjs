@@ -107,3 +107,21 @@ test('persistent DNS capture errors never invoke OC', async t => {
   }))
   assert.equal(captures, 3)
 })
+
+
+test('repair external build output before accepting captures or beginning an upload', async t => {
+  const f = fixture(t), external = mkdtempSync(join(tmpdir(), 'external-preview-'))
+  t.after(() => rmSync(external, { recursive: true, force: true }))
+  writeFileSync(join(external, 'index.html'), 'preview')
+  writeFileSync(join(f.env.PROJECT_DIR, 'deployment-output.json'), JSON.stringify({ project: f.env.PROJECT_DIR, directory: external }))
+  let repairs = 0, captures = 0
+  const result = await preparePreview({ ...f, repair: async prompt => {
+    repairs++; assert.equal(captures, 0)
+    assert.match(prompt, /Deployment output must be inside the project/)
+    assert.match(prompt, /not OPENCODE_WEB_DIR or RUNNER_TEMP/)
+    writeFileSync(join(f.env.PROJECT_DIR, 'deployment-output.json'), JSON.stringify({ project: f.env.PROJECT_DIR, directory: f.env.PROJECT_DIR }))
+  }, run: async (file, args) => {
+    if (args.length === 1 && args[0].endsWith('/capture.sh')) { captures++; f.capture() }
+  } })
+  assert.equal(result.repaired, true); assert.equal(repairs, 1); assert.equal(captures, 1)
+})
