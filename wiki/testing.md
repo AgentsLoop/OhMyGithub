@@ -362,9 +362,9 @@ Retry deployment upload using the same archive and generation for transient netw
 
 ## Verify project file serving
 
-Run `node --test scripts/project-file-mime.test.mjs`. Load the installed Nginx MIME table through `scripts/project-file-mime.mjs`; normalize browser asset types and fail startup if the table is unavailable. Show directory listings at `/` and do not open `index.html` automatically. Revalidate cached preview assets. Check CSS, JS/MJS, WASM, fonts, nested paths, and missing-file 404 responses through the file tunnel. Use the app tunnel for framework servers and backend routes.
+Run `npm ci --prefix scripts/live-files --no-audit --no-fund`, then `node --test scripts/live-files.test.mjs scripts/run-record.test.mjs scripts/opencode-reporting.test.mjs`. Verify directory listings, explicit HTML transformation, root-relative module paths, package imports, CSS processing, HMR messages, encoded folder names, readable Markdown and shell files, WASM types, and missing-file 404 responses. Confirm independent OpenCode and files URLs in run registration. Preserve the final-preview tunnel and keep dist execution outside live mode.
 
-Open Markdown (`.md`, `.markdown`) and shell scripts (`.sh`, `.bash`, `.zsh`, `.fish`) as `text/plain` in the file browser. Preserve browser asset MIME types and binary download types. Verify direct file links and `/omgithub/files/` proxy links after starting a new worker.
+Start a new worker after publishing workflow changes. Open its files URL and click index.html. Confirm that JS requests return modules rather than OpenCode HTML and that source edits update the page over the tunnel. Run project dependencies and framework-specific compatibility checks separately; do not treat generic Vite transforms as proof of project-plugin support.
 
 ## Verify progress and lean delivery
 

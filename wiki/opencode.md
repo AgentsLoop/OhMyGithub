@@ -256,7 +256,7 @@ Adopt the new script contract directly. Create new checkpoints using startup.sh 
 
 ## Register and deliver current runs
 
-Register structured run state through scripts/run-record.mjs. Send a heartbeat every 30 seconds from the controller. Persist tunnel URLs in web-url and app-url. Route project files through /omgithub/files/ on the control tunnel. Preserve directory listing, MIME types, and relative navigation.
+Register structured run state through scripts/run-record.mjs. Send a heartbeat every 30 seconds from the controller. Persist tunnel URLs in web-url, files-url, and app-url. Tunnel live source files directly to the managed Vite server on PROJECT_FILE_PORT. Keep OpenCode on its control tunnel and final preview on its app tunnel. List directories without automatically opening index.html; process explicit source HTML and module requests through Vite. Keep dist for final preview. Preserve readable Markdown and shell files. Install the locked live-browser dependencies through scripts/start-live-files.sh. Use the managed vanilla Vite configuration independently of generated project build configuration; install project dependencies before expecting package imports to resolve. Extend the managed server explicitly before using framework-specific plugins or project aliases.
 
 Declare the static deployment directory in OPENCODE_WEB_DIR/deployment-output.json with absolute project and directory fields. Use the shared default starter to write this declaration for HTML and Vite. Write the same declaration from custom start.sh scripts. Restart the app when its recorded checkpoint differs from the current checkpoint. Capture the resulting server before packaging that declared output.
 

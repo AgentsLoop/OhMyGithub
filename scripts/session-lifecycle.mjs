@@ -126,18 +126,8 @@ async function serve() {
         messageGate = gate.catch(() => {})
         await gate
       }
-      let targetURL = `${upstream}${req.url}`
-      if (req.url.startsWith('/omgithub/files/')) {
-        const config = readFileSync(join(directory, 'nginx/nginx.conf'), 'utf8')
-        const port = config.match(/listen\s+127\.0\.0\.1:(\d+)/)?.[1]
-        if (!port) throw new Error('File server unavailable')
-        targetURL = `http://127.0.0.1:${port}/${req.url.slice('/omgithub/files/'.length)}`
-      }
+      const targetURL = `${upstream}${req.url}`
       const target = httpRequest(targetURL, { method: req.method, headers: req.headers }, reply => {
-        if (req.url.startsWith('/omgithub/files/') && reply.headers.location) {
-          const location = new URL(reply.headers.location, targetURL)
-          reply.headers.location = '/omgithub/files' + location.pathname + location.search
-        }
         res.writeHead(reply.statusCode, reply.headers); reply.pipe(res)
       })
       target.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })

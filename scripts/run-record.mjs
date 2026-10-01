@@ -12,7 +12,7 @@ export async function registerRun(env, state, check) {
   const body = { run: env.GITHUB_RUN_ID, attempt: Number(env.GITHUB_RUN_ATTEMPT || 1), sequence: (lastSequence = Math.max(Date.now(), lastSequence + 1)),
     state: state || (session && web ? 'live' : 'starting'), session_id: session,
     urls: { opencode: session && web ? `${web}/${Buffer.from(env.PROJECT_DIR).toString('base64url')}/session/${session}` : '',
-      files: web ? `${web}/omgithub/files/` : '', preview,
+      files: read('files-url'), preview,
       branch: `https://github.com/${env.GITHUB_REPOSITORY}/tree/opencode-checkpoints/${env.TRIGGER_ISSUE_NUMBER}` } }
   body.urls = await readyPublicUrls(body.urls, check)
   if (body.state === 'live' && !body.urls.opencode) body.state = 'starting'
