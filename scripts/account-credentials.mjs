@@ -87,16 +87,8 @@ export function createCredentialClient({ env = process.env, request = fetch, mas
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const client = createCredentialClient(), mode = process.argv[2] || 'load'
   if (mode === 'load') {
-    const deadline = Date.now() + 5 * 3600000
-    let warned = false
-    for (;;) {
-      try { const result = await client.load(); console.log(`Loaded ${result.customSecrets} account secret(s); subscription auth: ${result.accountAuth ? 'account' : 'repository/default'}.`); break }
-      catch (error) {
-        if (error.status !== 423 || Date.now() >= deadline) throw error
-        if (!warned) { console.log('Waiting for another run using this account’s subscription credentials.'); warned = true }
-        await new Promise(resolve => setTimeout(resolve, 15000))
-      }
-    }
+    const result = await client.load()
+    console.log(`Loaded ${result.customSecrets} account secret(s); subscription auth: ${result.accountAuth ? 'account' : 'repository/default'}.`)
   } else if (mode === 'watch') {
     while (existsSync(client.stateFile)) {
       await new Promise(resolve => setTimeout(resolve, 60000))

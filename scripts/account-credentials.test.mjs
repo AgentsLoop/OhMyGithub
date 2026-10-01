@@ -32,7 +32,7 @@ test('load account credentials, mask multiline values, preserve repository overr
   assert.equal(f.calls.at(-1).revision, 'revision-2'); assert.equal(f.calls.at(-1).release, true)
   assert.equal(existsSync(f.file), false)
 })
-test('repository auth JSON takes precedence and does not acquire account OAuth lease', async t => {
+test('repository auth JSON takes precedence over account auth', async t => {
   const f = fixture(t, { OPENCODE_AUTH_CONTENT: JSON.stringify(initial) })
   assert.equal((await f.client.load()).accountAuth, false)
   assert.equal(f.calls[0].use_auth, false); assert.equal(existsSync(f.file), false)
@@ -77,4 +77,18 @@ test('release only after main execution and validation settle, and before debug 
   assert.equal(credentialWorkSettled(env), false)
   const workflow = readFileSync(new URL('../.github/workflows/opencode-reusable.yml', import.meta.url), 'utf8')
   assert.ok(workflow.indexOf('- name: Release account credentials before debug hold') < workflow.indexOf('- name: Keep temporary access available for 5 hours'))
+})
+
+
+test('two independent runners load identical account auth concurrently and clean up independently', async t => {
+  const a = fixture(t), b = fixture(t, { GITHUB_RUN_ID: '43', TRIGGER_ISSUE_NUMBER: '6' })
+  const results = await Promise.all([a.client.load(), b.client.load()])
+  assert.ok(results.every(result => result.accountAuth))
+  assert.notEqual(a.file, b.file)
+  assert.deepEqual(JSON.parse(readFileSync(a.file)), JSON.parse(readFileSync(b.file)))
+  await a.client.sync(true)
+  assert.equal(existsSync(a.file), false)
+  assert.equal(existsSync(b.file), true)
+  await b.client.sync(true)
+  assert.equal(existsSync(b.file), false)
 })
