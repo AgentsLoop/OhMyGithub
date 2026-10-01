@@ -61,3 +61,20 @@ test('cleanup removes account auth even when a revision conflict already stopped
   await f.client.sync(true)
   assert.equal(existsSync(f.file), false)
 })
+
+test('release only after main execution and validation settle, and before debug hold', async t => {
+  const { credentialWorkSettled } = await import('./account-credentials.mjs')
+  const { dir, env } = fixture(t); env.OPENCODE_WEB_DIR = dir
+  assert.equal(credentialWorkSettled(env), true)
+  writeFileSync(join(dir, 'main-model'), 'openai/gpt-6-astra')
+  assert.equal(credentialWorkSettled(env), false)
+  writeFileSync(join(dir, 'opencode-run.exit'), '0')
+  writeFileSync(join(dir, 'deployment-status.json'), JSON.stringify({ state: 'deploying' }))
+  assert.equal(credentialWorkSettled(env), false)
+  writeFileSync(join(dir, 'deployment-status.json'), JSON.stringify({ state: 'failed' }))
+  assert.equal(credentialWorkSettled(env), true)
+  writeFileSync(join(dir, 'active-validation.json'), '{}')
+  assert.equal(credentialWorkSettled(env), false)
+  const workflow = readFileSync(new URL('../.github/workflows/opencode-reusable.yml', import.meta.url), 'utf8')
+  assert.ok(workflow.indexOf('- name: Release account credentials before debug hold') < workflow.indexOf('- name: Keep temporary access available for 5 hours'))
+})

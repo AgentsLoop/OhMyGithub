@@ -10,6 +10,15 @@ export function writeEnv(file, name, value) {
   do { delimiter = `omgithub_${randomUUID()}` } while (String(value).split(/\r?\n/).includes(delimiter))
   appendFileSync(file, `${name}<<${delimiter}\n${value}\n${delimiter}\n`)
 }
+export function credentialWorkSettled(env) {
+  const directory = env.OPENCODE_WEB_DIR
+  if (!directory) return true
+  if (existsSync(join(directory, 'active-validation.json'))) return false
+  if (!existsSync(join(directory, 'main-model'))) return true
+  if (!existsSync(join(directory, 'opencode-run.exit'))) return false
+  try { return ['ready', 'failed'].includes(JSON.parse(readFileSync(join(directory, 'deployment-status.json'), 'utf8')).state) }
+  catch { return true }
+}
 export function createCredentialClient({ env = process.env, request = fetch, mask = value => console.log(`::add-mask::${escapeCommand(value)}`) } = {}) {
   const origin = (env.OMGITHUB_ORIGIN || 'https://omgithub.com').replace(/\/$/, '')
   const directory = join(env.RUNNER_TEMP, 'omgithub-account-credentials')
@@ -93,6 +102,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       await new Promise(resolve => setTimeout(resolve, 60000))
       try { await client.sync() } catch { console.log('Account auth sync unavailable; retrying in one minute.') }
     }
+  } else if (mode === 'finish') {
+    const deadline = Date.now() + 15 * 60000
+    while (existsSync(client.stateFile) && !credentialWorkSettled(process.env)) {
+      if (Date.now() >= deadline) throw new Error('Credential release is waiting for validation to finish.')
+      await new Promise(resolve => setTimeout(resolve, 5000))
+    }
+    // Stop the refresher only after any repair/validation model work settles.
+    const pidFile = join(process.env.RUNNER_TEMP, 'omgithub-account-auth-sync.pid')
+    if (existsSync(pidFile)) { try { process.kill(Number(readFileSync(pidFile, 'utf8').trim()), 'SIGTERM') } catch {} }
+    await client.sync(true)
   } else if (mode === 'release') await client.sync(true)
   else throw new Error('Unknown credentials operation')
 }

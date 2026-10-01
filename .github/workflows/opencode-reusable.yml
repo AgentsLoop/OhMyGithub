@@ -1305,6 +1305,16 @@ jobs:
             --data "{\"run\":\"$GITHUB_RUN_ID\",\"attempt\":$GITHUB_RUN_ATTEMPT,\"sequence\":$sequence,\"state\":\"ended\",\"phase\":\"building\",\"outcome\":\"failure\"}" \
             "$OMGITHUB_ORIGIN/api/github/$GITHUB_REPOSITORY/issues/$TRIGGER_ISSUE_NUMBER/run"
 
+      - name: Release account credentials before debug hold
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f "$RUNTIME_DIR/scripts/account-credentials.mjs" ]]; then
+            /usr/bin/time -p node "$RUNTIME_DIR/scripts/account-credentials.mjs" finish
+          fi
+
       - name: Keep temporary access available for 5 hours
         if: (success() || (failure() && vars.OPENCODE_DEBUG_HOLD == 'true' && steps.opencode_web.outcome == 'success')) && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash
