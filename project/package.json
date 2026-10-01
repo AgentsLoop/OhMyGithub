@@ -1,0 +1,23 @@
+{
+  "name": "frontier-ops-fps",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 3000 --strictPort",
+    "start": "vite --host 0.0.0.0 --port 3000 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0",
+    "vitest": "^1.4.0",
+    "jsdom": "^24.0.0",
+    "@playwright/test": "^1.44.0",
+    "playwright": "^1.44.0"
+  }
+}
