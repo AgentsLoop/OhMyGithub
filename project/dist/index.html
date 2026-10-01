@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEON CATCHER — Arcade Starfall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-B-W3TCrz.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-D7dCg8sx.css">
+</head>
+<body>
+<div id="app">
+  <!-- ambient -->
+  <div class="bg-grid"></div>
+  <div class="bg-vignette"></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">◉</div>
+      <div class="brand-text">
+        <h1>NEON CATCHER</h1>
+        <p>ARCADE STARFALL • CATCH THE LIGHT</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="pauseBtn" class="btn ghost">⏸ Pause</button>
+      <button id="soundBtn" class="btn ghost">🔊 Sound</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="panel left">
+      <section class="card stats-card">
+        <div class="stat big">
+          <span>SCORE</span>
+          <strong id="score">0</strong>
+          <em id="highScoreLabel">BEST 0</em>
+        </div>
+        <div class="stat-row">
+          <div class="stat mini"><span>LIVES</span><strong id="lives" class="lives">● ● ●</strong></div>
+          <div class="stat mini"><span>LEVEL</span><strong id="level">1</strong></div>
+        </div>
+        <div class="progress">
+          <div class="progress-label"><span>Stars caught</span><span id="progressLabel">0 / 10</span></div>
+          <div class="bar"><i id="progressBar" style="width:0%"></i></div>
+        </div>
+        <div class="streak" id="streak">Streak 0 — keep catching!</div>
+      </section>
+
+      <section class="card">
+        <h3>HOW TO PLAY</h3>
+        <ul class="help">
+          <li><kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> — move catcher</li>
+          <li>Mouse / touch drag — slide</li>
+          <li>Catch falling ★ for points</li>
+          <li>Miss 3 stars = game over</li>
+          <li>Each 10 catches = level up, faster fall</li>
+        </ul>
+        <div class="mobile-pad">
+          <button id="leftBtn" aria-label="Move left">◀</button>
+          <button id="rightBtn" aria-label="Move right">▶</button>
+        </div>
+      </section>
+    </aside>
+
+    <main class="stage">
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="600" height="760" aria-label="Neon Catcher game canvas"></canvas>
+        <div id="overlay" class="overlay">
+          <!-- START -->
+          <div class="overlay-card" id="startCard">
+            <div class="badge">NEON ARCADE</div>
+            <h2>NEON CATCHER</h2>
+            <p class="subtitle">Slide the glowing catcher. Grab every star.</p>
+            <div class="hero-catcher">
+              <div class="hero-catcher-body"></div>
+              <div class="hero-star">★</div>
+            </div>
+            <button id="startBtn" class="cta">▶ START GAME</button>
+            <p class="hint">Tip: Use Arrow keys or A/D — don't let 3 stars fall!</p>
+          </div>
+          <!-- PAUSE -->
+          <div class="overlay-card hidden" id="pauseCard">
+            <h2>PAUSED</h2>
+            <p class="subtitle">Neon on hold</p>
+            <button id="resumeBtn" class="cta">RESUME</button>
+            <button id="restartBtn2" class="btn ghost large">RESTART</button>
+          </div>
+          <!-- GAME OVER -->
+          <div class="overlay-card hidden" id="gameOverCard">
+            <div class="badge danger">SIGNAL LOST</div>
+            <h2 id="gameOverTitle">GAME OVER</h2>
+            <p id="finalScore" class="final-score">Score 0</p>
+            <p id="finalMsg" class="hint"></p>
+            <button id="restartBtn" class="cta">↻ PLAY AGAIN</button>
+            <p class="hint small">Missed 3 stars. Try to beat your best!</p>
+          </div>
+        </div>
+        <!-- HUD over canvas bottom -->
+        <div class="hud">
+          <span id="hudScore">0</span>
+          <span id="hudCenter">NEON CATCHER</span>
+          <span id="hudLives">♥♥♥</span>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel right">
+      <section class="card">
+        <h3>NEON STATS</h3>
+        <div class="neon-stats">
+          <div class="nstat"><span>Speed</span><strong id="speedLabel">×1.00</strong></div>
+          <div class="bar thin gold"><i id="speedBar" style="width:18%"></i></div>
+          <div class="nstat"><span>Caught</span><strong id="caughtLabel">0</strong></div>
+          <div class="nstat"><span>Missed</span><strong id="missedLabel">0 / 3</strong></div>
+        </div>
+      </section>
+      <section class="card small">
+        <h3>ARCADE TIP</h3>
+        <p class="small muted">Rare magenta stars are worth 30 points — plus streak bonus from 3 in a row. Let the catcher tilt carry you.</p>
+        <div class="attribution" style="margin-top:10px">No external paid services. Pure Canvas + CSS + WebAudio.</div>
+      </section>
+    </aside>
+  </div>
+
+  <footer class="footer">
+    <span>© Neon Catcher • 60fps Canvas • Keyboard + Touch • </span><span id="buildInfo">ready</span>
+  </footer>
+</div>
+<div id="toast" class="toast"></div>
+</body>
+</html>
