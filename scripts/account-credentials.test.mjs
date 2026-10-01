@@ -51,3 +51,13 @@ test('High models set CLI reasoning variant in all OpenCode invocation modes', (
   assert.equal(invocations.length, 5)
   for (const line of invocations) assert.ok(line.includes('"${variant_args[@]}"'))
 })
+
+
+test('cleanup removes account auth even when a revision conflict already stopped sync', async t => {
+  const f = fixture(t)
+  await f.client.load()
+  f.env.OMGITHUB_ACCOUNT_AUTH_FILE = f.file
+  rmSync(f.client.stateFile)
+  await f.client.sync(true)
+  assert.equal(existsSync(f.file), false)
+})

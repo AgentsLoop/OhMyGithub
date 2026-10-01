@@ -53,7 +53,10 @@ export function createCredentialClient({ env = process.env, request = fetch, mas
     return { customSecrets: names.length, accountAuth: Boolean(data.auth && !env.OPENCODE_AUTH_CONTENT) }
   }
   async function sync(release = false) {
-    if (!existsSync(stateFile)) return
+    if (!existsSync(stateFile)) {
+      if (release && env.OMGITHUB_ACCOUNT_AUTH_FILE === authFile) rmSync(authFile, { force: true })
+      return
+    }
     const state = JSON.parse(readFileSync(stateFile, 'utf8'))
     const auth = JSON.parse(readFileSync(authFile, 'utf8'))
     // Only return the providers actually checked out from this account.
