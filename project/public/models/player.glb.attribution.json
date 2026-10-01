@@ -1,0 +1,10 @@
+{
+  "uid": "custom-player-starship-v1",
+  "name": "Starship - Custom Procedural",
+  "author": "aiplay procedural generator (CC0)",
+  "license": "CC0-1.0",
+  "modelUrl": null,
+  "thumbnailUrl": null,
+  "glbBytes": 6060,
+  "note": "Procedurally generated low-poly starship for game"
+}

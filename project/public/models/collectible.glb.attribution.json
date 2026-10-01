@@ -1,0 +1,10 @@
+{
+  "uid": "custom-collectible-crystal-v1",
+  "name": "Energy Crystal - Custom Procedural",
+  "author": "aiplay procedural generator (CC0)",
+  "license": "CC0-1.0",
+  "modelUrl": null,
+  "thumbnailUrl": null,
+  "glbBytes": 3036,
+  "note": "Procedurally generated crystal with spin animation"
+}
