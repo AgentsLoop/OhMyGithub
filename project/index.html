@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pirate Island Treasure — Hunt the Lost Chests</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Inter:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Top HUD -->
+    <header id="hud">
+      <div class="hud-left">
+        <div class="brand">
+          <span class="brand-icon">🏴‍☠️</span>
+          <div>
+            <h1>Pirate Island</h1>
+            <p>Treasure Hunt</p>
+          </div>
+        </div>
+      </div>
+      <div class="hud-center">
+        <div id="objective" class="objective">
+          <span class="obj-label">Objective</span>
+          <span id="objective-text">Find 3 lost chests, then return to your ship</span>
+        </div>
+        <div id="treasure-counter" class="counter">
+          <span class="counter-icon">💎</span>
+          <span id="counter-text">0 / 3</span>
+          <div class="counter-dots">
+            <span class="dot" data-index="0"></span>
+            <span class="dot" data-index="1"></span>
+            <span class="dot" data-index="2"></span>
+          </div>
+        </div>
+      </div>
+      <div class="hud-right">
+        <button id="credits-btn" class="btn btn-ghost">Credits</button>
+        <button id="reset-btn" class="btn btn-ghost">Restart</button>
+      </div>
+    </header>
+
+    <!-- Bottom controls -->
+    <footer id="controls-bar">
+      <div class="controls-group">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span>or</span> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> <span>Move</span>
+        <span class="sep">·</span>
+        <kbd>E</kbd> <span>Collect</span>
+        <span class="sep">·</span>
+        <span>Mouse drag to orbit · Scroll to zoom</span>
+      </div>
+      <div id="status-text" class="status-text">Sail to the island and hunt for treasure…</div>
+    </footer>
+
+    <!-- Interaction prompt -->
+    <div id="interact-prompt" class="interact hidden">
+      <span>Press <kbd>E</kbd> to collect treasure</span>
+    </div>
+
+    <!-- Win overlay -->
+    <div id="win-overlay" class="overlay hidden">
+      <div class="overlay-card">
+        <div class="overlay-icon">🏆</div>
+        <h2>Treasure Secured!</h2>
+        <p>You recovered all 3 chests and escaped aboard your ship.<br>Legend of the island is yours.</p>
+        <div class="overlay-stats">
+          <span id="win-time">Time: --</span>
+        </div>
+        <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+        <button id="win-credits-btn" class="btn btn-ghost">Credits</button>
+      </div>
+    </div>
+
+    <!-- Credits modal -->
+    <div id="credits-modal" class="overlay hidden">
+      <div class="overlay-card credits-card">
+        <h2>Credits & Attribution</h2>
+        <div class="credits-list">
+          <div class="credit-item">
+            <strong>Pirate Ship</strong> — by <a href="https://sketchfab.com/IoannSergeich" target="_blank" rel="noopener">IoannSergeich</a> on Sketchfab<br>
+            <span>Model: “Pirate Ship” (UID: 64ee92cebf5441629c4ed97c2ebed515) · License: CC Attribution</span><br>
+            <a href="https://sketchfab.com/3d-models/none-64ee92cebf5441629c4ed97c2ebed515" target="_blank" rel="noopener">View on Sketchfab</a>
+            <div class="credit-file">Local asset: <code>public/models/pirate-ship.glb</code></div>
+          </div>
+          <div class="credit-item">
+            <strong>Stylized Pirate Character</strong> — by <a href="https://sketchfab.com/walterpalladino" target="_blank" rel="noopener">walterpalladino</a> on Sketchfab<br>
+            <span>Model: “Stylized Pirate Laughing” (UID: 23473493628b4a0089eab5f6ed129c71) · License: CC Attribution · Animation: mixamo.com (9.77s)</span><br>
+            <a href="https://sketchfab.com/3d-models/none-23473493628b4a0089eab5f6ed129c71" target="_blank" rel="noopener">View on Sketchfab</a>
+            <div class="credit-file">Local asset: <code>public/models/pirate-character.glb</code></div>
+          </div>
+          <div class="credit-item muted">
+            Three.js · Vite · Hand-crafted island, ocean, and chest props<br>
+            Sidecar attribution JSON preserved beside each GLB.
+          </div>
+        </div>
+        <button id="close-credits-btn" class="btn btn-primary">Close</button>
+      </div>
+    </div>
+
+    <!-- Loading screen -->
+    <div id="loading-screen">
+      <div class="loading-card">
+        <div class="loading-title">🏴‍☠️ Preparing the Voyage</div>
+        <div class="loading-bar"><div id="loading-fill"></div></div>
+        <div id="loading-text">Loading island… 0%</div>
+        <div class="loading-sub">Real Sketchfab GLB assets loading with GLTFLoader</div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
