@@ -1,0 +1,12 @@
+{
+  "active_subagents": 0,
+  "total_subagents_executed": 7,
+  "image_context_calls": 3,
+  "sessions": ["ses_fbf175f31ffeszzTcW2tBhtuh5","ses_fbf14b839ffexBQWqmNV9LNCIN","ses_fbf0d13baffeYcgnhBr5iSJdqH","ses_fbf033531ffe0SxbLIFOOZ5Yvi","ses_fbf008c8fffeW1dAXWNMtvvC7z","ses_fbefe6a75ffefbvMyDeVDyVOXz","ses_fbefc24c1ffefbUT2ugGqjMcNX"],
+  "last_visual_critic": "harsh - inspected /tmp/blacksite-arena.png and /tmp/final-arena3.png as image input, reported weapon/lighting gap",
+  "crate_uid": "037d2624e22f4fb4b7066676c6321903",
+  "crate_attribution": "Sci-fi crate — juicymalina (CC Attribution) - https://sketchfab.com/3d-models/none-037d2624e22f4fb4b7066676c6321903",
+  "crate_stats": {"meshes":2,"triangles":12999,"materials":1,"textures":3,"bytes":2929936,"extensionsUsed":[],"animations":0},
+  "viewer_url": "http://127.0.0.1:8765/",
+  "game_url": "http://127.0.0.1:3000/"
+}
