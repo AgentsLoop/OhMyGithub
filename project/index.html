@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>GLB Relic Escape — Temple of the Idol</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="canvas-wrap"><canvas id="game" aria-label="GLB Relic Escape 3D game"></canvas></div>
+
+  <div class="overlay" aria-hidden="false">
+    <div class="hud">
+      <div class="hud-left">
+        <div class="pill"><span>⏱</span> <strong id="hud-time">50.0s</strong> <div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div></div>
+        <div class="pill" id="hud-objective">Objective: <strong id="objective-text">Reach the Idol</strong></div>
+      </div>
+      <div class="hud-right">
+        <div class="pill"><span>Relic</span> <strong id="hud-relic">✕ Not collected</strong></div>
+        <div class="pill"><span>Health</span> <span class="hearts" id="hud-hearts"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="start-card" class="center-cards">
+    <div class="card">
+      <div class="badge">GLB Relic Escape · Three.js + Sketchfab CC</div>
+      <h1>GLB RELIC ESCAPE</h1>
+      <p><strong style="color:var(--text)">Steal the idol, escape the temple.</strong> The altar holds a real Sketchfab GLB with authored PBR textures. Touch it, then sprint to the north gate before the temple collapses. Avoid the roaming sentinels.</p>
+      <div class="controls-help">
+        <div><strong>Keyboard</strong><br><span class="kbd">WASD</span> / <span class="kbd">Arrows</span> move<br><span class="kbd">R</span> restart · <span class="kbd">Space</span> dash</div>
+        <div><strong>Mobile</strong><br>Left joystick to move<br>Right button to dash · Tap <em>Play</em> to start</div>
+      </div>
+      <p class="objective">Authored material proof: <strong id="material-proof">loading relic…</strong></p>
+      <button id="btn-play" class="btn">▶ PLAY — ENTER TEMPLE</button>
+      <p style="margin-top:10px; font-size:12px; color:var(--muted)">Tip: after grabbing the idol it hovers above you — GATE opens north.</p>
+    </div>
+  </div>
+
+  <div id="win-card" class="center-cards hidden">
+    <div class="card">
+      <h2 style="color:var(--success)">✦ ESCAPED WITH THE RELIC ✦</h2>
+      <p id="win-stats">Time bonus + score</p>
+      <button id="btn-restart-win" class="btn">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <div id="lose-card" class="center-cards hidden">
+    <div class="card">
+      <h2 style="color:var(--danger)">✻ TEMPLE CLAIMED YOU ✻</h2>
+      <p id="lose-stats">Collapsed…</p>
+      <button id="btn-restart-lose" class="btn secondary" style="background:linear-gradient(180deg,#ff5a5a,#ff2a2a); color:white;">RETRY</button>
+    </div>
+  </div>
+
+  <div class="mobile-controls" id="mobile-controls">
+    <div class="joy" id="joy" aria-label="movement joystick"><div class="joy-stick" id="joy-stick"></div></div>
+    <button class="action-btn" id="btn-dash" aria-label="dash">DASH</button>
+  </div>
+
+  <div class="attribution">
+    <div class="attrib-pill" id="attribution">Model: <strong>Free Low Poly Idol</strong> by warcool (CC Attribution) · <a href="https://sketchfab.com/3d-models/none-5ac9636f616b4f6381168597d4beaa35" target="_blank" rel="noopener">Sketchfab</a> · GLB 217 kB · 586 tris · 1 mat / 1 tex</div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
