@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Lantern Loop — Shifting Maze</title>
+<style>
+  :root{ --bg:#0b0e14; --panel:#151a26; --accent:#ffbb33; --accent2:#ff6b35; --text:#e6e8ee; --muted:#8a90a3; --wall:#1e2638; --wall2:#2a3654; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{ background:radial-gradient(1200px 600px at 50% -10%, #1a2340 0%, #0b0e14 60%); color:var(--text); font-family:ui-sans-system,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; min-height:100vh; display:flex; flex-direction:column; align-items:center; overflow-x:hidden;}
+  header{ width:min(960px,96vw); padding:18px 0 10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;}
+  h1{font-size:clamp(22px,3.5vw,30px); letter-spacing:0.04em; font-weight:800; display:flex; align-items:center; gap:10px;}
+  h1 span{ display:inline-grid; place-items:center; width:34px; height:34px; border-radius:10px; background:radial-gradient(circle at 30% 30%, #ffe8a0 0%, #ffb733 35%, #ff6b35 70%); box-shadow:0 0 18px rgba(255,187,51,0.6), inset 0 1px 1px rgba(255,255,255,0.8);}
+  .stats{ display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  .pill{ background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); padding:8px 14px; border-radius:999px; font-size:14px; display:flex; align-items:center; gap:8px; backdrop-filter:blur(6px);}
+  .pill b{ color:var(--accent); font-size:16px;}
+  #wrap{ width:min(960px,96vw); position:relative; border-radius:18px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); background:#0d111d; box-shadow:0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset; }
+  canvas{ display:block; width:100%; height:auto; aspect-ratio: 960 / 560; background:radial-gradient(900px 500px at 30% 20%, #131b2e 0%, #0d111d 55%);}
+  #overlay{ position:absolute; inset:0; display:grid; place-items:center; background:rgba(11,14,20,0.78); backdrop-filter:blur(8px); padding:24px; text-align:center; transition:opacity .25s; }
+  #overlay.hidden{ opacity:0; pointer-events:none; }
+  .card{ background:linear-gradient(180deg, #1a2238 0%, #121827 100%); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:26px 22px; max-width:520px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.4);}
+  .card h2{ font-size:22px; margin-bottom:8px;}
+  .card p{ color:var(--muted); line-height:1.5; font-size:14px; margin-bottom:12px;}
+  .kbd{ display:inline-block; background:#0b0e14; border:1px solid rgba(255,255,255,0.15); border-bottom-width:2px; padding:2px 7px; border-radius:6px; font-size:12px; font-weight:700; color:#d0d6ea;}
+  .btn{ appearance:none; border:none; cursor:pointer; font-weight:800; letter-spacing:0.03em; padding:12px 18px; border-radius:999px; font-size:14px; transition:transform .08s, filter .15s; }
+  .btn:active{ transform:scale(0.97); }
+  .btn-primary{ background:linear-gradient(180deg, #ffcf5a 0%, #ffb733 50%, #ff8c2a 100%); color:#1a1200; box-shadow:0 6px 20px rgba(255,187,51,0.35), inset 0 1px 0 rgba(255,255,255,0.8);}
+  .btn-primary:hover{ filter:brightness(1.06);}
+  .btn-ghost{ background:rgba(255,255,255,0.08); color:var(--text); border:1px solid rgba(255,255,255,0.12); margin-left:8px;}
+  #hudBottom{ width:min(960px,96vw); display:flex; justify-content:space-between; gap:12px; padding:12px 0 8px; flex-wrap:wrap; align-items:center;}
+  .instructions{ background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:10px 14px; font-size:13px; color:var(--muted); line-height:1.5; flex:1; min-width:260px;}
+  .instructions strong{ color:var(--text);}
+  .controls{ display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .dpad{ display:grid; grid-template-columns:repeat(3,42px); grid-template-rows:repeat(2,42px); gap:6px;}
+  .dpad button{ width:42px; height:42px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.07); color:var(--text); font-size:16px; cursor:pointer; display:grid; place-items:center; user-select:none; touch-action:manipulation; -webkit-user-select:none;}
+  .dpad button:active{ background:rgba(255,187,51,0.28); border-color:rgba(255,187,51,0.45);}
+  #toast{ position:absolute; top:14px; left:50%; transform:translateX(-50%) translateY(-4px); background:rgba(255,187,51,0.95); color:#1a1200; padding:8px 14px; border-radius:999px; font-weight:800; font-size:13px; opacity:0; pointer-events:none; transition:opacity .22s, transform .22s; box-shadow:0 6px 20px rgba(0,0,0,0.3); white-space:nowrap; z-index:5;}
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0);}
+  .shiftBar{ position:absolute; bottom:0; left:0; height:6px; background:linear-gradient(90deg, #ffb733, #ff6b35); width:0%; opacity:0.95; transition:width 0.08s linear; box-shadow:0 0 10px rgba(255,187,51,0.6); border-radius:0 3px 0 0;}
+  #shiftLabel{ position:absolute; bottom:8px; left:10px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,187,51,0.25); color:#ffcf5a; font-size:11px; font-weight:800; letter-spacing:0.05em; padding:3px 8px; border-radius:999px; pointer-events:none; backdrop-filter:blur(4px); transition:opacity .15s;}
+  footer{ width:min(960px,96vw); padding:10px 0 20px; color:var(--muted); font-size:12px; text-align:center; opacity:0.7;}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>🏮</span> LANTERN LOOP</h1>
+  <div class="stats">
+    <div class="pill">Sparks <b id="score">0/3</b></div>
+    <div class="pill">Time <b id="time">00:00</b></div>
+    <div class="pill">Shadows <b id="shadowCount">2</b></div>
+  </div>
+</header>
+
+<div id="wrap">
+  <canvas id="game" width="960" height="560" aria-label="Lantern Loop maze"></canvas>
+  <div id="toast">Maze shifts!</div>
+  <div class="shiftBar" id="shiftBar"></div>
+  <div id="shiftLabel">SHIFT IN 7s</div>
+  <div id="overlay">
+    <div class="card" id="card">
+      <h2 id="cardTitle">Light the Way</h2>
+      <p id="cardDesc">You carry the last lantern through a <strong>shifting maze</strong>. Collect <strong>3 sparks</strong> to rekindle the loop. Touch a <em>shadow</em> and your light goes out. The maze shifts every ~7 seconds — walls open and close!</p>
+      <p><span class="kbd">WASD</span> / <span class="kbd">ARROWS</span> or <span class="kbd">Swipe / D-Pad</span> to move · <span class="kbd">R</span> restart</p>
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" id="playBtn">ENTER THE MAZE →</button>
+        <button class="btn btn-ghost" id="howBtn">How to play</button>
+      </div>
+      <p style="margin-top:14px; font-size:12px; opacity:0.8;">Tip: luring shadows into dead ends gives you time to grab sparks. Your lantern glows — shadows hate light.</p>
+    </div>
+  </div>
+</div>
+
+<div id="hudBottom">
+  <div class="instructions">
+    <strong>Goal:</strong> Collect 3 <span style="color:#ffcf5a">✦ sparks</span> · <strong>Avoid:</strong> <span style="color:#8a90ff">shadows</span> · <strong>Maze shifts</strong> automatically. <span id="statusText">Use WASD/Arrows. On mobile use D-Pad or drag on canvas.</span>
+  </div>
+  <div class="controls">
+    <div class="dpad" aria-label="D-Pad">
+      <div></div><button data-dir="up" aria-label="Up">▲</button><div></div>
+      <button data-dir="left" aria-label="Left">◀</button><button data-dir="down" aria-label="Down">▼</button><button data-dir="right" aria-label="Right">▶</button>
+    </div>
+    <button class="btn btn-ghost" id="restartBtn" style="height:40px;">Restart (R)</button>
+  </div>
+</div>
+
+<footer>Self-contained • No dependencies • Works offline • Built for keyboard + touch</footer>
+
+<script>
+(() => {
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const timeEl = document.getElementById('time');
+const overlay = document.getElementById('overlay');
+const cardTitle = document.getElementById('cardTitle');
+const cardDesc = document.getElementById('cardDesc');
+const playBtn = document.getElementById('playBtn');
+const howBtn = document.getElementById('howBtn');
+const restartBtn = document.getElementById('restartBtn');
+const toast = document.getElementById('toast');
+const shiftBar = document.getElementById('shiftBar');
+const shiftLabel = document.getElementById('shiftLabel');
+const statusText = document.getElementById('statusText');
+const shadowCountEl = document.getElementById('shadowCount');
+
+// Maze config
+const COLS = 15, ROWS = 9;
+const SHIFT_INTERVAL = 7000;
+let cellW, cellH, offsetX, offsetY;
+
+// Game state
+let maze, player, sparks, shadows, keys={}, gameState='menu', score=0, startTime=0, elapsed=0, lastShift=0, animId=0, shiftProgress=0;
+let sparkParticles=[];
+let howToggle=false;
+let mazeFlash=0;
+let mazeShake=0;
+
+function createMaze(){
+  // init cells
+  const grid = Array.from({length: ROWS}, (_,y)=> Array.from({length: COLS}, (_,x)=> ({x,y, visited:false, walls:[true,true,true,true]}))); // top,right,bottom,left
+  const stack=[];
+  let cur=grid[0][0];
+  cur.visited=true;
+  stack.push(cur);
+  const dirs=[{dx:0,dy:-1, w:0, ow:2},{dx:1,dy:0,w:1,ow:3},{dx:0,dy:1,w:2,ow:0},{dx:-1,dy:0,w:3,ow:1}];
+  while(stack.length){
+    const curr=stack[stack.length-1];
+    const neighbors=[];
+    for(const d of dirs){
+      const nx=curr.x+d.dx, ny=curr.y+d.dy;
+      if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS && !grid[ny][nx].visited) neighbors.push({cell:grid[ny][nx], dir:d});
+    }
+    if(neighbors.length){
+      const {cell,dir}=neighbors[Math.floor(Math.random()*neighbors.length)];
+      curr.walls[dir.w]=false;
+      cell.walls[dir.ow]=false;
+      cell.visited=true;
+      stack.push(cell);
+    } else stack.pop();
+  }
+  return grid;
+}
+
+function isOpen(maze,x,y,dir){
+  // dir 0 top 1 right 2 bottom 3 left
+  if(x<0||x>=COLS||y<0||y>=ROWS) return false;
+  return !maze[y][x].walls[dir];
+}
+
+function canMove(x,y,nx,ny){
+  if(nx<0||nx>=COLS||ny<0||ny>=ROWS) return false;
+  if(nx===x+1 && ny===y) return isOpen(maze,x,y,1);
+  if(nx===x-1 && ny===y) return isOpen(maze,x,y,3);
+  if(ny===y+1 && nx===x) return isOpen(maze,x,y,2);
+  if(ny===y-1 && nx===x) return isOpen(maze,x,y,0);
+  return false;
+}
+// Better wall check for continuous movement: test AABB walls
+function wallRects(){
+  const rects=[];
+  const w=4;
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    const c=maze[y][x];
+    const px=offsetX + x*cellW;
+    const py=offsetY + y*cellH;
+    if(c.walls[0]) rects.push({x:px, y:py, w:cellW, h:w});
+    if(c.walls[1]) rects.push({x:px+cellW-w, y:py, w:w, h:cellH});
+    if(c.walls[2]) rects.push({x:px, y:py+cellH-w, w:cellW, h:w});
+    if(c.walls[3]) rects.push({x:px, y:py, w:w, h:cellH});
+  }
+  // outer border already included via walls, but ensure outer rect
+  return rects;
+}
+
+function bfsReachable(sx,sy){
+  const vis=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  const q=[[sx,sy]]; vis[sy][sx]=true;
+  while(q.length){
+    const [x,y]=q.shift();
+    const neigh=[[0,-1,0],[1,0,1],[0,1,2],[-1,0,3]];
+    for(const [dx,dy,dir] of neigh){
+      const nx=x+dx, ny=y+dy;
+      if(nx<0||nx>=COLS||ny<0||ny>=ROWS) continue;
+      if(vis[ny][nx]) continue;
+      if(!isOpen(maze,x,y,dir)) continue;
+      vis[ny][nx]=true; q.push([nx,ny]);
+    }
+  }
+  return vis;
+}
+
+function pickSparkPositions(){
+  // pick 3 reachable dead ends far from start
+  const vis=bfsReachable(0,0);
+  const candidates=[];
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    if(!vis[y][x]) continue;
+    if(x===0&&y===0) continue;
+    // count walls
+    const open = maze[y][x].walls.filter(v=>!v).length;
+    const dist = Math.abs(x)+Math.abs(y);
+    candidates.push({x,y,open,dist});
+  }
+  candidates.sort((a,b)=> (a.open - b.open) || (b.dist - a.dist));
+  // pick 3 with some randomness among top
+  const pool=candidates.slice(0, Math.min(9,candidates.length));
+  shuffle(pool);
+  return pool.slice(0,3).map(c=> ({cx: c.x, cy: c.y, collected:false, pulse: Math.random()*Math.PI*2 }));
+}
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
+
+function resetGame(){
+  maze=createMaze();
+  computeLayout();
+  const sparksPos=pickSparkPositions();
+  sparks=sparksPos;
+  player={ x: offsetX+cellW*0.5, y: offsetY+cellH*0.5, r:11, speed:2.4, vx:0, vy:0, glow:0 };
+  shadows=[
+    {x: offsetX + (COLS-1)*cellW+cellW/2, y: offsetY+cellH*1.5, vx:1.6, vy:1.0, r:16, phase:0},
+    {x: offsetX + (COLS-2)*cellW+cellW/2, y: offsetY+(ROWS-1)*cellH-cellH/2, vx:-1.4, vy:-1.2, r:15, phase:1.2}
+  ];
+  score=0; startTime=performance.now(); lastShift=startTime; elapsed=0; scoreEl.textContent=`0/3`; shadowCountEl.textContent='2';
+  statusText.textContent='Maze is shifting! Use D-Pad or drag on mobile. Press R to restart.';
+  gameState='playing';
+  overlay.classList.add('hidden');
+  sparkParticles=[]; mazeFlash=0; mazeShake=0; shiftProgress=0; shiftBar.style.width='0%';
+  if(animId) cancelAnimationFrame(animId);
+  loop();
+}
+
+function computeLayout(){
+  const pad=12;
+  const availW= canvas.width - pad*2;
+  const availH= canvas.height - pad*2;
+  cellW= Math.floor(availW / COLS);
+  cellH= Math.floor(availH / ROWS);
+  const gridW= cellW*COLS, gridH= cellH*ROWS;
+  offsetX= (canvas.width - gridW)/2;
+  offsetY= (canvas.height - gridH)/2 + 4;
+}
+
+function showToast(msg){
+  toast.textContent=msg;
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=> toast.classList.remove('show'), 1600);
+}
+
+function shiftMaze(){
+  // Multi-wall shift: flip 3-5 walls in one dramatic event
+  const targetFlips = 3 + Math.floor(Math.random()*3); // 3-5
+  let flips=0;
+  const flipped=[];
+  const maxAttempts=80;
+  for(let i=0;i<maxAttempts && flips<targetFlips;i++){
+    const x=Math.floor(Math.random()*COLS);
+    const y=Math.floor(Math.random()*ROWS);
+    const dir=Math.floor(Math.random()*4);
+    let nx=x, ny=y;
+    if(dir===0) ny=y-1; else if(dir===1) nx=x+1; else if(dir===2) ny=y+1; else nx=x-1;
+    if(nx<0||nx>=COLS||ny<0||ny>=ROWS) continue;
+    const before0=maze[y][x].walls[dir];
+    const before1=maze[ny][nx].walls[(dir+2)%4];
+    if(before0!==before1) continue;
+    const newState=!before0;
+    // avoid flipping same wall twice this event
+    if(flipped.some(f=> (f.x===x&&f.y===y&&f.dir===dir)||(f.x===nx&&f.y===ny&&f.dir===(dir+2)%4))) continue;
+    maze[y][x].walls[dir]=newState;
+    maze[ny][nx].walls[(dir+2)%4]=newState;
+    const vis=bfsReachable(0,0);
+    const pcx=Math.floor((player.x - offsetX)/cellW);
+    const pcy=Math.floor((player.y - offsetY)/cellH);
+    const cx=Math.max(0,Math.min(COLS-1,pcx)), cy=Math.max(0,Math.min(ROWS-1,pcy));
+    let ok=true;
+    for(const s of sparks) if(!s.collected && !vis[s.cy][s.cx]) ok=false;
+    if(!vis[cy]||!vis[cy][cx]) ok=false;
+    if(!ok){
+      maze[y][x].walls[dir]=before0;
+      maze[ny][nx].walls[(dir+2)%4]=before1;
+      continue;
+    }
+    flipped.push({x,y,dir,nx,ny,newState});
+    flips++;
+    const wx= offsetX + x*cellW + (dir===1?cellW: dir===3?0: cellW/2);
+    const wy= offsetY + y*cellH + (dir===2?cellH: dir===0?0: cellH/2);
+    const count= newState ? 12 : 16;
+    for(let k=0;k<count;k++) sparkParticles.push({x:wx,y:wy, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:1, decay:0.03+Math.random()*0.03, color: newState? 'seal':'open'});
+  }
+  lastShift=performance.now();
+  if(flips>0){
+    mazeFlash=1; mazeShake=12;
+    showToast(`◎ MAZE SHIFTS! ${flips} walls moved`);
+    if(navigator.vibrate) try{navigator.vibrate(flips>3?[40,30,60,30]:[40,30,60]);}catch(e){}
+    // extra global flash particles scattered
+    for(let k=0;k<8;k++) sparkParticles.push({x: offsetX+Math.random()*COLS*cellW, y: offsetY+Math.random()*ROWS*cellH, vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3, life:1, decay:0.04, color:'open'});
+    // WebAudio blip
+    try{
+      const ac = new (window.AudioContext||window.webkitAudioContext)();
+      flipped.forEach((f,i)=>{
+        const o=ac.createOscillator(), g=ac.createGain();
+        o.type='sine'; o.frequency.value= f.newState? 180 : 520;
+        o.connect(g); g.connect(ac.destination);
+        const t=ac.currentTime + i*0.08;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.12, t+0.02); g.gain.exponentialRampToValueAtTime(0.001, t+0.22);
+        o.start(t); o.stop(t+0.24);
+      });
+      setTimeout(()=> ac.close().catch(()=>{}), 900);
+    }catch(e){}
+  } else {
+    mazeFlash=0.6; mazeShake=6;
+    showToast('Maze rumbles… shifting again soon');
+  }
+}
+
+// Input
+keys={};
+addEventListener('keydown', e=>{
+  const k=e.key.toLowerCase();
+  if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d',' '].includes(k)) e.preventDefault();
+  keys[k]=true;
+  if(k==='r'){ e.preventDefault(); resetGame(); return; }
+  if(k==='p'){
+    if(gameState==='playing') showPause();
+    else if(gameState==='paused'){ overlay.classList.add('hidden'); gameState='playing'; lastShift=performance.now() - (shiftProgress*SHIFT_INTERVAL); loop(); }
+    return;
+  }
+  if(k==='escape' && gameState==='playing'){ showPause(); }
+  if(k==='enter' && overlay && !overlay.classList.contains('hidden')){
+    // allow Enter to start/resume when overlay visible
+    if(gameState==='menu' || gameState==='win' || gameState==='lose') resetGame();
+    else if(gameState==='paused'){ overlay.classList.add('hidden'); gameState='playing'; lastShift=performance.now() - (shiftProgress*SHIFT_INTERVAL); loop(); }
+  }
+});
+addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+
+function showPause(){
+  if(gameState!=='playing') return;
+  gameState='paused';
+  cardTitle.textContent='Paused';
+  cardDesc.innerHTML='Maze is waiting. Press <span class="kbd">P</span> or click Resume. &nbsp; <span class="kbd">R</span> to restart.';
+  playBtn.textContent='RESUME →';
+  howBtn.textContent='How to play';
+  howToggle=false;
+  overlay.classList.remove('hidden');
+}
+
+// buttons
+playBtn.addEventListener('click', ()=>{
+  if(gameState==='paused'){ overlay.classList.add('hidden'); gameState='playing'; lastShift=performance.now() - (shiftProgress*SHIFT_INTERVAL); loop(); return; }
+  if(gameState==='menu' || gameState==='win' || gameState==='lose') resetGame();
+  else { overlay.classList.add('hidden'); gameState='playing'; }
+});
+howBtn.addEventListener('click', ()=>{
+  howToggle=!howToggle;
+  if(howToggle){ cardTitle.textContent='How to Play'; cardDesc.innerHTML='• Collect <b style="color:#ffcf5a">3 sparks ✦</b> scattered in dead ends.<br>• Avoid <b style="color:#8a90ff">shadows</b> (they patrol the corridors).<br>• Maze <b>shifts every 7s</b> — stay adaptable.<br>• Mobile: drag on maze or use D-Pad.'; howBtn.textContent='Back'; }
+  else { cardTitle.textContent='Light the Way'; cardDesc.innerHTML='You carry the last lantern through a <strong>shifting maze</strong>. Collect <strong>3 sparks</strong> to rekindle the loop. Touch a <em>shadow</em> and your light goes out. The maze shifts every ~7 seconds — walls open and close!'; howBtn.textContent='How to play'; }
+});
+restartBtn.addEventListener('click', resetGame);
+
+// D-pad — robust pointer + touch
+document.querySelectorAll('.dpad button').forEach(b=>{
+  const dir=b.dataset.dir;
+  const set = (v)=>{
+    if(dir==='up') keys['arrowup']=v;
+    if(dir==='down') keys['arrowdown']=v;
+    if(dir==='left') keys['arrowleft']=v;
+    if(dir==='right') keys['arrowright']=v;
+  };
+  b.addEventListener('pointerdown', e=>{ e.preventDefault(); try{b.setPointerCapture(e.pointerId)}catch(_){} set(true); });
+  const clear=()=> set(false);
+  b.addEventListener('pointerup', clear);
+  b.addEventListener('pointercancel', clear);
+  b.addEventListener('pointerleave', clear);
+  b.addEventListener('lostpointercapture', clear);
+});
+// also clear D-pad keys on global pointerup
+addEventListener('pointerup', ()=>{
+  // only clear D-pad keys if drag not active; keep drag handling separate
+  if(!dragActive){
+    keys['arrowup']=keys['arrowdown']=keys['arrowleft']=keys['arrowright']=false;
+  }
+});
+
+// drag on canvas — continuous angle, not just threshold latch
+let dragActive=false, dragX=0, dragY=0;
+canvas.addEventListener('pointerdown', e=>{
+  dragActive=true; dragX=e.clientX; dragY=e.clientY;
+  try{canvas.setPointerCapture(e.pointerId)}catch(_){}
+  if(gameState==='menu') resetGame();
+  e.preventDefault();
+});
+canvas.addEventListener('pointerup', e=>{ dragActive=false; keys['arrowup']=keys['arrowdown']=keys['arrowleft']=keys['arrowright']=false; });
+canvas.addEventListener('pointercancel', ()=>{ dragActive=false; keys['arrowup']=keys['arrowdown']=keys['arrowleft']=keys['arrowright']=false; });
+canvas.addEventListener('pointermove', e=>{
+  if(!dragActive) return;
+  if(gameState!=='playing' && gameState!=='menu') return;
+  const dx=e.clientX - dragX, dy=e.clientY - dragY;
+  const dist=Math.hypot(dx,dy);
+  const th=10;
+  if(dist < th){
+    keys['arrowup']=keys['arrowdown']=keys['arrowleft']=keys['arrowright']=false;
+    return;
+  }
+  // angle-based 4-dir with diagonals normalized: choose dominant axis, but allow diagonals if both axes significant
+  const ax=Math.abs(dx), ay=Math.abs(dy);
+  if(ax>th || ay>th){
+    keys['arrowleft']= dx < -th;
+    keys['arrowright']= dx > th;
+    keys['arrowup']= dy < -th;
+    keys['arrowdown']= dy > th;
+  }
+  // on menu drag, start game but keep direction
+  if(gameState==='menu') { /* resetGame already called on pointerdown */ }
+});
+canvas.addEventListener('touchmove', e=> e.preventDefault(), {passive:false});
+
+function circleRectCollide(cx,cy,r, rx,ry,rw,rh){
+  const nx= Math.max(rx, Math.min(cx, rx+rw));
+  const ny= Math.max(ry, Math.min(cy, ry+rh));
+  const dx=cx-nx, dy=cy-ny;
+  return dx*dx+dy*dy < r*r;
+}
+
+function update(){
+  if(gameState!=='playing') return;
+  const now=performance.now();
+  elapsed=(now - startTime)/1000;
+  timeEl.textContent= `${String(Math.floor(elapsed/60)).padStart(2,'0')}:${String(Math.floor(elapsed%60)).padStart(2,'0')}`;
+  shiftProgress= Math.min(1, (now - lastShift)/SHIFT_INTERVAL);
+  shiftBar.style.width= (shiftProgress*100)+'%';
+  // color shift bar from gold to orange as it fills, pulse near 80%
+  shiftBar.style.opacity = shiftProgress>0.8 ? (0.9+Math.sin(now*0.02)*0.15) : '0.95';
+  shiftBar.style.boxShadow = shiftProgress>0.8 ? '0 0 12px rgba(255,140,40,0.9)' : '0 0 10px rgba(255,187,51,0.6)';
+  const secsLeft = Math.max(0, Math.ceil((SHIFT_INTERVAL - (now-lastShift))/1000));
+  if(shiftLabel) {
+    shiftLabel.textContent = shiftProgress>0.82 ? '⚠ SHIFTING...' : `SHIFT IN ${secsLeft}s`;
+    shiftLabel.style.background = shiftProgress>0.8 ? 'rgba(255,60,20,0.28)' : 'rgba(0,0,0,0.55)';
+    shiftLabel.style.borderColor = shiftProgress>0.8 ? 'rgba(255,120,40,0.55)' : 'rgba(255,187,51,0.25)';
+    shiftLabel.style.color = shiftProgress>0.8 ? '#ff8c5a' : '#ffcf5a';
+  }
+  if(now - lastShift > SHIFT_INTERVAL) shiftMaze();
+  if(mazeFlash>0) mazeFlash=Math.max(0, mazeFlash-0.06);
+  if(mazeShake>0) mazeShake=Math.max(0, mazeShake-0.7);
+
+  // player input
+  let ix=0, iy=0;
+  if(keys['arrowup']||keys['w']) iy-=1;
+  if(keys['arrowdown']||keys['s']) iy+=1;
+  if(keys['arrowleft']||keys['a']) ix-=1;
+  if(keys['arrowright']||keys['d']) ix+=1;
+  if(ix!==0||iy!==0){ const len=Math.hypot(ix,iy); ix/=len; iy/=len; }
+  const speed=2.6;
+  let nx= player.x + ix*speed;
+  let ny= player.y + iy*speed;
+
+  // wall collision: test X then Y separately
+  const rects=wallRects();
+  let canX=true, canY=true;
+  for(const r of rects){ if(circleRectCollide(nx, player.y, player.r, r.x, r.y, r.w, r.h)) {canX=false; break;} }
+  for(const r of rects){ if(circleRectCollide(player.x, ny, player.r, r.x, r.y, r.w, r.h)) {canY=false; break;} }
+  if(canX) player.x = nx;
+  if(canY) player.y = ny;
+  // clamp inside grid
+  player.x= Math.max(offsetX+player.r+2, Math.min(offsetX+COLS*cellW-player.r-2, player.x));
+  player.y= Math.max(offsetY+player.r+2, Math.min(offsetY+ROWS*cellH-player.r-2, player.y));
+  player.glow = 0.7 + Math.sin(now*0.004)*0.15;
+
+  // sparks collision
+  for(const s of sparks){
+    if(s.collected) continue;
+    const sx= offsetX + s.cx*cellW+cellW/2, sy= offsetY + s.cy*cellH+cellH/2;
+    const d=Math.hypot(player.x - sx, player.y - sy);
+    if(d < player.r + 13){
+      s.collected=true; score++;
+      scoreEl.textContent=`${score}/3`;
+      statusText.textContent = score===1? '1/3 sparks — keep going!' : score===2? '2/3 sparks — one more!' : '3/3!';
+      if(navigator.vibrate) try{navigator.vibrate(30)}catch(e){}
+      // burst
+      for(let k=0;k<16;k++) sparkParticles.push({x:sx,y:sy, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:1, decay:0.045+Math.random()*0.02, spark:true});
+      showToast(score>=3 ? '✦ All sparks! Loop rekindled!' : `✦ Spark ${score}/3 collected!`);
+      if(score>=3) { win(); return; }
+    }
+    s.pulse+=0.14;
+  }
+
+  // shadows update
+  for(const sh of shadows){
+    let nx2= sh.x + sh.vx;
+    let ny2= sh.y + sh.vy;
+    let hit=false;
+    for(const r of rects){
+      if(circleRectCollide(nx2, sh.y, sh.r, r.x, r.y, r.w, r.h)){ sh.vx*=-1; hit=true; break; }
+    }
+    for(const r of rects){
+      if(circleRectCollide(sh.x, ny2, sh.r, r.x, r.y, r.w, r.h)){ sh.vy*=-1; hit=true; break; }
+    }
+    if(!hit){
+      // add slight wander
+      sh.vx+= (Math.random()-0.5)*0.08;
+      sh.vy+= (Math.random()-0.5)*0.08;
+      const sp=Math.hypot(sh.vx, sh.vy);
+      const max=1.8; if(sp>max){ sh.vx*=max/sp; sh.vy*=max/sp; }
+      sh.x+=sh.vx; sh.y+=sh.vy;
+    } else {
+      sh.x+=sh.vx*0.5; sh.y+=sh.vy*0.5;
+    }
+    sh.x= Math.max(offsetX+sh.r, Math.min(offsetX+COLS*cellW-sh.r, sh.x));
+    sh.y= Math.max(offsetY+sh.r, Math.min(offsetY+ROWS*cellH-sh.r, sh.y));
+    sh.phase+=0.08;
+    // slight homing when close
+    const dToPlayer=Math.hypot(player.x-sh.x, player.y-sh.y);
+    if(dToPlayer < 120){
+      sh.vx += (player.x - sh.x)*0.0007;
+      sh.vy += (player.y - sh.y)*0.0007;
+    }
+    // player collision
+    if(dToPlayer < player.r + sh.r -2){
+      lose();
+    }
+  }
+
+  // particles
+  for(const p of sparkParticles){ p.x+=p.vx; p.y+=p.vy; p.vx*=0.98; p.vy*=0.98; p.vy+=0.04; p.life-=p.decay; }
+  sparkParticles=sparkParticles.filter(p=> p.life>0);
+}
+
+function win(){
+  gameState='win';
+  cardTitle.textContent='Loop Rekindled! ✨';
+  cardDesc.innerHTML=`You gathered <b>3/3 sparks</b> in <b>${timeEl.textContent}</b>. The lantern burns bright and the maze is sealed. <br>Shadows dispelled! Press <span class="kbd">R</span> or Play Again to restart.`;
+  playBtn.textContent='PLAY AGAIN ↺';
+  statusText.textContent='You win! Press R or Restart to play again.';
+  overlay.classList.remove('hidden');
+  shiftBar.style.width='100%';
+  // celebratory particles
+  for(let k=0;k<28;k++) sparkParticles.push({x:player.x+ (Math.random()-0.5)*40, y:player.y+(Math.random()-0.5)*20, vx:(Math.random()-0.5)*7, vy:(Math.random()-0.9)*5, life:1, decay:0.025+Math.random()*0.02, spark:true});
+  if(navigator.vibrate) try{navigator.vibrate([40,30,60])}catch(e){}
+}
+function lose(){
+  gameState='lose';
+  cardTitle.textContent='Light Extinguished…';
+  cardDesc.innerHTML='A shadow touched your lantern. Darkness takes the maze.<br>Try again — learn the shifting walls. Press <span class="kbd">R</span> to restart instantly.';
+  playBtn.textContent='TRY AGAIN ↺';
+  statusText.textContent='Caught by a shadow! Press R or Restart.';
+  overlay.classList.remove('hidden');
+  if(navigator.vibrate) try{navigator.vibrate([80])}catch(e){}
+  // dark burst
+  for(let k=0;k<18;k++) sparkParticles.push({x:player.x, y:player.y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:1, decay:0.05, spark:false});
+}
+
+function draw(){
+  ctx.save();
+  if(mazeShake>0){
+    const sx=(Math.random()-0.5)*mazeShake;
+    const sy=(Math.random()-0.5)*mazeShake;
+    ctx.translate(sx,sy);
+  }
+  ctx.clearRect(-10,-10,canvas.width+20, canvas.height+20);
+  // subtle grid background
+  ctx.fillStyle='#0d111d';
+  ctx.fillRect(0,0,canvas.width, canvas.height);
+  // maze base
+  ctx.fillStyle='#0f1424';
+  ctx.fillRect(offsetX-6, offsetY-6, COLS*cellW+12, ROWS*cellH+12);
+  // dramatic global shift flash overlay
+  if(mazeFlash>0){
+    ctx.fillStyle=`rgba(255,207,90,${0.20*mazeFlash})`;
+    ctx.fillRect(offsetX-6, offsetY-6, COLS*cellW+12, ROWS*cellH+12);
+    // inner pulse ring
+    ctx.strokeStyle=`rgba(255,160,40,${0.35*mazeFlash})`;
+    ctx.lineWidth=3;
+    ctx.strokeRect(offsetX-6, offsetY-6, COLS*cellW+12, ROWS*cellH+12);
+  }
+  // floor tiles
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    const px=offsetX+x*cellW, py=offsetY+y*cellH;
+    ctx.fillStyle= ((x+y)%2===0) ? '#131a2e' : '#11182c';
+    ctx.fillRect(px,py,cellW,cellH);
+  }
+  // draw sparks before walls? so behind
+  for(const s of sparks){
+    if(s.collected) continue;
+    const sx= offsetX + s.cx*cellW+cellW/2, sy= offsetY + s.cy*cellH+cellH/2;
+    const pulse = 0.85 + Math.sin(s.pulse)*0.15;
+    // glow
+    const g= ctx.createRadialGradient(sx,sy,0, sx,sy, 30);
+    g.addColorStop(0,'rgba(255,207,90,0.55)');
+    g.addColorStop(0.4,'rgba(255,140,40,0.18)');
+    g.addColorStop(1,'rgba(255,140,40,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(sx,sy, 30*pulse,0,Math.PI*2); ctx.fill();
+    // core
+    ctx.fillStyle='#ffcf5a';
+    ctx.shadowColor='rgba(255,207,90,0.9)'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(sx,sy, 8*pulse,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(sx-2,sy-2, 2.5,0,Math.PI*2); ctx.fill();
+    // outer ring
+    ctx.strokeStyle='rgba(255,207,90,0.5)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(sx,sy, 13+ Math.sin(s.pulse*1.5)*2,0,Math.PI*2); ctx.stroke();
+  }
+
+  // walls
+  ctx.strokeStyle='#1e2a4a';
+  ctx.lineWidth=1;
+  // draw thick walls as blocks
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    const c=maze[y][x];
+    const px=offsetX+x*cellW, py=offsetY+y*cellH;
+    // brighter walls for readability vs dark floor
+    if(c.walls[0]){
+      const grad=ctx.createLinearGradient(px,py, px,py+6);
+      grad.addColorStop(0,'#3a4a72'); grad.addColorStop(1,'#24304d');
+      ctx.fillStyle=grad;
+      ctx.fillRect(px,py,cellW,5);
+      ctx.fillStyle='rgba(255,255,255,0.10)';
+      ctx.fillRect(px,py,cellW,1);
+    }
+    if(c.walls[1]){
+      const grad=ctx.createLinearGradient(px+cellW-5,py, px+cellW,py);
+      grad.addColorStop(0,'#24304d'); grad.addColorStop(1,'#3a4a72');
+      ctx.fillStyle=grad;
+      ctx.fillRect(px+cellW-5,py,5,cellH);
+    }
+    if(c.walls[2]){
+      ctx.fillStyle='#2a3654';
+      ctx.fillRect(px,py+cellH-5,cellW,5);
+      ctx.fillStyle='rgba(0,0,0,0.18)';
+      ctx.fillRect(px,py+cellH-2,cellW,2);
+    }
+    if(c.walls[3]){
+      ctx.fillStyle='#232f4a';
+      ctx.fillRect(px,py,5,cellH);
+    }
+  }
+  // outer border glow
+  ctx.strokeStyle='rgba(255,187,51,0.12)';
+  ctx.lineWidth=8;
+  ctx.strokeRect(offsetX-4, offsetY-4, COLS*cellW+8, ROWS*cellH+8);
+  ctx.strokeStyle='rgba(255,255,255,0.08)';
+  ctx.lineWidth=1;
+  ctx.strokeRect(offsetX-6, offsetY-6, COLS*cellW+12, ROWS*cellH+12);
+
+  // shadows
+  for(const sh of shadows){
+    // shadow blob dark + purple glow
+    const g= ctx.createRadialGradient(sh.x,sh.y,0, sh.x,sh.y, 40);
+    g.addColorStop(0,'rgba(80,70,180,0.35)');
+    g.addColorStop(1,'rgba(80,70,180,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(sh.x,sh.y, 40,0,Math.PI*2); ctx.fill();
+    // body
+    ctx.fillStyle='#0a0d16';
+    ctx.strokeStyle='rgba(120,110,255,0.35)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    const wobble = Math.sin(sh.phase)*2;
+    ctx.arc(sh.x, sh.y + wobble*0.3, sh.r, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    // eyes
+    ctx.fillStyle='rgba(150,140,255,0.95)';
+    ctx.shadowColor='rgba(120,110,255,0.9)'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.arc(sh.x-5, sh.y-2 + wobble*0.2, 3,0,Math.PI*2); ctx.arc(sh.x+5, sh.y-2 + wobble*0.2, 3,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    // trailing smoke
+    ctx.fillStyle='rgba(30,30,60,0.25)';
+    ctx.beginPath(); ctx.arc(sh.x - sh.vx*3, sh.y - sh.vy*3, sh.r*0.6,0,Math.PI*2); ctx.fill();
+  }
+
+  // player lantern
+  {
+    const px=player.x, py=player.y;
+    // light radius (limited by walls? approximate with radial)
+    const lightGrad= ctx.createRadialGradient(px,py, 12, px,py, 140);
+    lightGrad.addColorStop(0,'rgba(255,207,90,0.22)');
+    lightGrad.addColorStop(0.35,'rgba(255,160,40,0.10)');
+    lightGrad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=lightGrad;
+    ctx.beginPath(); ctx.arc(px,py,140,0,Math.PI*2); ctx.fill();
+    // lantern body shadow
+    ctx.fillStyle='rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.ellipse(px, py+10, 14, 4, 0,0,Math.PI*2); ctx.fill();
+    // lantern frame
+    ctx.fillStyle='#2b1a08';
+    ctx.fillRect(px-7, py-9, 14, 3);
+    ctx.fillRect(px-7, py+6, 14, 3);
+    // glass
+    const glassGrad= ctx.createLinearGradient(px-7, py-6, px+7, py+6);
+    glassGrad.addColorStop(0,'rgba(255,240,180,0.95)');
+    glassGrad.addColorStop(0.5,'rgba(255,207,90,1)');
+    glassGrad.addColorStop(1,'rgba(255,140,30,0.95)');
+    ctx.fillStyle=glassGrad;
+    ctx.fillRect(px-6, py-6, 12, 13);
+    ctx.strokeStyle='rgba(80,40,0,0.4)';
+    ctx.lineWidth=1;
+    ctx.strokeRect(px-6, py-6, 12,13);
+    // glow core
+    ctx.fillStyle='rgba(255,255,255,0.92)';
+    ctx.beginPath(); ctx.arc(px, py-1, 3.5*player.glow,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.beginPath(); ctx.arc(px-2, py-3, 1.5,0,Math.PI*2); ctx.fill();
+    // outer glow halo
+    ctx.shadowColor='rgba(255,187,51,0.8)'; ctx.shadowBlur=18;
+    ctx.strokeStyle='rgba(255,207,90,0.9)';
+    ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.arc(px,py, player.r+2,0,Math.PI*2); ctx.stroke();
+    ctx.shadowBlur=0;
+  }
+
+  // particles
+  for(const p of sparkParticles){
+    ctx.globalAlpha= Math.max(0,p.life);
+    if(p.color==='seal') ctx.fillStyle=`rgba(110,140,255,${p.life})`;
+    else if(p.color==='open') ctx.fillStyle=`rgba(255,207,90,${p.life})`;
+    else ctx.fillStyle= p.spark ? `rgba(255,207,90,${p.life})` : `rgba(120,140,255,${p.life})`;
+    ctx.beginPath(); ctx.arc(p.x,p.y, p.spark? 3:2.2,0,Math.PI*2); ctx.fill();
+    if(p.spark){
+      ctx.fillStyle=`rgba(255,255,255,${p.life*0.6})`;
+      ctx.beginPath(); ctx.arc(p.x,p.y, 1,0,Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha=1;
+
+  // vignette
+  const vg= ctx.createRadialGradient(canvas.width/2, canvas.height/2, 300, canvas.width/2, canvas.height/2, 700);
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(0,0,0,0.45)');
+  ctx.fillStyle=vg;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.restore();
+}
+
+function loop(){
+  update();
+  draw();
+  if(gameState==='playing' || gameState==='paused') animId=requestAnimationFrame(loop);
+  else if(gameState==='win' || gameState==='lose') { draw(); }
+}
+
+// init layout and draw menu state
+computeLayout();
+maze=createMaze();
+sparks=pickSparkPositions();
+player={ x: offsetX+cellW*0.5, y: offsetY+cellH*0.5, r:11, glow:1 };
+shadows=[
+  {x: offsetX + (COLS-1)*cellW+cellW/2, y: offsetY+cellH*1.5, vx:1.6, vy:1.0, r:16, phase:0},
+  {x: offsetX + (COLS-2)*cellW+cellW/2, y: offsetY+(ROWS-1)*cellH-cellH/2, vx:-1.4, vy:-1.2, r:15, phase:1.2}
+];
+draw();
+
+// handle resize keeping canvas internal size
+addEventListener('resize', ()=>{
+  computeLayout();
+  // keep player relative? just clamp
+  if(player){ player.x= Math.max(offsetX+player.r, Math.min(offsetX+COLS*cellW-player.r, player.x)); player.y= Math.max(offsetY+player.r, Math.min(offsetY+ROWS*cellH-player.r, player.y)); }
+  draw();
+});
+
+// auto focus for keyboard
+canvas.tabIndex=1000;
+canvas.addEventListener('click', ()=> canvas.focus());
+})();
+</script>
+</body>
+</html>
