@@ -22,7 +22,7 @@ export function credentialWorkSettled(env) {
 export function createCredentialClient({ env = process.env, request = fetch, mask = value => console.log(`::add-mask::${escapeCommand(value)}`) } = {}) {
   const origin = (env.OMGITHUB_ORIGIN || 'https://omgithub.com').replace(/\/$/, '')
   const directory = join(env.RUNNER_TEMP, 'omgithub-account-credentials')
-  const stateFile = join(directory, 'state.json'), secretFile = join(directory, 'values.json')
+  const stateFile = join(directory, 'state.json'), secretFile = join(directory, 'values.json'), mcpFile = join(directory, 'mcp.json')
   const authFile = join(env.XDG_DATA_HOME || join(env.HOME, '.local/share'), 'opencode/auth.json')
   const save = (file, value) => { mkdirSync(dirname(file), { recursive: true, mode: 0o700 }); const tmp = `${file}.tmp`; writeFileSync(tmp, JSON.stringify(value), { mode: 0o600 }); renameSync(tmp, file) }
   function remember(value) {
@@ -44,6 +44,18 @@ export function createCredentialClient({ env = process.env, request = fetch, mas
   }
   async function load() {
     const data = await call({ use_auth: !env.OPENCODE_AUTH_CONTENT })
+    const mcp = data.mcp || {}
+    if (Object.keys(mcp).length) {
+      remember(Object.values(mcp).map(server => server.headers))
+      let configured = {}
+      if (env.OPENCODE_CONFIG_CONTENT) {
+        try { configured = JSON.parse(env.OPENCODE_CONFIG_CONTENT) } catch { throw new Error('Enter valid JSON in OPENCODE_CONFIG_CONTENT before adding account MCP servers') }
+      }
+      // Keep explicit workflow entries; account servers use an account_ prefix.
+      const content = JSON.stringify({ ...configured, mcp: { ...mcp, ...configured.mcp } })
+      writeEnv(env.GITHUB_ENV, 'OPENCODE_CONFIG_CONTENT', content)
+      save(mcpFile, { names: Object.keys(mcp) })
+    }
     remember(data.secrets)
     const names = []
     for (const [name, value] of Object.entries(data.secrets || {})) {
@@ -62,6 +74,10 @@ export function createCredentialClient({ env = process.env, request = fetch, mas
     return { customSecrets: names.length, accountAuth: Boolean(data.auth && !env.OPENCODE_AUTH_CONTENT) }
   }
   async function sync(release = false) {
+    if (release && existsSync(mcpFile)) {
+      await call({ operation: 'release_mcp' })
+      rmSync(mcpFile, { force: true })
+    }
     if (!existsSync(stateFile)) {
       if (release && env.OMGITHUB_ACCOUNT_AUTH_FILE === authFile) rmSync(authFile, { force: true })
       return
@@ -82,7 +98,7 @@ export function createCredentialClient({ env = process.env, request = fetch, mas
       if (release) { rmSync(stateFile, { force: true }); rmSync(authFile, { force: true }) }
     }
   }
-  return { load, sync, stateFile }
+  return { load, sync, stateFile, mcpFile }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const client = createCredentialClient(), mode = process.argv[2] || 'load'
@@ -96,7 +112,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }
   } else if (mode === 'finish') {
     const deadline = Date.now() + 15 * 60000
-    while (existsSync(client.stateFile) && !credentialWorkSettled(process.env)) {
+    while ((existsSync(client.stateFile) || existsSync(client.mcpFile)) && !credentialWorkSettled(process.env)) {
       if (Date.now() >= deadline) throw new Error('Credential release is waiting for validation to finish.')
       await new Promise(resolve => setTimeout(resolve, 5000))
     }

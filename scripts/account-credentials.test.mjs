@@ -92,3 +92,23 @@ test('two independent runners load identical account auth concurrently and clean
   await b.client.sync(true)
   assert.equal(existsSync(b.file), false)
 })
+
+test('MCP-only accounts configure OpenCode outside the checkout, mask run credentials and revoke on cleanup', async t => {
+  const f = fixture(t, { OPENCODE_AUTH_CONTENT: 'repository-auth', OPENCODE_CONFIG_CONTENT: JSON.stringify({ model: 'test/model', mcp: { repository_server: { type: 'remote', url: 'https://repo.test/mcp' } } }) })
+  const mcp = { account_composio: { type: 'remote', url: 'https://omgithub.com/api/mcp/gateway/test', enabled: true, oauth: false, headers: { Authorization: 'Bearer run-scoped-credential' } } }
+  const client = createCredentialClient({ env: f.env, mask: value => f.masks.push(value), request: async (url, options) => {
+    if (String(url).startsWith('https://identity.test')) return Response.json({ value: 'signed-oidc' })
+    const body = JSON.parse(options.body); f.calls.push(body)
+    return Response.json(body.operation === 'release_mcp' ? { released: true } : { auth: null, secrets: {}, mcp })
+  } })
+  await client.load()
+  const output = readFileSync(f.env.GITHUB_ENV, 'utf8'), match = output.match(/OPENCODE_CONFIG_CONTENT<<[^\n]+\n([^\n]+)/)
+  const config = JSON.parse(match[1])
+  assert.equal(config.model, 'test/model'); assert.deepEqual(config.mcp.account_composio, mcp.account_composio)
+  assert.ok(config.mcp.repository_server)
+  assert.ok(f.masks.includes('Bearer run-scoped-credential'))
+  assert.equal(existsSync(f.file), false)
+  await client.sync(true)
+  assert.equal(f.calls.at(-1).operation, 'release_mcp')
+  assert.equal(existsSync(join(f.dir, 'omgithub-account-credentials/mcp.json')), false)
+})
