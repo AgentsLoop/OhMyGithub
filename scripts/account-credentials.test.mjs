@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createCredentialClient, writeEnv, escapeCommand } from './account-credentials.mjs'
 const initial = { openai: { type: 'oauth', access: 'initial-access', refresh: 'initial-refresh', expires: 123 } }
-function fixture(t, extra = {}) {
+function fixture(t, extra = {}, account = initial) {
   const dir = mkdtempSync(join(tmpdir(), 'credential-client-')); t.after(() => rmSync(dir, { force: true, recursive: true }))
   const env = { RUNNER_TEMP: dir, HOME: dir, GITHUB_ENV: join(dir, 'env'), GITHUB_REPOSITORY: 'owner/repo', GITHUB_RUN_ID: '42', GITHUB_RUN_ATTEMPT: '1', TRIGGER_ISSUE_NUMBER: '5', ACTIONS_ID_TOKEN_REQUEST_URL: 'https://identity.test/token', ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'request-token', ...extra }
   const calls = [], masks = []
@@ -13,7 +13,7 @@ function fixture(t, extra = {}) {
     if (String(url).startsWith('https://identity.test')) return Response.json({ value: 'signed-oidc' })
     assert.equal(options.headers.authorization, 'Bearer signed-oidc')
     const body = JSON.parse(options.body); calls.push(body)
-    return Response.json(body.operation === 'refresh' ? { revision: 'revision-2' } : { revision: 'revision-1', auth: body.use_auth ? initial : null, secrets: { CUSTOM_SERVICE: 'secret\nmultiline', EXISTING_KEY: 'account-value' } })
+    return Response.json(body.operation === 'refresh' ? { revision: 'revision-2' } : { revision: 'revision-1', auth: body.use_auth ? account : null, secrets: { CUSTOM_SERVICE: 'secret\nmultiline', EXISTING_KEY: 'account-value' } })
   } })
   return { dir, env, calls, masks, client, file: join(dir, '.local/share/opencode/auth.json') }
 }
@@ -32,10 +32,10 @@ test('load account credentials, mask multiline values, preserve repository overr
   assert.equal(f.calls.at(-1).revision, 'revision-2'); assert.equal(f.calls.at(-1).release, true)
   assert.equal(existsSync(f.file), false)
 })
-test('repository auth JSON takes precedence over account auth', async t => {
+test('repository credentials override matching account providers', async t => {
   const f = fixture(t, { OPENCODE_AUTH_CONTENT: JSON.stringify(initial) })
   assert.equal((await f.client.load()).accountAuth, false)
-  assert.equal(f.calls[0].use_auth, false); assert.equal(existsSync(f.file), false)
+  assert.equal(f.calls[0].use_auth, true); assert.equal(existsSync(f.file), false)
 })
 test('environment file delimiters and workflow masking escape command characters', t => {
   const { dir } = fixture(t), file = join(dir, 'delimiter')
@@ -94,7 +94,7 @@ test('two independent runners load identical account auth concurrently and clean
 })
 
 test('MCP-only accounts configure OpenCode outside the checkout, mask run credentials and revoke on cleanup', async t => {
-  const f = fixture(t, { OPENCODE_AUTH_CONTENT: 'repository-auth', OPENCODE_CONFIG_CONTENT: JSON.stringify({ model: 'test/model', mcp: { repository_server: { type: 'remote', url: 'https://repo.test/mcp' } } }) })
+  const f = fixture(t, { OPENCODE_AUTH_CONTENT: JSON.stringify({}), OPENCODE_CONFIG_CONTENT: JSON.stringify({ model: 'test/model', mcp: { repository_server: { type: 'remote', url: 'https://repo.test/mcp' } } }) })
   const mcp = { account_composio: { type: 'remote', url: 'https://omgithub.com/api/mcp/gateway/test', enabled: true, oauth: false, headers: { Authorization: 'Bearer run-scoped-credential' } } }
   const client = createCredentialClient({ env: f.env, mask: value => f.masks.push(value), request: async (url, options) => {
     if (String(url).startsWith('https://identity.test')) return Response.json({ value: 'signed-oidc' })
@@ -111,4 +111,23 @@ test('MCP-only accounts configure OpenCode outside the checkout, mask run creden
   await client.sync(true)
   assert.equal(f.calls.at(-1).operation, 'release_mcp')
   assert.equal(existsSync(join(f.dir, 'omgithub-account-credentials/mcp.json')), false)
+})
+
+
+test('import missing Go providers beside repository OpenAI auth without syncing repository overrides', async t => {
+  const repository = { openai: { type: 'api', key: 'repository-openai' } }
+  const account = { ...initial, 'opencode-go': { type: 'api', key: 'account-go' } }
+  const f = fixture(t, { OPENCODE_AUTH_CONTENT: JSON.stringify(repository) }, account)
+  assert.equal((await f.client.load()).accountAuth, true)
+  assert.deepEqual(JSON.parse(readFileSync(f.file)), { ...account, ...repository })
+  const env = readFileSync(f.env.GITHUB_ENV, 'utf8')
+  assert.match(env, /OPENCODE_AUTH_CONTENT<<[^\n]+\n\n/)
+  assert.ok(f.masks.includes('repository-openai')); assert.ok(f.masks.includes('account-go'))
+  await f.client.sync()
+  assert.equal(Object.hasOwn(f.calls.at(-1), 'auth'), false)
+  writeFileSync(f.file, JSON.stringify({ ...repository, 'opencode-go': { type: 'api', key: 'updated-go' } }))
+  await f.client.sync()
+  assert.deepEqual(f.calls.at(-1).auth.openai, initial.openai)
+  assert.equal(f.calls.at(-1).auth['opencode-go'].key, 'updated-go')
+  await f.client.sync(true); assert.equal(existsSync(f.file), false)
 })

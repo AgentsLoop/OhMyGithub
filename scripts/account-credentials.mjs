@@ -43,7 +43,7 @@ export function createCredentialClient({ env = process.env, request = fetch, mas
     return response.json()
   }
   async function load() {
-    const data = await call({ use_auth: !env.OPENCODE_AUTH_CONTENT })
+    const data = await call({ use_auth: true })
     const mcp = data.mcp || {}
     if (Object.keys(mcp).length) {
       remember(Object.values(mcp).map(server => server.headers))
@@ -64,14 +64,23 @@ export function createCredentialClient({ env = process.env, request = fetch, mas
       if (env[name]) continue
       writeEnv(env.GITHUB_ENV, name, value); names.push(name)
     }
-    if (data.auth && !env.OPENCODE_AUTH_CONTENT) {
-      remember(data.auth)
-      save(authFile, data.auth)
-      save(stateFile, { revision: data.revision, auth: data.auth })
+    let repositoryAuth = {}
+    if (env.OPENCODE_AUTH_CONTENT) {
+      try { repositoryAuth = JSON.parse(env.OPENCODE_AUTH_CONTENT) } catch { throw new Error('Enter valid JSON in OPENCODE_AUTH_CONTENT') }
+    }
+    const imported = Object.keys(data.auth || {}).filter(provider => !Object.hasOwn(repositoryAuth, provider))
+    if (imported.length) {
+      const merged = { ...data.auth, ...repositoryAuth }
+      remember(merged)
+      save(authFile, merged)
+      save(stateFile, { revision: data.revision, auth: data.auth, imported })
+      // OpenCode gives inline auth absolute precedence over auth.json.
+      // Use the merged file so OAuth refreshes remain visible to synchronization.
+      writeEnv(env.GITHUB_ENV, 'OPENCODE_AUTH_CONTENT', '')
       writeEnv(env.GITHUB_ENV, 'OMGITHUB_ACCOUNT_AUTH_FILE', authFile)
     }
     writeEnv(env.GITHUB_ENV, 'OMGITHUB_SECRET_VALUES_FILE', secretFile)
-    return { customSecrets: names.length, accountAuth: Boolean(data.auth && !env.OPENCODE_AUTH_CONTENT) }
+    return { customSecrets: names.length, accountAuth: Boolean(imported.length) }
   }
   async function sync(release = false) {
     if (release && existsSync(mcpFile)) {
@@ -85,12 +94,13 @@ export function createCredentialClient({ env = process.env, request = fetch, mas
     const state = JSON.parse(readFileSync(stateFile, 'utf8'))
     const auth = JSON.parse(readFileSync(authFile, 'utf8'))
     // Only return the providers actually checked out from this account.
-    const selected = Object.fromEntries(Object.keys(state.auth).map(key => [key, auth[key]]))
+    const imported = new Set(state.imported || Object.keys(state.auth))
+    const selected = Object.fromEntries(Object.keys(state.auth).map(key => [key, imported.has(key) ? auth[key] : state.auth[key]]))
     remember(selected)
     const changed = JSON.stringify(selected) !== JSON.stringify(state.auth)
     try {
       const data = await call({ operation: 'refresh', revision: state.revision, ...(changed ? { auth: selected } : {}), release })
-      save(stateFile, { revision: data.revision, auth: selected })
+      save(stateFile, { revision: data.revision, auth: selected, imported: [...imported] })
     } catch (error) {
       if (error.status === 409) { rmSync(stateFile, { force: true }); console.log('Account credentials changed; retained the newer account version.'); return }
       throw error
