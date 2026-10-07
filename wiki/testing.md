@@ -392,3 +392,7 @@ Set `STARTUP_TIMEOUT_SECONDS` to override the local readiness window.
 Reuse the live `starting-commit` process for the same checkpoint across readiness retries.
 Restart for a changed checkpoint, an exited process, or explicit `RESTART_APP=true`.
 Reproduce Greywatch issue 1 with its pinned snapshot; require deployment and desktop/mobile captures after its 73-second build.
+
+## Regress oversized checkpoint publication
+
+Run `node --test scripts/session-checkpoint.test.mjs`. Verify a conversation above 25 MiB uploads as gzip, restores every message and part, and deduplicates unchanged saves. Keep the full conversation within the 128 MiB limit. Download managed restore payloads to a temporary file and remove it after parsing.

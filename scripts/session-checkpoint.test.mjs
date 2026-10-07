@@ -72,7 +72,7 @@ test('save, late edit, shutdown checkpoint, and restore preserve code and full c
 const fs = require('node:fs'), path = require('node:path'); const args=process.argv.slice(2), state=process.env.FAKE_STATE;
 if (path.basename(process.argv[1]) === 'curl') {
  const source=args[args.indexOf('--data-binary')+1];
- fs.copyFileSync(source.slice(1),path.join(state,'checkpoint-upload.json'));
+ fs.writeFileSync(path.join(state,'checkpoint-upload.json'),require('node:zlib').gunzipSync(fs.readFileSync(source.slice(1))));
  process.stdout.write('{}');
 } else if (path.basename(process.argv[1]) === 'opencode') {
  if(args[0]==='--version') process.stdout.write('1.2.3');
@@ -113,7 +113,7 @@ if (path.basename(process.argv[1]) === 'curl') {
     assert.deepEqual(saveCheckpoint(), first, 'unchanged checkpoint does not upload again')
     writeFileSync(join(root, 'index.html'), '<h1>Castle and water</h1>')
     const updated = structuredClone(session)
-    updated.messages.push({ info: { id: 'msg_two', role: 'user' }, parts: [{ id: 'prt_two', type: 'text', text: 'Add water' }] })
+    updated.messages.push({ info: { id: 'msg_two', role: 'user' }, parts: [{ id: 'prt_two', type: 'text', text: 'Add water' + 'x'.repeat(26 * 1024 * 1024) }] })
     writeFileSync(join(state, 'session.json'), JSON.stringify(updated))
     const second = saveCheckpoint()
     assert.notEqual(second.commit, first.commit)
@@ -130,7 +130,8 @@ if (path.basename(process.argv[1]) === 'curl') {
     restore()
     const restored = JSON.parse(readFileSync(join(state, 'session.json')))
     assert.equal(restored.messages.length, 2)
-    assert.equal(restored.messages[1].parts[0].text, 'Add water')
+    assert.equal(restored.messages[1].parts[0].text, updated.messages[1].parts[0].text)
+    assert.ok(Buffer.byteLength(JSON.stringify(exported)) > 25 * 1024 * 1024)
     assert.equal(restored.info.directory, root)
     assert.match(readFileSync(process.env.GITHUB_ENV, 'utf8'), /RESUME_SESSION_ID/)
   } finally {

@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync, openSync, closeSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -106,7 +107,11 @@ export function prepare() {
   if (!source.prompt.trim()) throw new Error('Enter the next game change.')
   let payload
   const managedUrl = `${env.OMGITHUB_ORIGIN || 'https://omgithub.com'}/api/github/${source.source_repository}/issues/${source.source_issue}/checkpoint`
-  try { payload = JSON.parse(command('curl', ['--fail', '--silent', '--show-error', '--max-time', '30', managedUrl])) }
+  const download = join(env.RUNNER_TEMP, `checkpoint-download-${randomUUID()}.json`)
+  try {
+    command('curl', ['--fail', '--silent', '--show-error', '--max-time', '120', '--output', download, managedUrl])
+    payload = JSON.parse(readFileSync(download, 'utf8'))
+  }
   catch (error) {
     if (error.status !== 404) throw error
     // Read old releases until their checkpoints have moved to OmGithub storage.
@@ -122,6 +127,7 @@ export function prepare() {
     if (!sessionAsset) throw new Error('Missing conversation asset.')
     payload.session = JSON.parse(api(`repos/${source.source_repository}/releases/assets/${sessionAsset.id}`, ['-H', 'Accept: application/octet-stream']))
   }
+  finally { rmSync(download, { force: true }) }
   const checkpoint = validateCheckpoint(payload, source)
   if (source.source_commit && source.source_commit !== checkpoint.commit) throw new Error('The selected checkpoint has been replaced. Select the current saved version.')
   const importedSnapshot = usesImportedSnapshot(source, checkpoint)
@@ -208,13 +214,13 @@ export function saveCheckpoint({ interrupted = false } = {}) {
     const generation = `${run}-${Date.now()}`
     const tag = `opencode-checkpoint-${issue}`
     const { session: exported, ...metadata } = checkpoint
-    if (Buffer.byteLength(JSON.stringify(exported)) > 25 * 1024 * 1024) throw new Error('Session export exceeds 25 MB.')
+    if (Buffer.byteLength(JSON.stringify(exported)) > 128 * 1024 * 1024) throw new Error('Session export exceeds 128 MB.')
     git('push', `--force-with-lease=refs/heads/${branch}:${remote}`, 'origin', `${commit}:refs/heads/${branch}`)
     const uploadPath = join(directory, `checkpoint-upload-${generation}.json`)
-    writeFileSync(uploadPath, JSON.stringify({ manifest: { ...metadata, generation, interrupted, session_id: sessionId }, session: exported }), { mode: 0o600 })
+    writeFileSync(uploadPath, gzipSync(JSON.stringify({ manifest: { ...metadata, generation, interrupted, session_id: sessionId }, session: exported })), { mode: 0o600 })
     try {
       command('curl', ['--fail-with-body', '--silent', '--show-error', '--max-time', '120', '-X', 'PUT',
-        '-H', `Authorization: Bearer ${env.OMGITHUB_CALLBACK_TOKEN || ''}`, '-H', 'Content-Type: application/octet-stream',
+        '-H', `Authorization: Bearer ${env.OMGITHUB_CALLBACK_TOKEN || ''}`, '-H', 'Content-Type: application/octet-stream', '-H', 'Content-Encoding: gzip',
         '-H', `x-omgithub-run: ${run}`, '-H', `x-omgithub-attempt: ${env.GITHUB_RUN_ATTEMPT || 1}`,
         '--data-binary', `@${uploadPath}`,
         `${env.OMGITHUB_ORIGIN || 'https://omgithub.com'}/api/github/${env.GITHUB_REPOSITORY}/issues/${issue}/checkpoint`])
