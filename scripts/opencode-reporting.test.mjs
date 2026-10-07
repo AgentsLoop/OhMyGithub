@@ -83,3 +83,13 @@ test('registers progress before checkout and preserves real production delivery 
   assert.match(workflow, /gh release create/)
   assert.doesNotMatch(workflow, /upload-artifact/)
 })
+
+
+test('hold failed debug workers for 30 minutes and successful workers for five hours', () => {
+  const hold = workflow.split('      - name: Keep temporary access available\n')[1].split('      - name:')[0];
+  assert.match(hold, /failure\(\) && vars\.OPENCODE_DEBUG_HOLD == 'true'/);
+  assert.match(hold, /steps\.opencode_web\.outcome == 'success'/);
+  assert.match(hold, /env\.TEST_REQUEST != 'true' && env\.SSH_ONLY_REQUEST != 'true'/);
+  assert.match(hold, /HOLD_SECONDS: \$\{\{ failure\(\) && '1800' \|\| '18000' \}\}/);
+  assert.match(hold, /run: \/usr\/bin\/time -p sleep "\$HOLD_SECONDS"/);
+});

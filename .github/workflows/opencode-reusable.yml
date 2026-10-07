@@ -1247,10 +1247,12 @@ jobs:
             /usr/bin/time -p node "$RUNTIME_DIR/scripts/account-credentials.mjs" finish
           fi
 
-      - name: Keep temporary access available for 5 hours
+      - name: Keep temporary access available
         if: (success() || (failure() && vars.OPENCODE_DEBUG_HOLD == 'true' && steps.opencode_web.outcome == 'success')) && env.TEST_REQUEST != 'true' && env.SSH_ONLY_REQUEST != 'true'
         shell: bash
-        run: sleep 18000
+        env:
+          HOLD_SECONDS: ${{ failure() && '1800' || '18000' }}
+        run: /usr/bin/time -p sleep "$HOLD_SECONDS"
 
       - name: Sync and release account credentials
         if: always()

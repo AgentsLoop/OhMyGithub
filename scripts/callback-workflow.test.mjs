@@ -24,7 +24,7 @@ test('grant OIDC permission and bootstrap before checkout in both jobs', () => {
 test('report failed execution before the debug hold keeps Actions running', () => {
   const workflow = read('.github/workflows/opencode-reusable.yml')
   const early = workflow.indexOf('name: Report failed build before debug hold')
-  const hold = workflow.indexOf('name: Keep temporary access available for 5 hours')
+  const hold = workflow.indexOf('name: Keep temporary access available')
   const final = workflow.indexOf('name: Report terminal build status')
   assert.ok(early > 0 && early < hold && hold < final)
   const step = workflow.slice(early, hold)

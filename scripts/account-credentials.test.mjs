@@ -76,7 +76,7 @@ test('release only after main execution and validation settle, and before debug 
   writeFileSync(join(dir, 'active-validation.json'), '{}')
   assert.equal(credentialWorkSettled(env), false)
   const workflow = readFileSync(new URL('../.github/workflows/opencode-reusable.yml', import.meta.url), 'utf8')
-  assert.ok(workflow.indexOf('- name: Release account credentials before debug hold') < workflow.indexOf('- name: Keep temporary access available for 5 hours'))
+  assert.ok(workflow.indexOf('- name: Release account credentials before debug hold') < workflow.indexOf('- name: Keep temporary access available'))
 })
 
 

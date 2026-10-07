@@ -218,7 +218,7 @@ Mark games without complete checkpoints as **Resume unavailable**.
 Run `node --test scripts/session-checkpoint.test.mjs` to verify the checkpoint cycle.
 
 Preserve transcript text and tool results when importing. Remove provider-bound replay IDs, encrypted reasoning, and signatures before submitting to a new runner's provider session.
-Set `OPENCODE_DEBUG_HOLD=true` only in a debugging repository to retain failed live runners for the normal five-hour access period. Use `scripts/ssh-run-log.sh` to inspect the live worker. Remove the variable after debugging.
+Set `OPENCODE_DEBUG_HOLD=true` only in a debugging repository to retain failed live runners for 30 minutes. Use `scripts/ssh-run-log.sh` to inspect the live worker. Remove the variable after debugging.
 
 ## Restore the main session and preview
 
@@ -311,7 +311,7 @@ before creating a fresh test issue; do not rerun existing issues for verificatio
 
 Load account credentials with `scripts/account-credentials.mjs` after fetching the pinned runtime and before starting OpenCode. Authenticate each request with fresh Actions OIDC. Keep repository auth JSON and explicit workflow environment values as overrides. Load only the account bound to the issue by OmGithub. Keep unbound GitHub issues on repository defaults.
 
-Write account auth outside the checkout. Mask account values before exporting custom environment variables. Retain initial and refreshed values for checkpoint redaction. Run the auth watcher every minute; return refreshed auth with its revision and stop synchronization after main execution and validation settle, before the five-hour debug hold. Retain final cleanup as a fallback. Start authorized account runs concurrently with the same auth JSON. Preserve newer saved credentials when revision checks reject a stale update. Replace expired or revoked subscription credentials in OmGithub Settings.
+Write account auth outside the checkout. Mask account values before exporting custom environment variables. Retain initial and refreshed values for checkpoint redaction. Run the auth watcher every minute; return refreshed auth with its revision and stop synchronization after main execution and validation settle, before the temporary-access hold. Retain final cleanup as a fallback. Start authorized account runs concurrently with the same auth JSON. Preserve newer saved credentials when revision checks reject a stale update. Replace expired or revoked subscription credentials in OmGithub Settings.
 
 Map `openai/gpt-6.1-sol` and `openai/gpt-6-astra` to `--variant high` in every invocation mode, including resumes and Goal/Ralph commands. Keep other models on their existing defaults.
 
