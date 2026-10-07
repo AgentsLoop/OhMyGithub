@@ -90,6 +90,6 @@ test('hold failed debug workers for 30 minutes and successful workers for five h
   assert.match(hold, /failure\(\) && vars\.OPENCODE_DEBUG_HOLD == 'true'/);
   assert.match(hold, /steps\.opencode_web\.outcome == 'success'/);
   assert.match(hold, /env\.TEST_REQUEST != 'true' && env\.SSH_ONLY_REQUEST != 'true'/);
-  assert.match(hold, /HOLD_SECONDS: \$\{\{ failure\(\) && '1800' \|\| '18000' \}\}/);
+  assert.match(hold, /HOLD_SECONDS: \$\{\{ job\.status == 'failure' && '1800' \|\| '18000' \}\}/);
   assert.match(hold, /run: \/usr\/bin\/time -p sleep "\$HOLD_SECONDS"/);
 });
